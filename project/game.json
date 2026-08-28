@@ -1,9 +1,9 @@
 {
-  "title": "Platformer",
-  "startLevel": "level1",
+  "title": "Counter-Strike 1.6",
+  "startLevel": "de_dust2",
   "window": {
-    "width": 960,
-    "height": 540
+    "width": 1280,
+    "height": 720
   },
   "plugins": {
     "disabled": []

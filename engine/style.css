@@ -89,6 +89,49 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline:2p
 .panel-body { min-height:0; flex:1; }
 .panel-body.scroll { overflow:auto; }
 
+/* ---------- play focus ---------- */
+/* What `shell.focus(true)` looks like. The kernel owns this vocabulary — get out
+   of the way — and a plugin owns the policy of when to spend it; `Play Focus`
+   is the one that does today.
+
+   Everything here hides. Nothing here removes: a dock that is destroyed loses
+   its scroll position and whatever its panel was holding, and the point of
+   stopping play is getting back exactly what you had. */
+.app.focused { grid-template-rows:0 1fr 0 0; }
+.app.focused .dock,
+.app.focused .status { display:none; }
+
+/* The toolbar stays, because it is the one always-visible way out — but as a
+   faint strip holding nothing except the button that stops play. A player who
+   cannot find how to stop is worse off than one looking at a toolbar.
+
+   Flattened to nothing and allowed to overflow, rather than taken out of the
+   grid with `position:absolute`. An absolutely positioned grid item stops being
+   a grid item, and the rows after it shuffle up one — which put the whole game
+   in the row meant for the bottom dock and left the viewport zero pixels tall.
+   Staying in flow at zero height keeps every other row where it was. */
+.app.focused .bar { z-index:30; height:0; padding:0; gap:10px; border:0;
+  background:transparent; overflow:visible; align-items:flex-start;
+  pointer-events:none; }
+.app.focused .bar > * { display:none; }
+.app.focused .bar > .play { display:block; margin:8px 0 0 10px; pointer-events:auto; opacity:.55; }
+.app.focused .bar > .play:hover, .app.focused .bar > .play:focus-visible { opacity:1; }
+
+/* What Escape does, said where you are looking when you press it. It fades once
+   it has been read, because a line of instructions across the top of the game
+   for a whole round is its own kind of editor. */
+.app.focused .bar::after {
+  content:'ESC gives the mouse back · again for the editor · the round carries on';
+  font:9.5px var(--mono); letter-spacing:.06em; color:var(--ink-3);
+  margin-top:12px; white-space:nowrap;
+  animation:focus-hint-fades 9s ease-in 1 forwards;
+}
+@keyframes focus-hint-fades { 0%, 55% { opacity:.8 } 100% { opacity:0 } }
+
+/* Real full screen goes on the shell root, so nothing of the page shows at the
+   edges of the letterbox a wide monitor leaves. */
+#app:fullscreen { background:var(--paper); }
+
 /* ---------- viewport ---------- */
 .viewport { position:relative; min-width:0; min-height:0; background:var(--void); overflow:hidden; }
 .viewport canvas { display:block; width:100%; height:100%; }

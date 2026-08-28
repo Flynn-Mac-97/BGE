@@ -18,9 +18,21 @@
  * given. The renderer imports this rather than keeping a second copy — one
  * rule, or the viewport and the thumbnail eventually disagree.
  */
+/**
+ * Where a named file actually lives.
+ *
+ * A path is project-relative only when it names one of the project's own
+ * folders. Everything else resolves under `assets/` — including a path with a
+ * subfolder in it, which is how a project with two hundred assets stays
+ * navigable. The old rule was "any name containing a slash is project-relative",
+ * and it meant `counter-strike/wall.png` resolved to `/project/counter-strike/`
+ * — the file was right there on disk and the only symptom was a missing texture.
+ */
+const PROJECT_FOLDER = /^(assets|levels|types|behaviours|tests|plugins)\//
+
 export const assetURL = src => {
-  const rel = String(src).replace(/^project\//, '')
-  return '/project/' + (rel.includes('/') ? rel : 'assets/' + rel)
+  const rel = String(src).replace(/^\/?project\//, '')
+  return '/project/' + (PROJECT_FOLDER.test(rel) ? rel : 'assets/' + rel)
 }
 
 const IMAGE = /\.(png|jpg|jpeg|webp|gif|svg)$/i

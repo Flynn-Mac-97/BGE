@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Counter-Strike texture sheet</title>
+<style>
+  body { margin: 0; background: #14161a; color: #cfd4dc;
+         font: 12px ui-monospace, monospace; padding: 14px; }
+  h1 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: #8f98a6; letter-spacing: .08em; }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  figure { margin: 0; }
+  /* Each swatch tiles the texture three times across. A seam is invisible in a
+     single copy and obvious the moment it repeats, which is the whole point of
+     looking at it this way rather than at the file. */
+  .swatch { width: 100%; aspect-ratio: 1; background-repeat: repeat;
+            background-size: 33.333% 33.333%; image-rendering: auto;
+            border: 1px solid #2a2f38; }
+  .alpha { background-color: #6a6f78;
+           background-image: linear-gradient(45deg,#4a4f58 25%,transparent 25%,transparent 75%,#4a4f58 75%),
+                             linear-gradient(45deg,#4a4f58 25%,transparent 25%,transparent 75%,#4a4f58 75%); }
+  figcaption { margin-top: 4px; color: #7d8694; font-size: 11px; }
+</style>
+<h1>DE_DUST2 TEXTURE SET — each swatch tiled 3×3</h1>
+<div class="grid" id="grid"></div>
+<script>
+  const files = [
+    'sand-floor', 'sandstone-block', 'sandstone-brick', 'plaster-wall', 'plaster-trim',
+    'concrete', 'stairs-stone', 'tunnel-wall', 'tunnel-floor', 'ceiling-dark',
+    'roof-tile', 'crate-wood', 'door-blue', 'door-metal', 'tarp-blue',
+    'rug-red', 'metal-panel', 'sky', 'decal-bullet-hole', 'decal-blood', 'muzzle-flash'
+  ]
+  const transparent = new Set(['decal-bullet-hole', 'decal-blood', 'muzzle-flash'])
+  document.getElementById('grid').innerHTML = files.map(name => `
+    <figure>
+      <div class="swatch ${transparent.has(name) ? 'alpha' : ''}"
+           style="background-image:url('/project/assets/counter-strike/${name}.png')"></div>
+      <figcaption>${name}</figcaption>
+    </figure>`).join('')
+</script>

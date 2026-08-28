@@ -38,7 +38,14 @@ const DEFAULT_VIEWPORT = { width: 1280, height: 720 }
  * it through `context.renderer.view` — and a world with nothing rendering it
  * had no camera at all. It is a game value, so it lives with the game.
  */
-const DEFAULT_VIEW = { x: 7, y: 3, zoom: 48, mode: 'ortho' }
+const DEFAULT_VIEW = {
+  x: 7, y: 3, z: 0, zoom: 48, mode: 'ortho',
+  // Where a perspective camera is pointed. Radians, Y-up, rotation order YXZ:
+  // yaw turns left around +Y, pitch looks up around +X, and 0/0 faces -Z.
+  // They sit here rather than in the renderer for the same reason x and y do —
+  // a first-person camera plugin writes them whether or not anything is drawing.
+  yaw: 0, pitch: 0, fov: 90
+}
 
 export async function startWorld({
   /**
@@ -172,8 +179,19 @@ export async function startWorld({
     return { name, entities: moved }
   }
 
+  /**
+   * The level file exactly as it was read.
+   *
+   * A save must never narrow a file — the same rule `_extraKeys` follows for a
+   * placement, applied to the level itself. `hud`, `world`, `seed` and a camera
+   * rule like `follow` belong to plugins the kernel knows nothing about, and
+   * writing only what the kernel models would silently delete every one of them.
+   */
+  let loadedLevel = {}
+
   async function loadLevel(name) {
     const raw = JSON.parse(await files.read(`levels/${name}.json`))
+    loadedLevel = raw
     world.clear()
     // Clock, schedule and random stream all go back to zero together, so loading
     // a level is a clean starting point rather than "wherever the last run left
@@ -185,8 +203,18 @@ export async function startWorld({
     if (raw.camera) {
       view.x = raw.camera.at?.[0] ?? view.x
       view.y = raw.camera.at?.[1] ?? view.y
+      view.z = raw.camera.at?.[2] ?? view.z
       view.zoom = raw.camera.zoom ?? view.zoom
-      view.mode = raw.camera.mode ?? 'ortho'
+      // `mode` is deliberately NOT copied here. The level's camera block is the
+      // GAME camera — where the player looks while playing — and the game camera
+      // plugin adopts it on play and hands it back on stop. Copying it at load
+      // put the editor inside a first-person camera standing in a wall the
+      // moment you opened a 3D level, and a black viewport is the worst thing
+      // this engine can show.
+      view.mode = 'ortho'
+      view.fov = raw.camera.fov ?? view.fov
+      view.yaw = raw.camera.yaw ?? view.yaw
+      view.pitch = raw.camera.pitch ?? view.pitch
     }
     // Ids are position-in-file, not a counter, so `coin-2` means the same coin
     // after a reload. An agent that noted an id an hour ago can still use it.
@@ -210,11 +238,13 @@ export async function startWorld({
       console.warn('[save] skipped — the world has been simulated, so it no longer holds start positions. Stop play mode (or engine.stop()) to reload the level first.')
       return { skipped: 'simulated' }
     }
-    const level = world.toLevel({
-      mode: view.mode,
-      at: [round(view.x), round(view.y)],
-      zoom: round(view.zoom)
-    })
+    // The editor's viewport is not the game's camera rule. In first person the
+    // level says where the player looks from; overwriting that with wherever the
+    // editor happened to be pointing would break the level by looking at it.
+    const camera = view.mode === 'ortho'
+      ? { ...loadedLevel.camera, mode: view.mode, at: [round(view.x), round(view.y)], zoom: round(view.zoom) }
+      : loadedLevel.camera
+    const level = { ...loadedLevel, ...world.toLevel(camera) }
     await files.writeJSON(`levels/${editor.levelName}.json`, level)
   }
 

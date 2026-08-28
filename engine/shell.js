@@ -31,6 +31,34 @@ export function makeShell(root, context) {
     </div>`
 
   const element = id => root.querySelector('#' + id)
+  const frame = root.querySelector('.app')
+
+  /**
+   * Collapse the frame to the viewport, or put the docks back.
+   *
+   * This is the same split the engine makes everywhere: the kernel owns the
+   * vocabulary and a plugin owns the policy. The frame lives here, so knowing
+   * *how* to get out of the way lives here too — and nothing in this file knows
+   * that play is the reason. `Play Focus` decides *when*, and a different plugin
+   * could decide differently without the kernel changing.
+   *
+   * A class, never a rebuild. A dock that is destroyed loses its scroll
+   * position, its search text and whatever its panel was holding, and the whole
+   * point of stopping play is that you get back exactly what you had. Hidden is
+   * recoverable; rebuilt is not — so nothing is removed and `draw()` is not
+   * called, which is what makes coming back free.
+   */
+  function focus(on) {
+    const wanted = !!on
+    if (!frame) return false
+    if (frame.classList.contains('focused') === wanted) return wanted
+    frame.classList.toggle('focused', wanted)
+    // The viewport just changed size and no window resize event says so. The
+    // camera's aspect ratio is computed from the viewport, so a renderer left on
+    // the old size draws the world stretched.
+    rend()?.resize()
+    return wanted
+  }
 
   function panelsFor(dock) {
     return loader.contrib.panels
@@ -176,8 +204,13 @@ export function makeShell(root, context) {
 
   return {
     draw,
+    // The element the whole frame hangs off. A plugin that wants the browser's
+    // own chrome gone as well asks the Fullscreen API about this one.
+    root,
     canvas: element('gl'),
     viewport: element('viewport'),
-    overlay: element('viewport-ui')
+    overlay: element('viewport-ui'),
+    focus,
+    get focused() { return frame?.classList.contains('focused') === true }
   }
 }

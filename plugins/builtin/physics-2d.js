@@ -8,6 +8,13 @@
  */
 const GRAVITY = -22
 
+/**
+ * A collider box with three numbers says the entity lives in the 3D world, and
+ * Physics 3D claims exactly those. Two plugins, disjoint sets of entities,
+ * nothing to configure — the shape of the collider decides which one owns it.
+ */
+const flat = entity => entity.collider?.box?.length !== 3
+
 const shape = e => {
   if (e.collider?.circle) return { kind: 'circle', r: e.collider.circle * (e.scale ?? 1) }
   const box = e.collider?.box || [1, 1]
@@ -57,9 +64,9 @@ export default {
   systems: [{
     phase: 'fixed',
     run(world, seconds, context) {
-      const bodies = world.entities.filter(e => e.properties?.body === 'dynamic')
-      const solids = world.entities.filter(e => e.properties?.body === 'solid')
-      const colliders = world.entities.filter(e => e.collider)
+      const bodies = world.entities.filter(e => flat(e) && e.properties?.body === 'dynamic')
+      const solids = world.entities.filter(e => flat(e) && e.properties?.body === 'solid')
+      const colliders = world.entities.filter(e => e.collider && flat(e))
 
       for (const e of bodies) {
         e.velocityX = e.velocityX ?? 0
@@ -97,7 +104,39 @@ export default {
 
   commands: [{
     id: 'physics.gravity',
-    label: 'Set world gravity',
-    run: (context, g) => { for (const e of context.world.entities) if (e.properties) e.properties.gravity = g }
+    label: 'Set world gravity for every 2D entity',
+    /**
+     * The three system filters above skip 3D entities, and this has to skip them
+     * too or the disjoint-domains claim is only true of the simulation and not
+     * of the plugin. Writing `properties.gravity` on every entity in the world
+     * meant `physics.gravity` quietly reset the gravity of a Counter-Strike map
+     * that Physics 3D owns — under a name that says 2D nowhere.
+     *
+     * A gravity that is not a number is refused rather than written: it would
+     * become a NaN velocity on the first step, and a body with one stops being
+     * simulated at all.
+     */
+    run(context, g) {
+      const gravity = Number(g)
+      if (!Number.isFinite(gravity)) {
+        throw new Error(`[physics-2d] gravity must be a number of metres per second per second — "${g}" is not one. Nothing was changed.`)
+      }
+      let changed = 0
+      let skipped = 0
+      for (const e of context.world.entities) {
+        if (!e.properties) continue
+        if (!flat(e)) { skipped++; continue }
+        e.properties.gravity = gravity
+        changed++
+      }
+      return {
+        gravity,
+        changed,
+        skipped,
+        note: skipped
+          ? `${skipped} ${skipped === 1 ? 'entity has' : 'entities have'} a three-number collider box, so ${skipped === 1 ? 'it belongs' : 'they belong'} to Physics 3D and ${skipped === 1 ? 'was' : 'were'} left alone`
+          : 'every entity with a collider in this world is flat, so all of them were set'
+      }
+    }
   }]
 }

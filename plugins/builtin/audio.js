@@ -55,7 +55,12 @@ export default {
       if (buffers.has(file)) return buffers.get(file)
       const a = wake()
       if (!a) return null
-      const url = '/project/' + (file.includes('/') ? file : 'assets/' + file)
+      // The same rule the renderer resolves a texture by: only a name starting
+      // with one of the project's own folders is project-relative, and anything
+      // else — subfolder included — lives under assets/. Written out here rather
+      // than imported because a plugin receives `ui`, it does not import it.
+      const rel = file.replace(/^\/?project\//, '')
+      const url = '/project/' + (/^(assets|levels|types|behaviours|tests|plugins)\//.test(rel) ? rel : 'assets/' + rel)
       try {
         const res = await fetch(url)
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)

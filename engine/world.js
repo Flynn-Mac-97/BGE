@@ -14,7 +14,7 @@
 let nextId = 1
 
 /** Placement keys the entity models directly; everything else is preserved verbatim. */
-const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprite', 'collider', 'behaviours'])
+const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprite', 'mesh', 'collider', 'behaviours'])
 
 /**
  * Names a behaviour may not take.
@@ -24,9 +24,9 @@ const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprit
  * be a thing that stops drawing. Refused by name instead, at attach time.
  */
 const RESERVED = new Set([
-  'id', 'type', 'x', 'y', 'z', 'rotation', 'scale', 'sprite', 'collider',
+  'id', 'type', 'x', 'y', 'z', 'rotation', 'scale', 'sprite', 'mesh', 'collider',
   'properties', 'overrides', 'behaviours', 'hidden', 'play',
-  'velocityX', 'velocityY', 'grounded', 'animation', 'frame', 'flip', 'animationDone'
+  'velocityX', 'velocityY', 'velocityZ', 'grounded', 'animation', 'frame', 'flip', 'animationDone'
 ])
 
 /**
@@ -50,9 +50,37 @@ const expand = (v, key) => (typeof v === 'string' ? { [key]: v } : v)
  * declared the string shorthand — compare what they mean, not how they were
  * written, or every save writes an override that is not one.
  */
-const sameSprite = (a, b) => {
-  const norm = v => JSON.stringify(expand(v, 'image') ?? null)
+const sameLook = (a, b, key) => {
+  const norm = v => JSON.stringify(expand(v, key) ?? null)
   return norm(a) === norm(b)
+}
+
+/**
+ * A placement's `mesh` MERGES over the type's, key by key — it does not replace it.
+ *
+ * Replacing was the obvious reading and it was wrong. A map is hundreds of walls
+ * that share one texture and differ only in size, and under replacement every one
+ * of them had to repeat the texture, the tiling and the tint in order to change
+ * the box. de_dust2 came out at 3,300 lines where 1,300 would do, and every read
+ * of that file paid the difference. `properties` has always merged; this is the
+ * same rule applied to the other thing a placement customises.
+ */
+const mergeLook = (base, over, key) => {
+  const a = expand(base, key)
+  const b = expand(over, key)
+  if (!a) return b
+  if (!b) return a
+  return { ...a, ...b }
+}
+
+/** What this value says that its type default does not. The decision, not the copy. */
+const lookDiff = (value, base) => {
+  if (!value) return null
+  const out = {}
+  for (const [k, v] of Object.entries(value)) {
+    if (JSON.stringify(base?.[k]) !== JSON.stringify(v)) out[k] = v
+  }
+  return Object.keys(out).length ? out : null
 }
 
 export function makeWorld(bus) {
@@ -75,6 +103,11 @@ export function makeWorld(bus) {
       scale: placement.scale ?? 1,
 
       sprite: expand(placement.sprite ?? type.sprite, 'image'),
+      // The 3D counterpart of `sprite`: solid geometry rather than a textured
+      // plane. A thing declares one or the other, never both — `mesh` is what
+      // the renderer draws when it is there. It merges rather than replaces, so
+      // a placement can change the box without restating the material.
+      mesh: mergeLook(type.mesh, placement.mesh, 'texture'),
       collider: placement.collider ?? type.collider ?? null,
 
       // properties: type defaults, overridden per placement. Overrides stay visible.
@@ -96,6 +129,7 @@ export function makeWorld(bus) {
       // must follow the file.
       _setByPlacement: {
         sprite: placement.sprite !== undefined,
+        mesh: placement.mesh !== undefined,
         collider: placement.collider !== undefined
       },
 
@@ -229,6 +263,9 @@ export function makeWorld(bus) {
 
       for (const e of entities) {
         if (e.type !== name) continue
+        // What this placement said about its mesh, worked out against the OLD
+        // definition — so it has to be read before the pointer moves.
+        const ownMesh = lookDiff(e.mesh, expand(e._definition.mesh, 'texture'))
         e._definition = definition
 
         // Re-merge from the new defaults, keeping only what this placement
@@ -239,6 +276,10 @@ export function makeWorld(bus) {
         e.properties = { ...(definition.properties || {}), ...kept }
 
         if (!e._setByPlacement.sprite) e.sprite = expand(definition.sprite, 'image')
+        // Merge, not replace: changing a texture in the type file reaches every
+        // wall that never disagreed with it, while a wall that set its own box
+        // keeps that box.
+        e.mesh = mergeLook(definition.mesh, ownMesh, 'texture')
         if (!e._setByPlacement.collider) e.collider = definition.collider ?? null
         syncTypeBehaviours(e, definition)
         moved++
@@ -375,7 +416,11 @@ export function makeWorld(bus) {
           if (e.collider && e.collider !== e._definition.collider) out.collider = e.collider
           // Same rule for the sprite: if this placement carries its own, it has
           // to come back out, or changing one crate's art is lost on save.
-          if (e.sprite && !sameSprite(e.sprite, e._definition.sprite)) out.sprite = e.sprite
+          if (e.sprite && !sameLook(e.sprite, e._definition.sprite, 'image')) out.sprite = e.sprite
+          // Only the keys this placement disagrees with its type about. Writing
+          // the whole mesh back turned one decision into a copy of the material.
+          const ownMesh = lookDiff(e.mesh, expand(e._definition.mesh, 'texture'))
+          if (ownMesh) out.mesh = ownMesh
           const attached = behaviourPlacement(e)
           if (attached) out.behaviours = attached
           if (e.overrides.length) {
