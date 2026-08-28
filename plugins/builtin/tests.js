@@ -19,7 +19,6 @@ const HISTORY = 20
 /** id -> { name, ok, ms, checks, error, recent } — recent is a 'PPFP' string. */
 const results = new Map()
 let running = false
-let version = 0
 
 /**
  * The list comes from the generated index rather than `import.meta.glob`.
@@ -31,7 +30,9 @@ const listed = context => Object.entries(context.editor.index.tests || {})
   .map(([id, test]) => ({ id, ...test }))
   .sort((a, b) => a.id.localeCompare(b.id))
 
-const load = async file => (await import(/* @vite-ignore */ `/project/${file}?hot=${++version}`)).default
+// Through context, because the browser imports a project file by URL and node
+// imports it by path. One place knows the difference; this is not it.
+const load = (context, file) => context.importProjectFile(file)
 
 export default {
   name: 'Test Runner',
@@ -119,7 +120,7 @@ async function runAll(context, only) {
 
       let definition
       try {
-        definition = await load(entry.file)
+        definition = await load(context, entry.file)
         if (typeof definition?.run !== 'function') throw new Error('no run(test) exported')
       } catch (e) {
         out.push(record(id, { name: id, ok: false, ms: 0, checks: [], error: `load failed — ${e.message}` }))
@@ -183,11 +184,14 @@ function makeT(context, checks) {
 
   const same = (a, b) => Object.is(a, b) || JSON.stringify(a) === JSON.stringify(b)
 
-  // Real key events, so the input plugin is exercised rather than bypassed.
-  const key = (action, type) => {
+  // A real key, so the input plugin's binding is exercised rather than
+  // bypassed — but pressed through the plugin rather than through a
+  // KeyboardEvent, so the same test runs with no window to dispatch into.
+  const key = (action, down) => {
     const code = context.input?.codes?.(action)?.[0]
     if (!code) throw new Error(`no key bound to action "${action}"`)
-    dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }))
+    if (down) context.input.press(code)
+    else context.input.release(code)
   }
 
   const startAll = () => {
@@ -218,8 +222,8 @@ function makeT(context, checks) {
       if (!started) { startAll(); started = true }
       loop.step(Math.max(1, Math.round(seconds * 60)))
     },
-    hold(action, seconds = 0.5) { key(action, 'keydown'); test.simulate(seconds); key(action, 'keyup') },
-    tap(action) { key(action, 'keydown'); test.simulate(1 / 60); key(action, 'keyup') },
+    hold(action, seconds = 0.5) { key(action, true); test.simulate(seconds); key(action, false) },
+    tap(action) { key(action, true); test.simulate(1 / 60); key(action, false) },
 
     is: (got, want, message) => push(same(got, want), message, got, want),
     near: (got, want, tol, message) => push(Math.abs(got - want) <= tol, message, round(got), `${want} ±${tol}`),

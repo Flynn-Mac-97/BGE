@@ -45,12 +45,26 @@ friction  pain "<what was hard or expensive>" [--kind engine|cli|docs|editor]
 Args that parse as JSON are sent as JSON, everything else as a string.
 Flags (--foo) collect into a trailing options object.
 
+  --headless     run the op in a private world in this process — no dev server,
+                 no browser, no port. Many of these run at once without ever
+                 seeing each other, which is how several agents work in parallel.
+  --level NAME   headless only: open this level first
   --port N       default ${PORT}, or set ENGINE_PORT
   --timeout MS   default 8000
   --raw          force one-line JSON      --pretty  force indented
                  (default: indented at a terminal, compact when captured)
 
 Exit 0 ok, 1 error, 2 no editor attached (open ${HOST}).
+
+index, tree, check and pain read the project straight off disk, so they answer
+with nothing running. Everything else drives a live editor unless --headless
+says to start a world here instead.
+
+  node bin/engine.mjs --headless run tests.run
+  node bin/engine.mjs --headless simulate 2 --level level1
+
+Headless cannot draw — there is no canvas, so no screenshot and no picking.
+Everything else behaves as it does on screen, because it is the same engine.
 
 pain needs no dev server and no editor — friction is worst exactly when
 nothing is running, so recording it must never depend on anything working.
@@ -66,7 +80,7 @@ and pain.list ranks by it. A vague number beats no number.
  * boolean — a general "the next word is the value" rule would swallow the
  * following argument and the failure would look like the flag doing nothing.
  */
-const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads'])
+const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root'])
 
 const argv = process.argv.slice(2)
 const flags = {}
@@ -100,7 +114,8 @@ const coerce = w => {
 // Flags the CLI itself consumes never reach the browser.
 const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
-                 'kind', 'where', 'fix', 'cost', 'reads', 'all']) delete options[k]
+                 'kind', 'where', 'fix', 'cost', 'reads', 'all',
+                 'headless', 'level', 'root']) delete options[k]
 
 let args = words.map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
@@ -274,16 +289,83 @@ if (op === 'pain.list') {
 }
 
 // ------------------------------------------------------------------ ops
-// These two answer from disk, so they work with no editor open.
-if (op === 'index') { out(await get('/api/index')); process.exit(0) }
-if (op === 'tree')  { out(await get('/api/tree'));  process.exit(0) }
+/**
+ * What is in the project, read straight off disk.
+ *
+ * These used to go through the dev server. They do not need to: the index
+ * builder is a module now, so the answer is the same and it arrives with
+ * nothing running. That matters most when something is broken — the moment you
+ * want `check` is rarely the moment the server is healthy.
+ */
+const REPO = fileURLToPath(new URL('..', import.meta.url))
+const PROJECT = fileURLToPath(new URL('../project/', import.meta.url))
+const readProject = async () => import('../engine/project-index.mjs')
+
+if (op === 'index') {
+  const { buildIndex } = await readProject()
+  out(await buildIndex(PROJECT))
+  process.exit(0)
+}
+
+if (op === 'tree') {
+  const { walk, KIND } = await readProject()
+  const files = await walk(PROJECT)
+  out(files.filter(f => !f.startsWith('.engine')).map(f => ({ path: f, kind: KIND(f) })))
+  process.exit(0)
+}
 
 // `check` exits non-zero when something is wrong, so it works in a shell chain:
-//   node bin/engine.mjs check && node bin/engine.mjs tests.run
+//   node bin/engine.mjs check && node bin/engine.mjs --headless run tests.run
 if (op === 'check') {
-  const r = await get('/api/check')
-  out(r)
-  process.exit(r.ok ? 0 : 1)
+  const { buildIndex, problemsIn } = await readProject()
+  const problems = problemsIn(await buildIndex(PROJECT))
+  out({ ok: problems.length === 0, problems })
+  process.exit(problems.length === 0 ? 0 : 1)
+}
+
+/**
+ * Run the op in a world of this process's own.
+ *
+ * No dev server, no port, no browser tab, and nothing shared with any other
+ * run. That is the whole reason it exists: agents can fan out and simulate at
+ * the same moment without trampling one another's world, which one shared
+ * editor makes impossible.
+ */
+if (flags.headless) {
+  // Anything the engine prints goes to stderr, so stdout stays one JSON value.
+  // A caller that has to strip log lines out of the result is a caller that
+  // will eventually strip the wrong one.
+  const original = console.log
+  console.log = (...a) => process.stderr.write(a.map(String).join(' ') + '\n')
+  console.warn = console.log
+
+  const { startWorldInNode } = await import('../engine/start-world-node.mjs')
+  let engine, editor
+  try {
+    ({ engine, editor } = await startWorldInNode({ root: typeof flags.root === 'string' ? flags.root : REPO }))
+  } catch (e) {
+    console.log = original
+    die(1, `could not start a world — ${e.message}`, e.stack)
+  }
+
+  if (typeof flags.level === 'string') {
+    try { await editor.loadLevel(flags.level) }
+    catch (e) { die(1, `no level "${flags.level}" — ${e.message}`) }
+  }
+
+  const verb = engine[op]
+  if (typeof verb !== 'function') {
+    die(1, `no op "${op}" — every op is a method on the engine. Try: node bin/engine.mjs --headless commands`)
+  }
+
+  let result
+  try { result = await verb.apply(engine, args) }
+  catch (e) { die(1, String(e?.message || e), e?.stack) }
+
+  console.log = original
+  out(result === undefined ? { ok: true } : result)
+  // The loop may hold a timer open. The op is done, so leave rather than wait.
+  process.exit(0)
 }
 
 if (op === 'watch') {

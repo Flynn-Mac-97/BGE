@@ -23,18 +23,34 @@ export default {
 
     const editing = element => ['INPUT', 'TEXTAREA'].includes(element?.tagName)
 
-    addEventListener('keydown', event => {
-      if (editing(event.target)) return
-      if (!down.has(event.code)) justPressed.add(event.code)
-      down.add(event.code)
-    })
-    addEventListener('keyup', event => down.delete(event.code))
-    addEventListener('blur', () => down.clear())
+    /**
+     * Holding and releasing a key, with no event in sight.
+     *
+     * The keyboard is one way to reach these, not the only way. A test presses a
+     * key here directly, so the same code runs whether there is a window to
+     * type into or not — and a headless run is not a second, weaker input path.
+     */
+    const press = code => {
+      if (!down.has(code)) justPressed.add(code)
+      down.add(code)
+    }
+    const release = code => down.delete(code)
+
+    if (typeof addEventListener === 'function') {
+      addEventListener('keydown', event => {
+        if (editing(event.target)) return
+        press(event.code)
+      })
+      addEventListener('keyup', event => release(event.code))
+      addEventListener('blur', () => down.clear())
+    }
 
     const held = action => (ACTIONS[action] || []).some(c => down.has(c))
 
     context.input = {
       held,
+      press,
+      release,
       pressed: action => (ACTIONS[action] || []).some(c => justPressed.has(c)),
       axis: which => which === 'y'
         ? (held('up') ? 1 : 0) - (held('down') ? 1 : 0)

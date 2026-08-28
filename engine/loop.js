@@ -91,14 +91,20 @@ export function makeLoop({ onFixed, onFrame, onError }) {
     onFixed(STEP, fixed)
   }
 
+  // Animation frames only exist in a browser. Outside one there is no screen to
+  // be in step with, so the timer drives every frame — and step() below, the
+  // path that matters for headless work, touches none of this.
+  const canAnimate = typeof requestAnimationFrame === 'function'
+  const onScreen = () => canAnimate && !document.hidden
+
   /** Animation frames while visible, a timer while not. */
   function schedule() {
-    cancelAnimationFrame(raf)
+    if (canAnimate) cancelAnimationFrame(raf)
     clearInterval(timer)
     timer = 0
     if (!running) return
-    if (document.hidden) timer = setInterval(() => tick(performance.now()), 16)
-    else raf = requestAnimationFrame(tick)
+    if (onScreen()) raf = requestAnimationFrame(tick)
+    else timer = setInterval(() => tick(performance.now()), 16)
   }
 
   // Switching tabs mid-play swaps drivers rather than stalling.
@@ -108,7 +114,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
 
   function tick(now) {
     if (!running) return
-    if (!document.hidden) raf = requestAnimationFrame(tick)
+    if (onScreen()) raf = requestAnimationFrame(tick)
 
     const seconds = Math.min((now - last) / 1000, 0.25)
     last = now
@@ -156,7 +162,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
 
     stop() {
       running = false
-      cancelAnimationFrame(raf)
+      if (canAnimate) cancelAnimationFrame(raf)
       clearInterval(timer)
       timer = 0
     },

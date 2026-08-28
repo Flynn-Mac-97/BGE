@@ -1,0 +1,117 @@
+/**
+ * Start a world in node — the same engine, with nothing drawing it.
+ *
+ * This is the parallel story. A world here needs no dev server, no port and no
+ * browser tab, so many agents run one each and never touch the same mutable
+ * thing. Two of them can simulate different levels at the same moment and
+ * neither can see the other.
+ *
+ * It is deliberately the browser's twin and not its cousin: the same
+ * `start-world.js`, the same plugins, the same `window.engine` surface. All
+ * that differs is how the three outside things are reached — files come off
+ * disk instead of over HTTP, plugins are found by reading a directory instead
+ * of by a Vite glob, and project files are imported by path instead of by URL.
+ *
+ * What it cannot do is draw. There is no canvas, so no screenshot and no
+ * picking. Everything else — play, simulate, tests, commands, hot reload of a
+ * type — behaves exactly as it does on screen.
+ */
+import path from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
+import fs from 'node:fs/promises'
+
+import { makeFiles } from './files.js'
+import { startWorld } from './start-world.js'
+import { buildIndex, walk } from './project-index.mjs'
+
+/** The repository, found from this file, so a world starts the same from any directory. */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+/**
+ * Reach the project directly rather than through the dev server.
+ *
+ * Writes rebuild the index, exactly as the server's POST handler does, so a
+ * headless session that writes a level sees the new index on the next read.
+ * Skipping that is how a world ends up acting on a project that no longer
+ * exists.
+ */
+export function onDisk(projectDirectory) {
+  const inside = rel => {
+    const abs = path.resolve(projectDirectory, rel)
+    // Same guard the dev server applies. A path that climbs out of the project
+    // is a bug wherever it came from, and answering it quietly would make the
+    // headless runner the weaker door.
+    if (abs !== projectDirectory && !abs.startsWith(projectDirectory + path.sep)) {
+      throw new Error(`path outside project: ${rel}`)
+    }
+    return abs
+  }
+
+  return {
+    index: () => buildIndex(projectDirectory),
+    tree: async () => (await walk(projectDirectory))
+      .filter(f => !f.startsWith('.engine'))
+      .map(f => ({ path: f })),
+    read: rel => fs.readFile(inside(rel), 'utf8'),
+    async write(rel, text) {
+      const abs = inside(rel)
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await fs.writeFile(abs, text, 'utf8')
+      await buildIndex(projectDirectory)
+    }
+  }
+}
+
+/**
+ * Every plugin file, read from the directories rather than globbed.
+ *
+ * `import.meta.glob` is a Vite feature and is expanded at build time. Reading
+ * the directory means a plugin written a second ago is found on the next start,
+ * which is the same promise the index makes about types.
+ */
+async function findPlugins(root) {
+  const places = [
+    { directory: path.join(root, 'plugins/builtin'), builtin: true },
+    { directory: path.join(root, 'project/plugins'), builtin: false }
+  ]
+  const found = []
+
+  for (const { directory, builtin } of places) {
+    let names = []
+    try { names = await fs.readdir(directory) } catch { continue }
+    for (const name of names.sort()) {
+      if (!name.endsWith('.js')) continue
+      const file = path.join(directory, name)
+      try {
+        const definition = (await import(pathToFileURL(file).href)).default
+        if (!definition) continue
+        found.push({ definition, builtin })
+      } catch (e) {
+        console.error(`[loader] ${file} failed to import`, e)
+      }
+    }
+  }
+  return found
+}
+
+/**
+ * Import one file out of the project.
+ *
+ * The changing query is why a hot reload works here too: node caches a module
+ * by URL forever, so re-importing the same path would hand back the version
+ * read at start-up and a live edit would appear to do nothing.
+ */
+let fileVersion = 0
+const importProjectFileFrom = projectDirectory => async file =>
+  (await import(pathToFileURL(path.join(projectDirectory, file)).href + `?hot=${++fileVersion}`)).default || {}
+
+export async function startWorldInNode({ root = ROOT, viewport } = {}) {
+  const projectDirectory = path.join(root, 'project')
+
+  return startWorld({
+    openFiles: bus => makeFiles(bus, onDisk(projectDirectory)),
+    loadPlugins: () => findPlugins(root),
+    importProjectFile: importProjectFileFrom(projectDirectory),
+    ...(viewport ? { viewport } : {})
+  })
+}

@@ -89,7 +89,15 @@ function tint(type) {
 
 const PLANE = new THREE.PlaneGeometry(1, 1)
 
-export function makeRenderer(canvas, bus) {
+/**
+ * `view` and `viewport` are handed in, not owned here.
+ *
+ * Where the camera looks and how big the picture is are game values — the
+ * camera plugin moves one and clamps against the other — so they belong to the
+ * session, which exists whether or not anything is drawing. The renderer reads
+ * the same two objects the game does.
+ */
+export function makeRenderer(canvas, view, viewport) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
 
@@ -97,20 +105,19 @@ export function makeRenderer(canvas, bus) {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000)
   camera.position.z = 10
 
-  const view = { x: 7, y: 3, zoom: 48, mode: 'ortho' }
   const meshes = new Map()   // entity id -> mesh
-  let size = { w: 1, h: 1 }
 
   function resize() {
     const r = canvas.getBoundingClientRect()
-    size = { w: Math.max(1, r.width), h: Math.max(1, r.height) }
-    renderer.setSize(size.w, size.h, false)
+    viewport.width = Math.max(1, r.width)
+    viewport.height = Math.max(1, r.height)
+    renderer.setSize(viewport.width, viewport.height, false)
     updateCamera()
   }
 
   function updateCamera() {
-    const hw = size.w / 2 / view.zoom
-    const hh = size.h / 2 / view.zoom
+    const hw = viewport.width / 2 / view.zoom
+    const hh = viewport.height / 2 / view.zoom
     camera.left = -hw; camera.right = hw
     camera.top = hh;   camera.bottom = -hh
     camera.position.x = view.x
@@ -178,10 +185,12 @@ export function makeRenderer(canvas, bus) {
   }
 
   return {
+    // Both are the session's objects, re-exposed so existing plugins that reach
+    // for renderer.view keep working.
     view,
+    get size() { return { w: viewport.width, h: viewport.height } },
     scene,
     camera,
-    get size() { return size },
 
     resize,
 
@@ -235,14 +244,14 @@ export function makeRenderer(canvas, bus) {
     // ---- coordinate helpers, used by every viewport tool ----
     toScreen(x, y) {
       return {
-        x: (x - view.x) * view.zoom + size.w / 2,
-        y: size.h / 2 - (y - view.y) * view.zoom
+        x: (x - view.x) * view.zoom + viewport.width / 2,
+        y: viewport.height / 2 - (y - view.y) * view.zoom
       }
     },
     toWorld(px, py) {
       return {
-        x: (px - size.w / 2) / view.zoom + view.x,
-        y: view.y - (py - size.h / 2) / view.zoom
+        x: (px - viewport.width / 2) / view.zoom + view.x,
+        y: view.y - (py - viewport.height / 2) / view.zoom
       }
     },
 

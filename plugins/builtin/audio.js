@@ -43,8 +43,13 @@ export default {
       if (audio.state === 'suspended') audio.resume()
       return audio
     }
-    addEventListener('pointerdown', wake, { once: false })
-    addEventListener('keydown', wake, { once: false })
+    // Nothing to wake without a page to click on. The list of plays below is
+    // still kept, so a headless run can assert that a sound was asked for even
+    // though no one could hear it.
+    if (typeof addEventListener === 'function') {
+      addEventListener('pointerdown', wake, { once: false })
+      addEventListener('keydown', wake, { once: false })
+    }
 
     async function buffer(file) {
       if (buffers.has(file)) return buffers.get(file)

@@ -42,10 +42,10 @@ export default {
         return cam.target
       },
       moveTo(x, y) {
-        context.renderer.view.x = x
-        context.renderer.view.y = y
+        context.view.x = x
+        context.view.y = y
       },
-      zoomTo(z) { context.renderer.view.zoom = z },
+      zoomTo(z) { context.view.zoom = z },
 
       /** Decays on the fixed clock, so it is the same length on every replay. */
       shake(amount = 0.3) { cam.amount = Math.max(cam.amount, amount) }
@@ -63,7 +63,7 @@ export default {
     })
 
     context.bus.on('play:started', () => {
-      const v = context.renderer.view
+      const v = context.view
       cam.editorView = { x: v.x, y: v.y, zoom: v.zoom }
       if (cam.rule.follow) cam.follow(cam.rule.follow)
       if (cam.rule.zoom) v.zoom = cam.rule.zoom
@@ -73,7 +73,7 @@ export default {
       // Put the editor back exactly where it was looking. Losing your place in
       // the level every time you press play is a small theft that makes an
       // editor tiring to use.
-      if (cam.editorView) Object.assign(context.renderer.view, cam.editorView)
+      if (cam.editorView) Object.assign(context.view, cam.editorView)
       cam.editorView = null
       cam.target = null
       cam.amount = 0
@@ -91,7 +91,7 @@ export default {
       if (!cam.target) return
       if (!world.entities.includes(cam.target)) { cam.target = null; return }
 
-      const view = context.renderer.view
+      const view = context.view
       const rule = cam.rule
 
       const lead = (rule.lookAhead ?? 0) * (cam.target.velocityX ?? 0)
@@ -99,7 +99,7 @@ export default {
       view.x += (cam.target.x + lead - view.x) * k
       view.y += (cam.target.y + (rule.offsetY ?? 0) - view.y) * k
 
-      if (rule.bounds) clampToBounds(view, rule.bounds, context.renderer.size)
+      if (rule.bounds) clampToBounds(view, rule.bounds, context.viewport)
 
       if (cam.amount > 0) {
         // context.random, not Math.random: a replay has to shake identically.
@@ -115,9 +115,9 @@ export default {
     label: 'Camera state',
     run: context => ({
       view: {
-        x: round(context.renderer.view.x),
-        y: round(context.renderer.view.y),
-        zoom: round(context.renderer.view.zoom)
+        x: round(context.view.x),
+        y: round(context.view.y),
+        zoom: round(context.view.zoom)
       },
       following: context.camera.target?.id ?? null,
       rule: context.camera.rule
@@ -132,9 +132,9 @@ export default {
  * behave the same in a small panel and on a full screen. If the level is
  * narrower than the screen, centre on it rather than jam against one edge.
  */
-function clampToBounds(view, [x0, y0, x1, y1], size) {
-  const halfW = size.w / 2 / view.zoom
-  const halfH = size.h / 2 / view.zoom
+function clampToBounds(view, [x0, y0, x1, y1], viewport) {
+  const halfW = viewport.width / 2 / view.zoom
+  const halfH = viewport.height / 2 / view.zoom
 
   view.x = (x1 - x0) <= halfW * 2 ? (x0 + x1) / 2 : clamp(view.x, x0 + halfW, x1 - halfW)
   view.y = (y1 - y0) <= halfH * 2 ? (y0 + y1) / 2 : clamp(view.y, y0 + halfH, y1 - halfH)

@@ -11,7 +11,7 @@
  */
 const RING = 200
 
-export function makeInspect({ world, loader, loop, files, bus, renderer, editor }) {
+export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
   const log = []
 
   const push = (level, source, message, extra) => {
@@ -37,15 +37,21 @@ export function makeInspect({ world, loader, loop, files, bus, renderer, editor 
   // console.error only catches what someone remembered to log. An uncaught
   // throw or a rejected promise in game code would otherwise be invisible here
   // — the log would say the run was clean while the run was not.
-  addEventListener('error', event => {
-    push('error', 'uncaught', event.error?.stack || event.message, {
-      at: event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined
-    })
-  })
-  addEventListener('unhandledrejection', event => {
-    const r = event.reason
-    push('error', 'rejection', r?.stack || r?.message || String(r))
-  })
+  //
+  // Node reports the same two things under different names, so both are wired
+  // up. A headless run that silently swallowed an uncaught throw would be the
+  // worst possible thing to hand an agent working without a screen.
+  const uncaught = (error, at) => push('error', 'uncaught', error?.stack || error?.message || String(error), { at })
+  const rejected = reason => push('error', 'rejection', reason?.stack || reason?.message || String(reason))
+
+  if (typeof addEventListener === 'function') {
+    addEventListener('error', event => uncaught(event.error || event.message,
+      event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined))
+    addEventListener('unhandledrejection', event => rejected(event.reason))
+  } else if (typeof process !== 'undefined' && typeof process.on === 'function') {
+    process.on('uncaughtException', error => uncaught(error))
+    process.on('unhandledRejection', reason => rejected(reason))
+  }
 
   /**
    * `bulk` trims properties to the overridden ones. In a list of fifty entities the
@@ -87,7 +93,7 @@ export function makeInspect({ world, loader, loop, files, bus, renderer, editor 
         // if you know where the clock and the random stream were.
         time: r(loop.time),
         seed: loop.random.seed,
-        camera: { x: r(renderer.view.x), y: r(renderer.view.y), zoom: r(renderer.view.zoom) },
+        camera: { x: r(view.x), y: r(view.y), zoom: r(view.zoom), mode: view.mode },
         counts: {
           entities: world.entities.length,
           types: types.length,
@@ -197,7 +203,11 @@ export function makeInspect({ world, loader, loop, files, bus, renderer, editor 
     clearLog: () => { log.length = 0 },
 
     // direct handles for anything the summary does not cover
-    world, loader, loop, files, bus, renderer, editor
+    world, loader, loop, files, bus, editor, view,
+
+    // Undefined when nothing is drawing, which is the honest answer rather than
+    // a stub that pretends to render.
+    get renderer() { return editor.context?.renderer }
   }
 
   return api
