@@ -255,13 +255,18 @@ node bin/engine.mjs run plugins.list
 Two suites, and they cover different layers.
 
 ```
-npm test                        # the CLI -> engine bridge, from outside the browser
-node bin/engine.mjs tests.run   # the project's own game tests, inside it
+npm test                                      # the CLI -> engine bridge, from outside the browser
+node bin/engine.mjs --headless run tests.run  # the project's own game tests, in this process
 ```
 
 `npm test` spawns the real CLI and checks exit codes, argument coercion,
-determinism, and the failure modes an agent hits — it needs `npm run dev` and
-an open editor tab.
+determinism, isolation between headless worlds, and the failure modes an agent
+hits — it needs `npm run dev` and **one** open editor tab. Two tabs both answer
+the bridge and the first reply wins, which shows up as a test that fails for no
+visible reason.
+
+The game tests need neither. They run in a private world in the CLI process, so
+several can run at once without seeing each other.
 
 A test is a file, the same way a type is a file. The throwaway scripts written
 to check a change are exactly the ones worth keeping, so they live in the
@@ -283,8 +288,8 @@ export default {
 ```
 
 ```
-node bin/engine.mjs tests.run              # all
-node bin/engine.mjs tests.run coin-pickup  # one
+node bin/engine.mjs --headless run tests.run              # all
+node bin/engine.mjs --headless run tests.run coin-pickup  # one
 ```
 
 They also run from the Tests panel in the bottom dock, which keeps a pass/fail
@@ -302,7 +307,7 @@ simulated world refuses to save, so a test run cannot damage a level file.
 
 ## The kernel
 
-Six modules, and nothing else is privileged.
+Nothing else is privileged.
 
 | Module | Owns |
 |---|---|
@@ -313,6 +318,14 @@ Six modules, and nothing else is privileged.
 | `loader.js` | plugin loading, dependency order, failure containment |
 | `render.js` | one GL context (Three.js), ortho for 2D |
 | `ui.js` | the UI vocabulary plugins compose from |
+| `start-world.js` | boot, and the `context` everything receives |
+| `index.js` | the browser half: shell, renderer, the paint loop |
+| `start-world-node.mjs` | the same world in node, with no screen |
+| `project-index.mjs` | what is in a project, and the determinism lint |
+
+The last three are the split that lets a world run without a browser. Put new
+runtime behaviour in `start-world.js`; anything added to `index.js` is something
+a headless world cannot do.
 
 ## Plugins
 
@@ -390,10 +403,42 @@ Output is compact when captured and indented at a terminal, because an agent
 pays for whitespace on every call and a person does not. `--raw` and
 `--pretty` force either.
 
-### Headless
+### Headless — and running many at once
 
-The client can be headless Chrome — WebGL, physics and canvas readback all
-work, and nothing about driving it changes.
+`--headless` starts a world inside the CLI process. No dev server, no port, no
+browser tab.
+
+```
+node bin/engine.mjs --headless run tests.run
+node bin/engine.mjs --headless simulate 2 --level level1 --entities
+```
+
+It is the same engine, not a reduced copy — the same plugins, the same context,
+the same ops. Only three things differ: files come off disk instead of over
+HTTP, plugins are found by reading a directory instead of by a Vite glob, and
+project files are imported by path instead of by URL. A test asserts that a
+headless snapshot and an attached editor's snapshot match entity for entity, so
+the two cannot drift apart unnoticed.
+
+This is what makes a fan-out of agents possible. One dev server has one world,
+and ten agents stepping it trample each other. Ten headless worlds never meet.
+
+```
+for lvl in a b c; do node bin/engine.mjs --headless run tests.run --level $lvl & done; wait
+```
+
+**Private:** the world, the clock, the random stream, the selection, and
+anything `spawn` or `simulate` does.
+**Shared, because it is on disk:** `project/`. So `set` and `save` are *not*
+isolated — give a writer its own git worktree, or keep writers to one lane.
+**Not possible:** drawing. There is no canvas, so no screenshot and no `pick`.
+
+`index`, `tree`, `check` and `pain` need nothing running either — they read the
+project straight off disk. The moment you most want `check` is rarely the moment
+the dev server is healthy.
+
+For a real frame with no monitor, headless Chrome is still the client, and
+nothing about driving it changes:
 
 ```
 ENGINE_NO_OPEN=1 npx vite --port 5181 &
@@ -519,7 +564,13 @@ There are no tool modes. The handle you grab is the choice.
   way to reorder the ones on an entity from the editor — edit the file.
 - Play mode and edit mode look identical.
 - The game runs in the editor's page, not a sandboxed iframe, so an infinite
-  loop in game code will freeze the editor.
+  loop in game code will freeze the editor. `--headless` gives you somewhere
+  else to run it, but the editor itself is still one page.
+- Two editor tabs on one dev server both answer the bridge and the first reply
+  wins, so a state-dependent CLI call can read the other tab's world. Keep one
+  tab open; use `--headless` when you want more than one world.
+- Headless worlds are isolated in memory but share `project/` on disk, so two
+  runs that both save a level will collide.
 - No terminal panel in the editor yet — the bridge works, but you run your CLI
   in your own terminal. Embedding one needs a PTY (`node-pty`) so a CLI's TUI
   renders properly.

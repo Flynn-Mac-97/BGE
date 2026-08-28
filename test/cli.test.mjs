@@ -426,6 +426,95 @@ await test('a test file written while the editor runs is runnable at once', () =
   }
 })
 
+// ---------------------------------------------------- headless, and parallel
+/**
+ * These are the tests that matter for working in parallel.
+ *
+ * Every one of them points the CLI at a port nothing is listening on, so a pass
+ * proves the world really did start in this process rather than quietly finding
+ * the editor that the tests above are using.
+ */
+const NOWHERE = ['--headless', '--port', '5999']
+
+const headless = args => {
+  const r = cli([...args, ...NOWHERE])
+  if (r.code !== 0) throw new Error(`exit ${r.code}: ${r.stderr.trim() || r.stdout.trim()}`)
+  return JSON.parse(r.stdout)
+}
+
+/** The same call, not waited on, so several can be in flight together. */
+const headlessAsync = args => new Promise(resolve => {
+  const child = spawn(process.execPath, [CLI, ...args, ...NOWHERE], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let stdout = '', stderr = ''
+  child.stdout.on('data', c => (stdout += c))
+  child.stderr.on('data', c => (stderr += c))
+  child.on('close', code => resolve({ code, stdout, stderr }))
+})
+
+await test('a headless world starts with no dev server and no browser', () => {
+  const s = headless(['snapshot'])
+  eq(s.mode, 'edit', 'it opens in edit mode')
+  ok(s.counts.entities > 0, 'the level loaded')
+  ok(s.counts.plugins > 0, 'the plugins loaded')
+  eq(s.errors, [], 'and nothing failed on the way up')
+})
+
+await test('headless and the browser agree about the same level', () => {
+  const attached = json(['stop']) && json(['snapshot', '--entities'])
+  const alone = headless(['snapshot', '--entities', '--level', attached.level])
+  eq(alone.counts.entities, attached.counts.entities, 'same entity count')
+  eq(alone.byType, attached.byType, 'same entities, type by type')
+  eq(alone.entities, attached.entities, 'and every one in the same place')
+})
+
+await test('the project tests pass with nothing but node', () => {
+  const r = headless(['run', 'tests.run'])
+  ok(r.passed > 0, 'tests ran')
+  eq(r.failed, 0, `all passed — ${JSON.stringify(r.tests.filter(t => !t.ok))}`)
+})
+
+await test('stdout stays one JSON value even when the engine logs', () => {
+  const r = cli(['run', 'tests.run', ...NOWHERE])
+  eq(r.code, 0, 'it succeeded')
+  // Anything the engine prints must go to stderr. A caller that has to strip
+  // log lines out of the result will eventually strip the wrong one.
+  JSON.parse(r.stdout)
+  ok(!r.stdout.trim().includes('\n'), 'exactly one line on stdout')
+})
+
+await test('worlds running at once cannot see each other', async () => {
+  // Eight of them, all simulating the same level from the same seed. If they
+  // shared any state at all — a world, a clock, a random stream — they would
+  // not all land on the same answer.
+  const runs = await Promise.all(
+    Array.from({ length: 8 }, () => headlessAsync(['simulate', '2', '--entities']))
+  )
+  const bad = runs.filter(r => r.code !== 0)
+  eq(bad.length, 0, `every run succeeded — ${bad[0]?.stderr || ''}`)
+
+  const answers = new Set(runs.map(r => JSON.stringify(JSON.parse(r.stdout).entities)))
+  eq(answers.size, 1, `all eight agreed, not ${answers.size} different results`)
+})
+
+await test('what a headless world changes in memory stays there', () => {
+  // Spawn into a private world, then ask the real editor what it has. Memory is
+  // private; the project files are not, and `set` writes one — which is why
+  // this uses spawn. Two runs that both save a level will collide, and no
+  // amount of process isolation fixes that.
+  const added = headless(['spawn', 'coin', '{"at":[99,99,0]}'])
+  ok(added.id.startsWith('coin-'), 'the private world spawned it')
+
+  const editor = json(['snapshot', '--entities'])
+  ok(!editor.entities.some(e => e.at[0] === 99), 'and the attached editor never saw it')
+})
+
+await test('index, tree and check need no server at all', () => {
+  const port = ['--port', '5999']
+  ok(Object.keys(json(['index', ...port]).types).length > 0, 'index lists types')
+  ok(json(['tree', ...port]).some(f => f.path.endsWith('.json')), 'tree lists files')
+  eq(cli(['check', ...port]).code, 0, 'check passes with nothing running')
+})
+
 // ------------------------------------------------------------------ report
 fs.writeFileSync(LEVEL, original)   // whatever happened above, leave the file as found
 

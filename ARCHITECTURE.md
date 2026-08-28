@@ -19,13 +19,14 @@ Two consequences that everything else follows from:
 
 ## Shape
 
-About 4,700 lines. Roughly half kernel, half plugins — and the plugins have no
+About 5,200 lines. Roughly half kernel, half plugins — and the plugins have no
 privileges the kernel does not give everyone.
 
 ```
-engine/     world.js 414   index.js 335   render.js 282  ui.js 244
-            loop.js 223    inspect.js 206 shell.js 183
-            loader.js 82   files.js 43    bus.js 22
+engine/     world.js 414   start-world.js 323  render.js 291  ui.js 244
+            project-index.mjs 236   loop.js 229   inspect.js 216
+            shell.js 183   start-world-node.mjs 117   index.js 95
+            loader.js 82   files.js 58    bus.js 22
 
 plugins/builtin/
             tool-transform 370   tests 269    panel-inspector 238
@@ -45,20 +46,34 @@ the way you would say them out loud — `Inspector Panel`, `Terminal Bridge`.
 Nobody reading this code for the first time should have to decode it first, and
 that includes a model reading it cold.
 
-## The seven kernel modules
+## The kernel modules
 
 | Module | Owns | Does not know about |
 |---|---|---|
 | `bus.js` | an event channel | anything |
 | `world.js` | entities, types, behaviours, the shared vocabulary | rendering, physics, files |
 | `loop.js` | the clock, the schedule, the random stream | what it is stepping |
-| `files.js` | the only writer to disk | what a level is |
+| `files.js` | the only writer to disk | what a level is, or how disk is reached |
 | `loader.js` | plugin order, contribution points, failure containment | any specific plugin |
-| `render.js` | one GL context, one draw order | game rules |
+| `render.js` | one GL context, one draw order | game rules, or where the camera is |
 | `ui.js` | the vocabulary panels compose from | any specific panel |
 | `shell.js` | four docks, a toolbar, a status line | what goes in them |
-| `inspect.js` | `window.engine` | — |
-| `index.js` | boot, and the `context` everything receives | — |
+| `inspect.js` | the read-and-drive surface | whether anything is drawing |
+| `start-world.js` | boot, and the `context` everything receives | screens |
+| `index.js` | the browser: shell, renderer, the paint loop | game rules |
+| `start-world-node.mjs` | the same world in node: disk, readdir, paths | game rules |
+| `project-index.mjs` | what is in a project, and the determinism lint | the browser — node only |
+
+The last three are the split. Everything above `start-world.js` runs identically
+either side of it.
+
+Two things moved out of `render.js` to make that work. `view` — where the camera
+is looking — and `viewport` — how big the picture is — are session state now,
+because they are game values that a camera plugin reads and writes. They existed
+only inside the renderer before, so a world with nothing drawing it had no
+camera at all. It also made camera bounds reproducible: they were clamped
+against the real browser window, so the same level framed differently in a small
+window than a large one.
 
 `loader.js` is the reason the plugin claim is real. Every contribution point —
 `panels` `tools` `commands` `fields` `importers` `systems` `menus` — is a list
@@ -73,20 +88,31 @@ whole arrangement: switch off the inspector and watch it go.
 
 ## Boot
 
+`start-world.js` is the whole engine minus anything that needs a document.
+`index.js` is the browser wrapper around it; `start-world-node.mjs` is its twin
+in node. Steps 5 and 6 are the only ones a headless world skips.
+
 ```
-1. make bus, world, files, loader
+1. make bus, world, loader, files
 2. make the loop, with the fixed and frame callbacks
 3. load every plugin       plugins/builtin/*.js + project/plugins/*.js
                            sorted by `needs`, cycles reported not thrown
 4. build context               the one object plugins AND game code receive
-5. shell builds the DOM    four docks + a canvas
-6. renderer attaches to the canvas
-7. GET /api/index          the generated map of the project
-8. import each type        by URL, from the index — not import.meta.glob
+5. shell builds the DOM    four docks + a canvas          browser only
+6. renderer attaches to the canvas                        browser only
+7. read the index          the generated map of the project
+8. import each type        from the index — not import.meta.glob
 9. read the level JSON     one entity per placement
-10. expose window.engine
+10. expose the engine surface     window.engine in a page
 11. emit shell:ready       for plugins that need the DOM
 ```
+
+Three things differ between the two, and nothing else does: files come off disk
+instead of over HTTP, plugins are found by reading a directory instead of by a
+Vite glob, and project files are imported by path instead of by URL. Each is
+handed to `startWorld` as an argument, so there is one runtime rather than two
+that can disagree. A test asserts that a headless snapshot and an attached
+editor's snapshot are identical, entity for entity.
 
 Step 7 matters more than it looks. The dev server builds `.engine/index.json` by
 *importing* each type file and reading its actual `properties`, hooks and asset
@@ -237,8 +263,9 @@ together; resetting only some of them is the subtle version of the same bug.
 Every plugin and every hook receives the same thing:
 
 ```
-world  loop  bus  files  renderer  editor  loader  shell
-spawn  destroy  select  open  run  save  redraw
+world  loop  bus  files  editor  loader  view  viewport
+renderer  shell                          absent when nothing is drawing
+spawn  destroy  select  open  run  save  redraw  importProjectFile
 assets  types  levels  level  selection
 time  random  after  every  cancel          the deterministic runtime
 input  camera  play  audio  hud             contributed by plugins
@@ -327,14 +354,22 @@ writing it back would replace the level with a freeze-frame of a playthrough.
 
 ```
 your terminal ──▶ bin/engine.mjs ──▶ POST /api/engine ──▶ ws ──▶ Terminal Bridge ──▶ window.engine
+                              └────▶ --headless ──▶ startWorldInNode() ──▶ the same surface
 ```
 
-Every CLI op is a method name on `window.engine`, so the CLI cannot fall behind
-the surface. Any command id also works as a verb, so a plugin that adds
+Every CLI op is a method name on the engine surface, so the CLI cannot fall
+behind it. Any command id also works as a verb, so a plugin that adds
 `tests.run` has added a terminal command with it.
 
-Transport is the dev server's existing websocket. No extra port, no extra
-dependency, and it dies with the dev server.
+The bridge's transport is the dev server's existing websocket. No extra port, no
+extra dependency, and it dies with the dev server.
+
+`--headless` skips all of that and starts a world in the CLI process. It exists
+so several agents can work at once: one dev server has one world, and ten agents
+stepping it trample each other, while ten headless worlds never meet. Memory is
+private — world, clock, random stream, selection. `project/` is not, because it
+is on disk, so anything that *writes* still needs its own worktree or its own
+lane. Headless cannot draw; when you need a frame, use a browser.
 
 The engine hosts no AI. It opens a door; whichever CLI you run walks through it.
 
@@ -384,4 +419,8 @@ triggers separate from solids, particles, gamepad and touch input, pause and
 time scale, 3D model loading, and any way to export a playable build.
 
 The game also runs in the editor's own page, so an infinite loop in game code
-freezes the editor.
+freezes the editor — though `--headless` now gives you somewhere else to run it.
+
+Two editor tabs on one dev server both answer the bridge and the first reply
+wins, so a state-dependent CLI call can read the other tab's world. Keep one tab
+open, and use `--headless` when you want more than one world.

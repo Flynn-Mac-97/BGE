@@ -391,9 +391,10 @@ opening it.
 node bin/engine.mjs <op> [args...]
 \`\`\`
 
-Requires an editor tab to be open — a headless one counts, see below. Output is
-JSON on stdout, compact when captured and indented at a terminal. Exit 0 ok,
-1 error, 2 no editor attached.
+Drives an open editor tab. Add \`--headless\` to start a private world in this
+process instead — no dev server, no browser, and safe to run many at once; see
+"No screen needed" below. Output is JSON on stdout, compact when captured and
+indented at a terminal. Exit 0 ok, 1 error, 2 no editor attached.
 
 | Command | Does |
 |---|---|
@@ -458,11 +459,48 @@ two identical runs disagree.
 \`engine.seed(n)\` re-seeds and restarts the clock. Varying the seed is how you
 check that behaviour holds generally rather than by luck.
 
-### No screen needed
+### No screen needed — and how several agents work at once
 
-The editor is a normal page, so headless Chrome can be the client. WebGL, the
-renderer, physics and collisions all work, and the canvas can still be read
-back as a PNG. Nothing about driving it changes.
+**\`--headless\` starts a world inside the CLI process.** No dev server, no
+port, no browser tab, nothing shared with any other run.
+
+\`\`\`
+node bin/engine.mjs --headless run tests.run
+node bin/engine.mjs --headless simulate 2 --level level1 --entities
+\`\`\`
+
+This is the same engine, not a smaller copy of it. The same plugins load, the
+same context is built, the same ops exist. Only three things differ: files come
+off disk instead of over HTTP, plugins are found by reading a directory instead
+of by a Vite glob, and project files are imported by path instead of by URL.
+There is a test that asserts a headless snapshot and an attached editor's
+snapshot are identical, entity for entity, so the two cannot quietly drift.
+
+**Why it matters: this is what lets a fan-out of agents work.** One dev server
+has one world. Ten agents driving it all \`simulate\`, \`set\` and \`play\` on top of
+each other, and the results are nonsense. Ten headless worlds never meet.
+
+\`\`\`
+for level in a b c; do node bin/engine.mjs --headless run tests.run --level $level & done; wait
+\`\`\`
+
+What is **private**: the world, the clock, the random stream, the selection,
+every entity, and anything \`spawn\` or \`simulate\` does.
+
+What is **shared, because it is on disk**: \`project/\`. So \`set\`, \`save\`, and
+anything that writes a level or a type is *not* isolated — two runs saving the
+same level will collide. Give each agent its own git worktree if they need to
+write, or keep the writers to one lane.
+
+What headless **cannot** do: draw. There is no canvas, so no screenshot and no
+\`pick\`. When you need a frame, use a browser.
+
+\`index\`, \`tree\`, \`check\` and \`pain\` also need nothing running — they read the
+project straight off disk. The moment you most want \`check\` is rarely the
+moment the dev server is healthy.
+
+For a real frame with no monitor, headless Chrome is still the client, and
+nothing about driving it changes:
 
 \`\`\`
 ENGINE_NO_OPEN=1 npx vite --port 5181 &
@@ -623,9 +661,15 @@ a plugin helps every game after it, and the next agent finds it in the index
 instead of reinventing it.
 
 \`\`\`
-engine/            the kernel — 10 files, ~2,000 lines, all of it readable
+engine/            the kernel — 13 files, ~2,500 lines, all of it readable
 plugins/builtin/   everything else, including every panel and physics itself
 \`\`\`
+
+The kernel splits in two. \`start-world.js\` is the whole engine minus anything
+that needs a document; \`index.js\` is the browser wrapper that adds the shell
+and the renderer, and \`start-world-node.mjs\` is its twin in node. Put new
+runtime behaviour in the first one. Anything you add to \`index.js\` is something
+a headless world cannot do — and headless is how several agents work at once.
 
 Where to put a change, in order of preference:
 
@@ -657,14 +701,28 @@ These are load-bearing. Changing one is a real decision, not a detail.
 - **Silence is the enemy.** Anything that fails must say so, by name, in
   \`errors\`. A blank viewport with an empty error log is the worst thing this
   engine can hand you.
+- **One engine, not two.** The world runs the same with or without a screen.
+  Never add a headless-only path or a browser-only shortcut in the runtime —
+  the moment they are two implementations they start to disagree, and then
+  neither a test nor a frame can be trusted. If something needs the DOM, guard
+  it where it is used; do not fork the engine around it.
 
 ### After you change it
 
 \`\`\`
-node bin/engine.mjs check      # project still valid and deterministic
-node bin/engine.mjs tests.run  # the game's own tests
-npm test                       # the engine's own suite — run this whenever you touch engine/ or plugins/
+node bin/engine.mjs check                    # valid and deterministic — needs nothing running
+node bin/engine.mjs --headless run tests.run # the game's own tests, in this process
+npm test                                     # the engine's own suite — run this whenever you touch engine/ or plugins/
 \`\`\`
+
+The first two need no dev server and no browser, so they are the two to reach
+for first. \`npm test\` does need \`npm run dev\` and one open editor tab, because
+part of what it covers is the bridge.
+
+**One tab, not several.** Two editor tabs on one dev server both answer the
+bridge and the first reply wins, so a state-dependent test can read the other
+tab's world and fail for no visible reason. If you need more than one world at
+a time, that is what \`--headless\` is for.
 
 Then update \`ARCHITECTURE.md\` and \`README.md\`. This file regenerates itself
 from \`vite.config.js\`; those two do not, and a doc that lies is worse than no
