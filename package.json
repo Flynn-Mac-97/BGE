@@ -1,0 +1,22 @@
+{
+  "name": "browser-game-engine",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "engine": "bin/engine.mjs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "engine": "node bin/engine.mjs",
+    "test": "node test/cli.test.mjs"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

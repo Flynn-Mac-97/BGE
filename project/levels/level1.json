@@ -1,0 +1,105 @@
+{
+  "camera": {
+    "mode": "ortho",
+    "at": [
+      7,
+      3
+    ],
+    "zoom": 48
+  },
+  "entities": [
+    {
+      "type": "ground",
+      "at": [
+        7,
+        0,
+        0
+      ],
+      "collider": {
+        "box": [
+          16,
+          1
+        ]
+      }
+    },
+    {
+      "type": "ground",
+      "at": [
+        7.5,
+        3,
+        0
+      ],
+      "collider": {
+        "box": [
+          5,
+          0.4
+        ]
+      }
+    },
+    {
+      "type": "ground",
+      "at": [
+        12.5,
+        4.5,
+        0
+      ],
+      "collider": {
+        "box": [
+          3,
+          0.4
+        ]
+      }
+    },
+    {
+      "type": "player",
+      "at": [
+        2,
+        2,
+        0
+      ]
+    },
+    {
+      "type": "coin",
+      "at": [
+        6.5,
+        4,
+        0
+      ]
+    },
+    {
+      "type": "coin",
+      "at": [
+        8,
+        4,
+        0
+      ]
+    },
+    {
+      "type": "coin",
+      "at": [
+        9.5,
+        4,
+        0
+      ],
+      "properties": {
+        "value": 50
+      }
+    },
+    {
+      "type": "spike",
+      "at": [
+        4.5,
+        0.85,
+        0
+      ]
+    },
+    {
+      "type": "bat",
+      "at": [
+        12.5,
+        6,
+        0
+      ]
+    }
+  ]
+}

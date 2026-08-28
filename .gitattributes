@@ -1,0 +1,4 @@
+# Keep line endings as they are on disk. Agents diff these files constantly, and
+# a checkout that silently rewrote every line would turn one real change into a
+# whole-file diff.
+* text=auto eol=lf

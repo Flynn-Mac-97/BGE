@@ -1,0 +1,11 @@
+{
+  "title": "Platformer",
+  "startLevel": "level1",
+  "window": {
+    "width": 960,
+    "height": 540
+  },
+  "plugins": {
+    "disabled": []
+  }
+}

@@ -1,0 +1,9 @@
+{"id":"p1","at":"2026-08-28T14:52:26.642Z","kind":"engine","what":"physics resolve() reported the collision side inverted, so grounded was never true and jump silently did nothing — cost a long time to find because nothing errored","cost":18000,"reads":6,"where":"plugins/builtin/physics-2d.js","fix":"a test that asserts grounded after landing"}
+{"id":"p2","at":"2026-08-28T14:52:26.728Z","kind":"engine","what":"no single call site for hooks; adding behaviours meant finding all four by grep and I still missed one","cost":4000,"reads":4,"where":"engine/world.js"}
+{"id":"p3","at":"2026-08-28T14:52:26.816Z","kind":"docs","what":"AGENTS.md listed 'on' as a contribution point; it is not one","cost":1200}
+{"id":"p4","at":"2026-08-28T14:52:26.905Z","kind":"cli","what":"no verb attaches a behaviour from a test without saving the level"}
+{"id":"p1","resolved":true,"at":"2026-08-28T14:53:02.442Z","note":"swapped the labels in resolve(); jump had never worked. jump.js now asserts grounded after landing"}
+{"id":"p2","resolved":true,"at":"2026-08-28T14:53:02.518Z","note":"world.hook(entity, name, ...args) — behaviours then type, one try/catch"}
+{"id":"p3","resolved":true,"at":"2026-08-28T14:53:02.594Z","note":"AGENTS.md now says the seven points and that on is not one"}
+{"id":"p4","resolved":true,"at":"2026-08-28T14:53:02.668Z","note":"test.attach / test.detach go straight to the world"}
+{"id":"p5","at":"2026-08-28T14:58:00.132Z","kind":"cli","what":"two editor tabs attached to one dev server both answer the bridge and first reply wins, so a state-dependent CLI test can read the other tab's world and fail intermittently","cost":3000,"where":"vite.config.js","fix":"have the bridge pick one client, or make the CLI say how many are attached"}

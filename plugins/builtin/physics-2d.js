@@ -1,0 +1,103 @@
+/**
+ * Physics, as a plugin — which is the point. Swap this for Rapier or Box2D by
+ * disabling it and enabling something else; the collision contract is the only
+ * thing that has to match.
+ *
+ * Runs on the fixed step, so `onCollide` fires deterministically and game code
+ * never has to learn what a fixed step is.
+ */
+const GRAVITY = -22
+
+const shape = e => {
+  if (e.collider?.circle) return { kind: 'circle', r: e.collider.circle * (e.scale ?? 1) }
+  const box = e.collider?.box || [1, 1]
+  const s = e.scale ?? 1
+  return { kind: 'box', w: box[0] * s, h: box[1] * s }
+}
+
+function overlap(a, b) {
+  const sa = shape(a), sb = shape(b)
+  if (sa.kind === 'circle' && sb.kind === 'circle')
+    return Math.hypot(a.x - b.x, a.y - b.y) < sa.r + sb.r
+
+  // circle/box and box/box both reduce to an AABB test at this fidelity
+  const aw = sa.kind === 'circle' ? sa.r * 2 : sa.w
+  const ah = sa.kind === 'circle' ? sa.r * 2 : sa.h
+  const bw = sb.kind === 'circle' ? sb.r * 2 : sb.w
+  const bh = sb.kind === 'circle' ? sb.r * 2 : sb.h
+  return Math.abs(a.x - b.x) < (aw + bw) / 2 && Math.abs(a.y - b.y) < (ah + bh) / 2
+}
+
+/**
+ * Push `e` out of `solid` along the shallowest axis, and report which side of
+ * the solid `e` ended up on — 'above' means e is on top, which is what being
+ * grounded means.
+ */
+function resolve(e, solid) {
+  const se = shape(e), ss = shape(solid)
+  const ew = se.kind === 'circle' ? se.r * 2 : se.w
+  const eh = se.kind === 'circle' ? se.r * 2 : se.h
+  const sw = ss.kind === 'circle' ? ss.r * 2 : ss.w
+  const sh = ss.kind === 'circle' ? ss.r * 2 : ss.h
+
+  const dx = e.x - solid.x, dy = e.y - solid.y
+  const px = (ew + sw) / 2 - Math.abs(dx)
+  const py = (eh + sh) / 2 - Math.abs(dy)
+  if (px <= 0 || py <= 0) return null
+
+  if (px < py) { e.x += dx > 0 ? px : -px; e.velocityX = 0; return dx > 0 ? 'right' : 'left' }
+  e.y += dy > 0 ? py : -py
+  e.velocityY = 0
+  return dy > 0 ? 'above' : 'below'
+}
+
+export default {
+  name: 'Physics 2D',
+
+  systems: [{
+    phase: 'fixed',
+    run(world, seconds, context) {
+      const bodies = world.entities.filter(e => e.properties?.body === 'dynamic')
+      const solids = world.entities.filter(e => e.properties?.body === 'solid')
+      const colliders = world.entities.filter(e => e.collider)
+
+      for (const e of bodies) {
+        e.velocityX = e.velocityX ?? 0
+        e.velocityY = (e.velocityY ?? 0) + (e.properties.gravity ?? GRAVITY) * seconds
+        e.x += e.velocityX * seconds
+        e.y += e.velocityY * seconds
+        e.grounded = false
+
+        for (const s of solids) {
+          if (!overlap(e, s)) continue
+          if (resolve(e, s) === 'above') e.grounded = true
+        }
+      }
+
+      // report contacts once, on the frame they begin
+      const seen = new Set()
+      for (let i = 0; i < colliders.length; i++) {
+        for (let j = i + 1; j < colliders.length; j++) {
+          const a = colliders[i], b = colliders[j]
+          if (a.properties?.body === 'solid' && b.properties?.body === 'solid') continue
+          if (!overlap(a, b)) continue
+          const key = a.id + '|' + b.id
+          seen.add(key)
+          if (world._contacts?.has(key)) continue
+          // Through world.hook, so a behaviour can answer a collision too — a
+          // `breakable` should not have to be written into every type that
+          // wants it.
+          world.hook(a, 'onCollide', b, context)
+          world.hook(b, 'onCollide', a, context)
+        }
+      }
+      world._contacts = seen
+    }
+  }],
+
+  commands: [{
+    id: 'physics.gravity',
+    label: 'Set world gravity',
+    run: (context, g) => { for (const e of context.world.entities) if (e.properties) e.properties.gravity = g }
+  }]
+}
