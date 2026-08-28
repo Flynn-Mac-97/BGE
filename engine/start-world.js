@@ -241,9 +241,13 @@ export async function startWorld({
     // The editor's viewport is not the game's camera rule. In first person the
     // level says where the player looks from; overwriting that with wherever the
     // editor happened to be pointing would break the level by looking at it.
-    const camera = view.mode === 'ortho'
-      ? { ...loadedLevel.camera, mode: view.mode, at: [round(view.x), round(view.y)], zoom: round(view.zoom) }
-      : loadedLevel.camera
+    // `mode` is the GAME's rule and is never written from here. The editor
+    // always opens a level in ortho — that is what makes a 3D level editable —
+    // so writing the editor's mode back turned every save of a first-person
+    // level into a save that quietly demoted it to a flat one, and the only
+    // symptom was pressing play and getting the 2D camera.
+    const { mode, ...rule } = loadedLevel.camera || {}
+    const camera = { ...rule, ...(mode ? { mode } : {}), at: [round(view.x), round(view.y)], zoom: round(view.zoom) }
     const level = { ...loadedLevel, ...world.toLevel(camera) }
     await files.writeJSON(`levels/${editor.levelName}.json`, level)
   }

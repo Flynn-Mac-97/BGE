@@ -1,6 +1,6 @@
 {
   "camera": {
-    "mode": "ortho",
+    "mode": "first-person",
     "follow": "you",
     "eyeHeight": 1.346,
     "crouchEyeHeight": 0.762,
