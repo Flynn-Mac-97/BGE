@@ -80,6 +80,21 @@ conflict.
 | `agent.release` | runs each required check in the lane's workspace and refuses to complete when one fails |
 | `agent.merge` | merges the lane, runs its deferred checks in main, removes the worktree, deletes the branch |
 
+**Before the first lane, read one packet.**
+
+```sh
+node bin/engine.mjs agent.context <project>/plugins/probe.js --project <project>
+```
+
+Check the `lanes` list, not just that a packet came back. A thin one means no
+rule matched, and it looks exactly like a full one — five lanes once ran on 810
+characters with neither Plugin Master nor the Game lane, and nothing errored.
+
+**Give every lane a claim of its own.** A claim promises that two writers never
+edit one file, so claim the files a lane will own. A folder claim is for a lane
+that owns the folder; it blocks the files already in it, not files nobody has
+written yet.
+
 **The recipe:**
 
 ```sh
@@ -89,6 +104,11 @@ node bin/engine.mjs agent.prepare <id> <file...> --parallel
 node bin/engine.mjs agent.release <id>          # runs the checks; refuses if one fails
 node bin/engine.mjs agent.merge <id>            # lands it, then removes worktree and branch
 ```
+
+A proof script in `agent-runs/` must not clean up by resetting the checkout.
+Lanes hold worktrees off the same HEAD, so `git reset --hard` in a cleanup
+block reaches work the script never made. Export the pure function and point it
+at a `mkdtempSync` directory instead.
 
 A worktree isolates **tracked** files only, so commit untracked work first or
 lanes fight over exactly the files that are not in it.
