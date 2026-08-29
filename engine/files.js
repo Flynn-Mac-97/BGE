@@ -41,7 +41,35 @@ export function overHTTP() {
 export function makeFiles(bus, transport = overHTTP()) {
   let writing = 0
 
+  /**
+   * Asked before every write, and any one of them may refuse it.
+   *
+   * The kernel performs the write, so only the kernel can stop one — but the
+   * kernel has no business holding a policy about who may write what. A guard
+   * returns a reason to refuse, or nothing to allow, and the policy lives in
+   * whatever plugin registered it. Turn that plugin off and writes are open
+   * again, which is the point: a guard nobody can disable is a guard people
+   * route around.
+   *
+   * A guard that throws is treated as a refusal with its message, because a
+   * broken guard must not silently become permission.
+   */
+  const guards = new Set()
+  const refusal = (path, scope) => {
+    for (const guard of guards) {
+      let why
+      try { why = guard(path, scope) } catch (error) { why = String(error?.message || error) }
+      if (why) return String(why)
+    }
+    return null
+  }
+
   return {
+    /** Register a write guard. Returns the function that removes it again. */
+    guardWrites(guard) {
+      guards.add(guard)
+      return () => guards.delete(guard)
+    },
     async index() { return transport.index() },
     async tree() { return transport.tree() },
     async agentPlugins() { return transport.agentPlugins() },
@@ -49,6 +77,8 @@ export function makeFiles(bus, transport = overHTTP()) {
     async readAgent(scope, path) { return transport.readAgent(scope, path) },
 
     async write(path, text) {
+      const why = refusal(path, 'project')
+      if (why) throw new Error(`refused to write ${path} — ${why}`)
       writing++
       bus.emit('files:writing', { path, pending: writing })
       try {
@@ -63,6 +93,8 @@ export function makeFiles(bus, transport = overHTTP()) {
     async writeJSON(path, value) { return this.write(path, JSON.stringify(value, null, 2)) },
 
     async writeAgent(scope, path, text) {
+      const why = refusal(path, scope)
+      if (why) throw new Error(`refused to write ${path} — ${why}`)
       writing++
       bus.emit('files:writing', { path, scope, pending: writing })
       try {

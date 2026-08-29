@@ -333,6 +333,17 @@ export async function startWorld({
   for (const definition of loader.order(found.map(f => f.definition))) {
     loader.add(definition, cameFromBuiltin.get(definition) === true)
   }
+
+  // Which plugins are off, before any of them run. game.json used to be read
+  // after boot and the list applied by a plugin's own onLoad, so a "disabled"
+  // plugin still had its onLoad called — it had already subscribed, taken a
+  // context key and registered whatever it registers, and only then was marked
+  // off. Turning a plugin off has to mean it never ran, or it does not mean
+  // anything.
+  let game = {}
+  try { game = JSON.parse(await files.read('game.json')) } catch { /* optional */ }
+  for (const name of game.plugins?.disabled || []) loader.enable(name, false)
+
   loader.boot(context)
 
   // The screen, if there is one. Between booting the plugins and loading the
@@ -346,8 +357,6 @@ export async function startWorld({
   // means adding a level can silently change which one you land in — and the
   // first thing you would do is edit the wrong file.
   const levels = Object.keys(editor.index.levels)
-  let game = {}
-  try { game = JSON.parse(await files.read('game.json')) } catch { /* optional */ }
   editor.game = game
   editor.projectName = game.title || editor.projectName
 

@@ -28,13 +28,11 @@ const POINTS = [
 export default {
   name: 'Plugin Browser',
 
-  async onLoad(context) {
-    // Apply the project's disabled list once everything has loaded.
-    try {
-      const game = JSON.parse(await context.files.read('game.json'))
-      for (const name of game.plugins?.disabled || []) context.loader.enable(name, false)
-    } catch { /* no game.json, or nothing disabled */ }
-  },
+  // The project's disabled list is applied by the kernel before any plugin
+  // boots, not here. Doing it in an onLoad meant a disabled plugin had already
+  // run its own onLoad — subscribed, taken its context key — before it was
+  // marked off. This panel still turns one on and off during a session, which
+  // is what `enable` is for.
 
   menus: [{
     id: 'plugins.browse',
