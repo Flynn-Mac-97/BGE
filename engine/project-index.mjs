@@ -318,8 +318,14 @@ export async function buildIndex(projectDirectory) {
  * last-one-wins is the right answer. The run registry next door does take a
  * lock, because it accumulates rather than derives.
  */
+let writeCount = 0
+
 async function writeAtomic(file, text) {
-  const temporary = `${file}.${process.pid}.tmp`
+  // The pid is not enough on its own. One process rebuilds the index on every
+  // save, and two of those overlap the moment saves come faster than a write —
+  // they would then share a temporary name, and the second rename would find
+  // the first had already moved it away.
+  const temporary = `${file}.${process.pid}.${++writeCount}.tmp`
   try {
     await fs.writeFile(temporary, text)
     await fs.rename(temporary, file)

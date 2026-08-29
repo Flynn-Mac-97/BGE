@@ -166,6 +166,13 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
     simulate(seconds = 1, options = {}) {
       const started = loop.running
       if (!started) {
+        // Marked before the hooks, not after the first step. A start hook is
+        // only running because a simulation asked for it, and anything it
+        // spawns is already a simulated entity — so the flag that means "these
+        // are no longer start positions" has to be true while they run. It is
+        // what stops a hook's own save writing a mid-simulation level, and what
+        // keeps those spawns out of the History palette.
+        world.simulated = true
         for (const e of [...world.entities]) world.hook(e, 'start', editor.context)
       }
       loop.step(Math.round(seconds * 60))
