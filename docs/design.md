@@ -25,7 +25,10 @@
   configure. Behaviours compose, but they cannot query each other, and an
   entity stays flat.
 - No scene format beyond JSON placements.
-- No editor state that is not either in a file or trivially recomputed.
+- No editor state that is not either in a file or trivially recomputed — with
+  one exception, `History`. It holds this session's past states of the level in
+  memory, and they are neither on disk nor recomputable. Photoshop's history is
+  session-only too. The level on disk stays the truth: every step writes it.
 - No CSS in game code. The editor is styled by `engine/style.css`; a game draws
   into the canvas.
 
@@ -42,3 +45,12 @@ freezes the editor — though `--headless` now gives you somewhere else to run i
 Two editor tabs on one dev server both answer the bridge and the first reply
 wins, so a state-dependent CLI call can read the other tab's world. Keep one tab
 open, and use `--headless` when you want more than one world.
+
+`History` covers the editor's own edits, not everything. A step is exactly as
+lossy as reopening the level — it replays the placements `toLevel` would have
+written — so `hidden`, ad-hoc fields set by `engine.set`, and runtime behaviour
+state do not come back. It is also session-only: reloading the page loses it.
+
+Parallel agents coordinate but are not separated. File claims are advisory —
+nothing reads the run registry at write time — and `agent.release --checked`
+records that checks ran without running them. See painpoints p54, p55 and p56.

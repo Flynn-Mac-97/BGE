@@ -419,6 +419,7 @@ Transform Tool      Place And Attach    Behaviours
 Physics 2D          Sprite Animation    Game Camera
 Sound               Heads Up Display    Keyboard Input
 Terminal Bridge     Test Runner         Live File Updates
+History
 ```
 
 Names are what you would say out loud, in capitalised words. That one name is
