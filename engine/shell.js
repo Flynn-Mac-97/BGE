@@ -15,23 +15,111 @@ export function makeShell(root, context) {
   const rend = () => context.renderer
   const panelState = new Map()
 
+  const DEFAULT_LAYOUT = {
+    left: 190,
+    right: 236,
+    centre: Math.min(560, Math.max(240, Math.round(root.getBoundingClientRect().width * 0.46))),
+    bottom: 220
+  }
+  const layout = readLayout(DEFAULT_LAYOUT)
+
   root.innerHTML = `
     <div class="app">
       <div class="bar" id="bar"></div>
-      <div class="mid">
+      <div class="mid" id="mid">
         <div class="dock left" id="dock-left"></div>
-        <div class="centre" id="centre">
+        <div class="dock-resizer vertical" id="resize-left" role="separator" tabindex="0" aria-label="Resize left panels" aria-orientation="vertical"></div>
+        <div class="centre stage" id="centre">
           <div class="viewport" id="viewport"><canvas id="gl"></canvas><div class="viewport-ui" id="viewport-ui"></div></div>
+          <div class="dock-resizer vertical" id="resize-centre" role="separator" tabindex="0" aria-label="Resize expanded centre panel" aria-orientation="vertical"></div>
           <div class="dock centre" id="dock-centre"></div>
         </div>
+        <div class="dock-resizer vertical" id="resize-right" role="separator" tabindex="0" aria-label="Resize right panels" aria-orientation="vertical"></div>
         <div class="dock right" id="dock-right"></div>
       </div>
+      <div class="dock-resizer horizontal" id="resize-bottom" role="separator" tabindex="0" aria-label="Resize bottom panels" aria-orientation="horizontal"></div>
       <div class="dock bottom" id="dock-bottom"></div>
       <div class="status" id="status"></div>
     </div>`
 
   const element = id => root.querySelector('#' + id)
   const frame = root.querySelector('.app')
+  applyLayout()
+  installResizer('resize-left', 'left', 'x', 1)
+  installResizer('resize-right', 'right', 'x', -1)
+  installResizer('resize-centre', 'centre', 'x', -1)
+  installResizer('resize-bottom', 'bottom', 'y', -1)
+
+  function boundsFor(key) {
+    const box = frame.getBoundingClientRect()
+    if (key === 'bottom') return [100, Math.max(100, Math.round(box.height * 0.65))]
+    if (key === 'centre') return [240, Math.max(240, Math.round(box.width * 0.65))]
+    return [120, Math.max(120, Math.min(480, Math.round(box.width * 0.45)))]
+  }
+
+  function resize(key, value, save = false) {
+    const [least, most] = boundsFor(key)
+    layout[key] = Math.round(Math.max(least, Math.min(most, Number(value) || DEFAULT_LAYOUT[key])))
+    frame.style.setProperty(`--${key}-size`, `${layout[key]}px`)
+    const handle = element('resize-' + key)
+    handle?.setAttribute('aria-valuemin', String(least))
+    handle?.setAttribute('aria-valuemax', String(most))
+    handle?.setAttribute('aria-valuenow', String(layout[key]))
+    if (save) saveLayout(layout)
+    rend()?.resize()
+  }
+
+  function applyLayout() {
+    for (const key of Object.keys(DEFAULT_LAYOUT)) resize(key, layout[key])
+  }
+
+  function resetLayout(key = null) {
+    for (const name of key ? [key] : Object.keys(DEFAULT_LAYOUT)) resize(name, DEFAULT_LAYOUT[name])
+    saveLayout(layout)
+    return { ...layout }
+  }
+
+  function installResizer(id, key, axis, direction) {
+    const handle = element(id)
+    if (!handle) return
+    handle.title = 'Drag to resize · double-click to reset'
+
+    handle.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return
+      event.preventDefault()
+      const startPoint = axis === 'x' ? event.clientX : event.clientY
+      const startSize = layout[key]
+      handle.setPointerCapture?.(event.pointerId)
+      frame.classList.add('resizing')
+      handle.classList.add('active')
+
+      const move = next => {
+        const point = axis === 'x' ? next.clientX : next.clientY
+        resize(key, startSize + (point - startPoint) * direction)
+      }
+      const done = () => {
+        handle.removeEventListener('pointermove', move)
+        handle.removeEventListener('pointerup', done)
+        handle.removeEventListener('pointercancel', done)
+        handle.classList.remove('active')
+        frame.classList.remove('resizing')
+        saveLayout(layout)
+      }
+      handle.addEventListener('pointermove', move)
+      handle.addEventListener('pointerup', done)
+      handle.addEventListener('pointercancel', done)
+    })
+
+    handle.addEventListener('dblclick', () => resetLayout(key))
+    handle.addEventListener('keydown', event => {
+      const backward = axis === 'x' ? event.key === 'ArrowLeft' : event.key === 'ArrowUp'
+      const forward = axis === 'x' ? event.key === 'ArrowRight' : event.key === 'ArrowDown'
+      if (!backward && !forward && event.key !== 'Home') return
+      event.preventDefault()
+      if (event.key === 'Home') resetLayout(key)
+      else resize(key, layout[key] + (backward ? -16 : 16) * direction, true)
+    })
+  }
 
   /**
    * Collapse the frame to the viewport, or put the docks back.
@@ -116,6 +204,18 @@ export function makeShell(root, context) {
     const list = panelsFor(dock)
     host.innerHTML = ''
     host.classList.toggle('hidden', list.length === 0)
+    if (dock === 'left' || dock === 'right') {
+      element('mid').classList.toggle(`no-${dock}`, list.length === 0)
+      element(`resize-${dock}`).classList.toggle('hidden', list.length === 0)
+    }
+    if (dock === 'centre') {
+      element('centre').classList.toggle('no-panel', list.length === 0)
+      element('resize-centre').classList.toggle('hidden', list.length === 0)
+    }
+    if (dock === 'bottom') {
+      frame.classList.toggle('no-bottom', list.length === 0)
+      element('resize-bottom').classList.toggle('hidden', list.length === 0)
+    }
     for (const p of list) host.append(drawPanel(p))
   }
 
@@ -211,6 +311,26 @@ export function makeShell(root, context) {
     viewport: element('viewport'),
     overlay: element('viewport-ui'),
     focus,
+    layout: () => ({ ...layout }),
+    setLayout(values = {}) {
+      for (const key of Object.keys(DEFAULT_LAYOUT)) {
+        if (values[key] != null) resize(key, values[key])
+      }
+      saveLayout(layout)
+      return { ...layout }
+    },
+    resetLayout,
     get focused() { return frame?.classList.contains('focused') === true }
   }
+}
+
+const LAYOUT_KEY = 'browser-game-engine.layout.v1'
+
+function readLayout(fallback) {
+  try { return { ...fallback, ...JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') } }
+  catch { return { ...fallback } }
+}
+
+function saveLayout(layout) {
+  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)) } catch { /* storage may be blocked */ }
 }

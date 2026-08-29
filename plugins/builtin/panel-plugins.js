@@ -63,6 +63,8 @@ export default {
         enabled: p.enabled,
         error: p.error,
         builtin: p.builtin,
+        about: p.definition.about || '',
+        needs: p.definition.needs || [],
         gives: POINTS
           .map(([point, word]) => {
             const n = (p.definition[point] || []).length
@@ -86,8 +88,8 @@ export default {
             key: p => p.name,
             selected: state.selected,
             dim: p => !p.enabled,
-            row: p => pluginRow(ui, p),
-            onPick: p => toggle(context, p)
+            row: p => pluginRow(ui, context, p),
+            onPick: p => select(context, p)
           })
         ]),
 
@@ -97,8 +99,8 @@ export default {
             key: p => p.name,
             selected: state.selected,
             dim: p => !p.enabled,
-            row: p => pluginRow(ui, p),
-            onPick: p => toggle(context, p),
+            row: p => pluginRow(ui, context, p),
+            onPick: p => select(context, p),
             emptyText: 'none yet — drop a .js file in project/plugins/'
           })
         ]),
@@ -138,8 +140,12 @@ export default {
   ]
 }
 
-function pluginRow(ui, p) {
+function pluginRow(ui, context, p) {
   return [
+    ui.toggle({
+      value: p.enabled, label: '', stop: true,
+      onChange: on => setEnabled(context, p.name, on).catch(() => {})
+    }),
     ui.glyph(p.error ? '✗' : p.enabled ? '•' : '·', { strong: !!p.error }),
     ui.label(p.name),
     ui.spacer(),
@@ -147,9 +153,10 @@ function pluginRow(ui, p) {
   ]
 }
 
-function toggle(context, p) {
+function select(context, p) {
   state.selected = p.name
-  setEnabled(context, p.name, !p.enabled)
+  context.bus.emit('inspector:plugin', p)
+  context.redraw()
 }
 
 /**

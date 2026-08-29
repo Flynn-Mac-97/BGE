@@ -22,11 +22,18 @@ export function overHTTP() {
   return {
     index: () => j('/api/index'),
     tree: () => j('/api/tree'),
+    agentPlugins: () => j('/api/agent-plugins'),
     read: async path => (await j('/api/file?path=' + encodeURIComponent(path))).text,
+    readAgent: async (scope, path) => (await j('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
     write: (path, text) => j('/api/file', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ path, text })
+    }),
+    writeAgent: (scope, path, text) => j('/api/agent-file', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ scope, path, text })
     })
   }
 }
@@ -37,7 +44,9 @@ export function makeFiles(bus, transport = overHTTP()) {
   return {
     async index() { return transport.index() },
     async tree() { return transport.tree() },
+    async agentPlugins() { return transport.agentPlugins() },
     async read(path) { return transport.read(path) },
+    async readAgent(scope, path) { return transport.readAgent(scope, path) },
 
     async write(path, text) {
       writing++
@@ -52,6 +61,18 @@ export function makeFiles(bus, transport = overHTTP()) {
     },
 
     async writeJSON(path, value) { return this.write(path, JSON.stringify(value, null, 2)) },
+
+    async writeAgent(scope, path, text) {
+      writing++
+      bus.emit('files:writing', { path, scope, pending: writing })
+      try {
+        await transport.writeAgent(scope, path, text)
+        bus.emit('files:written', { path, scope })
+      } finally {
+        writing--
+        bus.emit('files:writing', { path, scope, pending: writing })
+      }
+    },
 
     get pending() { return writing }
   }

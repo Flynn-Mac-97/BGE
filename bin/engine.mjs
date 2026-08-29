@@ -41,6 +41,9 @@ debug     errors    log [n]    watch    eval '<js>'
 friction  pain "<what was hard or expensive>" [--kind engine|cli|docs|editor]
                [--cost <tokens>] [--reads <n>] [--where path] [--fix "..."]
           pain.list [--all]    pain.resolve <id> "<what you did>"
+agents    agent.context [file...]
+          agent.prepare <id> [file...] [--parallel]
+          agent.status         agent.release <id> --checked
 
 Args that parse as JSON are sent as JSON, everything else as a string.
 Flags (--foo) collect into a trailing options object.
@@ -59,6 +62,9 @@ Exit 0 ok, 1 error, 2 no editor attached (open ${HOST}).
 index, tree, check and pain read the project straight off disk, so they answer
 with nothing running. Everything else drives a live editor unless --headless
 says to start a world here instead.
+
+Agent commands also need nothing running. Small prepared tasks use this
+workspace; parallel writers get a git worktree and require a clean baseline.
 
   node bin/engine.mjs --headless run tests.run
   node bin/engine.mjs --headless simulate 2 --level level1
@@ -115,7 +121,7 @@ const coerce = w => {
 const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
                  'kind', 'where', 'fix', 'cost', 'reads', 'all',
-                 'headless', 'level', 'root']) delete options[k]
+                 'headless', 'level', 'root', 'parallel', 'checked', 'blocked']) delete options[k]
 
 let args = words.map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
@@ -300,6 +306,52 @@ if (op === 'pain.list') {
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 const PROJECT = fileURLToPath(new URL('../project/', import.meta.url))
 const readProject = async () => import('../engine/project-index.mjs')
+
+// Agent context and worktree setup are file/git operations, not world
+// operations. They must work before a dev server or browser exists.
+if (op.startsWith('agent.')) {
+  const agents = await import('../engine/agent-workspace-node.mjs')
+  try {
+    if (op === 'agent.context') {
+      const request = args[0] && typeof args[0] === 'object'
+        ? args[0]
+        : args.length ? { files: args.map(String) } : {}
+      out(await agents.contextFromDisk(REPO, request))
+      process.exit(0)
+    }
+
+    if (op === 'agent.prepare') {
+      const id = args[0]
+      if (typeof id !== 'string') die(1, 'usage: agent.prepare <id> [JSON task request]')
+      const supplied = args[1]
+      const request = supplied && typeof supplied === 'object'
+        ? { ...supplied }
+        : { task: id, files: args.slice(1).map(String) }
+      if (flags.parallel) request.parallel = true
+      out(await agents.prepareAgent(REPO, id, request))
+      process.exit(0)
+    }
+
+    if (op === 'agent.status') {
+      out(agents.readAgentRegistry(REPO))
+      process.exit(0)
+    }
+
+    if (op === 'agent.release') {
+      const id = args[0]
+      if (typeof id !== 'string') die(1, 'usage: agent.release <id> [JSON result]')
+      const result = args[1] && typeof args[1] === 'object' ? { ...args[1] } : {}
+      if (flags.checked) result.checks = 'all'
+      if (flags.blocked) result.status = 'blocked'
+      out(agents.releaseAgent(REPO, id, result))
+      process.exit(0)
+    }
+
+    die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, or agent.release`)
+  } catch (error) {
+    die(1, String(error?.message || error), error?.stack)
+  }
+}
 
 if (op === 'index') {
   const { buildIndex } = await readProject()

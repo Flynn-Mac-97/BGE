@@ -5,11 +5,15 @@
  * Implemented as two panel registrations with a `when` predicate rather than a
  * panel that moves itself — the dock is declared, not imperative.
  */
-const state = { file: null, text: '', open: false, dirty: false }
+const state = { file: null, scope: null, text: '', open: false, dirty: false }
 
-async function openFile(context, path) {
-  state.file = path
-  state.text = await context.files.read(path)
+async function openFile(context, target) {
+  const value = typeof target === 'string' ? { path: target, scope: null } : target
+  state.file = value.path
+  state.scope = value.scope || null
+  state.text = state.scope
+    ? await context.files.readAgent(state.scope, state.file)
+    : await context.files.read(state.file)
   state.dirty = false
   state.open = true
   context.redraw()
@@ -17,7 +21,8 @@ async function openFile(context, path) {
 
 async function save(context) {
   if (!state.file || !state.dirty) return
-  await context.files.write(state.file, state.text)
+  if (state.scope) await context.files.writeAgent(state.scope, state.file, state.text)
+  else await context.files.write(state.file, state.text)
   state.dirty = false
   // A changed type used to mean reloading the page, which threw away the scene
   // you were looking at. Live File Updates swaps it in place instead — this save just
@@ -101,5 +106,6 @@ export default {
         openFile(context, path)
       }
     })
+    context.bus.on('open:agent-file', target => openFile(context, target))
   }
 }

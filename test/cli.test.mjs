@@ -97,6 +97,15 @@ await test('snapshot returns the fields an agent depends on', () => {
   ok(Array.isArray(s.errors), 'errors is a list')
 })
 
+await test('panel layout can be inspected, resized, and restored', () => {
+  const before = json(['layout.read'])
+  const wanted = before.left === 260 ? 276 : 260
+  const changed = json(['layout.set', JSON.stringify({ left: wanted })])
+  eq(changed.left, wanted, 'left dock changed size')
+  const restored = json(['layout.set', JSON.stringify(before)])
+  eq(restored, before, 'the previous layout was restored')
+})
+
 await test('captured output is compact, --pretty is indented', () => {
   const compact = cli(['snapshot']).stdout
   const indented = cli(['snapshot', '--pretty']).stdout

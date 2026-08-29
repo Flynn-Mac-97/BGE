@@ -6,8 +6,24 @@
  * Fields are generated from the type's `properties`, which is the only schema —
  * declared once, in code, with no separate serialisation annotation.
  */
+const state = { plugin: null, guide: null, error: null }
+
 export default {
   name: 'Inspector Panel',
+
+  onLoad(context) {
+    context.bus.on('inspector:plugin', plugin => inspectPlugin(context, plugin))
+    context.bus.on('selection:changed', () => {
+      if (!state.plugin) return
+      state.plugin = null
+      state.guide = null
+      context.redraw()
+    })
+    context.bus.on('open:file', () => {
+      state.plugin = null
+      state.guide = null
+    })
+  },
 
   panels: [{
     id: 'inspector',
@@ -19,12 +35,60 @@ export default {
       const sel = context.selection
       const file = context.editor._file
 
+      if (state.plugin) return pluginView(ui, context)
       if (sel.length > 1) return multi(ui, context, sel)
       if (sel.length === 1) return entity(ui, context, sel[0])
       if (file) return fileView(ui, context, file)
       return ui.empty('select something in the scene, or open a file')
     }
   }]
+}
+
+async function inspectPlugin(context, plugin) {
+  state.plugin = plugin
+  state.guide = null
+  state.error = null
+  context.redraw()
+  try {
+    const guides = await context.files.agentPlugins()
+    const guide = guides.find(guide => guide.plugin === plugin.name)
+    if (!guide) return
+    const text = await context.files.readAgent(guide.scope, guide.file)
+    if (state.plugin?.name !== plugin.name) return
+    state.guide = { ...guide, text, dirty: false }
+  } catch (error) { state.error = String(error?.message || error) }
+  context.redraw()
+}
+
+async function savePluginGuide(context) {
+  if (!state.guide?.dirty) return
+  await context.files.writeAgent(state.guide.scope, state.guide.file, state.guide.text)
+  state.guide.dirty = false
+  context.redraw()
+}
+
+function pluginView(ui, context) {
+  const plugin = state.plugin
+  return ui.stack([
+    ui.section(`${plugin.name} · plugin`, [
+      ui.field({ k: 'source', v: plugin.builtin ? 'built-in' : 'project' }),
+      ui.field({ k: 'state', v: plugin.enabled ? 'enabled' : 'disabled' }),
+      plugin.needs?.length ? ui.field({ k: 'needs', v: plugin.needs.join(', ') }) : null,
+      plugin.error ? ui.field({ k: 'error', v: plugin.error, marked: true }) : null
+    ].filter(Boolean)),
+    plugin.about ? ui.section('About', [ui.text(plugin.about)]) : null,
+    ui.section('Contributes', [ui.text(plugin.gives.join(' · ') || 'nothing', { dim: true })]),
+    ui.section('Agent guide', [
+      state.error ? ui.text(state.error) : null,
+      state.guide
+        ? ui.stack([
+            ui.text(state.guide.file, { dim: true }),
+            ui.textarea({ value: state.guide.text, onChange: text => { state.guide.text = text; state.guide.dirty = true } }),
+            ui.button(state.guide.dirty ? 'Save guide' : 'Guide saved', () => savePluginGuide(context), { primary: state.guide.dirty })
+          ])
+        : ui.text('reading guide…', { dim: true })
+    ].filter(Boolean))
+  ].filter(Boolean))
 }
 
 function entity(ui, context, e) {

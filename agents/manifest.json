@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "nodes": [
+    { "id": "agent-framework", "title": "Agent Framework", "kind": "group" },
+    { "id": "bootstrap", "title": "Start Here", "kind": "document", "parent": "agent-framework", "file": "agents/bootstrap.md" },
+    { "id": "architecture", "title": "Architecture", "kind": "document", "parent": "agent-framework", "file": "ARCHITECTURE.md" },
+    { "id": "core", "title": "Shared Rules", "kind": "instruction", "parent": "architecture", "file": "agents/core.md", "always": true },
+    { "id": "code-style", "title": "Code Style", "kind": "instruction", "parent": "architecture", "file": "agents/code-style.md", "override": "code-style", "match": ["**/*.js"] },
+    { "id": "comment-style", "title": "Comment Style", "kind": "instruction", "parent": "architecture", "file": "agents/comment-style.md", "override": "comment-style", "match": ["**/*.js", "**/*.md"] },
+    { "id": "engine", "title": "Engine", "kind": "instruction", "parent": "architecture", "file": "agents/engine.md", "match": ["engine/**"], "tests": ["node bin/engine.mjs check", "npm test"] },
+    { "id": "editor", "title": "Editor", "kind": "instruction", "parent": "architecture", "file": "agents/editor.md", "match": ["plugins/builtin/**", "engine/ui.js", "engine/shell.js", "engine/render.js"], "tests": ["node bin/engine.mjs check", "npm test"] },
+    { "id": "tooling", "title": "CLI and Tools", "kind": "instruction", "parent": "architecture", "file": "agents/tooling.md", "match": ["bin/**", "tools/**", "vite.config.js", "package.json", "agents/**", "project/agents/**"], "tests": ["node bin/engine.mjs check", "npm test"] },
+    { "id": "project", "title": "Project", "kind": "group", "parent": "agent-framework" },
+    { "id": "plugins", "title": "Plugins", "kind": "group", "parent": "agent-framework" },
+    { "id": "skills", "title": "Skills", "kind": "group", "parent": "agent-framework" },
+    { "id": "blender-3d", "title": "Blender 3D", "kind": "skill", "parent": "skills", "file": "agents/skills/blender-3d/SKILL.md", "optional": true, "triggers": ["blender", "3d model", ".blend"], "match": ["project/assets/**/*.blend"] }
+  ]
+}

@@ -24,8 +24,47 @@ project/
   tests/             coin-pickup.js  jump.js          checks that outlive a session
   assets/            sprites and sounds
   plugins/           your own editor extensions
+  agents/            game instructions and skill settings
   .engine/index.json generated; read by both the editor and the AI
 ```
+
+## Agent workspace
+
+The root `AGENTS.md` is a short bootstrap. Engine rules live in `agents/`.
+Game rules live in `project/agents/`. Their manifests join into one tree.
+
+Open **AGENTS** to inspect the tree, add a branch, edit its file, or switch an
+optional skill on or off. A disabled skill adds no text to an agent packet.
+Skills use the portable `SKILL.md` format.
+
+Every plugin may carry a short sidecar guide beside its code:
+
+```text
+plugins/builtin/physics-3d.js
+plugins/builtin/physics-3d.agent.md
+```
+
+The **Plugins** branch discovers these files by itself. A guide is loaded only
+when its plugin is enabled and the task names or edits that plugin.
+
+Engine style defaults can be replaced for one project. An engine rule names an
+override key; a project rule with the same key wins only for matching project
+files. Core safety rules have no key, so a project cannot replace them.
+
+```text
+node bin/engine.mjs agent.context engine/world.js
+node bin/engine.mjs agent.prepare small-fix engine/world.js
+node bin/engine.mjs agent.prepare parallel-fix engine/world.js --parallel
+node bin/engine.mjs agent.status
+node bin/engine.mjs agent.release small-fix --checked
+```
+
+A small, single-writer task stays in the current workspace. A parallel writing
+task requires a clean tracked baseline and gets a git worktree under
+`.agent-worktrees/`. Overlapping file claims are refused. The editor's
+**AGENTS** panel shows the same tree, file sizes, skill state, and recorded
+runs. A task cannot be marked complete until its required checks are recorded.
+Context resolution works offline; the browser never runs git.
 
 ### A type
 
@@ -211,6 +250,10 @@ renderer with its own coordinates, invisible to `snapshot()` and absent from a
 screenshot. `node bin/engine.mjs run hud.read` returns what it currently says.
 
 ## Authoring in the editor
+
+**Layout.** Drag the thin borders beside the left, right, bottom, or expanded
+centre panels to resize them. Sizes survive reloads. Arrow keys resize a
+focused border; double-click or `node bin/engine.mjs layout.reset` restores it.
 
 **New.** The `+` in the Project panel makes a type, behaviour, level, test or
 plugin — pick a kind, give it a name, and it writes the file and opens it. The

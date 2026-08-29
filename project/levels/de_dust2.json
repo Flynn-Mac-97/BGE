@@ -1,6 +1,5 @@
 {
   "camera": {
-    "mode": "first-person",
     "follow": "you",
     "eyeHeight": 1.346,
     "crouchEyeHeight": 0.762,
@@ -9,7 +8,8 @@
       7.07,
       2.603
     ],
-    "zoom": 42.857
+    "zoom": 42.857,
+    "mode": "first-person"
   },
   "world": {
     "sky": "#b6c6d8",

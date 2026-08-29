@@ -132,7 +132,8 @@ export function makeUI(state, redraw) {
       const on = o.value ?? (o.bind ? !!state[o.bind] : false)
       const element = h('button', 'u-toggle', { 'aria-pressed': String(on) })
       append(element, [h('span', 'u-box'), h('span', null, { text: o.label || '' })])
-      element.addEventListener('click', () => {
+      element.addEventListener('click', event => {
+        if (o.stop) event.stopPropagation()
         const v = !on
         if (o.bind) state[o.bind] = v
         o.onChange?.(v)
@@ -201,6 +202,41 @@ export function makeUI(state, redraw) {
         })
         append(element, [row])
       })
+      return element
+    },
+
+    textarea(o = {}) {
+      const element = h('textarea', 'u-textarea', { spellcheck: 'false', placeholder: o.placeholder || '' })
+      element.value = String(o.value ?? '')
+      bindable(o, element, 'input', target => target.value)
+      return element
+    },
+
+    tree(o = {}) {
+      const element = h('div', 'u-tree')
+      const nodes = o.nodes || []
+      if (!nodes.length) return append(element, [ui.empty(o.emptyText || 'nothing here')])
+      const byParent = new Map()
+      for (const node of nodes) {
+        const key = node.parent || ''
+        byParent.set(key, [...(byParent.get(key) || []), node])
+      }
+      const draw = (parent, depth) => {
+        for (const node of byParent.get(parent) || []) {
+          const children = byParent.get(node.id) || []
+          const row = h('div', 'u-trow' + (o.selected === node.id ? ' on' : ''), {
+            role: 'button', tabindex: '0', style: `--depth:${depth}`
+          })
+          append(row, o.row ? o.row(node, children.length) : [ui.label(node.title || node.id)])
+          row.addEventListener('click', event => o.onPick?.(node, event))
+          row.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); o.onPick?.(node, event) }
+          })
+          append(element, [row])
+          draw(node.id, depth + 1)
+        }
+      }
+      draw('', 0)
       return element
     },
 

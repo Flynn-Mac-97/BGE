@@ -36,6 +36,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
  * exists.
  */
 export function onDisk(projectDirectory) {
+  const root = path.dirname(projectDirectory)
   const inside = rel => {
     const abs = path.resolve(projectDirectory, rel)
     // Same guard the dev server applies. A path that climbs out of the project
@@ -47,17 +48,63 @@ export function onDisk(projectDirectory) {
     return abs
   }
 
+  const insideAgent = (scope, rel) => {
+    const base = scope === 'engine' ? root : scope === 'project' ? projectDirectory : null
+    const clean = String(rel || '').replaceAll('\\', '/').replace(/^\.\//, '')
+    const allowed = scope === 'engine'
+      ? clean === 'AGENTS.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || /^plugins\/builtin\/[^/]+\.agent\.md$/.test(clean)
+      : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent\.md$/.test(clean)
+    if (!base || !allowed) throw new Error(`bad agent file path: ${scope}:${rel}`)
+    const abs = path.resolve(base, clean)
+    if (!abs.startsWith(base + path.sep)) throw new Error(`bad agent file path: ${scope}:${rel}`)
+    return abs
+  }
+
+  const pluginSidecars = async () => {
+    const game = JSON.parse(await fs.readFile(path.join(projectDirectory, 'game.json'), 'utf8').catch(() => '{}'))
+    const disabled = new Set(game.plugins?.disabled || [])
+    const places = [
+      { scope: 'engine', directory: path.join(root, 'plugins/builtin'), prefix: 'plugins/builtin' },
+      { scope: 'project', directory: path.join(projectDirectory, 'plugins'), prefix: 'plugins' }
+    ]
+    const found = []
+    for (const place of places) {
+      let names = []
+      try { names = await fs.readdir(place.directory) } catch { continue }
+      for (const name of names.filter(name => name.endsWith('.agent.md')).sort()) {
+        const stem = name.slice(0, -'.agent.md'.length)
+        const source = await fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => '')
+        const plugin = source.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
+        found.push({
+          id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
+          scope: place.scope, file: `${place.prefix}/${name}`,
+          match: [`${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`],
+          triggers: [stem.replaceAll('-', ' '), plugin.toLowerCase()], enabled: !disabled.has(plugin), plugin
+        })
+      }
+    }
+    return found
+  }
+
   return {
     index: () => buildIndex(projectDirectory),
     tree: async () => (await walk(projectDirectory))
       .filter(f => !f.startsWith('.engine'))
       .map(f => ({ path: f })),
+    agentPlugins: pluginSidecars,
     read: rel => fs.readFile(inside(rel), 'utf8'),
+    readAgent: (scope, rel) => fs.readFile(insideAgent(scope, rel), 'utf8'),
     async write(rel, text) {
       const abs = inside(rel)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, text, 'utf8')
       await buildIndex(projectDirectory)
+    },
+    async writeAgent(scope, rel, text) {
+      const abs = insideAgent(scope, rel)
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await fs.writeFile(abs, text, 'utf8')
+      if (scope === 'project') await buildIndex(projectDirectory)
     }
   }
 }
