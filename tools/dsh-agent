@@ -1,16 +1,18 @@
-#!/usr/bin/env node
-// dsh-agent POSIX shim: re-exports the shared implementation next to it.
-// Installed npm shims for Windows use dsh-agent.cmd instead.
-import { spawn } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+#!/bin/sh
+# dsh-agent POSIX shim (git-bash / WSL / macOS / Linux): execs the shared
+# implementation next to it. Windows cmd/PowerShell use dsh-agent.cmd instead.
+basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
 
-const dir = dirname(fileURLToPath(import.meta.url));
-const impl = join(dir, "dsh-agent.mjs");
-const child = spawn(process.execPath, [impl, ...process.argv.slice(2)], {
-  stdio: "inherit",
-  windowsHide: true
-});
-child.on("exit", (code, signal) => {
-  process.exit(signal ? 1 : (code ?? 1));
-});
+case `uname` in
+    *CYGWIN*|*MINGW*|*MSYS*)
+        if command -v cygpath > /dev/null 2>&1; then
+            basedir=`cygpath -w "$basedir"`
+        fi
+    ;;
+esac
+
+if [ -x "$basedir/node" ]; then
+  exec "$basedir/node" "$basedir/dsh-agent.mjs" "$@"
+else
+  exec node "$basedir/dsh-agent.mjs" "$@"
+fi

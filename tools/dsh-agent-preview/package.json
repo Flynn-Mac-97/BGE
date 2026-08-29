@@ -1,0 +1,12 @@
+{
+  "name": "dsh-agent-preview",
+  "description": "Live preview of agents and what they are doing: /agents command in the web GUI",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,3 @@
+- insert:
+    - id: agent-preview
+      name: '../node_modules/dsh-agent-preview/lib/index.js'
