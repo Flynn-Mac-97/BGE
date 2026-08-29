@@ -32,6 +32,40 @@ your edit silently does nothing.
 `_extraKeys` exists so a save never narrows a file. Anything the placement carried
 that the entity does not model is written straight back out.
 
+### Which way a body is facing
+
+Two names, and they are not a duplicate — they are the two places a facing comes
+from. `rotation` is the editor's handle, in **degrees** about Y, because degrees
+are what an author types into an inspector and reads back off a level file.
+`yaw` is what game code sets while the world is running, in **radians**, because
+radians are what every other angle in the engine is in: the camera's aim, a
+raycast, the answer `Math.atan2` gives.
+
+The renderer draws by `yaw` when there is one and falls back to `rotation`. So a
+type that turns to face where it is running writes `entity.yaw` and nothing else.
+
+### A body made of boxes
+
+`mesh` takes one box, one quad, a loaded model — or `parts`, a list of boxes that
+are drawn as one entity:
+
+```js
+mesh: {
+  tint: '#e8a55c',
+  parts: [
+    { box: [0.42, 0.30, 0.54] },                                  // body, centred
+    { box: [0.30, 0.28, 0.26], at: [0, 0.22, -0.31] },            // head, in front
+    { name: 'legFrontLeft', box: [0.1, 0.16, 0.1], at: [-0.13, -0.145, -0.2] }
+  ]
+}
+```
+
+`at` is metres from the entity's centre, `rotation` is degrees about X, Y and Z,
+and a part inherits every other key of the mesh. Forward is -Z, the direction the
+camera faces at yaw 0. A **named** part is swung by `entity.pose`, exactly as a
+named node of a loaded model is — `pose: { legFrontLeft: 0.4 }` is a run cycle
+whether the body came out of a file or out of this list.
+
 ## Types and placements
 
 A type says what a thing *is*. A level says where things *are*. Overrides stay
