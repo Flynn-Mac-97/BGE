@@ -59,7 +59,9 @@ friction  pain "<what was hard or expensive>" [--kind engine|cli|docs|editor]
           pain.list [--all]    pain.resolve <id> "<what you did>"
 agents    agent.context [file...]
           agent.prepare <id> [file...] [--parallel]
-          agent.status         agent.release <id> --checked
+          agent.status         agent.release <id> [--blocked "<why>"]
+          agent.merge <id>     merge the lane, run its deferred checks, remove
+                               its worktree and branch
 
 Args that parse as JSON are sent as JSON, everything else as a string.
 Flags (--foo) collect into a trailing options object.
@@ -378,13 +380,24 @@ if (op.startsWith('agent.')) {
       const id = args[0]
       if (typeof id !== 'string') die(1, 'usage: agent.release <id> [JSON result]')
       const result = args[1] && typeof args[1] === 'object' ? { ...args[1] } : {}
-      if (flags.checked) result.checks = 'all'
+      // `--checked` used to be the whole gate: it copied the required list into
+      // the record without running anything. Release runs them now, so the flag
+      // asks for what already happens. Say so rather than accepting it quietly,
+      // because a caller passing it believes it is doing something.
+      if (flags.checked) process.stderr.write('[agents] --checked is no longer needed; release runs the checks itself\n')
       if (flags.blocked) result.status = 'blocked'
       out(agents.releaseAgent(REPO, id, result))
       process.exit(0)
     }
 
-    die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, or agent.release`)
+    if (op === 'agent.merge') {
+      const id = args[0]
+      if (typeof id !== 'string') die(1, 'usage: agent.merge <id>')
+      out(agents.mergeAgent(REPO, id))
+      process.exit(0)
+    }
+
+    die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, agent.release, or agent.merge`)
   } catch (error) {
     die(1, String(error?.message || error), error?.stack)
   }

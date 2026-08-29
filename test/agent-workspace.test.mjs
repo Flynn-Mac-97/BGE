@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import { matchesAgentPattern, readAgentWorkspace, resolveAgentContext } from '../engine/agent-workspace.js'
-import { prepareAgent, readAgentRegistry, releaseAgent } from '../engine/agent-workspace-node.mjs'
+import { prepareAgent, readAgentRegistry, releaseAgent, mergeAgent } from '../engine/agent-workspace-node.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -126,13 +126,27 @@ test('small tasks stay put and parallel tasks receive worktrees', async t => {
   const small = await prepareAgent(root, 'small-fix', { files: ['engine/world.js'] })
   assert.equal(small.mode, 'current')
   await assert.rejects(prepareAgent(root, 'overlap', { files: ['engine/world.js'] }), /overlaps active work|active writer/)
-  assert.throws(() => releaseAgent(root, 'small-fix'), /checks not recorded/)
-  releaseAgent(root, 'small-fix', { checks: 'all' })
+
+  // The fixture is not a real checkout, so its required checks cannot pass.
+  // That is the point: release runs them and refuses, where it used to record
+  // the caller's word that they had been run.
+  assert.throws(() => releaseAgent(root, 'small-fix'), /checks failed/)
+  assert.equal(readAgentRegistry(root).runs.find(run => run.id === 'small-fix').status, 'active',
+    'a refused release leaves the run active')
+
+  const blocked = releaseAgent(root, 'small-fix', { status: 'blocked', note: 'no engine in the fixture' })
+  assert.equal(blocked.status, 'blocked')
 
   const parallel = await prepareAgent(root, 'parallel-fix', { files: ['engine/world.js'], parallel: true })
   assert.equal(parallel.mode, 'worktree')
   assert.ok(fs.existsSync(path.join(parallel.workspace, 'project/.engine/agent-task.json')))
   assert.equal(readAgentRegistry(root).runs.filter(run => run.status === 'active').length, 1)
-  releaseAgent(root, 'parallel-fix', { checks: 'all' })
-  git(['worktree', 'remove', '--force', parallel.workspace]); git(['branch', '-D', parallel.branch])
+  releaseAgent(root, 'parallel-fix', { status: 'blocked', note: 'no engine in the fixture' })
+
+  // Merging takes the worktree and the branch away, so the id is free again.
+  mergeAgent(root, 'parallel-fix')
+  assert.ok(!fs.existsSync(parallel.workspace), 'the worktree is gone')
+  assert.equal(execFileSync('git', ['-C', root, 'branch', '--list', parallel.branch], { encoding: 'utf8' }).trim(), '',
+    'the branch is gone')
+  assert.equal(readAgentRegistry(root).runs.find(run => run.id === 'parallel-fix').status, 'merged')
 })
