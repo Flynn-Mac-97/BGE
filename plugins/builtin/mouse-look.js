@@ -131,17 +131,6 @@ const FIRST_PERSON = {
  */
 const HELD_BY_THE_BROWSER = ['Tab', 'Space']
 
-/**
- * The live input surface, published on the module.
- *
- * A test is handed a `test` object and no context, so this is how
- * `project/tests/mouse-look.js` reaches the same `look`, `lookBy` and `press`
- * the game reaches. Reading it through the module rather than rebuilding a
- * second copy is the point — a test that exercised its own accumulator would
- * pass while the real one was broken.
- */
-export const mouseLook = { input: null }
-
 export default {
   name: 'Mouse Look',
   needs: ['Keyboard Input'],
@@ -207,8 +196,6 @@ export default {
         return turned
       }
     })
-
-    mouseLook.input = input
 
     // Whatever was accumulated while nobody was reading is not aim, it is
     // history. Starting or stopping play with a stale half-turn in the bag

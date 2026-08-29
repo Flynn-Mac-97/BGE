@@ -151,7 +151,10 @@ async function runOne(definition, id, context) {
   await context.editor.loadLevel(definition.level || context.level())
 
   const checks = []
-  const test = makeT(context, checks)
+  // A subscription outlives the function that made it, so the next test would
+  // inherit it. Collected here and dropped below, whether the test passed or threw.
+  const unsubscribes = []
+  const test = makeT(context, checks, unsubscribes)
   const t0 = performance.now()
   let error = null
 
@@ -159,6 +162,8 @@ async function runOne(definition, id, context) {
     await definition.run(test)
   } catch (e) {
     error = String(e?.message || e)
+  } finally {
+    for (const off of unsubscribes) { try { off() } catch { /* already gone */ } }
   }
 
   // `note` records a line without asserting anything, so it must not count
@@ -184,7 +189,7 @@ async function runOne(definition, id, context) {
  * the engine uses — entities by id, properties, named input actions — so a test
  * reads like the game rather than like a harness.
  */
-function makeT(context, checks) {
+function makeT(context, checks, unsubscribes) {
   const { world, loop } = context
   let started = false
 
@@ -216,6 +221,27 @@ function makeT(context, checks) {
   }
 
   const test = {
+    /**
+     * The live context, the same object every hook is handed.
+     *
+     * Without it a test could only see the world, so anything a plugin
+     * contributed — raycast, damage, weapons, a match — could not be asked
+     * anything. Three builtins used to publish a module-level handle purely so a
+     * test could import it back, which worked only because a plugin module is a
+     * singleton and read like a trick. The verbs below are shortcuts into this.
+     */
+    context,
+
+    /** Drive the editor the way the terminal does. Commands are the public surface. */
+    run: (id, args) => context.run(id, args),
+
+    /** Listen on the bus. Dropped for you when the test ends. */
+    on(event, handler) {
+      const off = context.bus.on(event, handler)
+      unsubscribes.push(off)
+      return off
+    },
+
     get state() { return world.state },
     get entities() { return world.entities },
 

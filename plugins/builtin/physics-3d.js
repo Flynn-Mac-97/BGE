@@ -402,7 +402,7 @@ function stepUp(body, box, other, blockers, stepHeight) {
  * stands up. It is the reason standing up from a crouch under a vent correctly
  * refuses.
  */
-export function canStand(world, entity, height) {
+function canStand(world, entity, height) {
   if (!is3D(entity)) {
     report(`stand-${entity?.id}`, `canStand(${entity?.id}) — that entity has no three-number collider box`)
     return true

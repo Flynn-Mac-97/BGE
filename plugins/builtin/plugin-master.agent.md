@@ -10,7 +10,7 @@ match: plugins/** project/plugins/**
 - Compose panels from `ui.*`. Never write markup.
 - Give every action a command id, so a button a person can press works from a terminal too.
 - Declare a shortcut as `key: 'ctrl+z'` on the command — lowercase, ctrl then shift then alt, then the key; ctrl means Command too. Never open your own keydown listener; the shell owns the only one.
-- Contribute verbs and state through `context`, so a plugin and a test reach the same live thing.
+- Contribute verbs and state through `context`, so a plugin and a test reach the same live thing. Never export a module-level handle for a test to import back — a test gets `test.context`, and a second handle is a second copy waiting to disagree.
 - Curate the details: `about` for a paragraph, `inspect` for sections of `{ title, rows }` (data or a function of context) — the Inspector renders them when the plugin is selected.
 - Subscribe in `onLoad(context)`; the viewport exists only after `shell:ready`.
 - Use engine time, random, and timers. A plugin must not break determinism.

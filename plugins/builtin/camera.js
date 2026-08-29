@@ -81,21 +81,6 @@ const LANDING_FULL_DIP = 8     // the fall speed that earns the whole dip
 /** How far a unit of shake throws the aim when there is no picture to slide. */
 const SHAKE_RADIANS = 0.08
 
-/**
- * The camera the running world is using, and the context it was handed.
- *
- * A test file is given the `test` object and nothing else, so there is otherwise
- * no way for one to ask where the view is pointing or to feed it a look. A
- * plugin module is a singleton in node and in the browser alike, so importing
- * this file from `project/tests` reaches the very object the live world uses.
- *
- * Null until the plugin has loaded. One process runs one world, which is what
- * makes a single handle honest — that is also the arrangement `--headless`
- * relies on for several agents to work at once.
- */
-let running = null
-export const runningCamera = () => running
-
 export default {
   name: 'Game Camera',
   about: 'Follow the player or look around freely — the game camera, separate from the editor viewport.',
@@ -182,7 +167,6 @@ export default {
       }
     }
     context.camera = cam
-    running = { camera: cam, context }
 
     /** What the rule says, applied to the view. Play starts here, and so does a late read. */
     function applyRule() {
