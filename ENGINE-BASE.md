@@ -16,6 +16,13 @@ file, and nothing is saved anywhere else.
   `node bin/engine.mjs agent.context <file>`
 - Shared working rules: `agents/core.md` — always in force, never overridden.
 - Run every check named in your packet before you finish.
+- Read a plugin's `.agent.md` guide, not its source. That is what it is for —
+  the guide is ten lines, the plugin can be a thousand.
+- Read `project/.engine/index.agent.json` before opening many project files. It
+  is generated; `node bin/engine.mjs index` writes it.
+- Working with other agents at once: `docs/agent-workspace.md`, the "Several
+  agents at once" section. Claims are advisory, not enforced — know that before
+  you rely on them.
 
 ## Style links
 
@@ -28,7 +35,9 @@ file, and nothing is saved anywhere else.
 - `README.md` — how to use the engine
 - `ARCHITECTURE.md` — how it works and why it is shaped this way
 - `agents/` — the engine's instructions; `agents/manifest.json` is the tree
-- `plugins/` — everything is a plugin; each builtin plugin carries a short guide beside it
+- `plugins/` — everything is a plugin; each carries a short guide beside it.
+  Keep a plugin under 400 lines: `--headless run plugin.sizes` names the ones
+  that are over, and any missing a guide
 - `project/` — the game; `project/agents/` has the game's own rules
 - `agent-runs/` — anything an agent makes: one folder per round, and the
   friction log. All of it is a working artifact and all of it can be deleted.
