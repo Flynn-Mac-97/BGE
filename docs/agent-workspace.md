@@ -65,18 +65,18 @@ conflict.
 | clean tracked baseline before `--parallel` | enforced, `prepare` refuses otherwise |
 | index written atomically | enforced |
 | stale registry lock | broken after 60s, with a named warning |
-| **file claims** | **advisory — no write path reads the registry (p54)** |
-| **`--checked`** | **records that checks ran; runs nothing (p56)** |
-| **closing a lane** | **no verb — merge, worktree remove and branch delete are manual (p55)** |
+| file claims | enforced by `Claim Guard`, which refuses a write to another run's file by name. Node only, and off if the plugin is off |
+| `agent.release` | runs each required check in the lane's workspace and refuses to complete when one fails |
+| `agent.merge` | merges the lane, runs its deferred checks in main, removes the worktree, deletes the branch |
 
-**The recipe today:**
+**The recipe:**
 
 ```sh
 git status --porcelain --untracked-files=all   # must be empty, or prepare refuses
 node bin/engine.mjs agent.prepare <id> <file...> --parallel
-# ... the lane works in .agent-worktrees/<id> ...
-node bin/engine.mjs agent.release <id> --checked
-git merge agent/<id> && git worktree remove .agent-worktrees/<id> && git branch -d agent/<id>
+# the lane works in .agent-worktrees/<id>, with ENGINE_AGENT_ID=<id> set
+node bin/engine.mjs agent.release <id>          # runs the checks; refuses if one fails
+node bin/engine.mjs agent.merge <id>            # lands it, then removes worktree and branch
 ```
 
 A worktree isolates **tracked** files only, so commit untracked work first or
@@ -84,9 +84,6 @@ lanes fight over exactly the files that are not in it.
 
 **What still bites:**
 
-- `npm test` is a required check for the engine, editor and tooling lanes, and
-  it needs a dev server and one open editor tab — so N lanes cannot all satisfy
-  it. Run it once, serially, in the main worktree at the end.
 - Two editor tabs both answer the bridge and the first reply wins, so a
   state-dependent CLI call can read the other tab's world. One tab, or
   `--headless`.

@@ -21,8 +21,8 @@ file, and nothing is saved anywhere else.
 - Read `project/.engine/index.agent.json` before opening many project files. It
   is generated; `node bin/engine.mjs index` writes it.
 - Working with other agents at once: `docs/agent-workspace.md`, the "Several
-  agents at once" section. Claims are advisory, not enforced — know that before
-  you rely on them.
+  agents at once" section. Claim a file with `agent.prepare` and set
+  `ENGINE_AGENT_ID`, or another run's claim will refuse your writes.
 
 ## Style links
 

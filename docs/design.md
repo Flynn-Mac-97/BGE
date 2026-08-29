@@ -51,6 +51,8 @@ lossy as reopening the level — it replays the placements `toLevel` would have
 written — so `hidden`, ad-hoc fields set by `engine.set`, and runtime behaviour
 state do not come back. It is also session-only: reloading the page loses it.
 
-Parallel agents coordinate but are not separated. File claims are advisory —
-nothing reads the run registry at write time — and `agent.release --checked`
-records that checks ran without running them. See painpoints p54, p55 and p56.
+Parallel agents are separated by claim and by worktree, but `Claim Guard` reads
+the registry once at boot and only on the node side, so a run that starts
+mid-session is not seen and the browser guards nothing. `npm test` still cannot
+run in a lane — it needs the one dev server and the one editor tab — so it is
+deferred to `agent.merge`.
