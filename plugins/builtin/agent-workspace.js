@@ -74,9 +74,7 @@ export default {
   name: 'Agent Workspace',
 
   onLoad(context) {
-    // Named for this plugin, not `agents`, because Agents owns that key: this
-    // is the instruction tree and the run registry, not a way to run one.
-    context.agentWorkspace = {
+    context.agents = {
       context: async request => resolveAgentContext(reader(context), request, await pluginNodes(context)),
       status: async () => ({ workspace: await readAgentWorkspace(reader(context), await pluginNodes(context)), runs: await readRegistry(context) })
     }
