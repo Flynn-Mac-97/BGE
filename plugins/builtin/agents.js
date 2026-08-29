@@ -73,6 +73,22 @@ async function runAgent(id, task, options) {
   }
 
   const outcome = await spawnAgent(built, effective)
+
+  // Silence is the enemy. A command that was never found and a command the
+  // timeout killed both end with no exit code and no output, and a provider
+  // handed nothing cannot tell those apart — it would report an empty answer
+  // as an answer. So name the failure here, in the provider's own four-key
+  // shape, instead of asking parse() to read nothing.
+  if (outcome.failure) {
+    return {
+      agent: provider.id,
+      ok: false,
+      text: '',
+      error: outcome.failure,
+      meta: { run: commandLine(built), exitCode: outcome.exitCode, signal: outcome.signal }
+    }
+  }
+
   const parsed = provider.parse(outcome.stdout, outcome.stderr, outcome.exitCode) || {}
   return { agent: provider.id, ...parsed }
 }
@@ -82,8 +98,13 @@ async function runAgent(id, task, options) {
  *
  * The timeout is the child process's own `timeout` option, not a timer of
  * ours: a plugin must not break determinism, and setTimeout is on the banned
- * list. exitCode is null when the process never ran to an exit — the command
- * was not found, or the timeout killed it.
+ * list.
+ *
+ * `failure` is the reason the command produced no answer, already written out
+ * for a person to read, or null when the command ran and exited on its own.
+ * Both of the ways this goes wrong — the executable is not installed, and the
+ * timeout killed it — otherwise arrive as the same empty result with a null
+ * exit code, which is the one thing the caller must not have to guess at.
  */
 async function spawnAgent(built, options) {
   const { spawn } = await import('node:child_process')
@@ -99,8 +120,21 @@ async function spawnAgent(built, options) {
     child.stderr.on('data', chunk => { stderr += chunk })
     let settled = false
     const finish = value => { if (!settled) { settled = true; resolve(value) } }
-    child.on('error', () => finish({ stdout, stderr, exitCode: null }))
-    child.on('close', (exitCode, signal) => finish({ stdout, stderr, exitCode, signal }))
+    child.on('error', error => finish({
+      stdout, stderr, exitCode: null, signal: null,
+      failure: error.code === 'ENOENT'
+        ? `${built.command} is not on PATH — install it, or name a different agent`
+        : `${built.command} could not be started: ${error.message}`
+    }))
+    child.on('close', (exitCode, signal) => finish({
+      stdout, stderr, exitCode, signal: signal ?? null,
+      // Node kills the child with a signal when its own timeout fires, so a
+      // signal and a timeout together is the timeout, said plainly.
+      failure: !signal ? null
+        : options.timeout
+          ? `${built.command} was killed after its ${options.timeout}ms timeout`
+          : `${built.command} was killed by ${signal}`
+    }))
   })
 }
 
