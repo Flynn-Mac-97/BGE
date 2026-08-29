@@ -32,6 +32,7 @@
  * `node bin/engine.mjs run decals.recent` — the same way the audio plugin
  * answers "did that make a noise".
  */
+import { assetURL } from '../../engine/asset-path.js'
 
 /**
  * How many marks exist at once.
@@ -487,17 +488,6 @@ function readColour(value) {
 }
 
 const toLinear = c => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
-
-/**
- * The same rule the renderer resolves a texture by: a name starting with one of
- * the project's own folders is project-relative, and anything else — subfolder
- * included — lives under assets/. Written out here rather than imported because
- * a plugin receives `ui`, it does not import it.
- */
-function assetURL(src) {
-  const rel = String(src).replace(/^\/?project\//, '')
-  return '/project/' + (/^(assets|levels|types|behaviours|tests|plugins)\//.test(rel) ? rel : 'assets/' + rel)
-}
 
 /**
  * Say it once, not sixty times a second. Silence is the enemy, but a caller

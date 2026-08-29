@@ -13,6 +13,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assetPath } from './asset-path.js'
+
+// Where a named asset lives is the one rule this file shares with the browser,
+// so it is imported from the pure module both halves may import rather than
+// copied. Not re-exported: a second door onto one rule is how the copies
+// started.
 
 export const HOOKS = ['start', 'update', 'onCollide', 'onDestroy']
 
@@ -67,26 +73,6 @@ export function lint(file, text) {
     }
   })
   return out
-}
-
-/**
- * Where a named asset actually lives, as a path relative to `project/`.
- *
- * THIS MUST AGREE WITH `assetURL` IN `engine/ui.js`, which is the rule the
- * running engine fetches by. It is copied rather than imported because that file
- * is the browser's and this one is node's, and the moment the two disagree
- * `check` starts swearing a file is there that the renderer cannot fetch — or,
- * worse, reporting two hundred missing assets that are all sitting on disk.
- *
- * The rule: strip a leading `project/`, then a path that starts with one of the
- * project's own folders is project-relative and anything else — subfolder
- * included — lives under `assets/`.
- */
-const PROJECT_FOLDER = /^(assets|levels|types|behaviours|tests|plugins)\//
-
-export const assetPath = reference => {
-  const rel = String(reference).replace(/^\/?project\//, '')
-  return PROJECT_FOLDER.test(rel) ? rel : 'assets/' + rel
 }
 
 /**

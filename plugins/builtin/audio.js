@@ -20,6 +20,8 @@
  *    reports that the jump sound played at t=0.35 — so "did the coin make a
  *    noise" is a question an agent can answer without listening.
  */
+import { assetURL } from '../../engine/asset-path.js'
+
 const RING = 60
 
 export default {
@@ -62,12 +64,9 @@ export default {
       if (buffers.has(file)) return buffers.get(file)
       const a = wake()
       if (!a) return null
-      // The same rule the renderer resolves a texture by: only a name starting
-      // with one of the project's own folders is project-relative, and anything
-      // else — subfolder included — lives under assets/. Written out here rather
-      // than imported because a plugin receives `ui`, it does not import it.
-      const rel = file.replace(/^\/?project\//, '')
-      const url = '/project/' + (/^(assets|levels|types|behaviours|tests|plugins)\//.test(rel) ? rel : 'assets/' + rel)
+      // The same call the renderer resolves a texture by, so a sound and a
+      // texture can never be looked for in two different places.
+      const url = assetURL(file)
       try {
         const res = await fetch(url)
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)

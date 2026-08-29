@@ -10,30 +10,12 @@
  * vocabulary is missing something — add the primitive, do not add an escape hatch.
  */
 
-/**
- * Where an asset reference points.
- *
- * A bare name means `assets/`, because the project is depth 1 and writing
- * `sprite: 'player.png'` should just work. A name with a slash is taken as
- * given. The renderer imports this rather than keeping a second copy — one
- * rule, or the viewport and the thumbnail eventually disagree.
- */
-/**
- * Where a named file actually lives.
- *
- * A path is project-relative only when it names one of the project's own
- * folders. Everything else resolves under `assets/` — including a path with a
- * subfolder in it, which is how a project with two hundred assets stays
- * navigable. The old rule was "any name containing a slash is project-relative",
- * and it meant `counter-strike/wall.png` resolved to `/project/counter-strike/`
- * — the file was right there on disk and the only symptom was a missing texture.
- */
-const PROJECT_FOLDER = /^(assets|levels|types|behaviours|tests|plugins)\//
-
-export const assetURL = src => {
-  const rel = String(src).replace(/^\/?project\//, '')
-  return '/project/' + (PROJECT_FOLDER.test(rel) ? rel : 'assets/' + rel)
-}
+// Where an asset reference points is one rule, and it lives in the pure module
+// both halves import. Re-exported here because the renderer, materials and the
+// skybox already import this file for the vocabulary and reach for it by name.
+// A plugin that wants only the URL should import `asset-path.js` directly —
+// audio, decals and particles do, so the headless world never loads this file.
+export { assetURL } from './asset-path.js'
 
 const IMAGE = /\.(png|jpg|jpeg|webp|gif|svg)$/i
 
