@@ -213,6 +213,18 @@ function bridge() {
 
     configureServer(server) {
       /**
+       * A watcher error must not end the session.
+       *
+       * Chokidar reports a file it cannot watch by emitting `error`, and an
+       * unhandled one on an EventEmitter takes the whole dev server down. A
+       * file another process has locked is a normal thing on Windows and is
+       * not worth losing the editor over. Report it by name and keep serving.
+       */
+      server.watcher.on('error', error => {
+        console.warn(`[engine] file watcher: ${error?.message || error}`)
+      })
+
+      /**
        * Tell the editor what changed on disk.
        *
        * The point is that an agent writes a file with its ordinary file tools —
@@ -310,5 +322,14 @@ export default defineConfig({
     { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() }
   ],
   // ENGINE_NO_OPEN keeps a headless or CI run from launching a visible browser.
-  server: { port: 5180, open: !process.env.ENGINE_NO_OPEN }
+  server: {
+    port: 5180,
+    open: !process.env.ENGINE_NO_OPEN,
+    // Other tools leave scratch directories in the repo — dsh-agent writes
+    // `tools/.dsh-agent.<pid>.<id>.tmpdir/` for as long as it runs. Watching
+    // one is pointless, and on Windows it is fatal: the directory is locked
+    // and then deleted under the watcher, which raises EBUSY. Dot-directories
+    // are never project content, so none of them are watched.
+    watch: { ignored: ['**/.*/**', '**/.agent-worktrees/**', '**/.tmp-agent-tests/**'] }
+  }
 })
