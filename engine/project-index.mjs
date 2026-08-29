@@ -328,10 +328,32 @@ async function writeAtomic(file, text) {
   const temporary = `${file}.${process.pid}.${++writeCount}.tmp`
   try {
     await fs.writeFile(temporary, text)
-    await fs.rename(temporary, file)
+    await renameWhenAllowed(temporary, file)
   } catch (error) {
     await fs.rm(temporary, { force: true })
     throw error
+  }
+}
+
+/**
+ * Rename, allowing for a reader that has the destination open.
+ *
+ * Windows refuses a rename onto a file another process is reading, and the
+ * index is read by every `check`, every agent and every editor boot — so a busy
+ * checkout meets EPERM as a matter of course. It clears in milliseconds. The
+ * only wrong answer is to treat the first refusal as final, because the caller
+ * is usually a file watcher and a throw there ends the whole dev server.
+ *
+ * A plain timer, not `context.after`: this is build tooling in node, running
+ * outside any world, and there is no fixed clock here to be deterministic on.
+ */
+async function renameWhenAllowed(from, to, tries = 5) {
+  const BUSY = new Set(['EPERM', 'EBUSY', 'EACCES'])
+  for (let attempt = 1; ; attempt++) {
+    try { return await fs.rename(from, to) } catch (error) {
+      if (attempt >= tries || !BUSY.has(error.code)) throw error
+      await new Promise(resolve => setTimeout(resolve, attempt * 20))
+    }
   }
 }
 

@@ -47,10 +47,32 @@ const lastWritten = new Map()
  */
 const slash = p => p.split(path.sep).join('/')
 const PROJECT_URL = slash(PROJECT)
+const PROJECT_ROOT_URL = slash(ROOT)
 const inProject = p => slash(p).startsWith(PROJECT_URL + '/')
 
 /** Project-relative, always forward-slashed. */
 const relative = p => slash(p).slice(PROJECT_URL.length + 1)
+
+/**
+ * Whether the watcher should look at a path at all.
+ *
+ * Other tools leave scratch directories in the repo — dsh-agent writes
+ * `tools/.dsh-agent.<pid>.<id>.tmpdir/` for as long as it runs. Watching one is
+ * pointless, and on Windows it is fatal: the directory is locked and then
+ * deleted under the watcher, which raises EBUSY. Dot-directories are never
+ * project content, so none of them are watched.
+ *
+ * The test is made against the path RELATIVE to this server's own root, and
+ * that is the whole point. A parallel agent's checkout lives inside
+ * `.agent-worktrees/<lane>/`, so a pattern matched against the absolute path
+ * ignored every single file that agent owned — the editor never saw one edit,
+ * hot reload never fired, and the stale module cache made it look as though the
+ * work had not been written. In the one workflow this engine exists to support.
+ */
+const watched = file => {
+  const inside = slash(path.resolve(file)).slice(PROJECT_ROOT_URL.length)
+  return !/(^|\/)\.[^/]/.test(inside)
+}
 
 const send = (res, code, body) => {
   res.statusCode = code
@@ -283,7 +305,14 @@ function bridge() {
           lastWritten.delete(rel)
         }
 
-        await buildIndex()
+        // A failed rebuild must not take the server with it. This handler is
+        // async, so anything it throws is an unhandled rejection and node ends
+        // the process — the editor vanishes mid-edit and the last thing on
+        // screen is a stack trace about a temporary file. Say what happened and
+        // keep serving; the next save rebuilds anyway.
+        try { await buildIndex() } catch (error) {
+          console.warn(`[engine] could not rebuild the index: ${error?.message || error}`)
+        }
         server.ws.send('engine:changed', {
           event,                                   // add | change | unlink
           file: rel,
@@ -371,11 +400,6 @@ export default defineConfig({
   server: {
     port: 5180,
     open: !process.env.ENGINE_NO_OPEN,
-    // Other tools leave scratch directories in the repo — dsh-agent writes
-    // `tools/.dsh-agent.<pid>.<id>.tmpdir/` for as long as it runs. Watching
-    // one is pointless, and on Windows it is fatal: the directory is locked
-    // and then deleted under the watcher, which raises EBUSY. Dot-directories
-    // are never project content, so none of them are watched.
-    watch: { ignored: ['**/.*/**', '**/.agent-worktrees/**', '**/.tmp-agent-tests/**'] }
+    watch: { ignored: file => !watched(file) }
   }
 })
