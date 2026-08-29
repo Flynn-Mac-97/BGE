@@ -25,7 +25,7 @@ const HOST = process.env.ENGINE_HOST || `http://localhost:${PORT}`
  * once both get their line, and nothing rewrites what came before.
  * `ENGINE_PAIN_FILE` points it elsewhere, so a test can isolate the log.
  */
-const PAIN_FILE = process.env.ENGINE_PAIN_FILE || fileURLToPath(new URL('../painpoints.jsonl', import.meta.url))
+const PAIN_FILE = process.env.ENGINE_PAIN_FILE || fileURLToPath(new URL('../agent-runs/painpoints.jsonl', import.meta.url))
 
 const HELP = `engine — read and drive the running editor
 

@@ -30,4 +30,7 @@ file, and nothing is saved anywhere else.
 - `agents/` — the engine's instructions; `agents/manifest.json` is the tree
 - `plugins/` — everything is a plugin; each builtin plugin carries a short guide beside it
 - `project/` — the game; `project/agents/` has the game's own rules
+- `agent-runs/` — anything an agent makes: one folder per round, and the
+  friction log. All of it is a working artifact and all of it can be deleted.
+  Write your leftovers there, never at the root
 - `bin/engine.mjs` — the CLI: `help`, `check`, `agent.*`, and every verb
