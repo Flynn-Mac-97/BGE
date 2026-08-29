@@ -6,8 +6,8 @@
  * and the number you lasted is the whole result. All three are the same small
  * piece of state, so they live in one place.
  *
- *   context.run.watch('you')                 end the run when this dies
- *   context.run.report('kills', () => n)     a number for the result
+ *   context.runClock.watch('you')                 end the run when this dies
+ *   context.runClock.report('kills', () => n)     a number for the result
  *   context.bus.on('run:ended', ...)         draw whatever the game says
  *
  * It measures **engine** time, so a run paused for a level-up is not a run that
@@ -23,7 +23,7 @@ export default {
   name: 'Run Clock',
   about: 'Time a run, end it when the thing it watches dies, and hold the world when it is over.',
   inspect: context => {
-    const run = context.run
+    const run = context.runClock
     if (!run) return []
     return [{
       title: 'Run',
@@ -105,7 +105,7 @@ export default {
       return entity || null
     }
 
-    context.run = {
+    context.runClock = {
       begin,
       end,
       reset,
@@ -155,8 +155,8 @@ export default {
   }],
 
   commands: [
-    { id: 'run.state', label: 'How the run is going', run: context => context.run.summary() },
-    { id: 'run.end', label: 'End the run now', run: (context, args) => context.run.end([].concat(args ?? [])[0] || 'ended') }
+    { id: 'run.state', label: 'How the run is going', run: context => context.runClock.summary() },
+    { id: 'run.end', label: 'End the run now', run: (context, args) => context.runClock.end([].concat(args ?? [])[0] || 'ended') }
   ]
 }
 

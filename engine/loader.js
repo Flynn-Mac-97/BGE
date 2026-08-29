@@ -69,10 +69,41 @@ export function makeLoader(bus) {
       rebuild()
     },
 
+    /**
+     * Run every plugin's onLoad, and say who took a name that was already taken.
+     *
+     * Contributing onto `context` is how a plugin publishes a verb, and two
+     * plugins reaching for one name is a silent replacement — the loser is not
+     * broken, it is absent, and nothing distinguishes that from never having
+     * loaded. Run Clock assigned `context.run` and destroyed the kernel's
+     * command runner; every `context.run(id)` in that project threw "not a
+     * function", including the one a test is handed, and the game played on.
+     *
+     * Reported rather than refused. A game deliberately shadowing a builtin's
+     * verb is a real thing to want, and the loader is not the place to decide
+     * that it is wrong — but nobody may do it by accident and hear nothing.
+     */
     boot(context) {
+      // Data properties only. `context.selection` and `context.time` are
+      // getters that answer freshly every read, so comparing what they returned
+      // would report every plugin as replacing both of them.
+      const values = () => new Map(Object.keys(context)
+        .filter(key => !Object.getOwnPropertyDescriptor(context, key)?.get)
+        .map(key => [key, context[key]]))
+
+      const owner = new Map([...values().keys()].map(key => [key, 'the kernel']))
       for (const [name, p] of plugins) {
         if (!p.enabled) continue
+        const before = values()
         try { p.definition.onLoad?.(context) } catch (e) { this.fail(name, e) }
+        for (const [key, value] of values()) {
+          if (!before.has(key)) { owner.set(key, name); continue }
+          if (before.get(key) === value) continue
+          console.error(`[loader] ${name} replaced context.${key}, which belonged to ${owner.get(key) || 'another plugin'}. ` +
+            'Two plugins cannot own one name — the earlier one is now unreachable. Rename one of them.')
+          bus.emit('context:replaced', { key, by: name, from: owner.get(key) || null })
+          owner.set(key, name)
+        }
       }
       rebuild()
     },

@@ -58,7 +58,7 @@ export default {
     rows: [
       ['level', String(context.experience?.level ?? 1)],
       ['kills', String(context.progression?.kills ?? 0)],
-      ['clock', context.run?.clock ?? '0:00']
+      ['clock', context.runClock?.clock ?? '0:00']
     ]
   }],
 
@@ -166,10 +166,10 @@ export default {
 
     // The run ends when the kitten does, and a card offered to a dead kitten is
     // a world held still with nobody left to answer.
-    context.run?.watch(kitten)
-    context.run?.report('kills', () => kills)
-    context.run?.report('level', () => context.experience.level)
-    context.run?.report('carried', () => context.kittenUpgrades.taken().map(entry => `${entry.name} ${entry.rank}`))
+    context.runClock?.watch(kitten)
+    context.runClock?.report('kills', () => kills)
+    context.runClock?.report('level', () => context.experience.level)
+    context.runClock?.report('carried', () => context.kittenUpgrades.taken().map(entry => `${entry.name} ${entry.rank}`))
     context.bus.on('run:ended', () => context.choiceScreen?.cancel())
 
     context.progression = {
@@ -206,7 +206,7 @@ export default {
 
     progression.tick = () => {
       context.world.state.kills = kills
-      if (!context.run?.over) return
+      if (!context.runClock?.over) return
       if (!context.input?.pressed('kittenRestart') || spent.has('restart')) return
       spent.add('restart')
       // Loading is asynchronous and this is a fixed step, so the failure has to
@@ -231,7 +231,7 @@ export default {
         level: context.experience.level,
         experience: `${context.experience.intoLevel}/${context.experience.needed}`,
         kills: context.progression.kills,
-        clock: context.run?.clock ?? '0:00',
+        clock: context.runClock?.clock ?? '0:00',
         carried: context.kittenUpgrades.taken(),
         stats: context.progression.stats()
       })

@@ -41,7 +41,7 @@ export default {
     function drawHud() {
       if (!playing()) return []
       const experience = context.experience
-      const run = context.run
+      const run = context.runClock
       const items = []
 
       // The experience bar: full width, square, right at the top edge. Square
@@ -110,7 +110,7 @@ export default {
      * number anybody quotes about a run of this kind.
      */
     function drawResult() {
-      const summary = context.run.summary()
+      const summary = context.runClock.summary()
       if (!summary.over) return []
       const died = summary.reason === 'died'
       const taken = context.kittenUpgrades.taken()
