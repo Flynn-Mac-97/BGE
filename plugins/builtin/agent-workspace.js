@@ -75,7 +75,7 @@ export default {
 
   onLoad(context) {
     context.agents = {
-      context: async request => resolveAgentContext(reader(context), request, await pluginNodes(context)),
+      context: async request => resolveAgentContext(reader(context), request, await pluginNodes(context), context.editor.projectDirectory),
       status: async () => ({ workspace: await readAgentWorkspace(reader(context), await pluginNodes(context)), runs: await readRegistry(context) })
     }
     refresh(context)
@@ -150,7 +150,7 @@ export default {
   }],
 
   commands: [
-    { id: 'agent.context', label: 'Build a small instruction packet', run: async (context, request) => resolveAgentContext(reader(context), request, await pluginNodes(context)) },
+    { id: 'agent.context', label: 'Build a small instruction packet', run: async (context, request) => resolveAgentContext(reader(context), request, await pluginNodes(context), context.editor.projectDirectory) },
     { id: 'agent.status', label: 'Read the agent tree and runs', run: async context => ({ workspace: await readAgentWorkspace(reader(context), await pluginNodes(context)), runs: await readRegistry(context) }) },
     { id: 'agent.toggle', label: 'Turn an optional skill on or off', run: (context, value) => setSkill(context, value.id || value[0], value.enabled ?? value[1]) },
     { id: 'agent.create', label: 'Add an instruction or skill', run: (context, value) => createNode(context, value) }

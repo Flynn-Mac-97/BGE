@@ -7,9 +7,20 @@
 Agent instructions follow the same disk-first rule as the game. The generated
 root `AGENTS.md` is only a bootstrap. `ENGINE-BASE.md` is the base instructions
 every agent reads first — speech, code and comment style at a glance, with
-links out to the detailed rules. `agents/manifest.json` owns engine rules.
-`project/agents/manifest.json` adds game rules. Parent ids join both manifests
-into one visible tree.
+links out to the detailed rules. `agents/manifest.json` owns engine rules,
+including the Game lane — how to build a game is engine knowledge, not one
+game's. `<project>/agents/manifest.json` adds only what that game overrides, and
+may be missing entirely. Parent ids join both manifests into one visible tree.
+
+## Which project
+
+The project directory is a start-up parameter, so a `match:` pattern writes
+`project/**` and the resolver rewrites a claimed file's real directory to
+`project/` before matching. Without that, a game opened as `kitten-survivors`
+matched no project rule and the packet still looked complete.
+
+A `tests:` entry writes `<project>`, replaced with the directory in use, so a
+lane is handed the check that proves its own game rather than the default one.
 
 `engine/agent-workspace.js` is the shared resolver. It receives a file reader,
 so the Agent Workspace plugin and the offline CLI return the same packet.

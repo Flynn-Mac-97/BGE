@@ -192,6 +192,9 @@ export async function startWorldInNode({ root = ROOT, project = 'project', viewp
     openFiles: bus => makeFiles(bus, onDisk(projectDirectory)),
     loadPlugins: () => findPlugins(checkout, projectDirectory),
     importProjectFile: importProjectFileFrom(projectDirectory),
+    // The name, not the absolute path: a plugin builds `<project>/plugins` from
+    // it, and the browser half only ever knows the name.
+    projectDirectory: path.basename(projectDirectory),
     ...(viewport ? { viewport } : {})
   })
 }

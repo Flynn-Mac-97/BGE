@@ -91,6 +91,7 @@ async function boot() {
     openFiles: bus => makeFiles(bus),
     loadPlugins: findPlugins,
     importProjectFile,
+    projectDirectory: PROJECT_DIRECTORY,
 
     // The shell builds the canvas the renderer draws into, so the shell comes
     // first and context.renderer is filled in immediately after. Both are put

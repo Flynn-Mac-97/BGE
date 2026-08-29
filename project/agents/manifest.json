@@ -2,8 +2,6 @@
   "version": 2,
   "nodes": [
     { "id": "project-code-style", "title": "Project Code Style", "kind": "instruction", "parent": "project", "file": "agents/overrides/code-style.md", "override": "code-style", "match": ["project/**/*.js"] },
-    { "id": "project-comment-style", "title": "Project Comment Style", "kind": "instruction", "parent": "project", "file": "agents/overrides/comment-style.md", "override": "comment-style", "match": ["project/**/*.js", "project/**/*.md"] },
-    { "id": "game", "title": "Game", "kind": "instruction", "parent": "project", "file": "agents/game.md", "match": ["project/types/**", "project/behaviours/**", "project/levels/**", "project/assets/**", "project/plugins/**"], "tests": ["node bin/engine.mjs check", "node bin/engine.mjs --headless run tests.run"] },
-    { "id": "project-tests", "title": "Game Tests", "kind": "instruction", "parent": "project", "file": "agents/tests.md", "match": ["project/tests/**"], "tests": ["node bin/engine.mjs check", "node bin/engine.mjs --headless run tests.run"] }
+    { "id": "project-comment-style", "title": "Project Comment Style", "kind": "instruction", "parent": "project", "file": "agents/overrides/comment-style.md", "override": "comment-style", "match": ["project/**/*.js", "project/**/*.md"] }
   ]
 }

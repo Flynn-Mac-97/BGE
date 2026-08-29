@@ -58,6 +58,16 @@ export async function startWorld({
   loadPlugins,
   /** async (file) => the module's default export, for types, behaviours and tests. */
   importProjectFile,
+  /**
+   * Which directory under the checkout holds the project.
+   *
+   * A parameter, and one a plugin has to be able to read: the browser learns it
+   * from the dev server and node is told it with `--project`, and before this
+   * was passed through, anything asking reached for `process.env.ENGINE_PROJECT`
+   * — which `--project` never sets. `plugin.sizes` measured the default
+   * project's plugins while reading another project's title, and said nothing.
+   */
+  projectDirectory = 'project',
   /** The browser mounts its shell and renderer here. Headless does nothing. */
   attachScreen = async () => {},
   viewport = { ...DEFAULT_VIEWPORT },
@@ -69,6 +79,10 @@ export async function startWorld({
   const files = openFiles(bus)
 
   const editor = {
+    // The directory, which is a parameter; and the title, which the project's
+    // own game.json sets below. Two different questions — a panel showing the
+    // title and a plugin reading `<project>/plugins` need different answers.
+    projectDirectory,
     projectName: 'project',
     levelName: '—',
     selection: new Set(),

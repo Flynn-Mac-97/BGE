@@ -99,9 +99,9 @@ const validateId = id => {
   }
 }
 
-export async function contextFromDisk(root, request) {
+export async function contextFromDisk(root, request, projectDirectory = 'project') {
   root = path.resolve(root)
-  const project = path.join(root, 'project')
+  const project = path.join(root, projectDirectory)
   const read = (scope, file) => {
     const base = scope === 'engine' ? root : project
     const target = path.resolve(base, file)
@@ -110,17 +110,17 @@ export async function contextFromDisk(root, request) {
     }
     return fs.promises.readFile(target, 'utf8')
   }
-  return resolveAgentContext(read, request, await onDisk(project).agentPlugins())
+  return resolveAgentContext(read, request, await onDisk(project).agentPlugins(), projectDirectory)
 }
 
-export async function prepareAgent(root, id, request = {}) {
+export async function prepareAgent(root, id, request = {}, projectDirectory = 'project') {
   validateId(id)
   const main = mainWorktree(root)
   const files = [].concat(request.files || []).map(normal).filter(Boolean)
   const parallel = request.parallel === true || request.mode === 'parallel'
   if (parallel && !files.length) throw new Error('parallel tasks must claim at least one file')
 
-  const packet = await contextFromDisk(main, { ...request, files, parallel })
+  const packet = await contextFromDisk(main, { ...request, files, parallel }, projectDirectory)
   assertAvailable(readAgentRegistry(main).runs, id, files, parallel)
 
   let workspace = main

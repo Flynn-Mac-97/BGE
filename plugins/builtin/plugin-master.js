@@ -29,24 +29,23 @@ const info = () => ({
  * game can use it. The title is the cheapest handle on "this game's nouns" that
  * does not need a list nobody maintains.
  */
-async function gameWords(root, join, readFile) {
-  const directory = (typeof process !== 'undefined' && process.env.ENGINE_PROJECT) || 'project'
+async function gameWords(root, directory, join, readFile) {
   try {
     const game = JSON.parse(await readFile(join(root, directory, 'game.json'), 'utf8'))
     return String(game.title || '').toLowerCase().split(/[^a-z0-9]+/i).filter(word => word.length >= 4)
   } catch { return [] }
 }
 
-async function measure() {
+async function measure(directory) {
   const { readdir, readFile } = await import('node:fs/promises')
   const { join, dirname } = await import('node:path')
   const { fileURLToPath } = await import('node:url')
 
   const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
-  const words = await gameWords(root, join, readFile)
+  const words = await gameWords(root, directory, join, readFile)
   const out = []
 
-  for (const place of ['plugins/builtin', 'project/plugins']) {
+  for (const place of ['plugins/builtin', `${directory}/plugins`]) {
     const directory = join(root, place)
     for (const name of (await readdir(directory).catch(() => [])).sort()) {
       if (!name.endsWith('.js')) continue
@@ -88,11 +87,14 @@ export default {
   commands: [{
     id: 'plugin.sizes',
     label: 'Measure every plugin against the size rule',
-    run: async () => {
+    run: async context => {
       if (typeof process === 'undefined' || !process.versions?.node) {
         return { ...info(), why: 'reading source needs node — use --headless or the terminal' }
       }
-      const all = await measure()
+      // The directory this world was opened on, not the default one. Measuring
+      // one project's plugins while reading another project's title is the kind
+      // of wrong answer that looks exactly like a right one.
+      const all = await measure(context.editor.projectDirectory)
       const over = all.filter(entry => entry.lines > BIG).sort((a, b) => b.lines - a.lines)
       const unguided = all.filter(entry => !entry.guide).map(entry => entry.plugin)
       // A builtin naming the game is a capability written inside one game.

@@ -76,7 +76,10 @@ const withoutFirstHeading = text => withoutFrontmatter(text).replace(/^# [^\n]+\
 
 async function loadAgentGraph(read, pluginNodes = []) {
   const engine = await readJSON(read, 'engine', ENGINE_AGENT_MANIFEST)
-  const project = await readJSON(read, 'project', PROJECT_AGENT_MANIFEST)
+  // A project need not add rules of its own. A new one has no `agents/` at all,
+  // and refusing to build a packet for it would mean the first agent to open a
+  // fresh project got an error instead of the engine's own instructions.
+  const project = await readJSON(read, 'project', PROJECT_AGENT_MANIFEST, { nodes: [] })
   const settings = await readJSON(read, 'project', AGENT_SETTINGS, { disabled: [] })
   const disabled = new Set(settings.disabled || [])
   const nodes = [
@@ -119,17 +122,36 @@ export async function readAgentWorkspace(read, pluginNodes = []) {
   return workspace
 }
 
-export async function resolveAgentContext(read, requestValue = {}, pluginNodes = []) {
+/**
+ * A file as a `match:` pattern spells it — with the project directory called
+ * `project`, whatever it is really called.
+ *
+ * Every guide in the tree writes `match: project/**`, and the project directory
+ * is a start-up parameter. So a game opened as `kitten-survivors` matched none
+ * of them: the project's own code style, its game lane and Plugin Master all
+ * silently went missing, and the packet still looked like a packet. The
+ * substitution goes here, once, rather than teaching every guide a token.
+ */
+const asProjectPattern = (file, projectDirectory) =>
+  projectDirectory && projectDirectory !== 'project'
+    ? cleanPath(file).replace(new RegExp(`^${projectDirectory}/`), 'project/')
+    : cleanPath(file)
+
+export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectDirectory = 'project') {
   const request = normaliseAgentRequest(requestValue)
   const workspace = await loadAgentGraph(read, pluginNodes)
   if (workspace.problems.length) throw new Error(`bad agent tree: ${workspace.problems.join('; ')}`)
+
+  // Matched against the spelling the patterns use; claimed and reported under
+  // the real one, because that is the path the agent has to open.
+  const matchable = request.files.map(file => asProjectPattern(file, projectDirectory))
 
   const wanted = new Set(request.nodes)
   const task = request.task.toLowerCase()
   for (const node of workspace.nodes) {
     if (!['instruction', 'skill'].includes(node.kind)) continue
     if (node.always) wanted.add(node.id)
-    if ((node.match || []).some(pattern => request.files.some(file => matchesAgentPattern(file, pattern)))) wanted.add(node.id)
+    if ((node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))) wanted.add(node.id)
     if ((node.triggers || []).some(trigger => task.includes(String(trigger).toLowerCase()))) wanted.add(node.id)
   }
 
@@ -143,7 +165,11 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const resolved = selected.filter(node =>
     !(node.scope === 'engine' && node.override && projectOverrides.has(node.override)))
   const entries = await Promise.all(resolved.map(async node => ({ ...node, text: await read(node.scope, node.file) })))
+  // A check that names the default project would test somebody else's game. The
+  // manifest writes `<project>` and the packet says which one, so the command a
+  // lane is handed is the command that proves the lane's own work.
   const tests = [...new Set(entries.flatMap(node => node.tests || []))]
+    .map(test => test.replaceAll('<project>', projectDirectory))
   const parts = [
     request.task ? `# Task\n\n${request.task}` : null,
     ...entries.map(node => `# ${node.title || node.id}\n\n${withoutFirstHeading(node.text)}`),

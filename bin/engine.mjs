@@ -355,7 +355,7 @@ if (op.startsWith('agent.')) {
       const request = args[0] && typeof args[0] === 'object'
         ? args[0]
         : args.length ? { files: args.map(String) } : {}
-      out(await agents.contextFromDisk(REPO, request))
+      out(await agents.contextFromDisk(REPO, request, path.basename(PROJECT)))
       process.exit(0)
     }
 
@@ -367,7 +367,7 @@ if (op.startsWith('agent.')) {
         ? { ...supplied }
         : { task: id, files: args.slice(1).map(String) }
       if (flags.parallel) request.parallel = true
-      out(await agents.prepareAgent(REPO, id, request))
+      out(await agents.prepareAgent(REPO, id, request, path.basename(PROJECT)))
       process.exit(0)
     }
 

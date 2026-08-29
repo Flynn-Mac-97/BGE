@@ -18,6 +18,8 @@
     { "id": "editor", "title": "Editor", "kind": "instruction", "parent": "architecture", "file": "agents/editor.md", "match": ["plugins/builtin/**", "engine/ui.js", "engine/shell.js", "engine/render.js"], "tests": ["node bin/engine.mjs check", "npm run test:offline", "npm test"] },
     { "id": "tooling", "title": "CLI and Tools", "kind": "instruction", "parent": "architecture", "file": "agents/tooling.md", "match": ["bin/**", "tools/**", "vite.config.js", "package.json", "agents/**", "project/agents/**"], "tests": ["node bin/engine.mjs check", "npm run test:offline", "npm test"] },
     { "id": "project", "title": "Project", "kind": "group", "parent": "agent-framework" },
+    { "id": "game", "title": "Game", "kind": "instruction", "parent": "project", "file": "agents/game.md", "match": ["project/types/**", "project/behaviours/**", "project/levels/**", "project/assets/**", "project/plugins/**"], "tests": ["node bin/engine.mjs check --project <project>", "node bin/engine.mjs --headless --project <project> run tests.run"] },
+    { "id": "game-tests", "title": "Game Tests", "kind": "instruction", "parent": "project", "file": "agents/game-tests.md", "match": ["project/tests/**"], "tests": ["node bin/engine.mjs check --project <project>", "node bin/engine.mjs --headless --project <project> run tests.run"] },
     { "id": "plugins", "title": "Plugins", "kind": "group", "parent": "agent-framework" },
     { "id": "skills", "title": "Skills", "kind": "group", "parent": "agent-framework" },
     { "id": "blender-3d", "title": "Blender 3D", "kind": "skill", "parent": "skills", "file": "agents/skills/blender-3d/SKILL.md", "optional": true, "triggers": ["blender", "3d model", ".blend"], "match": ["project/assets/**/*.blend"] }
