@@ -64,7 +64,7 @@ export default {
     render(ui, context) {
       const ids = listed(context).map(test => test.id)
       if (!ids.length) {
-        return ui.empty('no tests — add project/tests/<name>.js')
+        return ui.empty(`no tests — add ${context.editor.projectDirectory}/tests/<name>.js`)
       }
 
       const pass = ids.filter(id => results.get(id)?.ok).length

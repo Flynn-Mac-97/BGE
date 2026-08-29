@@ -99,7 +99,7 @@ export default {
             dim: p => !p.enabled,
             row: p => pluginRow(ui, context, p),
             onPick: p => select(context, p),
-            emptyText: 'none yet — drop a .js file in project/plugins/'
+            emptyText: `none yet — drop a .js file in ${context.editor.projectDirectory}/plugins/`
           })
         ]),
 
