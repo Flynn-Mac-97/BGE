@@ -26,6 +26,20 @@
  *     "eyeHeight": 1.62, "crouchEyeHeight": 0.91, "fov": 90
  *   }
  *
+ * Or, held behind the player in three dimensions — a top-down survivor at a
+ * steep pitch and a long distance, an action game at a shallow one and a short:
+ *
+ *   "camera": {
+ *     "mode": "third-person", "follow": "player",
+ *     "pitch": -1.05, "yaw": 0,    // radians. Down is negative, and it is steep
+ *     "distance": 15,              // metres from the body, along that angle
+ *     "offsetY": 0.6,              // look at the shoulders, not the feet
+ *     "lerp": 0.18,                // 1 = snap, lower = softer
+ *     "lookAhead": 0.25,           // lead the direction of travel, in seconds
+ *     "bounds": [-26, -26, 26, 26], // ground box: x0, z0, x1, z1
+ *     "fov": 50
+ *   }
+ *
  * And drivable for the moments a rule cannot express:
  *
  *   context.camera.follow(entity)   context.camera.moveTo(x, y)   context.camera.shake(0.4)
@@ -81,6 +95,16 @@ const LANDING_FULL_DIP = 8     // the fall speed that earns the whole dip
 /** How far a unit of shake throws the aim when there is no picture to slide. */
 const SHAKE_RADIANS = 0.08
 
+/**
+ * Where a chase camera sits when the level does not say.
+ *
+ * Deliberately a survivor's framing rather than a shooter's: far enough back to
+ * show the crowd closing in, and steep enough that the floor is most of the
+ * picture. A level that wants a shoulder says so in three numbers.
+ */
+const CHASE_DISTANCE = 14
+const CHASE_PITCH = -1.05
+
 export default {
   name: 'Game Camera',
   about: 'Follow the player or look around freely — the game camera, separate from the editor viewport.',
@@ -108,6 +132,9 @@ export default {
       appliedPitch: 0,
 
       eyeHeight: null,  // null until the first first-person step sets it
+      // What a chase camera is looking at, eased. Held rather than derived
+      // because the softness IS the lag between the body and this point.
+      focus: null,
       dip: 0,           // the landing dip, in metres, decaying
       bobEffort: 0,     // how much bob is on the eye, eased rather than switched
       wasGrounded: false,
@@ -175,6 +202,14 @@ export default {
       if (cam.rule.zoom) v.zoom = cam.rule.zoom
       if (cam.rule.mode) v.mode = cam.rule.mode
       if (cam.rule.fov) v.fov = cam.rule.fov
+      // A chase camera's angle is where it starts, not where it is pinned: the
+      // view keeps it from here on, so a plugin that wants to swing the camera
+      // round writes view.yaw and the next step obeys. In first person the angle
+      // belongs to the mouse and the rule must not touch it.
+      if (v.mode !== 'first-person') {
+        if (Number.isFinite(cam.rule.pitch)) v.pitch = cam.rule.pitch
+        if (Number.isFinite(cam.rule.yaw)) v.yaw = cam.rule.yaw
+      }
     }
 
     /**
@@ -266,6 +301,8 @@ export default {
       // calling simulate() while editing should not find its viewport moved.
       if (!cam.target) return
 
+      if (view.mode === 'third-person') { thirdPerson(cam, view, seconds, context); return }
+
       const rule = cam.rule
 
       const lead = (rule.lookAhead ?? 0) * (cam.target.velocityX ?? 0)
@@ -301,6 +338,10 @@ export default {
       // that as "eye" told an agent the player was standing wherever the author
       // had last dragged the camera to.
       const onABody = firstPerson && !!cam.target
+      // In third person the eye is a real place too — behind and above the
+      // body — and an agent asking where the camera is should be told, not left
+      // to work it out from a pitch and a distance.
+      const placed = !!cam.target && (firstPerson || view.mode === 'third-person')
       return {
         view: {
           x: round(view.x),
@@ -315,9 +356,12 @@ export default {
         },
         // Where the eye is and where it is actually pointing, so "what can the
         // player see right now" is one call rather than a screenshot.
-        eye: onABody ? [round(view.x), round(view.y), round(view.z)] : null,
+        eye: placed ? [round(view.x), round(view.y), round(view.z)] : null,
         aim: { yaw: round(aim.yaw), pitch: round(aim.pitch) },
         eyeHeight: onABody ? round(cam.eyeHeight ?? 0) : null,
+        // What a chase camera is pointed at, which lags the body by whatever
+        // `lerp` asked for — the difference between the two is the softness.
+        focus: cam.focus ? [round(cam.focus.x), round(cam.focus.y), round(cam.focus.z)] : null,
         following: cam.target?.id ?? null,
         rule: cam.rule,
         notes: stateNotes(cam, view, context)
@@ -393,6 +437,92 @@ function firstPerson(cam, view, seconds, context) {
   cam.appliedYaw = cam.punchYaw + shakeYaw
   view.pitch = pitched
   view.yaw += cam.appliedYaw
+}
+
+/**
+ * The chase camera: an eye held at a fixed angle and distance from the body.
+ *
+ * A third-person camera is one idea — an offset kept behind a point of interest
+ * — and the level's three numbers decide which game it reads as. A steep pitch
+ * and fifteen metres is a survivor looking down on a crowd; a shallow pitch and
+ * three is over a shoulder. There is no second camera for the second case.
+ *
+ * The FOCUS is what eases, never the eye. Ease the eye and the lag shows up as
+ * a swing about the body rather than as a slide, so the picture rolls when the
+ * player changes direction and the body drifts off centre by an amount that
+ * depends on which way it is running. Easing what the camera is LOOKING at and
+ * then placing the eye exactly behind it keeps the body where the player put it.
+ */
+function thirdPerson(cam, view, seconds, context) {
+  const rule = cam.rule
+  const body = cam.target
+
+  // `lookAhead` is in seconds of travel, so the lead is a distance the player
+  // can feel — a quarter of a second ahead is a quarter of a second ahead at
+  // any speed, and it does not have to be retuned when the speed changes.
+  const lead = rule.lookAhead ?? 0
+  const wanted = {
+    x: body.x + (body.velocityX ?? 0) * lead,
+    y: body.y + (rule.offsetY ?? 0),
+    z: (body.z ?? 0) + (body.velocityZ ?? 0) * lead
+  }
+  if (rule.bounds) holdInside(wanted, rule.bounds)
+
+  // `lerp` is a fraction per step, which is how the 2D camera has always read
+  // it, corrected for the length of the step. Without the correction the same
+  // level settles at a different speed the moment the fixed rate changes, and
+  // the softness an author tuned by eye is silently retuned for them.
+  const perStep = clamp(rule.lerp ?? 0.15, 0, 1)
+  const k = perStep >= 1 ? 1 : 1 - Math.pow(1 - perStep, seconds * 60)
+  // Snapped on the first step, so a level does not open with the camera flying
+  // in from wherever the editor left it.
+  if (!cam.focus) cam.focus = { ...wanted }
+  cam.focus.x += (wanted.x - cam.focus.x) * k
+  cam.focus.y += (wanted.y - cam.focus.y) * k
+  cam.focus.z += (wanted.z - cam.focus.z) * k
+
+  // The angle lives on the view, not in the rule, so anything that wants to
+  // swing the camera round writes view.yaw and this reads it back.
+  const pitch = clamp(view.pitch ?? CHASE_PITCH, -MAX_PITCH, MAX_PITCH)
+  const yaw = wrapAngle(view.yaw || 0)
+  const distance = Math.max(0, rule.distance ?? CHASE_DISTANCE)
+
+  // The eye is the focus minus the distance along forward — see the angle
+  // convention at the top of this file, which is where these signs come from.
+  const flat = Math.cos(pitch)
+  view.pitch = pitch
+  view.yaw = yaw
+  view.x = cam.focus.x + Math.sin(yaw) * flat * distance
+  view.y = cam.focus.y - Math.sin(pitch) * distance
+  view.z = cam.focus.z + Math.cos(yaw) * flat * distance
+
+  // A knock moves the camera here, not the aim. The camera is a thing out in
+  // the world in third person, and turning it instead would swing the whole
+  // picture about the player rather than jolt it.
+  if (cam.amount > 0) {
+    view.x += context.random.range(-cam.amount, cam.amount)
+    view.y += context.random.range(-cam.amount, cam.amount)
+    view.z += context.random.range(-cam.amount, cam.amount)
+    cam.amount = Math.max(0, cam.amount - seconds * 2)
+  }
+}
+
+/**
+ * Keep a point on the ground inside the level's box.
+ *
+ * Four numbers, and in three dimensions they are the ground plane: x0, z0, x1,
+ * z1. The flat camera's `bounds` are x0, y0, x1, y1 because in two dimensions
+ * the ground IS x and y — the same rectangle, read on the plane the game is
+ * played on.
+ *
+ * It holds the point the camera looks at rather than the rectangle it can see.
+ * Working out what a pitched perspective camera can see means projecting four
+ * frustum corners onto the floor and taking their hull, which is real machinery
+ * for an arena whose edge the player is not supposed to reach anyway.
+ */
+function holdInside(point, [x0, z0, x1, z1]) {
+  point.x = x1 <= x0 ? (x0 + x1) / 2 : clamp(point.x, x0, x1)
+  point.z = z1 <= z0 ? (z0 + z1) / 2 : clamp(point.z, z0, z1)
 }
 
 /**
@@ -498,6 +628,7 @@ function forget(cam) {
   cam.appliedYaw = 0
   cam.appliedPitch = 0
   cam.eyeHeight = null
+  cam.focus = null
   cam.dip = 0
   cam.bobEffort = 0
   cam.wasGrounded = false

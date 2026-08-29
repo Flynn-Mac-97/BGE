@@ -1,13 +1,18 @@
 {
   "about": "The meadow. One slab of grass, one kitten, and whatever the spawner sends. Enemies are not placed here — a survivor's crowd arrives on a clock, not out of a level file.",
   "camera": {
+    "mode": "third-person",
     "follow": "you",
-    "mode": "3d",
+    "pitch": -1.02,
+    "yaw": 0,
+    "distance": 9,
+    "offsetY": 0.15,
+    "lerp": 0.18,
+    "lookAhead": 0.22,
+    "bounds": [-22, -22, 22, 22],
+    "fov": 50,
     "at": [0, 12],
-    "zoom": 32,
-    "fov": 55,
-    "pitch": -1.1,
-    "yaw": 0
+    "zoom": 32
   },
   "world": {
     "sky": "#8fbfe0",

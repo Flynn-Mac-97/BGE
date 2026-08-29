@@ -4,8 +4,8 @@
  * 2D is an orthographic camera looking down -Z at textured planes. 3D is the
  * same scene with a perspective camera — the same entity list, the same texture
  * cache, the same picking. An entity carrying `sprite` draws as a plane and an
- * entity carrying `mesh` draws as solid geometry or a loaded model, and one
- * level may hold all three.
+ * entity carrying `mesh` draws as solid geometry, a list of `parts` or a loaded
+ * model, and one level may hold all of them.
  *
  * The sprite and solid paths differ in exactly three places, and each is a
  * decision rather than an accident: geometry (a cached box or quad against one
@@ -359,6 +359,23 @@ function meshOf(entity) {
 }
 
 /**
+ * Which way a body is turned, in radians about Y.
+ *
+ * There are two names for this and they are not a duplicate — they are the two
+ * places a facing comes from. `rotation` is the editor's handle, in degrees,
+ * because degrees are what an author types into an inspector and reads back off
+ * a level file. `yaw` is what game code sets while the world is running, in
+ * radians, because radians are what every other angle in the engine is in: the
+ * camera's aim, a raycast, the answer `Math.atan2` gives.
+ *
+ * The running value wins when there is one. Without this a type that turned its
+ * body to face where it was running — the plainest thing a character does —
+ * faced that way to every plugin that asked and stood facing north on screen.
+ */
+const facingRadians = entity =>
+  Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
+
+/**
  * How far to drop a model whose origin is not its middle.
  *
  * An entity's `y` is its CENTRE. That is what a box geometry wants and what
@@ -396,11 +413,114 @@ function anchorOffset(entity) {
 }
 
 /**
+ * One entity drawn as several boxes.
+ *
+ * The renderer knows three shapes — a box, a quad and a loaded model — and a
+ * great many things a game needs are none of them. A cat, a lamp post, a crate
+ * with a lid: each is a handful of boxes and none is worth an artist, a file
+ * format and a load path. So a type may say what it is made of:
+ *
+ *   mesh: {
+ *     tint: '#e8a55c',
+ *     parts: [
+ *       { box: [0.42, 0.30, 0.62] },                        // the body, centred
+ *       { box: [0.30, 0.28, 0.26], at: [0, 0.14, -0.35] },  // the head, in front
+ *       { box: [0.07, 0.07, 0.34], at: [0, 0.26, 0.43], rotation: [-40, 0, 0] }
+ *     ]
+ *   }
+ *
+ * `at` is metres from the entity's centre and `rotation` is degrees about X, Y
+ * and Z. A part inherits every other key of the mesh — tint, texture, material —
+ * so the common case names the colour once and only the odd part overrides it.
+ * Give a part a `name` and `entity.pose` swings it, exactly as it swings a named
+ * node of a loaded model: `pose: { legFrontLeft: 0.4 }` is a run cycle whether
+ * the body came out of a file or out of this list.
+ * Forward is -Z, the same direction the camera faces at yaw 0, so a body modelled
+ * nose-first at -Z turns the right way when `yaw` says where it is running.
+ *
+ * Read once per declaration, not once per entity per frame: a type file is one
+ * shared object, so the parsing, the bounds and the string that says whether the
+ * shape changed are all cached against the array the type declared.
+ *
+ * Parts are never merged into a batch. A batch is one geometry and one material,
+ * and a part-built body is several of each — the same reason a model is left out.
+ */
+const partsCache = new WeakMap()
+
+function partsOf(declared, where = 'mesh') {
+  if (!Array.isArray(declared?.parts) || !declared.parts.length) return null
+  const cached = partsCache.get(declared.parts)
+  if (cached) return cached
+
+  // Everything on the mesh except the list itself is what a part starts from.
+  const { parts, ...shared } = declared
+  const low = { x: Infinity, y: Infinity, z: Infinity }
+  const high = { x: -Infinity, y: -Infinity, z: -Infinity }
+
+  const list = parts.map((part, index) => {
+    const spot = `${where}.parts[${index}]`
+    const box = Array.isArray(part?.box) ? part.box : []
+    const shape = {
+      kind: 'box',
+      w: number(box[0], 0.1, `${spot}.box[0]`),
+      h: number(box[1], 0.1, `${spot}.box[1]`),
+      d: number(box[2], 0.1, `${spot}.box[2]`)
+    }
+    const at = Array.isArray(part?.at) ? part.at : []
+    const turn = Array.isArray(part?.rotation) ? part.rotation : []
+    const offset = {
+      x: number(at[0], 0, `${spot}.at[0]`),
+      y: number(at[1], 0, `${spot}.at[1]`),
+      z: number(at[2], 0, `${spot}.at[2]`)
+    }
+
+    // Bounds ignore the part's own rotation. They are only used to frame a
+    // selection and to place a feet anchor, and an oriented box would cost a
+    // matrix per part to make those two answers a few centimetres tighter.
+    low.x = Math.min(low.x, offset.x - shape.w / 2)
+    low.y = Math.min(low.y, offset.y - shape.h / 2)
+    low.z = Math.min(low.z, offset.z - shape.d / 2)
+    high.x = Math.max(high.x, offset.x + shape.w / 2)
+    high.y = Math.max(high.y, offset.y + shape.h / 2)
+    high.z = Math.max(high.z, offset.z + shape.d / 2)
+
+    return {
+      index,
+      shape,
+      at: offset,
+      // Only a named part can be posed. Most are not — a stripe or an eye has
+      // nothing to say — so naming is opt-in rather than an index nobody typed.
+      name: typeof part?.name === 'string' ? part.name : null,
+      // Degrees in the declaration, because that is the unit an author types;
+      // radians here, because that is the unit the scene graph is in.
+      turn: {
+        x: number(turn[0], 0, `${spot}.rotation[0]`) * Math.PI / 180,
+        y: number(turn[1], 0, `${spot}.rotation[1]`) * Math.PI / 180,
+        z: number(turn[2], 0, `${spot}.rotation[2]`) * Math.PI / 180
+      },
+      declaration: { ...shared, ...part }
+    }
+  })
+
+  const built = {
+    list,
+    size: { w: high.x - low.x, h: high.y - low.y, d: high.z - low.z },
+    // What the object was built from, so an edited type rebuilds and an
+    // untouched one never pays to be stringified again.
+    signature: JSON.stringify(parts)
+  }
+  partsCache.set(declared.parts, built)
+  return built
+}
+
+/**
  * What an entity's mesh is: a shape and three numbers, or null for a sprite.
  *
- * `box` and `quad` say it outright. A `model` brings its own geometry, so the
- * numbers only describe how big it counts as — for framing a selection — and the
- * collider is the honest source for that. Anything else takes the collider's
+ * `box` and `quad` say it outright. `parts` is measured from the boxes it lists,
+ * unless the type also states a box — a body whose tail sticks out has a larger
+ * drawing than the size it should count as. A `model` brings its own geometry, so
+ * the numbers only describe how big it counts as — for framing a selection — and
+ * the collider is the honest source for that. Anything else takes the collider's
  * box, because a thing that has declared how big it hits has already declared
  * how big it is. A metre cube is the last resort, and it is deliberately a size
  * you can see rather than nothing at all.
@@ -409,6 +529,18 @@ function meshShape(entity) {
   const declared = meshOf(entity)
   if (!declared) return null
   const collider = Array.isArray(entity.collider?.box) ? entity.collider.box : []
+
+  const parts = partsOf(declared, `${entity.type}.mesh`)
+  if (parts && !declared.model) {
+    const stated = Array.isArray(declared.box) ? declared.box : null
+    if (!stated) return { kind: 'parts', ...parts.size }
+    return {
+      kind: 'parts',
+      w: number(stated[0], parts.size.w, `${entity.type}.mesh.box[0]`),
+      h: number(stated[1], parts.size.h, `${entity.type}.mesh.box[1]`),
+      d: number(stated[2], parts.size.d, `${entity.type}.mesh.box[2]`)
+    }
+  }
 
   // Every branch below reads the numbers first and only builds the name of what
   // went wrong when something did. This runs for every mesh entity every frame,
@@ -963,7 +1095,14 @@ export function makeRenderer(canvas, view, viewport) {
   }
 
   /** Keys that describe the shape or choose the material, rather than tune it. */
-  const SHAPE_KEYS = new Set(['box', 'quad', 'model', 'scale', 'material', 'unlit', 'tiling'])
+  const SHAPE_KEYS = new Set([
+    'box', 'quad', 'model', 'scale', 'material', 'unlit', 'tiling',
+    // A part says where it is and which way it is turned. Both describe shape,
+    // and a key left out of this set is stringified into the material key on
+    // every part of every frame — which would also give twelve identically
+    // coloured boxes twelve materials, one per position.
+    'parts', 'at', 'rotation', 'name'
+  ])
 
   /**
    * Everything about a mesh that decides its material, and nothing about its
@@ -1014,6 +1153,13 @@ export function makeRenderer(canvas, view, viewport) {
       }
     }
     const declared = meshOf(entity)
+    const parts = declared.model ? null : partsOf(declared, `${entity.type}.mesh`)
+    if (parts) {
+      // Every part carries its own material, so the entity has no single one —
+      // and nothing to be merged into. The signature is what says the shape
+      // changed, and it is computed once per declaration rather than per frame.
+      return { material: null, look: `parts|${parts.signature}` }
+    }
     const shape = meshShape(entity)
     const material = materialLook(entity, declared, shape)
     // Geometry is in the key beside the material, because changing a box size in
@@ -1051,14 +1197,17 @@ export function makeRenderer(canvas, view, viewport) {
    * depth and culls its back faces, which is what lets a room be drawn from the
    * inside with nothing sorted.
    */
-  function meshMaterial(entity, key) {
+  function meshMaterial(entity, key, part = null) {
     const cached = sharedMaterials.get(key)
     if (cached) return cached
 
-    const declared = meshOf(entity)
-    const where = `${entity.type}.mesh`
+    // A part is a small mesh declaration of its own, already merged with the
+    // mesh's shared keys, so everything below reads it exactly as it reads a
+    // whole mesh — there is no second way to describe a surface.
+    const declared = part ? part.declaration : meshOf(entity)
+    const where = part ? `${entity.type}.mesh.parts[${part.index}]` : `${entity.type}.mesh`
     const declaredColour = readColour(declared.tint, `${where}.tint`)
-    const [u, v] = tilingOf(declared.tiling, meshShape(entity), `${where}.tiling`)
+    const [u, v] = tilingOf(declared.tiling, part ? part.shape : meshShape(entity), `${where}.tiling`)
 
     let map = null
     if (declared.texture && statusOf(declared.texture, 'world') !== 'failed') {
@@ -1154,6 +1303,8 @@ export function makeRenderer(canvas, view, viewport) {
   function buildObject(entity, described) {
     const declared = meshOf(entity)
     if (declared?.model) return buildModel(entity, declared, described)
+    const parts = partsOf(declared, `${entity.type}.mesh`)
+    if (parts) return buildParts(entity, parts, described)
 
     const object = new THREE.Mesh(
       geometryFor(entity),
@@ -1165,6 +1316,42 @@ export function makeRenderer(canvas, view, viewport) {
     // blank the other three hundred.
     object.userData.privateMaterial = !entity.mesh
     return object
+  }
+
+  /**
+   * A body made of boxes: one Group, one Mesh per part.
+   *
+   * Geometry and material both come out of the caches every other box uses, so
+   * a hundred kittens are a hundred groups over one set of shared boxes and one
+   * set of shared colours rather than a hundred copies of either.
+   */
+  function buildParts(entity, parts, described) {
+    const holder = new THREE.Group()
+    holder.userData.entity = entity.id
+    holder.userData.look = described.look
+    // Shared, like every other mesh material — disposing one would blank every
+    // other body built from the same declaration.
+    holder.userData.privateMaterial = false
+
+    for (const part of parts.list) {
+      const key = materialLook(entity, part.declaration, part.shape)
+      const piece = new THREE.Mesh(
+        solid('box', part.shape.w, part.shape.h, part.shape.d),
+        meshMaterial(entity, key, part))
+      piece.position.set(part.at.x, part.at.y, part.at.z)
+      piece.rotation.set(part.turn.x, part.turn.y, part.turn.z)
+      // A named part is a part `pose` can move, exactly as a named node of a
+      // model is. Its declared angle is where it rests, so a pose is added to
+      // that rather than replacing it — a tail held at 68 degrees must not snap
+      // flat the first time something swishes it.
+      if (part.name) {
+        piece.name = part.name
+        piece.userData.restRotationX = part.turn.x
+      }
+      holder.add(piece)
+    }
+    indexNodes(holder, holder)
+    return holder
   }
 
   function buildModel(entity, declared, described) {
@@ -1268,13 +1455,16 @@ export function makeRenderer(canvas, view, viewport) {
     for (const name of Object.keys(pose)) {
       const node = nodes[name]
       if (!node) {
-        report(`[render] ${object.userData.model}: no node named "${name}" to pose`)
+        report(`[render] ${object.userData.model || object.userData.entity}: no node named "${name}" to pose`)
         continue
       }
       const angle = pose[name]
       // The fast path first: this runs for every limb of every character every
       // frame, and naming the failure costs a string whether or not there is one.
-      node.rotation.x = Number.isFinite(angle) ? angle : number(angle, 0, `pose.${name}`)
+      const wanted = Number.isFinite(angle) ? angle : number(angle, 0, `pose.${name}`)
+      // Added to where the part was declared to rest. A model's nodes rest at
+      // zero, so this is the same line it always was for them.
+      node.rotation.x = (node.userData.restRotationX || 0) + wanted
     }
   }
 
@@ -1367,7 +1557,7 @@ export function makeRenderer(canvas, view, viewport) {
     // merge; a dimmed entity has its own material and would take the whole batch
     // with it; a hidden one has to be able to disappear on its own.
     const canMerge = !isModel && opacity >= 1 && !entity.hidden
-    const signature = `${entity.x},${entity.y},${entity.z || 0},${entity.rotation || 0},${entity.scale ?? 1}|${described.look}`
+    const signature = `${entity.x},${entity.y},${entity.z || 0},${facingRadians(entity)},${entity.scale ?? 1}|${described.look}`
 
     let record = stillness.get(entity.id)
     if (!record) stillness.set(entity.id, record = { signature: null, frames: 0, batch: null })
@@ -1610,18 +1800,21 @@ export function makeRenderer(canvas, view, viewport) {
           // which way it faces, and tipping it over is never what was meant.
           const s = (entity.scale ?? 1) * (declared.model ? number(declared.scale, 1, `${entity.type}.mesh.scale`) : 1)
           object.scale.set(s, s, s)
-          object.rotation.set(0, (entity.rotation || 0) * Math.PI / 180, 0)
+          object.rotation.set(0, facingRadians(entity), 0)
           // The editor dims a hovered entity to preview it.
           const opacity = entity.opacity ?? 1
           dim(object, opacity)
-          if (entity.pose && declared.model) applyPose(object, entity.pose)
+          // A named part of a body built from boxes poses exactly as a named
+          // node of a model does, so a run cycle is the same four numbers
+          // either way and game code never asks which the body is made of.
+          if (entity.pose && (declared.model || declared.parts)) applyPose(object, entity.pose)
           // Unconditional for a model, because taking an attachment off is as
           // much a state as putting one on: a body that dropped its rifle stops
           // declaring one, and the hand has to empty.
           if (declared.model) applyAttachments(object, entity.attachments)
           // Depth decides what covers what, so there is nothing to order.
           object.renderOrder = 0
-          considerForMerging(entity, described, opacity, !!declared.model)
+          considerForMerging(entity, described, opacity, !!declared.model || Array.isArray(declared.parts))
           return
         }
 

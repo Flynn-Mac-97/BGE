@@ -6,6 +6,7 @@
     "height": 720
   },
   "plugins": {
-    "disabled": []
+    "comment": "Mouse Look captures the pointer the moment play starts and rebinds the keys for a shooter. Nothing here is aimed with a mouse.",
+    "disabled": ["Mouse Look"]
   }
 }
