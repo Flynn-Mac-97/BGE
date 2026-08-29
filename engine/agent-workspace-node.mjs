@@ -77,12 +77,33 @@ export function claimsOverlap(left, right) {
   return ap.startsWith(bp + '/') || bp.startsWith(ap + '/')
 }
 
-function assertAvailable(runs, id, files, parallel) {
+/**
+ * Whether two claims can be held at once — which is not the same question as
+ * whether their paths overlap.
+ *
+ * A claim exists so two writers never edit one file. Under a directory claim,
+ * that only covers the files already in it: a file nobody has written yet
+ * cannot be edited twice, and each lane is in its own worktree, so two new
+ * files under one folder never touch. The prefix rule alone meant one lane
+ * claiming `<project>/plugins` locked every other lane out of a folder that was
+ * empty, and four lanes each adding one new plugin is the ordinary case.
+ *
+ * Same path is still a conflict, whether or not it is on disk yet — two lanes
+ * both meaning to create `horde.js` is exactly what this is here to stop.
+ */
+export const claimsCollide = (root, left, right) => {
+  if (normal(left) === normal(right)) return true
+  if (!claimsOverlap(left, right)) return false
+  const deeper = normal(left).length > normal(right).length ? left : right
+  return fs.existsSync(path.join(root, normal(deeper)))
+}
+
+function assertAvailable(root, runs, id, files, parallel) {
   const active = runs.filter(run => run.status === 'active')
   if (active.some(run => run.id === id)) throw new Error(`agent task "${id}" is already active`)
 
   const conflicts = active.filter(run =>
-    files.some(file => (run.files || []).some(claimed => claimsOverlap(file, claimed))))
+    files.some(file => (run.files || []).some(claimed => claimsCollide(root, file, claimed))))
   if (conflicts.length) {
     const detail = conflicts.map(run => `${run.id}: ${(run.files || []).join(', ')}`).join('; ')
     throw new Error(`file claim overlaps active work: ${detail}`)
@@ -121,7 +142,7 @@ export async function prepareAgent(root, id, request = {}, projectDirectory = 'p
   if (parallel && !files.length) throw new Error('parallel tasks must claim at least one file')
 
   const packet = await contextFromDisk(main, { ...request, files, parallel }, projectDirectory)
-  assertAvailable(readAgentRegistry(main).runs, id, files, parallel)
+  assertAvailable(main, readAgentRegistry(main).runs, id, files, parallel)
 
   let workspace = main
   let branch = null
@@ -157,7 +178,7 @@ export async function prepareAgent(root, id, request = {}, projectDirectory = 'p
     editRegistry(main, registry => {
       // Check again while holding the registry lock. Two prepare commands may
       // have passed the first read together; only one overlapping claim wins.
-      assertAvailable(registry.runs, id, files, parallel)
+      assertAvailable(main, registry.runs, id, files, parallel)
       return { ...registry, runs: [...registry.runs, run] }
     })
   } catch (error) {
