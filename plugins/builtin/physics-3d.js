@@ -446,35 +446,86 @@ const pairKey = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`)
  *
  * Only things that are not solid start a pair, which is both how solid against
  * solid is skipped and why this costs a few dozen tests rather than the square
- * of the map. A trigger reports contacts and pushes nothing, which is how a
+ * of the map.  A trigger reports contacts and pushes nothing, which is how a
  * goal marker knows a player is standing in it.
+ *
+ * The movers are binned on the ground plane before they are compared, in the
+ * same cells the solids already use. Testing every mover against every other
+ * one is the square of the crowd, and a crowd is exactly what a game reaches
+ * for once the engine can carry one: 200 bodies standing still cost 10 ms of a
+ * 16 ms step, and 500 cost 57 ms — measured, on the meadow, with nothing else
+ * running. Binning them makes it the number of bodies times the number near
+ * each, which is flat as the crowd grows.
+ *
+ * The overlap test also comes before the pair key now. A key is a string, and
+ * building one per candidate pair rather than per touching pair was most of
+ * what was left.
  */
 function reportContacts(world, context) {
   const movers = world.entities.filter(e => is3D(e) && e.properties?.body !== 'solid')
   const seen = new Set()
+  const count = movers.length
+  if (!count) { contacts = seen; return }
 
-  for (const mover of movers) {
-    const box = boxFor(mover)
-    const candidates = [
-      ...grid.near(
-        box.x - box.halfWidth, box.x + box.halfWidth,
-        box.z - box.halfDepth, box.z + box.halfDepth
-      ),
-      ...movers
-    ]
+  const boxes = new Array(count)
+  const bins = new Map()
+  // A mover covering more cells than it is worth binning — a trigger volume
+  // across a whole level — is compared with everything, exactly as an oversize
+  // solid is.
+  const everywhere = []
 
-    for (const other of candidates) {
-      if (other === mover) continue
-      const key = pairKey(mover, other)
+  for (let i = 0; i < count; i++) {
+    const box = boxFor(movers[i])
+    boxes[i] = box
+    const x0 = Math.floor((box.x - box.halfWidth) / CELL)
+    const x1 = Math.floor((box.x + box.halfWidth) / CELL)
+    const z0 = Math.floor((box.z - box.halfDepth) / CELL)
+    const z1 = Math.floor((box.z + box.halfDepth) / CELL)
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { everywhere.push(i); continue }
+    for (let ix = x0; ix <= x1; ix++) {
+      for (let iz = z0; iz <= z1; iz++) {
+        const key = `${ix},${iz}`
+        const list = bins.get(key)
+        if (list) list.push(i)
+        else bins.set(key, [i])
+      }
+    }
+  }
+
+  /** One pair, at most once, however many cells the two of them share. */
+  const touch = (i, j) => {
+    if (i === j) return
+    if (!overlap(boxes[i], boxes[j])) return
+    const key = pairKey(movers[i], movers[j])
+    if (seen.has(key)) return
+    seen.add(key)
+    if (contacts.has(key)) return
+    // Through world.hook, so a behaviour can answer a collision too — a
+    // trigger should not have to be written into every type that wants it.
+    world.hook(movers[i], 'onCollide', movers[j], context)
+    world.hook(movers[j], 'onCollide', movers[i], context)
+  }
+
+  for (const list of bins.values()) {
+    for (let a = 0; a < list.length; a++) {
+      for (let b = a + 1; b < list.length; b++) touch(list[a], list[b])
+    }
+  }
+  for (const i of everywhere) for (let j = 0; j < count; j++) touch(i, j)
+
+  for (let i = 0; i < count; i++) {
+    const box = boxes[i]
+    for (const solid of grid.near(
+      box.x - box.halfWidth, box.x + box.halfWidth,
+      box.z - box.halfDepth, box.z + box.halfDepth
+    )) {
+      if (!overlap(box, boxFor(solid))) continue
+      const key = pairKey(movers[i], solid)
       if (seen.has(key)) continue
-      if (!overlap(box, boxFor(other))) continue
-
       seen.add(key)
       if (contacts.has(key)) continue
-      // Through world.hook, so a behaviour can answer a collision too — a
-      // trigger should not have to be written into every type that wants it.
-      world.hook(mover, 'onCollide', other, context)
-      world.hook(other, 'onCollide', mover, context)
+      world.hook(movers[i], 'onCollide', solid, context)
+      world.hook(solid, 'onCollide', movers[i], context)
     }
   }
 
