@@ -125,6 +125,40 @@ let readCount = 0
 const importFresh = async abs => (await import(pathToFileURL(abs).href + '?read=' + ++readCount)).default || {}
 
 /**
+ * Type names a plugin registers, which therefore have no file under `types/`.
+ *
+ * `light` is the one that exists today: Lights registers it with
+ * `world.retype('light', LIGHT_TYPE)` because a lamp is an engine feature rather
+ * than a fact about one game, and copying a `light.js` into every project that
+ * ever wanted one would be worse. The cost was that `check` called every level
+ * with a light in it broken — "there is no project/types/light.js, so those
+ * placements are empty" — while the light drew perfectly.
+ *
+ * Found by reading the plugins as TEXT rather than by importing them. A plugin
+ * is browser code that may pull in three or touch the DOM, and node has no
+ * business running forty of them to learn one string. Being a regex is safe here
+ * in the one direction that matters: a registration written some other way is
+ * missed and the old false report comes back, which is exactly today's
+ * behaviour, and nothing is ever wrongly called present.
+ */
+async function typesRegisteredByPlugins(projectDirectory) {
+  const found = new Set()
+  const folders = [
+    path.resolve(projectDirectory, '../plugins/builtin'),
+    path.join(projectDirectory, 'plugins')
+  ]
+  for (const folder of folders) {
+    for (const file of await walk(folder)) {
+      if (!file.endsWith('.js')) continue
+      let text = ''
+      try { text = await fs.readFile(path.join(folder, file), 'utf8') } catch { continue }
+      for (const match of text.matchAll(/\bretype\s*\(\s*['"`]([\w-]+)['"`]/g)) found.add(match[1])
+    }
+  }
+  return [...found].sort()
+}
+
+/**
  * Build the index — the one artifact both the browser UI and the AI read.
  * Types are imported rather than parsed so `properties` and asset references
  * are exact.
@@ -134,7 +168,10 @@ export async function buildIndex(projectDirectory) {
   // Every file in the project, by its path from `project/`. `assets` is keyed by
   // basename and so cannot answer "is this exact file there" — two folders may
   // hold a `jump.wav` — and that question is the one the asset check asks.
-  const index = { types: {}, behaviours: {}, levels: {}, tests: {}, assets: {}, files, config: [], warnings: [] }
+  const index = {
+    types: {}, behaviours: {}, levels: {}, tests: {}, assets: {}, files, config: [], warnings: [],
+    pluginTypes: await typesRegisteredByPlugins(projectDirectory)
+  }
   const inside = f => path.join(projectDirectory, f)
 
   for (const f of files) {
@@ -428,7 +465,7 @@ export function missingTypes(index) {
     for (const type of l.types || []) {
       if (typeof type !== 'string' || !type.trim()) {
         out.push({ file: l.file, why: `level "${name}" has a placement with no "type" — it will place nothing` })
-      } else if (!index.types[type]) {
+      } else if (!index.types[type] && !(index.pluginTypes || []).includes(type)) {
         out.push({ file: l.file, why: `level "${name}" places type "${type}" — there is no project/types/${type}.js, so those placements are empty` })
       }
     }

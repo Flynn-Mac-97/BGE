@@ -1,114 +1,35 @@
 # Materials
 
-- A `mesh` block says how a surface is drawn. `mesh: "wall.png"` is shorthand for
-  `{ "texture": "wall.png" }`, and a placement's `mesh` merges over its type's, key
-  by key — change the box without restating the surface.
-- Structural keys — `box` `quad` `model` `material` `unlit` — pick the shape and the
-  material. **Every other key is a parameter handed to that material.**
-
-## One mesh block, in full
+- The library of surfaces, and the door a game adds its own through. A material is named on a `mesh`, on a type or on a placement.
+- **Prefer the flat form.** Both are read; the flat one is what the renderer's material cache is keyed on.
 
 ```json
-"mesh": {
-  "box": [4, 3, 0.4],
-  "material": "standard",
-  "texture": "counter-strike/wall.png",
-  "tiling": 2,
-  "tint": "#c9c0a8",
-  "opacity": 1,
-  "metalness": 0.1,
-  "roughness": 0.6,
-  "normal": "counter-strike/wall-normal.png",
-  "normalStrength": 1,
-  "lightmap": "maps/brush-12-lightmap.png",
-  "lightmapIntensity": 1
-}
+"mesh": { "box": [2, 3, 0.4], "material": "toon", "steps": 4, "outline": 0.3,
+          "texture": "wall.png", "tint": "#ffffff", "tiling": 1 }
 ```
 
-## The shape — one of `box`, `quad`, `model`
+Nine materials ship. Everything in the right-hand column is written **flat on the `mesh`**, beside `texture` and `tint`:
 
-| key | shape and unit | absent |
-| --- | --- | --- |
-| `box` | `[width, height, depth]` in metres | falls back to `collider.box`; neither → a 1 m cube, reported |
-| `quad` | `[width, height]` in metres, flat | — |
-| `model` | a `.glb` name, e.g. `counter-strike/models/c4.glb` | `box` or the collider stands in until the file arrives |
-| `anchor` | `centre` (or `center`) or `feet`, for a model whose origin is not its middle | `centre`; a misspelling is reported and treated as centre |
-| `scale` | model only, multiplied by the entity's `scale` | `1` |
+| name | is | its own parameters |
+|---|---|---|
+| `basic` | unlit, takes no light — a sky face, a lamp, a screen. `unlit: true` means exactly this | — |
+| `lambert` | **the default** — diffuse only, cheap and flat | `emissive` |
+| `standard` | physically based | `metalness` 0, `roughness` 0.8, `normal`, `normalStrength` 1, `ambientOcclusion`, `ambientOcclusionStrength` 1, `emissive`, `emissiveStrength` 1 |
+| `phong` | a specular highlight, cheaply | `shininess` 30, `specular` `#111111`, `normal` |
+| `toon` | banded light, with an optional rim outline | `steps` 3, `outline` 0, `outlineColour` `#000000` |
+| `matcap` | the whole lighting model baked into one sphere image | `matcap` |
+| `water` | scrolling normals on `context.time` | `normal`, `roughness` 0.15, `metalness` 0.1, `normalStrength` 0.6, `speed` 0.06, `direction` `[1, 0.35]` |
+| `additive` | adds its light to what is behind it — flame, muzzle flash, hologram | — |
+| `pulse` | raw GLSL, the worked example of a custom shader | `speed` 0.6, `bands` 1 |
 
-## Which material
+`opacity` (default 1) applies to all of them and sets `transparent` below 1. An unknown name is reported and falls back to lambert.
 
-- `"material": "toon"`, or `"material": { "name": "toon", "steps": 5 }`.
-- Absent → `basic` when `"unlit": true`, otherwise `lambert`.
-- **Prefer the flat form.** The renderer's shared-material cache keys on every
-  non-shape key of `mesh` but never on what is inside `material: { … }`, so two
-  meshes differing only inside that object share one material and the second draws
-  with the first one's numbers.
-- A name nobody registered draws lambert:
-  `[render] brush.mesh.material: no material named "tooon" is registered — using lambert`.
+Three things that are not obvious and cost real time:
 
-## Keys every material reads
+- **`tint` MULTIPLIES its texture.** It can only darken or shift a hue; a surface lighter than its texture needs a lighter texture. `#ffffff` means "as painted", and an untextured mesh with no tint gets a stable per-type colour.
+- **`mesh` merges into the type's key by key**, so a `tint` declared on a type is not a fallback — it multiplies into every textured placement that did not override it.
+- **`tiling` is a DENSITY.** `tiling: 2` is two repeats per metre and stays the same size on every face of any box; `tiling: [3, 1]` is three across and one up on the face, whatever its size. A box defaults to once per metre, a quad to its picture exactly once.
 
-| key | shape | default when absent |
-| --- | --- | --- |
-| `texture` | image name. A bare name — including one with folders, `counter-strike/wall.png` — resolves under `project/assets/`; a name starting `assets/ levels/ types/ behaviours/ tests/ plugins/` is project-relative | none |
-| `tint` | `#rgb`, `#rrggbb`, a CSS colour name, or a number | white behind a texture, a stable per-type colour without one |
-| `tiling` | a number is repeats **per metre** (`2` on a 12 m wall shows 24); `[u, v]` is absolute repeats **on the face**, whatever its size | 1 per metre for a box, exactly once for a quad |
-| `opacity` | 0–1; under 1 switches transparency on | `1` |
-| `lightmap` | baked image, read on the second UV set | none |
-| `lightmapIntensity` | multiplier on it | `1` |
+Textures are named as bare paths and resolve under the project's `assets/`: `meadow/grass.png` → `<project>/assets/meadow/grass.png`. A missing one falls back to a flat colour **and reports itself**.
 
-`texture`, `tint` and `tiling` are read by the renderer, which hands the material a
-texture that is already tiled and a colour that is already resolved. `lightmap`
-needs a material with a lightmap slot — `matcap` and `pulse` have none and say so.
-
-## The library, and what each one reads
-
-| name | what it is | its own parameters, with defaults |
-| --- | --- | --- |
-| `basic` | unlit — takes no light at all: a sky face, a lamp, a screen | — |
-| `lambert` | the default — diffuse only, cheap and flat, what a lightmapped scene wants | `emissive` none |
-| `standard` | physically based | `metalness` 0, `roughness` 0.8, `normal` none, `normalStrength` 1, `ambientOcclusion` none, `ambientOcclusionStrength` 1, `emissive` none, `emissiveStrength` 1 |
-| `phong` | a specular highlight without a pbr response | `shininess` 30, `specular` `#111111`, `normal` none |
-| `toon` | banded light, with an optional rim outline | `steps` 3 (clamped 2–16), `outline` 0 (0–1), `outlineColour` or `outlineColor` `#000000` |
-| `matcap` | one sphere image is the whole lighting model | `matcap` none |
-| `water` | scrolling normals, driven by `context.time` so a moment always looks the same | `normal` none, `tint` `#2e6f8e`, `opacity` 0.85, `roughness` 0.15, `metalness` 0.1, `normalStrength` 0.6, `speed` 0.06 m/s, `direction` `[1, 0.35]` |
-| `additive` | adds its light to whatever is behind — flames, flashes, holograms | `tint` `#ffffff` |
-| `pulse` | raw GLSL, the worked example of a custom shader | `tint` `#39e6ff`, `speed` 0.6, `bands` 1 |
-
-`pulse` reads `color` as well as `tint`. On `water`, write `tint`: the renderer only
-resolves `mesh.tint`, so a `color` there leaves the water its per-type colour. A material ignores a
-parameter it does not know, so one mesh may carry the keys of the material it has and
-the one it is about to be changed to — `anchor` and `scale` are handed over as
-parameters too, and no library material reads either.
-
-## What it refuses, and says
-
-- `[Materials] mesh.material must be a name or { name, … } — got 3` — falls back to
-  lambert, or to basic under `unlit`. An empty name says `mesh.material is an empty
-  name — falling back to the default`; an object with no `name` says so too and keeps
-  its other keys as parameters.
-- `[Materials] "reddish" is not a colour lambert.emissive can use — using the default instead`;
-  a material's own colours take `#rgb`, `#rrggbb`, a CSS name or a number.
-- `[Materials] a matcap material with no "matcap" image has no lighting model to read — it will draw as a flat colour`
-- `[Materials] water with no "normal" image has nothing to scroll — it will draw as flat tinted glass`
-- `[Materials] missing texture /project/assets/x.png (referenced as "x.png")` for a
-  `normal`, `matcap` or `ambientOcclusion` that 404s. This one goes to the console
-  alone, not into `problems`.
-- A `texture` that 404s is the renderer's: `[render] missing texture /project/assets/x.png (referenced as "x.png")`,
-  and the surface falls back to its stable per-type colour.
-- `[render] brush.mesh.lightmap: a "matcap" material has no lightmap slot`, and
-  `[render] brush.mesh.tint: cannot read colour "reddish"`.
-- Each `[Materials]` line above is said once and listed under `problems` by
-  `materials.list`. The `[render]` lines are the renderer's own and never appear there.
-
-## Driving it
-
-- `run materials.list` — the whole library, each one's parameters, whether it is
-  `drawable`, what the renderer itself answers to, and every problem so far.
-- A game adds its own: `context.materials.register('hologram', ({ mesh, texture, tint, view }) => material)`.
-  That is exactly what the renderer hands a builder; only `context.materials.build()`
-  adds a resolved `parameters`, so read the declaration off `mesh`. A material
-  registered after the level loaded still reaches the renderer.
-- Headless, no builder is ever called and nothing imports three; the library still
-  lists with `drawable: false`, which is not a fault.
-- Check a surface in a browser frame.
+A game registers its own with `context.materials.register(name, ({ mesh, texture, tint, view, parameters }) => material)` and never touches a file under `engine/`. `materials.list` · `run materials.list`.
