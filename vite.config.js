@@ -52,6 +52,10 @@ const inProject = p => slash(p).startsWith(PROJECT_URL + '/')
 /** Project-relative, always forward-slashed. */
 const relative = p => slash(p).slice(PROJECT_URL.length + 1)
 
+/** What the file watcher skips, said in absolute paths under this checkout. */
+const IGNORED = ['**/.*/**', '**/.agent-worktrees/**', '**/.tmp-agent-tests/**']
+  .map(pattern => `${slash(ROOT)}/${pattern}`)
+
 const send = (res, code, body) => {
   res.statusCode = code
   res.setHeader('content-type', 'application/json')
@@ -376,6 +380,14 @@ export default defineConfig({
     // one is pointless, and on Windows it is fatal: the directory is locked
     // and then deleted under the watcher, which raises EBUSY. Dot-directories
     // are never project content, so none of them are watched.
-    watch: { ignored: ['**/.*/**', '**/.agent-worktrees/**', '**/.tmp-agent-tests/**'] }
+    //
+    // Anchored to ROOT, and that is the whole point. Chokidar matches these
+    // against absolute paths, so the bare `**/.*/**` meant "any path with a
+    // dot-directory anywhere in it" — and a parallel agent's checkout lives at
+    // `<repo>/.agent-worktrees/<lane>/`, so the lane's dev server ignored every
+    // file it was serving. The page reloaded, Vite served the cached transform
+    // because nothing had invalidated it, and the plugin you had just rewritten
+    // behaved exactly as before, silently.
+    watch: { ignored: IGNORED }
   }
 })

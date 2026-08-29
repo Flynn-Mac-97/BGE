@@ -66,6 +66,20 @@ export function makeLoop({ onFixed, onFrame, onError }) {
   let timers = []
   let nextTimer = 1
 
+  /**
+   * Who is holding time still, by name.
+   *
+   * A survivor stops the world while you choose an upgrade, and a result screen
+   * stops it again. Neither can use `stop()`: that kills the frame phase too, so
+   * nothing draws and no key is read, and the screen doing the holding goes
+   * blank. A held step still runs every system and every update — with a step of
+   * zero seconds — so drawing and input carry on while nothing moves.
+   *
+   * Counted by name rather than a boolean, because two things can hold at once
+   * and whichever releases first must not start the world under the other.
+   */
+  const holds = new Set()
+
   function runTimers() {
     if (!timers.length) return
     // Snapshot first: a callback may add or cancel timers, and mutating the
@@ -86,6 +100,10 @@ export function makeLoop({ onFixed, onFrame, onError }) {
   }
 
   function fixedStep() {
+    // Held: the clock does not move, so no timer comes due and `context.time`
+    // reads the same on the far side of a pause. The step still runs, because a
+    // paused game is still a game being looked at.
+    if (holds.size) { onFixed(0, fixed); return }
     fixed = ++steps * STEP
     runTimers()
     onFixed(STEP, fixed)
@@ -143,6 +161,13 @@ export function makeLoop({ onFixed, onFrame, onError }) {
 
     random,
 
+    /** Stop time under this name. Naming it is what lets two holders overlap. */
+    hold(reason = 'paused') { holds.add(reason); return reason },
+    release(reason = 'paused') { return holds.delete(reason) },
+    get paused() { return holds.size > 0 },
+    /** Who is holding, so "why is nothing moving" is answerable from a snapshot. */
+    get holds() { return [...holds] },
+
     /**
      * Start playing.
      *
@@ -178,6 +203,9 @@ export function makeLoop({ onFixed, onFrame, onError }) {
       fixed = 0
       acc = 0
       timers = []
+      // A hold left over from the last run would open the next level frozen,
+      // with nothing on screen saying why.
+      holds.clear()
       random.reset(seed)
     },
 

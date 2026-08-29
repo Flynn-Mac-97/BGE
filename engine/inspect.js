@@ -92,6 +92,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
         // Engine time and seed, because "what happened" is only reproducible
         // if you know where the clock and the random stream were.
         time: r(loop.time),
+        // Only when something is holding time still. "Nothing is moving" is the
+        // hardest thing to diagnose without being told who asked for that.
+        ...(loop.paused ? { paused: loop.holds } : {}),
         seed: loop.random.seed,
         camera: { x: r(view.x), y: r(view.y), zoom: r(view.zoom), mode: view.mode },
         counts: {
