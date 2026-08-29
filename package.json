@@ -11,7 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "engine": "node bin/engine.mjs",
-    "test": "node --test test/agent-workspace.test.mjs && node test/cli.test.mjs",
+    "test": "node --test test/cli.offline.test.mjs && node --test test/agent-workspace.test.mjs && node test/cli.test.mjs",
     "test:agent": "node --test test/agent-workspace.test.mjs"
   },
   "dependencies": {

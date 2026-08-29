@@ -7,7 +7,7 @@
  * nothing to configure: a thing is in the 3D world because of the shape of its
  * collider, not because of a flag somebody remembered to set.
  *
- * The numbers are Counter-Strike's, converted once, here: one Half-Life unit is
+ * The numbers are a metre-scale conversion, done once, here: one unit is
  * 0.0254 m, so 800 units of gravity is 20.32 m/s/s and an 18 unit step is
  * 0.46 m. Everything else in the game can then talk in metres.
  *
@@ -77,7 +77,7 @@ function report(key, message) {
 
 // ------------------------------------------------------------------- the grid
 /**
- * A coarse grid over the static solids, because a Counter-Strike map is several
+ * A coarse grid over the static solids, because a map is several
  * hundred of them and a dozen moving bodies. Testing every body against every
  * solid every step is the loop that quietly turns into a frame budget problem
  * once a real map is loaded.
@@ -330,7 +330,7 @@ function simulateBody(body, seconds, others) {
  *
  * Two dynamic bodies block each other but never push each other — deciding who
  * yields needs a mass model this does not have, and standing on another player
- * is a Counter-Strike move rather than a bug. There are a dozen bodies at most,
+ * is a deliberate move rather than a bug. There are a dozen bodies at most,
  * so they are tested directly instead of binned.
  */
 function blockersAround(body, box, travel, others) {
@@ -380,7 +380,7 @@ function moveAlong(body, axis, distance, blockers, stepHeight) {
 /**
  * Walk up onto something instead of stopping against it.
  *
- * Without this every doorway lip and crate edge in a Counter-Strike map is a
+ * Without this every doorway lip and crate edge in a map is a
  * wall. The lift is refused unless the body fits where it would arrive, so a
  * body can never step up into something it would not then fit under.
  */
@@ -447,7 +447,7 @@ const pairKey = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`)
  * Only things that are not solid start a pair, which is both how solid against
  * solid is skipped and why this costs a few dozen tests rather than the square
  * of the map. A trigger reports contacts and pushes nothing, which is how a
- * bomb site knows a player is standing in it.
+ * goal marker knows a player is standing in it.
  */
 function reportContacts(world, context) {
   const movers = world.entities.filter(e => is3D(e) && e.properties?.body !== 'solid')
@@ -472,7 +472,7 @@ function reportContacts(world, context) {
       seen.add(key)
       if (contacts.has(key)) continue
       // Through world.hook, so a behaviour can answer a collision too — a
-      // `bombsite` should not have to be written into every type that wants it.
+      // trigger should not have to be written into every type that wants it.
       world.hook(mover, 'onCollide', other, context)
       world.hook(other, 'onCollide', mover, context)
     }
@@ -523,7 +523,7 @@ export default {
        * A sightline is one call from the terminal rather than a script:
        *
        *   run physics3d.raycast '[[0,1.6,0],[0,0,-1],40]'
-       *   run physics3d.raycast '{"from":"player-0","to":"bombsite-a"}'
+       *   run physics3d.raycast '{"from":"player-0","to":"goal-a"}'
        *
        * `from` and `to` take an entity id as well as a point, and a ray fired
        * from an entity skips that entity — a shooter never hits itself.
@@ -543,7 +543,7 @@ export default {
         if (typeof spec.from === 'string') ignore.push(spec.from)
 
         let direction = spec.direction ? asVector(spec.direction) : null
-        // JSON has no Infinity, and no Counter-Strike map is a kilometre across.
+        // JSON has no Infinity, and no map is a kilometre across.
         let maxDistance = spec.maxDistance ?? 1000
 
         if (spec.to !== undefined) {

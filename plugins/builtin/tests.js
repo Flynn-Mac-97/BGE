@@ -36,6 +36,14 @@ const load = (context, file) => context.importProjectFile(file)
 
 export default {
   name: 'Test Runner',
+  about: 'Run the project tests, and remember how they went.',
+  inspect: () => {
+    const ran = [...results.values()]
+    const passing = ran.filter(r => r.ok).length
+    return ran.length
+      ? [{ title: 'Last run', rows: [[`${passing}/${ran.length} passing`, ran.length === passing ? '' : 'some failed']] }]
+      : []
+  },
 
   async onLoad(context) {
     // Last run's verdicts, so the panel says something before you press anything.

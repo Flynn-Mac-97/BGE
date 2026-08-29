@@ -283,6 +283,37 @@ export async function buildIndex(projectDirectory) {
 
   await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
   await fs.writeFile(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index, null, 2))
+
+  // The agent view: the same map, minus what the editor alone acts on (the
+  // file lists, per-level asset tables, reverse references). This is the file
+  // the instructions tell an agent to read first — the full index is several
+  // times larger for nothing an agent does.
+  const agent = {
+    types: Object.fromEntries(Object.entries(index.types).map(([name, t]) => [name, {
+      file: t.file, properties: t.properties, hooks: t.hooks,
+      ...(t.uses?.length ? { uses: t.uses } : {}),
+      ...(t.behaviours?.length ? { behaviours: t.behaviours } : {}),
+      ...(t.error ? { error: t.error } : {})
+    }])),
+    behaviours: Object.fromEntries(Object.entries(index.behaviours).map(([name, b]) => [name, {
+      file: b.file, about: b.about, properties: b.properties, hooks: b.hooks,
+      ...(b.error ? { error: b.error } : {})
+    }])),
+    levels: Object.fromEntries(Object.entries(index.levels).map(([name, l]) => [name, {
+      file: l.file, entities: l.entities, types: l.types, behaviours: l.behaviours,
+      ...(l.error ? { error: l.error } : {})
+    }])),
+    tests: Object.fromEntries(Object.entries(index.tests).map(([name, t]) => [name, {
+      file: t.file,
+      ...(t.title ? { title: t.title } : {}),
+      ...(t.level ? { level: t.level } : {}),
+      ...(t.error ? { error: t.error } : {})
+    }])),
+    // Keyed by path, not basename, so "what kind is this file" is an exact
+    // lookup rather than a guess across folders.
+    assets: Object.fromEntries(Object.values(index.assets).map(a => [a.file, a.kind]))
+  }
+  await fs.writeFile(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent, null, 2))
   return index
 }
 

@@ -155,7 +155,7 @@ function pluginRow(ui, context, p) {
 
 function select(context, p) {
   state.selected = p.name
-  context.bus.emit('inspector:plugin', p)
+  context.bus.emit('plugin:selected', p)
   context.redraw()
 }
 

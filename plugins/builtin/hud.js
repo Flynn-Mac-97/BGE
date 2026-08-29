@@ -23,6 +23,13 @@
  */
 export default {
   name: 'Heads Up Display',
+  about: "Draw the level's HUD into the canvas — text and bars read from world state.",
+  inspect: context => {
+    const items = context.hud?.items || []
+    return items.length
+      ? [{ title: 'Declared', rows: items.map(i => [i.text ?? i.bar ?? '·', i.at ? `at ${i.at}` : '']) }]
+      : []
+  },
   needs: [],
 
   onLoad(context) {

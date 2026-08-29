@@ -12,12 +12,9 @@ export default {
   name: 'Inspector Panel',
 
   onLoad(context) {
-    context.bus.on('inspector:plugin', plugin => inspectPlugin(context, plugin))
+    context.bus.on('plugin:selected', plugin => inspectPlugin(context, plugin))
     context.bus.on('selection:changed', () => {
-      if (!state.plugin) return
-      state.plugin = null
-      state.guide = null
-      context.redraw()
+      if (state.plugin) { state.plugin = null; state.guide = null; context.redraw() }
     })
     context.bus.on('open:file', () => {
       state.plugin = null
@@ -51,7 +48,7 @@ async function inspectPlugin(context, plugin) {
   context.redraw()
   try {
     const guides = await context.files.agentPlugins()
-    const guide = guides.find(guide => guide.plugin === plugin.name)
+    const guide = guides.find(g => g.plugin === plugin.name)
     if (!guide) return
     const text = await context.files.readAgent(guide.scope, guide.file)
     if (state.plugin?.name !== plugin.name) return
@@ -67,17 +64,49 @@ async function savePluginGuide(context) {
   context.redraw()
 }
 
+/**
+ * What one plugin is, and what it contributes — as lists, not form fields.
+ * A command is its id and its label, a panel its title and dock, a system
+ * its phase; each reads as a single truncated row, the same way the scene
+ * and tests panels list things. A plugin may also export `about` for a
+ * paragraph and `inspect` — data or a function of context — as sections of
+ * { title, rows } rendered verbatim (CLI Surface lists its access points
+ * that way).
+ */
 function pluginView(ui, context) {
   const plugin = state.plugin
+  const def = (context.loader.plugins.get(plugin.name) || {}).definition || {}
+  const inspect = typeof def.inspect === 'function' ? def.inspect(context) : (def.inspect || [])
+
+  const facts = [
+    { k: 'source', v: plugin.builtin ? 'built-in' : 'project' },
+    { k: 'state', v: plugin.enabled ? 'enabled' : 'disabled' },
+    ...(def.needs?.length ? [{ k: 'needs', v: def.needs.join(', ') }] : [])
+  ]
+  const lists = [
+    ['Commands', def.commands, c => c.id, c => c.label],
+    ['Panels', def.panels, p => p.title || p.id, p => p.dock ? `dock ${p.dock}` : ''],
+    ['Systems', def.systems, s => s.phase, s => s.label || ''],
+    ['Menus', def.menus, m => m.label || m.id, () => 'toolbar'],
+    ['Tools', def.tools, t => t.id || t.label, t => t.label || '']
+  ].filter(([, items]) => items?.length)
+  const counted = [['fields', def.fields], ['importers', def.importers]].filter(([, items]) => items?.length)
+
   return ui.stack([
-    ui.section(`${plugin.name} · plugin`, [
-      ui.field({ k: 'source', v: plugin.builtin ? 'built-in' : 'project' }),
-      ui.field({ k: 'state', v: plugin.enabled ? 'enabled' : 'disabled' }),
-      plugin.needs?.length ? ui.field({ k: 'needs', v: plugin.needs.join(', ') }) : null,
+    ui.section(plugin.name, [
+      ui.list({ items: facts, key: f => f.k, row: f => [ui.label(f.k), ui.spacer(), ui.meta(f.v)] }),
       plugin.error ? ui.field({ k: 'error', v: plugin.error, marked: true }) : null
     ].filter(Boolean)),
-    plugin.about ? ui.section('About', [ui.text(plugin.about)]) : null,
-    ui.section('Contributes', [ui.text(plugin.gives.join(' · ') || 'nothing', { dim: true })]),
+    def.about ? ui.section('About', [ui.text(def.about)]) : null,
+    ...lists.map(([title, items, k, v]) => ui.section(title, [
+      ui.list({ items, key: item => k(item), row: item => [ui.label(k(item)), ui.spacer(), ui.meta(v(item))] })
+    ])),
+    ...inspect.map(block => ui.section(block.title, [
+      block.rows?.length
+        ? ui.list({ items: block.rows, key: row => row[0], row: row => [ui.label(row[0]), ui.spacer(), ui.meta(row[1])] })
+        : ui.text('nothing to show', { dim: true })
+    ])),
+    counted.length ? ui.section('Other', counted.map(([name, items]) => ui.text(`${name}: ${items.length}`, { dim: true }))) : null,
     ui.section('Agent guide', [
       state.error ? ui.text(state.error) : null,
       state.guide
@@ -87,7 +116,7 @@ function pluginView(ui, context) {
             ui.button(state.guide.dirty ? 'Save guide' : 'Guide saved', () => savePluginGuide(context), { primary: state.guide.dirty })
           ])
         : ui.text('reading guide…', { dim: true })
-    ].filter(Boolean))
+    ])
   ].filter(Boolean))
 }
 

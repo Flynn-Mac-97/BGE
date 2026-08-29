@@ -51,7 +51,7 @@
  *   right is forward × up, so the basis is right-handed the same way Three.js is.
  */
 
-/** Counter-Strike's standing and ducked eye heights, in metres. */
+/** A standing eye height and a crouched one, in metres — the fallback when the level's camera block names neither. */
 const EYE_HEIGHT = 1.62
 const CROUCH_EYE_HEIGHT = 0.91
 
@@ -98,6 +98,11 @@ export const runningCamera = () => running
 
 export default {
   name: 'Game Camera',
+  about: 'Follow the player or look around freely — the game camera, separate from the editor viewport.',
+  inspect: context => {
+    const v = context.view || {}
+    return [{ title: 'View', rows: [['mode', v.mode || 'ortho'], ['x', v.x], ['y', v.y], ['zoom', v.zoom]] }]
+  },
 
   onLoad(context) {
     // All camera state lives on context.camera, so the system below and game code
@@ -144,7 +149,7 @@ export default {
       /**
        * Where the shot goes: the aim the player is holding, plus the recoil
        * currently on it. Derived from the view rather than kept beside it, so a
-       * weapon firing between steps cannot read a stale angle.
+       * shot fired between steps cannot read a stale angle.
        *
        * Shake is deliberately not in here. A shake moves the picture; it must
        * not move the bullet, or a screen effect would decide a duel.
@@ -154,7 +159,7 @@ export default {
         pitch: clamp(context.view.pitch - cam.appliedPitch + cam.punchPitch, -MAX_PITCH, MAX_PITCH)
       }),
 
-      /** Recoil. Pitch first, because a weapon kicks up far more than it kicks sideways. */
+      /** Recoil. Pitch first, because a shot kicks up far more than it kicks sideways. */
       punch(pitchRadians = 0, yawRadians = 0) {
         cam.punchPitch += pitchRadians
         cam.punchYaw += yawRadians
@@ -422,7 +427,7 @@ function moveEye(cam, view, seconds, context) {
   // agree talk to each other in this engine — the camera cannot look a movement
   // behaviour up, and should not want to.
   const wants = crouching(entity) ? ducked : standing
-  // Eased, not snapped: ducking in Counter-Strike is a smooth drop, and a snap
+  // Eased, not snapped: ducking is a smooth drop, and a snap
   // reads as a glitch rather than as a movement.
   if (cam.eyeHeight == null) cam.eyeHeight = wants
   cam.eyeHeight += (wants - cam.eyeHeight) * (1 - Math.exp(-seconds / EYE_EASE))
@@ -467,7 +472,7 @@ function bob(cam, entity, seconds, context) {
 /**
  * Recoil comes off on the fixed clock, in whatever mode the view is in.
  *
- * `punch()` is on context.camera unconditionally, so a weapon can kick while the
+ * `punch()` is on context.camera unconditionally, so a shot can kick while the
  * view is ortho, or while a level is mid-load. Decaying it only on the
  * first-person path made that kick permanent, and aim() would have reported it
  * for the rest of the session.

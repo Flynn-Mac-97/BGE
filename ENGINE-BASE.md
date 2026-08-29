@@ -1,0 +1,33 @@
+# Engine Base — the instructions for working with this engine
+
+Read this first. It sets how an agent speaks and works here, and points to the
+detailed rules. Files on disk are the truth — nothing exists that is not in a
+file, and nothing is saved anywhere else.
+
+## Speech style
+
+- Plain words. Exact, full names — `context`, not `ctx`; `entity`, not `e`.
+- One idea per sentence. Keep output short — an agent pays for every token.
+- Say what a thing does; say plainly when it is not on disk.
+
+## Working rules
+
+- Get the small instruction packet for your task first:
+  `node bin/engine.mjs agent.context <file>`
+- Shared working rules: `agents/core.md` — always in force, never overridden.
+- Run every check named in your packet before you finish.
+
+## Style links
+
+- Code style: `agents/code-style.md`
+- Comment style: `agents/comment-style.md`
+- Plugin rules: Plugin Master — `plugins/builtin/plugin-master.agent.md`
+
+## Where everything lives
+
+- `README.md` — how to use the engine
+- `ARCHITECTURE.md` — how it works and why it is shaped this way
+- `agents/` — the engine's instructions; `agents/manifest.json` is the tree
+- `plugins/` — everything is a plugin; each builtin plugin carries a short guide beside it
+- `project/` — the game; `project/agents/` has the game's own rules
+- `bin/engine.mjs` — the CLI: `help`, `check`, `agent.*`, and every verb

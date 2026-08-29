@@ -109,8 +109,8 @@ export default {
      * The three system filters above skip 3D entities, and this has to skip them
      * too or the disjoint-domains claim is only true of the simulation and not
      * of the plugin. Writing `properties.gravity` on every entity in the world
-     * meant `physics.gravity` quietly reset the gravity of a Counter-Strike map
-     * that Physics 3D owns — under a name that says 2D nowhere.
+     * meant `physics.gravity` quietly reset the gravity of a 3D map that
+     * Physics 3D owns — under a name that says 2D nowhere.
      *
      * A gravity that is not a number is refused rather than written: it would
      * become a NaN velocity on the first step, and a body with one stops being

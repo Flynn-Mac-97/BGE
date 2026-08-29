@@ -23,8 +23,9 @@ const HOST = process.env.ENGINE_HOST || `http://localhost:${PORT}`
  * Anchored to the repo rather than the working directory, so `pain` records the
  * same file no matter where it was run from. Append-only: two agents working at
  * once both get their line, and nothing rewrites what came before.
+ * `ENGINE_PAIN_FILE` points it elsewhere, so a test can isolate the log.
  */
-const PAIN_FILE = fileURLToPath(new URL('../painpoints.jsonl', import.meta.url))
+const PAIN_FILE = process.env.ENGINE_PAIN_FILE || fileURLToPath(new URL('../painpoints.jsonl', import.meta.url))
 
 const HELP = `engine — read and drive the running editor
 
@@ -388,8 +389,11 @@ if (flags.headless) {
   // A caller that has to strip log lines out of the result is a caller that
   // will eventually strip the wrong one.
   const original = console.log
-  console.log = (...a) => process.stderr.write(a.map(String).join(' ') + '\n')
-  console.warn = console.log
+  const toStderr = (...a) => process.stderr.write(a.map(String).join(' ') + '\n')
+  console.log = toStderr
+  console.warn = toStderr
+  // console.info writes to stdout by default in node; it must join the redirect.
+  console.info = toStderr
 
   const { startWorldInNode } = await import('../engine/start-world-node.mjs')
   let engine, editor

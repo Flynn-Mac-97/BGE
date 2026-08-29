@@ -56,7 +56,7 @@ function safeAgent(scope, rel) {
   const base = scope === 'engine' ? ROOT : scope === 'project' ? PROJECT : null
   const clean = slash(String(rel || '')).replace(/^\.\//, '')
   const allowed = scope === 'engine'
-    ? clean === 'AGENTS.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || /^plugins\/builtin\/[^/]+\.agent\.md$/.test(clean)
+    ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent\.md$/.test(clean)
     : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent\.md$/.test(clean)
   if (!base || !allowed) return null
   const abs = path.resolve(base, clean)
@@ -81,10 +81,20 @@ async function agentPlugins() {
       const stem = name.slice(0, -'.agent.md'.length)
       const source = await fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => '')
       const plugin = source.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
+      // A guide applies to its own plugin by default. A leading frontmatter
+      // `match:` (space-separated paths) adds more — Plugin Master uses it to
+      // ride along with every plugin task.
+      const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
+      const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
+      const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
+      const match = [...new Set([
+        `${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`,
+        ...extra
+      ])]
       found.push({
         id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
         scope: place.scope, file: `${place.prefix}/${name}`,
-        match: [`${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`],
+        match,
         triggers: [stem.replaceAll('-', ' '), plugin.toLowerCase()], enabled: !disabled.has(plugin), plugin
       })
     }

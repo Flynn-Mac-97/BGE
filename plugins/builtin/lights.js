@@ -1,15 +1,15 @@
 /**
  * Lights — a light is an entity, and the level is where you put one.
  *
- * Counter-Strike 1.6 baked every photon into its textures and shipped no dynamic
- * lights at all. That is one game making one good choice for a map that never
- * changes, and it is not a reason for an engine to have no lights. A torch in a
- * dungeon, a muzzle flash lighting the corridor it was fired down, a car
- * headlight, a flashbang — every one of those is a light that moves, and none of
- * them can be baked. So both halves live here: real lights any game can place,
- * and the level-side half of baked lighting for the games that would rather pay
- * offline. A game that wants neither places no lights and declares no lightmaps,
- * and this file then costs one empty Map per frame.
+ * Baking every photon into the textures and shipping no dynamic lights is one
+ * good choice for a map that never changes, and it is not a reason for an
+ * engine to have no lights. A torch in a dungeon, a muzzle flash lighting the
+ * corridor it was fired down, a car headlight, a flashbang — every one of
+ * those is a light that moves, and none of them can be baked. So both halves
+ * live here: real lights any game can place, and the level-side half of baked
+ * lighting for the games that would rather pay offline. A game that wants
+ * neither places no lights and declares no lightmaps, and this file then costs
+ * one empty Map per frame.
  *
  *   { "type": "light", "at": [4, 3, -2],
  *     "properties": { "kind": "point", "color": "#ffb060", "intensity": 2.4,
@@ -248,7 +248,7 @@ export function flashIntensity(peak, elapsed, seconds) {
  *
  *   "lightmaps": {
  *     "intensity": 1,
- *     "directory": "counter-strike/maps",
+ *     "directory": "maps",
  *     "maps": { "brush-12": "brush-12-lightmap.png", "ground-0": "ground-0-lightmap.png" }
  *   }
  *
@@ -369,14 +369,14 @@ export default {
     context.bus.on('world:changed', () => syncLights(state))
 
     /**
-     * The one-shot light every weapon and every explosion reaches for.
+     * The one-shot light every shot and every explosion reaches for.
      *
      * It is a real entity, so it is in `snapshot`, it is deterministic, and it
      * dies through `context.destroy` like everything else. It costs exactly
      * nothing when nothing is flashing: no entity, no record, no work.
      *
      * `at` takes either shape — `[x, y, z]` from a level or `{ x, y, z }` from
-     * `context.raycast`, which is where a bullet impact comes from.
+     * `context.raycast`, which is where an impact comes from.
      */
     const flash = (options = {}) => {
       const at = pointOf(options.at)
@@ -547,7 +547,7 @@ function syncLights(state) {
  * three, loaded once, and only where there is a screen to use it on.
  *
  * A world with nothing drawing must not pay to import a renderer library it will
- * never call — the same reason World Look imports it inside its sky box builder.
+ * never call — the same reason Skybox imports it inside its sky box builder.
  * The first frame or two after a level loads have no three.js light objects yet,
  * which nobody can see because nothing has been drawn either.
  */
@@ -695,9 +695,10 @@ function markShadowSurfaces(context, scene) {
     if (!object.isMesh || object.userData.lightsShadow) continue
     object.userData.lightsShadow = true
     // The sky box surrounds everything and a light's marker box is an editing
-    // aid; either one would cast a shadow across the whole map.
+    // aid; a 3D gizmo is editor furniture, not a map object. Any of those would
+    // cast a shadow across the whole map for nothing.
     const entity = object.userData.entity ? context.world.byId(object.userData.entity) : null
-    const excluded = object.userData.worldLook === 'sky' || entity?.type === 'light'
+    const excluded = object.userData.skybox === true || object.userData.gizmo === true || entity?.type === 'light'
     object.castShadow = !excluded
     object.receiveShadow = !excluded
   }
@@ -707,7 +708,7 @@ function markShadowSurfaces(context, scene) {
 /**
  * Hand each named surface the lightmap the level chose for it.
  *
- * Applied only when something is drawing, for the same reason World Look does not
+ * Applied only when something is drawing, for the same reason Skybox does not
  * build a sky box headless: a lightmap is a texture and there is nothing to put
  * it on. `lights.bake` still reports the whole mapping either way, so a headless
  * agent can see exactly what a level asked for.

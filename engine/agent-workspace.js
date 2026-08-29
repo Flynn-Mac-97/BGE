@@ -68,7 +68,11 @@ function skillDetails(text) {
   return { name: field('name'), description: field('description') }
 }
 
-const withoutFirstHeading = text => String(text).replace(/^# [^\n]+\n+/, '').trim()
+// A skill or a plugin guide may open with `---` frontmatter (name, description,
+// or a declared match). It is metadata for the tree, never instruction text, so
+// it must not reach a packet.
+const withoutFrontmatter = text => String(text).replace(/^---\s*\n[\s\S]*?\n---\s*/, '').trim()
+const withoutFirstHeading = text => withoutFrontmatter(text).replace(/^# [^\n]+\n+/, '').trim()
 
 async function loadAgentGraph(read, pluginNodes = []) {
   const engine = await readJSON(read, 'engine', ENGINE_AGENT_MANIFEST)

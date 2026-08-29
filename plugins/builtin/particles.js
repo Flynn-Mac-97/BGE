@@ -373,6 +373,20 @@ export function makeParticleField() {
       return field.burst({ ...recipe, ...options })
     },
 
+    /**
+     * Restyle a named effect, or add a new one.
+     *
+     * The builtin table ships generic shapes — a soft-dot muzzle flash, grey
+     * smoke — and a game that wants its own art names it here, in its own
+     * plugin's onLoad, without touching the builtin:
+     *
+     *   context.particles.define('muzzle-flash', { texture: 'fx/muzzle.png' })
+     */
+    define(name, overrides = {}) {
+      EFFECTS[name] = { ...(EFFECTS[name] || {}), ...overrides }
+      return EFFECTS[name]
+    },
+
     /** Where every live particle is, rounded — what a determinism test compares. */
     positions() {
       return live.map(p => [round(p.x), round(p.y), round(p.z)])
@@ -387,6 +401,9 @@ export function makeParticleField() {
     },
 
     recent: (n = 20) => bursts.slice(-n),
+
+    /** The pictures the event wiring reaches for — the game names its own art. */
+    get art() { return art },
 
     get state() {
       return {
@@ -409,6 +426,11 @@ export const particles = makeParticleField()
 // ------------------------------------------------------------------ the plugin
 export default {
   name: 'Particles',
+  about: 'Smoke, sparks and debris — clouds that block sight, trails, and one-shot bursts.',
+  inspect: context => {
+    const s = context.particles.state
+    return [{ title: 'Alive', rows: [['clouds', s.clouds], ['trails', s.trails], ['bursts', s.bursts]] }]
+  },
   // Decals is not required — every call into it below is guarded — but naming
   // it means `context.decals` is there before the first bullet lands rather
   // than one plugin later.
@@ -478,13 +500,14 @@ export default {
  *
  * A table rather than eight functions, because every one of these is the same
  * burst with different numbers, and a table is the form somebody tuning them
- * can actually read. The colours are Counter-Strike's: pale sandstone dust,
- * brass, a red that stays red on a dark floor.
+ * can actually read. No effect ships a texture: an untextured particle is a
+ * soft dot, which is honest for every genre, and a game that wants a sprite
+ * names it with `particles.define`.
  */
 const EFFECTS = {
   'muzzle-flash': {
     count: 1, speed: 0, life: 0.05, size: 0.4, blend: 'add', fade: true,
-    colour: '#ffd9a0', texture: 'counter-strike/muzzle-flash.png'
+    colour: '#ffd9a0'
   },
   tracer: {
     count: 14, speed: 0, life: 0.06, size: 0.03, blend: 'add', fade: true,
@@ -508,7 +531,7 @@ const EFFECTS = {
   },
   smoke: {
     // A thousand, which is what the header promises the buffer can take, and
-    // eighteen seconds, which is how long a Counter-Strike smoke stands.
+    // eighteen seconds, which is how long a smoke screen stands.
     count: 900, speed: [0.3, 1.6], life: [14, 18], size: [0.5, 1.1],
     grow: 0.22, colour: ['#b9b9b9', '#9d9d9d', '#cfcfcf'], drag: 1.4,
     blocks: 4
@@ -525,11 +548,11 @@ const EFFECTS = {
 }
 
 /**
- * What a surface throws up when it is shot, by what it is made of.
+ * What a surface throws up when it is hit, by what it is made of.
  *
  * The first match wins, so the longer name goes first: `sandstone-brick.png`
  * would otherwise be read as sand, and the whole point of the table is that a
- * brick wall and the floor of a bombsite do not throw up the same dust.
+ * brick wall and a stone floor do not throw up the same dust.
  */
 const SURFACES = [
   ['sandstone', '#c9b489'],
@@ -548,8 +571,20 @@ const SURFACES = [
   ['roof', '#9c6a4a']
 ]
 
-const HOLE = 'counter-strike/decal-bullet-hole.png'
-const SPLATTER = 'counter-strike/decal-blood.png'
+/**
+ * The pictures the event wiring reaches for, named by the game.
+ *
+ * The engine ships none — a decal with no texture is a tinted quad, which is
+ * honest for every genre — and a game that wants its own art sets them in its
+ * own plugin's onLoad:
+ *
+ *   context.particles.art.bulletHole = 'decals/bullet-hole.png'
+ *   context.particles.art.blood = 'decals/blood.png'
+ *
+ * A mutable object on the field rather than constants, because the wiring
+ * below reads it at event time and a game may load after this plugin.
+ */
+export const art = { bulletHole: '', blood: '' }
 
 /**
  * The colour of what was hit.
@@ -575,7 +610,7 @@ const isAlive = entity => !!(entity?.properties?.team || entity?.damageable)
  *
  * `weapon:fired`, `weapon:hit`, `entity:hurt` and `entity:killed` are the
  * contract with the weapon and damage lanes. `grenade:detonated` and
- * `bomb:exploded` are offered rather than agreed: if nothing ever emits them
+ * `explosion` are offered rather than agreed: if nothing ever emits them
  * nothing happens, and the same effects are reachable by name through
  * `context.particles.effect`.
  *
@@ -646,7 +681,7 @@ function wireGameEffects(context) {
       context.decals?.place({
         at: { x: point.x, y: point.y - 1.2, z: point.z },
         normal: { x: 0, y: 1, z: 0 },
-        size: [0.5, 0.5], texture: SPLATTER, tint: '#8c1010',
+        size: [0.5, 0.5], texture: art.blood, tint: '#8c1010',
         rotation: context.random() * Math.PI * 2,
         life: 25
       })
@@ -659,7 +694,7 @@ function wireGameEffects(context) {
       particles.effect('sparks', { at: point, direction: normal })
     }
     context.decals?.place({
-      at: point, normal, size: 0.09, texture: HOLE, tint: colour,
+      at: point, normal, size: 0.09, texture: art.bulletHole, tint: colour,
       // Turned at random about the surface normal, so a wall of hits does not
       // read as a printed pattern. The randomness is the engine's, so the wall
       // looks the same on a replay.
@@ -687,7 +722,7 @@ function wireGameEffects(context) {
     context.decals?.place({
       at: { x: victim.x, y: victim.y - 0.9, z: victim.z },
       normal: { x: 0, y: 1, z: 0 },
-      size: [1.1, 1.1], texture: SPLATTER, tint: '#7a0d0d',
+      size: [1.1, 1.1], texture: art.blood, tint: '#7a0d0d',
       rotation: context.random() * Math.PI * 2,
       life: 40
     })
@@ -702,14 +737,14 @@ function wireGameEffects(context) {
     particles.effect('explosion', { at, count: 120 })
   })
 
-  context.bus.on('bomb:exploded', event => {
+  context.bus.on('explosion', event => {
     const at = asVector(event?.at) || asVector(event?.point) || asVector(event?.entity)
     if (!at) return
     particles.effect('explosion', { at })
     context.decals?.place({
       at: { x: at.x, y: at.y - 0.4, z: at.z },
       normal: { x: 0, y: 1, z: 0 },
-      size: [6, 6], texture: SPLATTER, tint: '#2a2320',
+      size: [6, 6], texture: art.blood, tint: '#2a2320',
       rotation: context.random() * Math.PI * 2
     })
   })

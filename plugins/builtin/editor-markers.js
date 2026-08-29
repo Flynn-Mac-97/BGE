@@ -1,11 +1,11 @@
 /**
  * Editor Markers — things that exist to be seen while building, and not while playing.
  *
- * A spawn point, a bomb site, a patrol node, a trigger volume, a camera hint: all
- * of them are real entities that a level genuinely contains, and all of them have
- * to be visible and draggable in the viewport or they cannot be authored. None of
- * them should be a coloured box standing in the middle of the map while somebody
- * is playing.
+ * A spawn point, a patrol node, a trigger volume, a camera hint, a goal marker:
+ * all of them are real entities that a level genuinely contains, and all of
+ * them have to be visible and draggable in the viewport or they cannot be
+ * authored. None of them should be a coloured box standing in the middle of the
+ * map while somebody is playing.
  *
  * The type says what it is, once:
  *
@@ -18,9 +18,9 @@
  * is not something a type can know. Where a thing is drawn is the editor's
  * business, so it is the editor that answers.
  *
- * `hidden` only stops it being drawn. A marker keeps its collider, so a bomb-site
- * trigger still reports the player standing in it while invisible, which is
- * exactly what a bomb site is for.
+ * `hidden` only stops it being drawn. A marker keeps its collider, so a trigger
+ * volume still reports the player standing in it while invisible, which is
+ * exactly what a trigger is for.
  */
 export default {
   name: 'Editor Markers',

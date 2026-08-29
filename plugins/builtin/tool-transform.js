@@ -69,13 +69,18 @@ function attach(context) {
 
   const pt = event => { const r = viewport.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top } }
   const sel = () => context.selection
+  // In the 3D view this tool is a flat overlay drawing 2D math, which is the
+  // wrong vocabulary for a perspective scene — the 3D Transform Gizmo plugin
+  // owns the viewport there, and this tool's overlay, drags and zoom stand
+  // down until the view is ortho again.
+  const in3d = () => context.view.mode === '3d'
 
   // ---------------------------------------------------------------- overlay
   function paint() {
     let html = ''
     const list = sel()
 
-    if (list.length && !context.loop.running) {
+    if (list.length && !context.loop.running && !in3d()) {
       const b = bounds(context, list)
       const tl = renderer.toScreen(b.x0, b.y1)
       const br = renderer.toScreen(b.x1, b.y0)
@@ -200,6 +205,7 @@ function attach(context) {
   })
 
   viewport.addEventListener('pointerdown', event => {
+    if (in3d()) return
     if (event.button === 2) return
     if (menu) { menu = null; if (peek) { peek.opacity = 1; peek = null } }
     viewport.setPointerCapture(event.pointerId)
@@ -316,6 +322,7 @@ function attach(context) {
   viewport.addEventListener('pointercancel', end)
 
   viewport.addEventListener('wheel', event => {
+    if (in3d()) return
     event.preventDefault()
     const p = pt(event)
     const before = renderer.toWorld(p.x, p.y)

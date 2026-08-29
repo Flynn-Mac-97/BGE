@@ -6,8 +6,6 @@
     "height": 720
   },
   "plugins": {
-    "disabled": [
-      "World Look"
-    ]
+    "disabled": []
   }
 }

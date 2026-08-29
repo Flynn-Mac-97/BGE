@@ -1106,6 +1106,22 @@ export default {
       sprayResetSeconds: SPRAY_RESET_SECONDS
     }
     running = { weapons: context.weapons, context }
+
+    // The game's own art, named here rather than in the builtin: the engine
+    // ships textureless effects and decals, and a game that wants its own look
+    // says so in its own plugin. The muzzle flash sprite and the hole and blood
+    // decals are this game's pictures.
+    if (context.particles) {
+      context.particles.define('muzzle-flash', { texture: 'counter-strike/muzzle-flash.png' })
+      context.particles.art.bulletHole = 'counter-strike/decal-bullet-hole.png'
+      context.particles.art.blood = 'counter-strike/decal-blood.png'
+    }
+
+    // The shelf's game-specific tools, named here rather than in the builtin.
+    if (context.tools?.register) {
+      context.tools.register({ name: 'counter-strike-sounds', file: 'tools/make-counter-strike-sounds.mjs', wrapped: false, makes: 'the Counter-Strike sound set', run: 'node tools/make-counter-strike-sounds.mjs' })
+      context.tools.register({ name: 'counter-strike-textures', file: 'tools/make-counter-strike-textures.mjs', wrapped: false, makes: 'the Counter-Strike textures', run: 'node tools/make-counter-strike-textures.mjs' })
+    }
   },
 
   commands: [

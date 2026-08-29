@@ -247,7 +247,16 @@ export async function startWorld({
     // level into a save that quietly demoted it to a flat one, and the only
     // symptom was pressing play and getting the 2D camera.
     const { mode, ...rule } = loadedLevel.camera || {}
-    const camera = { ...rule, ...(mode ? { mode } : {}), at: [round(view.x), round(view.y)], zoom: round(view.zoom) }
+    const camera = { ...rule, ...(mode ? { mode } : {}) }
+    // The same argument, one key further: in a perspective editor view (the 3D
+    // fly camera) view.x/y is where the author is LOOKING FROM, not where the
+    // game camera should sit — writing it into `at` would move every future
+    // play start to wherever the author happened to be flying. The flat view's
+    // position is the only editor position that is also a level position.
+    if (view.mode === 'ortho') {
+      camera.at = [round(view.x), round(view.y)]
+      camera.zoom = round(view.zoom)
+    }
     const level = { ...loadedLevel, ...world.toLevel(camera) }
     await files.writeJSON(`levels/${editor.levelName}.json`, level)
   }

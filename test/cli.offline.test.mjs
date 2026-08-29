@@ -1,0 +1,121 @@
+#!/usr/bin/env node
+/**
+ * CLI offline tests — the door itself, with nothing running.
+ *
+ * The bridge suite (test/cli.test.mjs) needs a dev server and an open editor
+ * tab, so its offline assertions are unreachable without one. This suite
+ * proves the same door works with nothing running: exit codes, argument
+ * coercion, the determinism lint, offline check, and the pain lifecycle
+ * (isolated into a temp file via ENGINE_PAIN_FILE).
+ */
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { lint } from '../engine/project-index.mjs'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const CLI = path.join(ROOT, 'bin/engine.mjs')
+
+const run = (args, options = {}) => {
+  try {
+    const stdout = execFileSync(process.execPath, [CLI, ...args], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options
+    })
+    return { code: 0, stdout, stderr: '' }
+  } catch (e) {
+    return { code: e.status ?? -1, stdout: e.stdout || '', stderr: e.stderr || '' }
+  }
+}
+
+const painFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'engine-pain-')), 'painpoints.jsonl')
+const withPain = (file, args) => run(args, { env: { ...process.env, ENGINE_PAIN_FILE: file } })
+
+test('help exits 0 and names the verb groups', () => {
+  const r = run(['help'])
+  assert.equal(r.code, 0)
+  for (const word of ['snapshot', 'check', 'pain', 'agent.context']) {
+    assert.ok(r.stdout.includes(word), `help mentions ${word}`)
+  }
+})
+
+test('exit codes: 0 ok, 1 bad argument, 2 nothing to talk to', () => {
+  assert.equal(run(['check']).code, 0, 'an offline op succeeds')
+  const badKind = run(['pain', 'x', '--kind', 'nonsense'])
+  assert.equal(badKind.code, 1, 'a bad argument is 1')
+  assert.ok(badKind.stderr.includes('--kind must be one of'), 'and says which rule')
+  assert.equal(run(['snapshot', '--port', '5999']).code, 2, 'no editor on that port is 2')
+})
+
+test('a JSON argument is sent as JSON, not a string', () => {
+  // agent.context coerces a JSON array into a file list.
+  const r = run(['agent.context', '["engine/world.js"]'])
+  assert.equal(r.code, 0)
+  assert.deepEqual(JSON.parse(r.stdout).files, ['engine/world.js'])
+})
+
+test('the determinism lint names each banned source with a line', () => {
+  const problems = lint('probe.js', [
+    'export default {',
+    '  update() {',
+    '    const now = performance.now()',
+    '    const r = Math.random()',
+    '    setTimeout(() => {}, 1)',
+    '    // a comment may say performance.now() without being a problem',
+    '  }',
+    '}'
+  ].join('\n'))
+  assert.ok(problems.some(p => /performance\.now/.test(p.why)), 'names the wall clock')
+  assert.ok(problems.some(p => /Math\.random/.test(p.why)), 'names the random source')
+  assert.ok(problems.some(p => /setTimeout/.test(p.why)), 'names the scheduler')
+  assert.ok(problems.every(p => p.line > 0), 'every problem has a line number')
+  assert.equal(problems.length, 3, 'the comment line is not a problem')
+})
+
+test('check passes clean with nothing running', () => {
+  const r = run(['check'])
+  assert.equal(r.code, 0)
+  assert.deepEqual(JSON.parse(r.stdout).problems, [])
+})
+
+test('pain records, lists and resolves against an isolated file', () => {
+  const file = painFile()
+  try {
+    const recorded = withPain(file, ['pain', 'the thing was hard', '--cost', '500', '--kind', 'cli', '--where', 'bin/engine.mjs'])
+    assert.equal(recorded.code, 0)
+    assert.equal(JSON.parse(recorded.stdout).id, 'p1', 'first id is p1')
+
+    const listed = JSON.parse(withPain(file, ['pain.list']).stdout)
+    assert.equal(listed.open, 1)
+    assert.equal(listed.cost, 500)
+    assert.equal(listed.byKind.cli.cost, 500)
+
+    const resolved = withPain(file, ['pain.resolve', 'p1', 'added a test for it'])
+    assert.equal(JSON.parse(resolved.stdout).id, 'p1')
+    const after = JSON.parse(withPain(file, ['pain.list']).stdout)
+    assert.equal(after.open, 0, 'the resolved entry no longer counts as open')
+    assert.equal(after.resolved, 1)
+  } finally {
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test('pain rejects a bad kind', () => {
+  const file = painFile()
+  try {
+    const r = withPain(file, ['pain', 'x', '--kind', 'nonsense'])
+    assert.equal(r.code, 1)
+  } finally {
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test('a headless world starts with nothing running', () => {
+  const r = run(['--headless', 'snapshot'])
+  assert.equal(r.code, 0, 'the world started')
+  assert.equal(JSON.parse(r.stdout).mode, 'edit')
+})

@@ -2726,8 +2726,8 @@
     {
       "type": "brush",
       "at": [
-        3,
-        3.3,
+        -4,
+        3.5,
         4
       ],
       "collider": {
@@ -6186,8 +6186,8 @@
       "id": "bomb-site-a",
       "type": "bomb-site",
       "at": [
-        1,
-        2.8,
+        0.8,
+        1.46,
         -25
       ],
       "collider": {

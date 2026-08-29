@@ -15,7 +15,7 @@
  * when the browser refuses. The kernel owns the vocabulary; a plugin spends it.
  *
  * What Escape means, written down because the two halves have to agree.
- * Escape both drops pointer lock and leaves full screen, and Counter-Strike's
+ * Escape both drops pointer lock and leaves full screen, and a shooter's
  * answer is that Escape opens a menu and the round carries on. So:
  *
  *   first press    the browser hands the mouse back. Still playing, still full

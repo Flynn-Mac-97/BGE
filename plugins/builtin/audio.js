@@ -24,6 +24,13 @@ const RING = 60
 
 export default {
   name: 'Sound',
+  about: 'Play sounds, and record every play whether or not it was audible.',
+  inspect: context => {
+    const recent = context.audio.recent(6)
+    return recent.length
+      ? [{ title: 'Recently played', rows: recent.map(p => [p.file ?? String(p), p.volume != null ? `volume ${p.volume}` : '']) }]
+      : []
+  },
 
   onLoad(context) {
     const buffers = new Map()   // file -> AudioBuffer

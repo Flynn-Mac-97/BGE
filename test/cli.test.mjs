@@ -87,6 +87,16 @@ if (probe.code === 2) {
 
 const original = fs.readFileSync(LEVEL, 'utf8')
 
+// The type probes below spawn into whichever level the editor has open, not
+// only level1, so that file must be left as found too — or a run on another
+// level dirties it (pain p31).
+let openLevelPath = null
+let openOriginal = null
+try {
+  openLevelPath = path.join(ROOT, `project/levels/${JSON.parse(probe.stdout).level}.json`)
+  openOriginal = fs.readFileSync(openLevelPath, 'utf8')
+} catch { /* no open level — nothing to restore */ }
+
 // ------------------------------------------------------------------ tests
 await test('snapshot returns the fields an agent depends on', () => {
   const s = json(['snapshot'])
@@ -339,23 +349,30 @@ const markAlive = () => json(['eval', 'globalThis.__alive = 1; return 1'])
 await test('a type written while the editor runs is usable without a reload', () => {
   const name = uniq()
   markAlive()
+  let placed = null
   try {
     fs.writeFileSync(typePath(name), body(3))
     settle(2500)
     eq(alive(), 1, 'the page did not reload')
     ok(json(['eval', `return engine.world.types.has('${name}')`]), 'the new type is registered')
-    eq(json(['spawn', name, '{"at":[5,1,0]}']).properties.mass, 3, 'and can be placed')
+    const spawned = json(['spawn', name, '{"at":[5,1,0]}'])
+    placed = spawned.id
+    eq(spawned.properties.mass, 3, 'and can be placed')
   } finally {
+    // The spawn persisted into the open level; take it out before the type
+    // file goes, or the placement outlives the probe (pain p31).
+    if (placed) { try { json(['destroy', placed]) } catch { /* best effort */ } }
     removeAndSettle(typePath(name))
   }
 })
 
 await test('editing a type moves live entities onto it and keeps overrides', () => {
   const name = uniq()
+  let id = null
   try {
     fs.writeFileSync(typePath(name), body(3))
     settle(2500)
-    const id = json(['spawn', name, '{"at":[5,1,0]}']).id
+    id = json(['spawn', name, '{"at":[5,1,0]}']).id
     json(['set', id, 'body', 'dynamic'])            // an override the file must not win back
     markAlive()
 
@@ -367,16 +384,18 @@ await test('editing a type moves live entities onto it and keeps overrides', () 
     eq(e.properties.mass, 42, 'the new default reached the live entity')
     eq(e.properties.body, 'dynamic', 'and the per-entity override survived')
   } finally {
+    if (id) { try { json(['destroy', id]) } catch { /* best effort */ } }
     removeAndSettle(typePath(name))
   }
 })
 
 await test('a broken type keeps the last good definition running', () => {
   const name = uniq()
+  let id = null
   try {
     fs.writeFileSync(typePath(name), body(7))
     settle(2500)
-    json(['spawn', name, '{"at":[5,1,0]}'])
+    id = json(['spawn', name, '{"at":[5,1,0]}']).id
     json(['clearLog'])
     markAlive()
 
@@ -392,10 +411,17 @@ await test('a broken type keeps the last good definition running', () => {
     settle(2500)
     eq(json(['eval', `return engine.world.all('${name}')[0]?.properties.mass`]), 9, 'fixing it applies live')
   } finally {
+    if (id) { try { json(['destroy', id]) } catch { /* best effort */ } }
     removeAndSettle(typePath(name))
     json(['clearLog'])
   }
 })
+
+// The type probes spawned into whichever level was open. Put that file back
+// now, or any offline check later in the suite still sees the probe placement.
+if (openOriginal != null) {
+  fs.writeFileSync(openLevelPath, openOriginal)
+}
 
 await test('a level edited on disk reloads, and the editor\'s own save does not loop', () => {
   const before = fs.readFileSync(LEVEL, 'utf8')
@@ -476,10 +502,13 @@ await test('headless and the browser agree about the same level', () => {
   eq(alone.entities, attached.entities, 'and every one in the same place')
 })
 
-await test('the project tests pass with nothing but node', () => {
+await test('the project test run completes with nothing but node', () => {
+  // The project suite is cleared while the Test Runner is being rebuilt. With
+  // no tests, a clean summary is the whole contract — restore a `passed > 0`
+  // check when real tests come back.
   const r = headless(['run', 'tests.run'])
-  ok(r.passed > 0, 'tests ran')
-  eq(r.failed, 0, `all passed — ${JSON.stringify(r.tests.filter(t => !t.ok))}`)
+  ok(Array.isArray(r.tests), 'a summary came back')
+  eq(r.failed, 0, `no failures — ${JSON.stringify(r.tests.filter(t => !t.ok))}`)
 })
 
 await test('stdout stays one JSON value even when the engine logs', () => {
@@ -526,6 +555,9 @@ await test('index, tree and check need no server at all', () => {
 
 // ------------------------------------------------------------------ report
 fs.writeFileSync(LEVEL, original)   // whatever happened above, leave the file as found
+if (openOriginal != null) {
+  try { fs.writeFileSync(openLevelPath, openOriginal) } catch { /* already restored */ }
+}
 
 const failed = results.filter(r => !r.ok)
 for (const r of results) {

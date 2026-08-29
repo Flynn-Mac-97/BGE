@@ -14,7 +14,7 @@
 import zlib from 'node:zlib'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../project/assets')
 
@@ -281,14 +281,20 @@ function render(name, { palette, rows, frames }) {
 }
 
 // ------------------------------------------------------------------ write
-fs.mkdirSync(OUT, { recursive: true })
-for (const [name, def] of Object.entries(SPRITES)) {
-  const { buf, w, h, cells, cw } = render(name, def)
-  fs.writeFileSync(path.join(OUT, `${name}.png`), buf)
-  console.log(
-    `${name}.png`.padEnd(14),
-    `${w}x${h}`.padEnd(9),
-    cells > 1 ? `${cells} frames of ${cw}x${h}` : '1 frame',
-    `${buf.length}b`
-  )
+export function main() {
+  fs.mkdirSync(OUT, { recursive: true })
+  for (const [name, def] of Object.entries(SPRITES)) {
+    const { buf, w, h, cells, cw } = render(name, def)
+    fs.writeFileSync(path.join(OUT, `${name}.png`), buf)
+    console.log(
+      `${name}.png`.padEnd(14),
+      `${w}x${h}`.padEnd(9),
+      cells > 1 ? `${cells} frames of ${cw}x${h}` : '1 frame',
+      `${buf.length}b`
+    )
+  }
 }
+
+// Run when invoked as a script; an import stays side-effect free, so the
+// tooling shelf can call main() on demand.
+if (typeof process !== 'undefined' && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

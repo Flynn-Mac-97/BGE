@@ -1,6 +1,6 @@
 # Engine work
 
-- Read `ARCHITECTURE.md` first.
+- Read `ARCHITECTURE.md` first — the design index; then the doc your task touches.
 - Browser and headless mode must run the same world.
 - Prefer a plugin. Change the kernel only when the kernel blocks the feature.
 - Keep entities flat and keep the four hooks.

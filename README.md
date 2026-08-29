@@ -25,13 +25,15 @@ project/
   assets/            sprites and sounds
   plugins/           your own editor extensions
   agents/            game instructions and skill settings
-  .engine/index.json generated; read by both the editor and the AI
+  .engine/index.json generated; the editor's copy, plus index.agent.json for agents
 ```
 
 ## Agent workspace
 
-The root `AGENTS.md` is a short bootstrap. Engine rules live in `agents/`.
-Game rules live in `project/agents/`. Their manifests join into one tree.
+The root `AGENTS.md` is a short bootstrap that points at `ENGINE-BASE.md` —
+the base instructions: speech, code and comment style, and where everything
+lives, with links out. Engine rules live in `agents/`. Game rules live in
+`project/agents/`. Their manifests join into one tree.
 
 Open **AGENTS** to inspect the tree, add a branch, edit its file, or switch an
 optional skill on or off. A disabled skill adds no text to an agent packet.
@@ -45,7 +47,9 @@ plugins/builtin/physics-3d.agent.md
 ```
 
 The **Plugins** branch discovers these files by itself. A guide is loaded only
-when its plugin is enabled and the task names or edits that plugin.
+when its plugin is enabled and the task names or edits that plugin — unless the
+guide declares `match:` paths of its own, as `Plugin Master` does to ride along
+with every plugin task. Being a plugin, it can carry commands and tests too.
 
 Engine style defaults can be replaced for one project. An engine rule names an
 override key; a project rule with the same key wins only for matching project
@@ -158,6 +162,7 @@ The demo art is generated from text, not committed as opaque binary:
 
 ```
 node tools/make-sprites.mjs
+node bin/engine.mjs --headless run tools.make sprites
 ```
 
 `tools/make-sprites.mjs` holds a palette and sixteen rows per sprite, so a
@@ -206,7 +211,8 @@ node bin/engine.mjs run audio.recent
 ```
 
 The demo sounds are generated, not committed as blobs — `node tools/make-sounds.mjs`
-describes each one as a frequency sweep you can read and change.
+describes each one as a frequency sweep you can read and change (`tools.make sounds`
+runs the same tool through the engine).
 
 ### A level
 

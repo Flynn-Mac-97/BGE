@@ -1952,6 +1952,21 @@ export function makeRenderer(canvas, view, viewport) {
       return found
     },
 
+    /**
+     * The world ray through a screen point, for tools that want to intersect
+     * their own objects — a 3D gizmo — without going through entity picking.
+     *
+     * `rayHits` aims the shared raycaster through the same pixel, so a tool
+     * that reaches for this and then casts against its own scene objects sees
+     * exactly the ray the entity pick would have used.
+     */
+    ray(px, py) {
+      readyCamera()
+      scene.updateMatrixWorld()
+      raycaster.setFromCamera(toNDC(px, py), activeCamera())
+      return raycaster.ray
+    },
+
     bounds: drawSize,
 
     /**

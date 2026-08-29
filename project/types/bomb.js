@@ -52,6 +52,13 @@ export default {
       entity.exploded = true
       entity.play?.('explode')
       context.camera?.shake(1.2)
+      // The generic `explosion` lane: the engine's particles and decals listen
+      // to it, so a bomb going off is a bomb going off in any game that speaks
+      // the lane.
+      context.bus.emit('explosion', {
+        at: { x: entity.x, y: entity.y, z: entity.z || 0 },
+        entity
+      })
       return
     }
 

@@ -24,9 +24,9 @@
  */
 
 /**
- * Degrees turned per mouse count. 0.022 is m_yaw, Counter-Strike's own
- * constant, and the reason a sensitivity carried over from that game feels like
- * the same mouse here. It is used for pitch too, as the game does.
+ * Degrees turned per mouse count. 0.022 is m_yaw, the first-person constant
+ * that became the de facto default, and the reason a sensitivity carried over
+ * from any shooter feels like the same mouse here. It is used for pitch too.
  */
 const DEGREES_PER_COUNT = 0.022
 const DEFAULT_SENSITIVITY = 2.5
@@ -37,12 +37,10 @@ export const radiansPerCount = sensitivity => sensitivity * DEGREES_PER_COUNT * 
  * What each mouse button is called, indexed by `MouseEvent.button`.
  *
  * The DOM numbers them 0 = left, **1 = middle**, **2 = right**, which is not the
- * order anybody says them in and not the order Counter-Strike uses. Naming them
- * `Mouse0`, `Mouse1`, `Mouse2` from that index is the bug this table exists to
- * make impossible: `attack2` was bound to `Mouse1`, so right-click pressed
- * `Mouse2` and nothing listened, while the middle button fired the secondary
- * attack — the silencer toggle, the burst selector and the AWP scope, all on the
- * wrong button and all silent about it.
+ * order anybody says them in. Naming them `Mouse0`, `Mouse1`, `Mouse2` from that
+ * index is the bug this table exists to make impossible: a secondary action
+ * bound to `Mouse1` would fire on the middle button while the right button did
+ * nothing — off by one and silent about it.
  *
  * So the buttons are named for what they are. A code that says `MouseRight`
  * cannot be off by one, and `mouseButtonName` below is the single place a raw
@@ -63,9 +61,10 @@ export const mouseButtonName = index => MOUSE_BUTTONS[index] ?? `MouseButton${in
  * One notch of the wheel, per `WheelEvent.deltaMode`.
  *
  * `deltaY` is not a unit. Chrome reports about 100 per notch in pixel mode,
- * Firefox about 3 in line mode, and a page-mode wheel reports 1 — so a weapon
- * switch driven by the raw number scrolls thirty times faster on one browser
- * than another. Dividing by these turns all three into notches.
+ * Firefox about 3 in line mode, and a page-mode wheel reports 1 — so an action
+ * bound to the raw number (switching weapons, changing tools) scrolls thirty
+ * times faster on one browser than another. Dividing by these turns all three
+ * into notches.
  */
 const WHEEL_NOTCH = [100, 3, 1]
 
@@ -197,9 +196,10 @@ export default {
         accumulated.pitch += pitch
       },
       /**
-       * Wheel notches since the last call, and clears them. Weapon switching
-       * wants it, and it is notches rather than the browser's own `deltaY` so
-       * one flick of the wheel is one weapon on every browser.
+       * Wheel notches since the last call, and clears them. Whatever the game
+       * binds the wheel to — a weapon cycle, a tool change — wants notches
+       * rather than the browser's own `deltaY`, so one flick of the wheel is
+       * one step of it on every browser.
        */
       mouseWheel() {
         const turned = accumulated.wheel
@@ -300,7 +300,7 @@ function attach(context, accumulated) {
     if (!input.locked) {
       // Escape takes the pointer back without the mouse ever coming up, so a
       // button held at that moment would stay held — and the visible symptom is
-      // a weapon that keeps firing at nothing. Every button, not the two that
+      // an action that keeps firing at nothing. Every button, not the two that
       // happened to be bound when this was written: a right button left down
       // holds the scope open forever, and nothing would say why.
       for (const name of MOUSE_BUTTONS) input.release(name)
@@ -323,7 +323,7 @@ function attach(context, accumulated) {
    *
    * `stopPropagation` and not `preventDefault`: cancelling a pointerdown would
    * also cancel the `mousedown` the browser fires after it, which is the event
-   * the weapon is listening for.
+   * the game is listening for.
    */
   const viewport = context.shell?.viewport
   if (viewport) {
@@ -335,7 +335,7 @@ function attach(context, accumulated) {
   }
 
   canvas.addEventListener('mousedown', event => {
-    // The click that takes the pointer must not also fire the weapon. In every
+    // The click that takes the pointer must not also fire the action. In every
     // shooter the first click means "give me the mouse", and only the ones
     // after it are shots.
     if (!input.locked) { capture(); return }
@@ -359,14 +359,14 @@ function attach(context, accumulated) {
   })
 
   // Only while captured: the editor's own wheel gestures are none of our
-  // business, and a weapon that switched while you were zooming the viewport
+  // business, and an action that switched while you were zooming the viewport
   // would be a mystery.
   canvas.addEventListener('wheel', event => {
     if (!input.locked) return
     event.preventDefault()
     // Notches, not deltaY. See wheelNotches: the raw number is about 100 per
-    // notch in Chrome, 3 on Firefox's line mode and 1 in page mode, so a weapon
-    // switch written against the raw number works on exactly one browser.
+    // notch in Chrome, 3 on Firefox's line mode and 1 in page mode, so an
+    // action written against the raw number works on exactly one browser.
     accumulated.wheel += wheelNotches(event.deltaY, event.deltaMode)
   }, { passive: false })
 

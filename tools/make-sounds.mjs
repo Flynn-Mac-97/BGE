@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../project/assets')
 const RATE = 22050
@@ -85,9 +85,15 @@ function wav(float32) {
 }
 
 // ------------------------------------------------------------------ write
-fs.mkdirSync(OUT, { recursive: true })
-for (const [name, def] of Object.entries(SOUNDS)) {
-  const buf = wav(samples(def))
-  fs.writeFileSync(path.join(OUT, `${name}.wav`), buf)
-  console.log(`${name}.wav`.padEnd(12), `${def.secs}s`.padEnd(7), def.wave.padEnd(7), `${buf.length}b`)
+export function main() {
+  fs.mkdirSync(OUT, { recursive: true })
+  for (const [name, def] of Object.entries(SOUNDS)) {
+    const buf = wav(samples(def))
+    fs.writeFileSync(path.join(OUT, `${name}.wav`), buf)
+    console.log(`${name}.wav`.padEnd(12), `${def.secs}s`.padEnd(7), def.wave.padEnd(7), `${buf.length}b`)
+  }
 }
+
+// Run when invoked as a script; an import stays side-effect free, so the
+// tooling shelf can call main() on demand.
+if (typeof process !== 'undefined' && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

@@ -1,12 +1,12 @@
 /**
  * Decals — a mark left on the surface something happened to.
  *
- * A bullet hole, a blood splatter, a scorch mark. One call, at the point a ray
- * came back with:
+ * A bullet hole, a blood splatter, a scorch mark, a footprint. One call, at the
+ * point a ray came back with:
  *
  *   context.decals.place({
  *     at: hit.point, normal: hit.normal, size: 0.08,
- *     texture: 'counter-strike/decal-bullet-hole.png'
+ *     texture: 'decals/bullet-hole.png'
  *   })
  *
  * Three things make this an engine feature rather than "spawn a flat entity".
@@ -21,12 +21,11 @@
  *    below what anyone can see at a metre and far above the depth buffer's
  *    resolution at forty.
  *
- * 3. **The total is capped and the oldest is recycled.** Counter-Strike shipped
- *    with a fixed decal budget for a machine with sixteen megabytes; a browser
- *    tab that has to stay at sixty frames while it garbage-collects needs it
- *    more, not less. A single firefight puts down a hole per bullet, and
- *    without a ceiling the wall of a bomb site grows without bound for as long
- *    as the round lasts.
+ * 3. **The total is capped and the oldest is recycled.** Shooters shipped with a
+ *    fixed decal budget for machines with sixteen megabytes; a browser tab that
+ *    has to stay at sixty frames while it garbage-collects needs it more, not
+ *    less. A single fight puts down a mark per hit, and without a ceiling the
+ *    wall grows without bound for as long as the round lasts.
  *
  * Every placement is recorded whether or not anything is drawing, so a headless
  * run still answers "did that shot mark the wall" —
@@ -37,10 +36,10 @@
 /**
  * How many marks exist at once.
  *
- * 300 is Half-Life's own `r_decals` default, and it is a good number for the
- * same reason it was then: it is more than a round's worth of shots at any one
- * wall, so the recycling is invisible while you play, and it is few enough that
- * rebuilding every one of them into a buffer is a few thousand float writes.
+ * 300 is a good number for the same reason it always was: it is more than a
+ * round's worth of marks on any one wall, so the recycling is invisible while
+ * you play, and it is few enough that rebuilding every one of them into a
+ * buffer is a few thousand float writes.
  */
 const CAP = 300
 
@@ -150,7 +149,7 @@ export function makeDecalWall() {
      * Age the wall by one fixed step.
      *
      * Only decals with a life have anything to do here, so a wall of permanent
-     * bullet holes costs one pass over 300 slots and no rebuild.
+     * marks costs one pass over 300 slots and no rebuild.
      */
     step() {
       const now = clock()
@@ -212,6 +211,11 @@ export const decals = makeDecalWall()
 // ------------------------------------------------------------------ the plugin
 export default {
   name: 'Decals',
+  about: 'Marks on the surfaces they hit — bullet holes, blood, scorch — within a fixed budget.',
+  inspect: context => {
+    const s = context.decals.state
+    return [{ title: 'Budget', rows: [['alive', s.alive], ['cap', s.cap], ['placed', s.placed], ['recycled', s.recycled]] }]
+  },
 
   onLoad(context) {
     if (context.decals) {
@@ -220,7 +224,7 @@ export default {
     decals.bind(() => context.time)
     context.decals = decals
 
-    // A new level is a clean wall. Otherwise the holes from the last round are
+    // A new level is a clean wall. Otherwise the marks from the last level are
     // still there, at coordinates that now mean somewhere else entirely.
     context.bus.on('level:loaded', () => { decals.clear(); said.clear() })
 
@@ -263,7 +267,7 @@ export default {
 /**
  * One mesh per texture, not one mesh per decal.
  *
- * Three hundred bullet holes drawn one at a time is three hundred draw calls
+ * Three hundred marks drawn one at a time is three hundred draw calls
  * for something nobody looks at directly. Merged into one buffer per texture it
  * is two or three, and rebuilding the whole buffer on change is cheaper than
  * the bookkeeping that would let us update one quad in place.
@@ -308,7 +312,7 @@ function makePainter(THREE, scene) {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 4 * 3), 3))
     // A Lambert material with no normals is lit by nothing but ambient, and the
-    // symptom is a bullet hole that is a black smudge in full sun.
+    // symptom is a decal that is a black smudge in full sun.
     geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(size * 4 * 3), 3))
     geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(size * 4 * 2), 2))
     // Four components, so alpha travels with the tint and a decal can fade out
@@ -336,12 +340,12 @@ function makePainter(THREE, scene) {
       polygonOffsetUnits: -4,
       // A decal is a flat quad on a surface, and which way its winding came out
       // depends on a cross product with a helper axis. Drawing both sides costs
-      // nothing here and removes a whole class of "my bullet hole is invisible
+      // nothing here and removes a whole class of "my decal is invisible
       // from the left" bugs.
       side: THREE.DoubleSide
     })
-    // Lambert rather than Basic so a hole in a dark corner is dark. A
-    // full-bright mark on a lit wall reads as a sticker.
+    // Lambert rather than Basic so a mark in a dark corner is dark. A
+    // full-bright decal on a lit wall reads as a sticker.
     const mesh = new THREE.Mesh(geometry, material)
     mesh.frustumCulled = false
     mesh.renderOrder = 1
