@@ -75,14 +75,18 @@ needs a material with a lightmap slot — `matcap` and `pulse` have none and say
 | `additive` | adds its light to whatever is behind — flames, flashes, holograms | `tint` `#ffffff` |
 | `pulse` | raw GLSL, the worked example of a custom shader | `tint` `#39e6ff`, `speed` 0.6, `bands` 1 |
 
-A material ignores a parameter it does not know, so one mesh may carry the keys of
-the material it has and the one it is about to be changed to.
+`pulse` reads `color` as well as `tint`. On `water`, write `tint`: the renderer only
+resolves `mesh.tint`, so a `color` there leaves the water its per-type colour. A material ignores a
+parameter it does not know, so one mesh may carry the keys of the material it has and
+the one it is about to be changed to — `anchor` and `scale` are handed over as
+parameters too, and no library material reads either.
 
 ## What it refuses, and says
 
 - `[Materials] mesh.material must be a name or { name, … } — got 3` — falls back to
-  lambert (or basic under `unlit`). An empty name, or an object with no `name`, is
-  reported the same way and keeps its other keys as parameters.
+  lambert, or to basic under `unlit`. An empty name says `mesh.material is an empty
+  name — falling back to the default`; an object with no `name` says so too and keeps
+  its other keys as parameters.
 - `[Materials] "reddish" is not a colour lambert.emissive can use — using the default instead`;
   a material's own colours take `#rgb`, `#rrggbb`, a CSS name or a number.
 - `[Materials] a matcap material with no "matcap" image has no lighting model to read — it will draw as a flat colour`
@@ -90,16 +94,21 @@ the material it has and the one it is about to be changed to.
 - `[Materials] missing texture /project/assets/x.png (referenced as "x.png")` for a
   `normal`, `matcap` or `ambientOcclusion` that 404s. This one goes to the console
   alone, not into `problems`.
+- A `texture` that 404s is the renderer's: `[render] missing texture /project/assets/x.png (referenced as "x.png")`,
+  and the surface falls back to its stable per-type colour.
 - `[render] brush.mesh.lightmap: a "matcap" material has no lightmap slot`, and
   `[render] brush.mesh.tint: cannot read colour "reddish"`.
-- Every other message is said once and is listed under `problems` by `materials.list`.
+- Each `[Materials]` line above is said once and listed under `problems` by
+  `materials.list`. The `[render]` lines are the renderer's own and never appear there.
 
 ## Driving it
 
 - `run materials.list` — the whole library, each one's parameters, whether it is
   `drawable`, what the renderer itself answers to, and every problem so far.
-- A game adds its own: `context.materials.register('hologram', ({ mesh, texture, tint, view, parameters }) => material)`.
-  It reaches the renderer even if it registers after the level loaded.
+- A game adds its own: `context.materials.register('hologram', ({ mesh, texture, tint, view }) => material)`.
+  That is exactly what the renderer hands a builder; only `context.materials.build()`
+  adds a resolved `parameters`, so read the declaration off `mesh`. A material
+  registered after the level loaded still reaches the renderer.
 - Headless, no builder is ever called and nothing imports three; the library still
   lists with `drawable: false`, which is not a fault.
 - Check a surface in a browser frame.

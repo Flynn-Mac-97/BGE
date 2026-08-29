@@ -26,7 +26,7 @@
 | `skyTexture` | one image name; a bare name resolves under `project/assets/` | none, so the flat colour is the whole sky | Skybox |
 | `fog` | `0.02` density, `"#8a94a3"` colour, `[density, colour]`, `{ density, color }`, `true` for the defaults, `false` or `null` for none | off. Written at all: density `0.014`, colour `#93a7c4` | World Look |
 | `ambient` | `0.6` intensity, `"#93a7c4"` colour, `[intensity, colour]`, or `{ intensity, color }` | `{ intensity: 0.55, color: "#93a7c4" }` | World Look |
-| `sun` | the same four shapes, plus `direction` — and a bare array on the sun **is** its direction, not `[intensity, colour]` | `{ direction: [-0.4, -1, -0.3], intensity: 0.9, color: "#fff2d8" }` | World Look |
+| `sun` | `1.2` intensity, `"#fff2d8"` colour, `{ intensity, color, direction }`, or a bare `[x, y, z]` — which on the sun **is** its direction, never `[intensity, colour]` | `{ direction: [-0.4, -1, -0.3], intensity: 0.9, color: "#fff2d8" }` | World Look |
 
 `color` and `colour` are both read on `fog`, `ambient` and `sun`. Fog is
 exponential-squared per metre: half of a surface is washed out at `0.83 / density`
@@ -52,11 +52,11 @@ already had.
 ## What it refuses, and says
 
 - `[Skybox] "purpleish" is not a colour the sky can use — it is neither a #hex value nor one of the CSS colour names — falling back to #6d7f96`
-- `[Skybox] skyTexture must be the name of one image file` for anything that is not a string.
-- `[Skybox] the sky texture "skies/dawn.png" did not load, so the flat sky colour is showing` — `skyBox` then reports `failed`, and the next apply tries again.
+- `[Skybox] skyTexture must be the name of one image file` for anything that is not a non-empty string.
 - `skybox.set` throws `no sky key "fog". One of sky, skyTexture` — fog belongs to `world.set`.
 - `skybox.set takes one JSON argument — run skybox.set '["sky", <value>]'` when given a bare string.
-- `[Skybox] this renderer has no setSky() — that part of the level's world block was not applied`. Each message is said once.
+- `[Skybox] this renderer has no setSky() — that part of the level's world block was not applied`. Those are said once each.
+- `[Skybox] the sky texture "skies/dawn.png" did not load, so the flat sky colour is showing` — `skyBox` then reports `failed` and the next apply tries again, so this line repeats; so does a `world` block that could not be read off disk.
 
 ## Driving it
 
