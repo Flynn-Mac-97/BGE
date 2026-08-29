@@ -8,7 +8,9 @@
  * screen that is otherwise solid with bodies.
  *
  * Narrow, tall and nearly black — the opposite silhouette to a rat in every
- * dimension, which is what makes the two tellable apart at a glance.
+ * dimension, which is what makes the two tellable apart at a glance. It is the
+ * only family allowed to be this dark; the hound gave up its near-black so that
+ * a dark shape on the meadow means one thing.
  */
 const WIDTH = 0.28
 const HEIGHT = 0.5
