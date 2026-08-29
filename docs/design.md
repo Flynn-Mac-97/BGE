@@ -36,10 +36,16 @@
 
 The runtime is much thinner than the tooling. Missing: tilemaps and bulk
 placement, scene flow between levels, saving game state, parenting, raycasts,
-triggers separate from solids, particles, gamepad and touch input, pause and
-time scale, 3D model loading, and any way to export a playable build.
+triggers separate from solids, particles, gamepad and touch input, time scale,
+3D model loading, and any way to export a playable build.
 
-Time scale has one piece of it now: `loop.hold(seconds)` skips whole fixed steps
+Pause is now in the kernel: `loop.hold(reason)` stops the clock while every
+system and update still runs with a step of zero seconds, so a screen drawn over
+a frozen world still draws and still reads keys. `loop.release(reason)` gives it
+back, and holds are counted by name so two holders cannot start the world under
+one another.
+
+Time scale has one piece of it now: `loop.holdFor(seconds)` skips whole fixed steps
 for hit stop, and `Impact` drives it. A pause and a general slow-motion are
 still not there, and a fractional time scale would need the fixed step to stop
 being fixed — which is a bigger decision than it looks.

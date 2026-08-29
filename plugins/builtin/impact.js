@@ -101,7 +101,7 @@ export default {
         : (weight >= WORTH_HOLDING ? MOST_HOLD * curve : 0)
       const given = asked > 0 ? budget(asked) : 0
       if (given > 0 && typeof context.loop?.hold === 'function') {
-        context.loop.hold(given)
+        context.loop.holdFor(given)
         state.held += given
       }
 
@@ -119,7 +119,7 @@ export default {
     context.impact = {
       hit,
       /** Just the freeze, for something that is not a hit — a boss landing. */
-      hold: seconds => context.loop?.hold(seconds) ?? 0,
+      hold: seconds => context.loop?.holdFor(seconds) ?? 0,
       /** Just the jolt. */
       shake: metres => context.camera?.shake(metres),
       get holding() { return context.loop?.holding ?? 0 },

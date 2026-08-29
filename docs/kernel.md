@@ -150,7 +150,7 @@ frame
 In edit mode the fixed step never runs — just sync and draw. That is the entire
 difference between editing and playing.
 
-`loop.hold(seconds)` is the one thing that can skip a step: hit stop, the two or
+`loop.holdFor(seconds)` is the one thing that can skip a step: hit stop, the two or
 three frames a game freezes on so a heavy blow lands as a blow. The clock and
 the schedule keep running through it, so `context.time` never becomes a second
 clock that disagrees with the first, and it is rounded to whole steps because a
