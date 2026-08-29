@@ -52,10 +52,17 @@ const ALIVE_PER_MINUTE = 55
  * Twenty minutes of the actual game, with a player moving and a weapon killing,
  * sits at 1.0 ms.
  *
- * The ceiling is the renderer's — every moving entity is its own mesh and its
- * own draw call, because the batcher only merges what has held still for 45
- * frames and nothing in a horde ever does. 600 is a draw count a browser holds
- * comfortably, and the number to raise the day the renderer instances a crowd.
+ * The renderer is the other half, and it was measured in Chrome rather than
+ * argued about: 602 entities cost 1.1 ms a frame through sync and draw, 202
+ * cost 0.56, so the whole game at the cap is about 13% of a 60 Hz frame. Every
+ * moving entity is still its own mesh and its own draw call — the batcher only
+ * merges what has held still for 45 frames and nothing in a horde ever does —
+ * so the number grows with the population and nothing amortises it.
+ *
+ * 600 is therefore a deliberately conservative cap rather than a wall. It is
+ * what a screen can hold and still be read, it leaves most of the frame to the
+ * four other lanes, and the GPU half of that measurement was taken in a hidden
+ * tab, which is the part I would want measured again before raising it.
  */
 const MOST_ALIVE = 600
 
