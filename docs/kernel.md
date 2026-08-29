@@ -92,7 +92,7 @@ in node. Steps 5 and 6 are the only ones a headless world skips.
 ```
 1. make bus, world, loader, files
 2. make the loop, with the fixed and frame callbacks
-3. load every plugin       plugins/builtin/*.js + project/plugins/*.js
+3. load every plugin       plugins/builtin/*.js + <project>/plugins/*.js
                            sorted by `needs`, cycles reported not thrown
 4. build context               the one object plugins AND game code receive
 5. shell builds the DOM    four docks + a canvas          browser only
@@ -104,12 +104,24 @@ in node. Steps 5 and 6 are the only ones a headless world skips.
 11. emit shell:ready       for plugins that need the DOM
 ```
 
-Three things differ between the two, and nothing else does: files come off disk
-instead of over HTTP, plugins are found by reading a directory instead of by a
-Vite glob, and project files are imported by path instead of by URL. Each is
-handed to `startWorld` as an argument, so there is one runtime rather than two
-that can disagree. A test asserts that a headless snapshot and an attached
-editor's snapshot are identical, entity for entity.
+Two things differ between the two, and nothing else does: files come off disk
+instead of over HTTP, and project files are imported by path instead of by URL.
+Each is handed to `startWorld` as an argument, so there is one runtime rather
+than two that can disagree. A test asserts that a headless snapshot and an
+attached editor's snapshot are identical, entity for entity.
+
+Plugin discovery used to be a third difference — a Vite glob in the browser
+against a readdir in node. It is not any more: both read a file listing, which
+is what let the project directory become a parameter. `import.meta.glob` takes
+a static literal only, so a glob could never have named a directory chosen at
+run time.
+
+Which project is one parameter: `ENGINE_PROJECT` for the dev server, `--project`
+for the CLI and headless, defaulting to `project` and required to be a directory
+directly inside the checkout. It reaches the browser through `import.meta.env` —
+the only `define` channel that survives dev, because Vite's define plugin
+returns early when not building, so a bare identifier is replaced in a
+production build and silently left alone in development.
 
 Step 7 matters more than it looks. The dev server builds `.engine/index.json` by
 *importing* each type file and reading its actual `properties`, hooks and asset
