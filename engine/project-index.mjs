@@ -282,7 +282,7 @@ export async function buildIndex(projectDirectory) {
   }
 
   await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
-  await fs.writeFile(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index, null, 2))
+  await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index, null, 2))
 
   // The agent view: the same map, minus what the editor alone acts on (the
   // file lists, per-level asset tables, reverse references). This is the file
@@ -313,8 +313,34 @@ export async function buildIndex(projectDirectory) {
     // lookup rather than a guess across folders.
     assets: Object.fromEntries(Object.values(index.assets).map(a => [a.file, a.kind]))
   }
-  await fs.writeFile(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent, null, 2))
+  await writeAtomic(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent, null, 2))
   return index
+}
+
+/**
+ * Write a whole file, or none of it.
+ *
+ * The index is rebuilt by every boot, every save and every `check`, so several
+ * agents in one checkout write it at the same time as a matter of course. A
+ * plain writeFile lets one of them read the half a neighbour had written, and
+ * a torn index fails `check` against files nobody touched — the reader is
+ * blamed for the writer's race.
+ *
+ * Rename is atomic on one filesystem, so a reader sees the whole old file or
+ * the whole new one. There is no lock, and there should not be: the index is
+ * derived from disk, so two writers racing both produce the same bytes and
+ * last-one-wins is the right answer. The run registry next door does take a
+ * lock, because it accumulates rather than derives.
+ */
+async function writeAtomic(file, text) {
+  const temporary = `${file}.${process.pid}.tmp`
+  try {
+    await fs.writeFile(temporary, text)
+    await fs.rename(temporary, file)
+  } catch (error) {
+    await fs.rm(temporary, { force: true })
+    throw error
+  }
 }
 
 /** Every attachment, from a type or a level, that names a behaviour file that is not there. */

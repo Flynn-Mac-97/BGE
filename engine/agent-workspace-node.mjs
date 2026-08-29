@@ -20,6 +20,9 @@ export function mainWorktree(root) {
 
 const registryFile = root => path.join(mainWorktree(root), 'project/.engine/agents.json')
 
+/** A registry edit is one read and one rename; a lock older than this is a corpse. */
+const STALE_LOCK_MILLISECONDS = 60_000
+
 export function readAgentRegistry(root) {
   try {
     const value = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'))
@@ -35,7 +38,18 @@ function editRegistry(root, change) {
   try {
     handle = fs.openSync(lock, 'wx')
   } catch {
-    throw new Error('another agent is updating the run registry; retry after it finishes')
+    // A killed agent leaves its lock behind, and nothing used to clear it, so
+    // one SIGKILL blocked every later prepare and release for good. A lock
+    // older than a minute cannot belong to a live edit — this function holds
+    // it for one read and one rename — so break it and say so, rather than
+    // making a person find a file they were never told about.
+    const age = Date.now() - (fs.statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now())
+    if (age < STALE_LOCK_MILLISECONDS) {
+      throw new Error('another agent is updating the run registry; retry after it finishes')
+    }
+    console.warn(`[agents] breaking a stale registry lock, ${Math.round(age / 1000)}s old: ${lock}`)
+    fs.rmSync(lock, { force: true })
+    handle = fs.openSync(lock, 'wx')
   }
   try {
     const registry = readAgentRegistry(root)

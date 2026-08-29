@@ -12,6 +12,8 @@
  *   node bin/engine.mjs set coin-7 value 99
  */
 import fs from 'node:fs'
+import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const PORT = process.env.ENGINE_PORT || 5180
@@ -20,12 +22,25 @@ const HOST = process.env.ENGINE_HOST || `http://localhost:${PORT}`
 /**
  * Where friction gets written down.
  *
- * Anchored to the repo rather than the working directory, so `pain` records the
- * same file no matter where it was run from. Append-only: two agents working at
- * once both get their line, and nothing rewrites what came before.
- * `ENGINE_PAIN_FILE` points it elsewhere, so a test can isolate the log.
+ * Anchored to the MAIN worktree, not to this checkout: a parallel agent runs in
+ * `.agent-worktrees/<id>`, and a log written there is deleted with the worktree
+ * — so the friction found by exactly the runs we most want to learn from was
+ * the friction that disappeared. The run registry is anchored the same way.
+ *
+ * Append-only: two agents working at once both get their line, and nothing
+ * rewrites what came before. `ENGINE_PAIN_FILE` points it elsewhere, so a test
+ * can isolate the log.
  */
-const PAIN_FILE = process.env.ENGINE_PAIN_FILE || fileURLToPath(new URL('../agent-runs/painpoints.jsonl', import.meta.url))
+const HERE = fileURLToPath(new URL('..', import.meta.url))
+const painHome = () => {
+  try {
+    const line = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: HERE, encoding: 'utf8' })
+      .split(/\r?\n/).find(value => value.startsWith('worktree '))
+    if (line) return path.resolve(line.slice('worktree '.length))
+  } catch { /* not a git checkout — this repo is still the right answer */ }
+  return HERE
+}
+const PAIN_FILE = process.env.ENGINE_PAIN_FILE || path.join(painHome(), 'agent-runs/painpoints.jsonl')
 
 const HELP = `engine — read and drive the running editor
 
