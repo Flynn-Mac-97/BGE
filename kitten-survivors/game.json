@@ -1,0 +1,11 @@
+{
+  "title": "Kitten Survivors",
+  "startLevel": "meadow",
+  "window": {
+    "width": 1280,
+    "height": 720
+  },
+  "plugins": {
+    "disabled": []
+  }
+}
