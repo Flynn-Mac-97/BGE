@@ -398,7 +398,12 @@ export default {
 Contribution points: `panels` `tools` `commands` `fields` `importers`
 `systems` `menus`. `menus` puts a button in the toolbar, and every one is
 also a CLI verb — a button a person can press must be reachable from a terminal
-or the two ways of driving the editor diverge. For events, subscribe in `onLoad(context)` with
+or the two ways of driving the editor diverge. A `commands` or `tools` entry may
+also carry `key: 'ctrl+shift+z'` — lowercase, `ctrl` then `shift` then `alt`
+then the key, with `ctrl` matching Command on a Mac. The shell listens and
+dispatches; never open your own keydown listener. Two entries claiming one key
+is reported by name in the log, and the first keeps it.
+For events, subscribe in `onLoad(context)` with
 `context.bus.on('shell:ready', ...)` — the viewport does not exist before then.
 
 Plugins never write markup — they compose from `ui.*`, which is why a panel is

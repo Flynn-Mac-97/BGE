@@ -42,12 +42,13 @@ that includes a model reading it cold.
 | `loader.js` | plugin order, contribution points, failure containment | any specific plugin |
 | `render.js` | one GL context, one draw order | game rules, or where the camera is |
 | `ui.js` | the vocabulary panels compose from | any specific panel |
-| `shell.js` | four docks, a toolbar, a status line | what goes in them |
+| `shell.js` | four docks, a toolbar, a status line, the one keyboard listener | what goes in them, or what a key does |
 | `inspect.js` | the read-and-drive surface | whether anything is drawing |
 | `start-world.js` | boot, and the `context` everything receives | screens |
 | `index.js` | the browser: shell, renderer, the paint loop | game rules |
 | `start-world-node.mjs` | the same world in node: disk, readdir, paths | game rules |
 | `project-index.mjs` | what is in a project, and the determinism lint | the browser — node only |
+| `asset-path.js` | where a named asset points, as a path and as a URL | anything else — both halves import it |
 
 The last three are the split. Everything above `start-world.js` runs identically
 either side of it.
@@ -67,8 +68,14 @@ window than a large one.
 
 `loader.js` is the reason the plugin claim is real. Every contribution point —
 `panels` `tools` `commands` `fields` `importers` `systems` `menus` — is a list
-it collects and hands to whoever consumes it. The shell asks for `panels` and
-`menus`. The loop asks for `systems`. Neither knows who supplied them.
+it collects and hands to whoever consumes it. The shell asks for `panels`,
+`menus` and `tools`, and reads the optional `key` on a `commands` or `tools`
+entry to bind it. The loop asks for `systems`. Neither knows who supplied them.
+
+A shortcut is `key: 'ctrl+z'` — lowercase, ctrl then shift then alt then the
+key, `ctrl` matching Command on a Mac. The shell listens; a plugin declares and
+never opens a listener of its own, because only the shell can see two plugins
+wanting the same key. It reports that collision by name and keeps the first.
 
 Turning a plugin off withdraws its contributions immediately; the next reload
 skips it entirely. A plugin cannot be un-loaded mid-session — its `onLoad` has
