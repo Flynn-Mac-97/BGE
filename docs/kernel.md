@@ -137,6 +137,7 @@ when the page loads, a fetched list is not.
 ```
 fixed step (exactly 1/60, never wall time)
   ├─ timers due now
+  ├─ held? stop here — the world is in hit stop, the frame still draws
   ├─ systems with phase:'fixed'     physics, animation, camera
   └─ every entity's update(e, seconds, context)
 
@@ -148,6 +149,13 @@ frame
 
 In edit mode the fixed step never runs — just sync and draw. That is the entire
 difference between editing and playing.
+
+`loop.hold(seconds)` is the one thing that can skip a step: hit stop, the two or
+three frames a game freezes on so a heavy blow lands as a blow. The clock and
+the schedule keep running through it, so `context.time` never becomes a second
+clock that disagrees with the first, and it is rounded to whole steps because a
+fraction of a fixed step is not a fixed step. `Impact` is the plugin that uses
+it. There is still no general time scale and no pause.
 
 **Physics never touches the renderer.** It reads and writes `e.x` / `e.y`; the
 renderer reads the same numbers. Swapping the renderer would not affect physics
