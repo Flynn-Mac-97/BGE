@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+// dsh-agent POSIX shim: re-exports the shared implementation next to it.
+// Installed npm shims for Windows use dsh-agent.cmd instead.
+import { spawn } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const dir = dirname(fileURLToPath(import.meta.url));
+const impl = join(dir, "dsh-agent.mjs");
+const child = spawn(process.execPath, [impl, ...process.argv.slice(2)], {
+  stdio: "inherit",
+  windowsHide: true
+});
+child.on("exit", (code, signal) => {
+  process.exit(signal ? 1 : (code ?? 1));
+});
