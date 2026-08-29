@@ -18,10 +18,27 @@ match: plugins/** project/plugins/**
 - Editing a plugin reloads the page. Reconnect before testing it.
 - Keep the sidecar guide short and specific to the plugin; declare `match:` when it applies beyond its own plugin.
 
+## Which folder — capability is the engine's, rules are the game's
+
+Building a game and need something the engine does not have — a 2D trigger,
+damage, a minimap, pathfinding? **Write it as a builtin, not as game code.** The
+next game needs it too, and a capability written inside one game has to be found
+and rebranded before anyone else can use it.
+
+- `plugins/builtin/` — anything another game would want. `<project>/plugins/` — this game's rules.
+- The test: *would a second game want this, and would you have to rename it first?* If yes, it is a builtin.
+- Check the known gaps in `docs/design.md` before writing. If it is listed there, it is engine work you happen to be doing from a game.
+- Name it for what it does: `Damage`, `Trigger Volume`, `Minimap`. Never for the game.
+- No game nouns in a builtin — no team, weapon, map or character names, and no number tuned to one game. Those come from the level or the type.
+- Behaviour is the engine's, data is the game's. A builtin reads its numbers; it does not hold them.
+- Writing the game's name inside a builtin means one of two things: wrong folder, or a game-specific part that has to come out as configuration.
+- Promoting a project plugin: move the `.js` and its `.agent.md`, strip the game nouns, turn its constants into properties, and leave the game's own tuning behind in the project.
+
 ## Size — the reader is an agent, and it pays per line
 
 - The guide is the interface. It must answer "what is this for" and "how do I drive it" without opening the `.js`. Ten to twenty lines: what it owns, its commands, its keys, what it refuses.
-- Keep a plugin under **400 lines**. Over that, finding one part of it costs more than the change is worth. `node bin/engine.mjs --headless run plugin.sizes` names every one that is over, and every one missing a guide.
+- Keep a plugin under **400 lines**. Over that, finding one part of it costs more than the change is worth.
+- `node bin/engine.mjs --headless run plugin.sizes` names every plugin that is over, every one missing a guide, and every builtin whose **code** mentions the game's own title. Comments may name the game; code naming it means it is in the wrong folder.
 - Split by what it owns, not by file length. `World Look` became Skybox, View 3D and Gizmo 3D because they were three jobs, and each is now readable on its own.
 - Everything is a plugin, so splitting one costs nothing structural — a new file, a `name`, and `needs:` if it depends on another's `context` key.
 - Big is not a bug to fix on sight. It is a signal the file holds more than one job. Split when you are already there for another reason.
