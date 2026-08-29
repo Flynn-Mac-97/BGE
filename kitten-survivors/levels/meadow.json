@@ -1,20 +1,46 @@
 {
-  "about": "The meadow. One slab of grass, one kitten, and whatever the spawner sends. Enemies are not placed here — a survivor's crowd arrives on a clock, not out of a level file.",
+  "about": "The meadow. One slab of grass, one kitten, and whatever the spawner sends. Enemies are not placed here \u00e2\u20ac\u201d a survivor's crowd arrives on a clock, not out of a level file.",
   "camera": {
     "follow": "you",
-    "mode": "3d",
-    "at": [0, 12],
+    "at": [
+      0,
+      12
+    ],
     "zoom": 32,
     "fov": 55,
     "pitch": -1.1,
-    "yaw": 0
+    "yaw": 0,
+    "mode": "3d"
   },
   "world": {
     "sky": "#8fbfe0",
     "gravity": -20
   },
   "entities": [
-    { "id": "floor", "type": "ground", "at": [0, 0, 0], "collider": { "box": [60, 1, 60] } },
-    { "id": "you", "type": "kitten", "at": [0, 0.725, 0] }
+    {
+      "id": "floor",
+      "type": "ground",
+      "at": [
+        0,
+        0,
+        0
+      ],
+      "collider": {
+        "box": [
+          60,
+          1,
+          60
+        ]
+      }
+    },
+    {
+      "id": "you",
+      "type": "kitten",
+      "at": [
+        0,
+        0.725,
+        0
+      ]
+    }
   ]
 }

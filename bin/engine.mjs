@@ -426,6 +426,30 @@ if (op === 'check') {
 }
 
 /**
+ * A lane talks to its own world, never the shared editor.
+ *
+ * The live editor serves the main workspace, so an op that drives it writes
+ * straight past the worktree that was created to keep the lane apart. Three
+ * lanes each ran `spawn` without `--headless`, reached the one dev server, and
+ * left a `_probe_<pid>` entity in the shared level — and `check` failed in a
+ * workspace none of them were working in. Claim Guard cannot catch this: it
+ * knows which run owns a file, and the write arrives from the server's process,
+ * which is nobody.
+ *
+ * Being inside `.agent-worktrees/` is the whole test. It needs no environment
+ * variable to be passed down, which is what makes it hold for a lane that spawns
+ * a shell of its own.
+ */
+// Every op that reads the project off disk — pain, agent, index, tree, check —
+// has already run and exited above. What is left here drives a world.
+const LANE = /[\\/]\.agent-worktrees[\\/]([^\\/]+)/.exec(REPO)
+if (LANE && !flags.headless) {
+  die(1, `"${op}" drives the live editor, which serves the main workspace — not lane "${LANE[1]}".\n` +
+    `Run it in this lane's own world instead:\n` +
+    `  node bin/engine.mjs --headless ${process.argv.slice(2).join(' ')}`)
+}
+
+/**
  * Run the op in a world of this process's own.
  *
  * No dev server, no port, no browser tab, and nothing shared with any other
