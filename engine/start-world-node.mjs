@@ -15,6 +15,10 @@
  * What it cannot do is draw. There is no canvas, so no screenshot and no
  * picking. Everything else — play, simulate, tests, commands, hot reload of a
  * type — behaves exactly as it does on screen.
+ *
+ * Which project it opens is a parameter, defaulting to `project`. It must be a
+ * directory inside the checkout — see `startWorldInNode` at the bottom for why
+ * a second root would be worse than one rule.
  */
 import path from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
@@ -81,8 +85,11 @@ export function onDisk(projectDirectory) {
         const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
         const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
         const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
+        // Named from the project directory in use, not the literal `project`.
+        // A guide whose match path points into the other project attaches to
+        // tasks about a file that is not there, and never to the real one.
         const match = [...new Set([
-          `${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`,
+          `${place.scope === 'project' ? path.basename(projectDirectory) + '/' : ''}${place.prefix}/${stem}.js`,
           ...extra
         ])]
         found.push({
@@ -126,10 +133,10 @@ export function onDisk(projectDirectory) {
  * the directory means a plugin written a second ago is found on the next start,
  * which is the same promise the index makes about types.
  */
-async function findPlugins(root) {
+async function findPlugins(root, projectDirectory) {
   const places = [
     { directory: path.join(root, 'plugins/builtin'), builtin: true },
-    { directory: path.join(root, 'project/plugins'), builtin: false }
+    { directory: path.join(projectDirectory, 'plugins'), builtin: false }
   ]
   const found = []
 
@@ -162,12 +169,28 @@ let fileVersion = 0
 const importProjectFileFrom = projectDirectory => async file =>
   (await import(pathToFileURL(path.join(projectDirectory, file)).href + `?hot=${++fileVersion}`)).default || {}
 
-export async function startWorldInNode({ root = ROOT, viewport } = {}) {
-  const projectDirectory = path.join(root, 'project')
+/**
+ * @param root     the checkout. The engine's own plugins and guides live here.
+ * @param project  which directory inside it holds the game. `project` by
+ *                 default, so a call that names nothing starts the world it
+ *                 always started.
+ */
+export async function startWorldInNode({ root = ROOT, project = 'project', viewport } = {}) {
+  const checkout = path.resolve(root)
+  const projectDirectory = path.resolve(checkout, project)
+
+  // The project has to be a child of the checkout, and this says so out loud.
+  // `onDisk` finds the engine root back from the project by taking its parent,
+  // and every agent-file path is resolved against that — so a project anywhere
+  // else would give two roots that can disagree, and the world would read its
+  // own instructions out of the wrong tree while reading its levels from here.
+  if (path.dirname(projectDirectory) !== checkout) {
+    throw new Error(`project must be a directory directly inside ${checkout} — got ${projectDirectory}`)
+  }
 
   return startWorld({
     openFiles: bus => makeFiles(bus, onDisk(projectDirectory)),
-    loadPlugins: () => findPlugins(root),
+    loadPlugins: () => findPlugins(checkout, projectDirectory),
     importProjectFile: importProjectFileFrom(projectDirectory),
     ...(viewport ? { viewport } : {})
   })

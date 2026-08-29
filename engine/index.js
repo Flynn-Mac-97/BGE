@@ -2,14 +2,15 @@
  * Editor boot — the browser half.
  *
  * Everything that does not need a document lives in `start-world.js`. What is
- * left here is the screen: find the plugin files with a Vite glob, import
- * project files by URL, mount the shell, build the renderer, and keep painting
- * while nothing is playing.
+ * left here is the screen: find the plugin files, import project files by URL,
+ * mount the shell, build the renderer, and keep painting while nothing is
+ * playing.
  *
  * Keeping this file thin is the point. Anything added here is something a
  * headless world cannot do, and headless is how several agents work at once.
  */
-import { makeFiles } from './files.js'
+import { PROJECT_DIRECTORY } from './asset-path.js'
+import { makeFiles, overHTTP } from './files.js'
 import { makeRenderer } from './render.js'
 import { makeShell } from './shell.js'
 import { startWorld } from './start-world.js'
@@ -22,25 +23,64 @@ import { startWorld } from './start-world.js'
  * does not exist as far as the running editor is concerned — writing a new type
  * would need a reload before it could be used. The index is rebuilt by the
  * server on every write, so this path sees new files immediately.
+ *
+ * `@vite-ignore` is also what lets the project directory be a parameter: Vite
+ * passes a runtime-built specifier straight through instead of resolving it at
+ * build time.
  */
 let fileVersion = 0
 const importProjectFile = async file =>
-  (await import(/* @vite-ignore */ `/project/${file}?hot=${++fileVersion}`)).default || {}
+  (await import(/* @vite-ignore */ `/${PROJECT_DIRECTORY}/${file}?hot=${++fileVersion}`)).default || {}
 
+/** A plugin the project supplies: one `.js` file directly in its `plugins/`. */
+const PROJECT_PLUGIN = /^plugins\/[^/]+\.js$/
+
+/**
+ * Every plugin file. Engine plugins are globbed; the project's are listed.
+ *
+ * The engine's own glob stays a static literal because those files are engine
+ * source that a production build has to bundle, and their path is not
+ * project-relative. The project's plugins cannot be globbed once the project
+ * directory is a parameter — Vite's import-glob plugin checks its argument is a
+ * literal and throws on anything else — so they are read from the project tree
+ * and imported by URL, exactly the way every type, behaviour and test in the
+ * project is already imported. That also makes this the twin of the headless
+ * runner, which has always read the directory rather than globbing it: a plugin
+ * written a second ago is found on the next load, either side of the split.
+ */
 async function findPlugins() {
-  const builtin = import.meta.glob('/plugins/builtin/*.js')
-  const project = import.meta.glob('/project/plugins/*.js')
   const found = []
 
-  for (const [path, load] of Object.entries({ ...builtin, ...project })) {
+  for (const [path, load] of Object.entries(import.meta.glob('/plugins/builtin/*.js'))) {
     try {
       const definition = (await load()).default
       if (!definition) continue
-      found.push({ definition, builtin: path in builtin })
+      found.push({ definition, builtin: true })
     } catch (e) {
       console.error(`[loader] ${path} failed to import`, e)
     }
   }
+
+  let listing = []
+  try {
+    listing = await overHTTP().tree()
+  } catch (e) {
+    // A project whose file list cannot be read has no plugins as far as this is
+    // concerned, and an editor quietly missing eight of them is the worst way to
+    // find that out.
+    console.error(`[loader] could not list ${PROJECT_DIRECTORY}/ — no project plugins were loaded`, e)
+  }
+
+  for (const file of listing.map(entry => entry.path).filter(f => PROJECT_PLUGIN.test(f)).sort()) {
+    try {
+      const definition = (await import(/* @vite-ignore */ `/${PROJECT_DIRECTORY}/${file}`)).default
+      if (!definition) continue
+      found.push({ definition, builtin: false })
+    } catch (e) {
+      console.error(`[loader] ${PROJECT_DIRECTORY}/${file} failed to import`, e)
+    }
+  }
+
   return found
 }
 

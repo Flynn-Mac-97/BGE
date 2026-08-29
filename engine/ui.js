@@ -15,7 +15,12 @@
 // skybox already import this file for the vocabulary and reach for it by name.
 // A plugin that wants only the URL should import `asset-path.js` directly —
 // audio, decals and particles do, so the headless world never loads this file.
-export { assetURL } from './asset-path.js'
+// Imported as well as re-exported, deliberately: `export { x } from '...'`
+// forwards the name without creating a local binding, so `ui.thumb` and
+// `ui.preview` called an `assetURL` that was not in scope and threw for any
+// image. Silently — the loader catches a panel's error and disables it.
+import { assetURL } from './asset-path.js'
+export { assetURL }
 
 const IMAGE = /\.(png|jpg|jpeg|webp|gif|svg)$/i
 

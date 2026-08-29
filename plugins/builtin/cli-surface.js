@@ -44,6 +44,7 @@ const OFFLINE = [
 const FLAGS = [
   { op: '--headless', purpose: 'run the op in a private world in this process' },
   { op: '--level <name>', purpose: 'open this level first (headless only)' },
+  { op: '--project <name>', purpose: 'open this project directory instead of `project` — a directory inside the checkout. index, tree, check and headless read it' },
   { op: '--port <n>', purpose: 'which dev server to talk to' },
   { op: '--timeout <ms>', purpose: 'how long to wait for the editor' },
   { op: '--raw / --pretty', purpose: 'force one-line or indented JSON' }

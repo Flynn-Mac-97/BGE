@@ -68,6 +68,10 @@ Flags (--foo) collect into a trailing options object.
                  no browser, no port. Many of these run at once without ever
                  seeing each other, which is how several agents work in parallel.
   --level NAME   headless only: open this level first
+  --project NAME open this project directory instead of \`project\`. Must be a
+                 directory inside the checkout. index, tree, check and --headless
+                 read it; a live editor serves whatever its dev server started
+                 with, so switch that one with ENGINE_PROJECT=NAME npm run dev
   --port N       default ${PORT}, or set ENGINE_PORT
   --timeout MS   default 8000
   --raw          force one-line JSON      --pretty  force indented
@@ -102,7 +106,7 @@ and pain.list ranks by it. A vague number beats no number.
  * boolean — a general "the next word is the value" rule would swallow the
  * following argument and the failure would look like the flag doing nothing.
  */
-const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root'])
+const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project'])
 
 const argv = process.argv.slice(2)
 const flags = {}
@@ -137,7 +141,7 @@ const coerce = w => {
 const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
                  'kind', 'where', 'fix', 'cost', 'reads', 'all',
-                 'headless', 'level', 'root', 'parallel', 'checked', 'blocked']) delete options[k]
+                 'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked']) delete options[k]
 
 let args = words.map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
@@ -320,7 +324,24 @@ if (op === 'pain.list') {
  * want `check` is rarely the moment the server is healthy.
  */
 const REPO = fileURLToPath(new URL('..', import.meta.url))
-const PROJECT = fileURLToPath(new URL('../project/', import.meta.url))
+
+/**
+ * Which checkout, and which project inside it.
+ *
+ * `--root` moves the checkout and `--project NAME` names a directory inside it.
+ * Neither given is the whole default case: this checkout, and `project` —
+ * exactly what these ops read before either flag existed.
+ */
+const CHECKOUT = path.resolve(typeof flags.root === 'string' ? flags.root : REPO)
+const PROJECT = path.resolve(CHECKOUT, typeof flags.project === 'string' ? flags.project : 'project')
+// The same rule the dev server and the headless runner already enforce, said
+// here too. `path.resolve` accepts an absolute path, so without this `index`
+// wrote its generated files into any directory on the machine and exited 0 —
+// and a project further away would read its instructions out of one tree while
+// reading its levels from another.
+if (path.dirname(PROJECT) !== CHECKOUT) {
+  die(1, `--project must name a directory directly inside ${CHECKOUT} — got ${JSON.stringify(flags.project)}`)
+}
 const readProject = async () => import('../engine/project-index.mjs')
 
 // Agent context and worktree setup are file/git operations, not world
@@ -413,7 +434,7 @@ if (flags.headless) {
   const { startWorldInNode } = await import('../engine/start-world-node.mjs')
   let engine, editor
   try {
-    ({ engine, editor } = await startWorldInNode({ root: typeof flags.root === 'string' ? flags.root : REPO }))
+    ({ engine, editor } = await startWorldInNode({ root: CHECKOUT, project: PROJECT }))
   } catch (e) {
     console.log = original
     die(1, `could not start a world — ${e.message}`, e.stack)

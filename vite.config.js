@@ -7,7 +7,26 @@ import path from 'node:path'
 import { buildIndex as buildProjectIndex, problemsIn, walk, KIND } from './engine/project-index.mjs'
 
 const ROOT = process.cwd()
-const PROJECT = path.join(ROOT, 'project')
+
+/**
+ * Which project this server serves.
+ *
+ * One parameter, `ENGINE_PROJECT`, naming a directory inside the checkout.
+ * Unset means `project`, so a server started the way it always was serves
+ * exactly what it always did.
+ *
+ * It must be a CHILD of the root and nothing further away. The browser fetches
+ * project modules and assets by URL from this same root, and `agents/`, `docs/`
+ * and the builtin plugin guides are resolved against the root beside it — a
+ * project living elsewhere would give two directories that can disagree about
+ * which checkout you are in.
+ */
+const PROJECT_DIRECTORY = process.env.ENGINE_PROJECT || 'project'
+const PROJECT = path.join(ROOT, PROJECT_DIRECTORY)
+if (path.dirname(PROJECT) !== ROOT) {
+  throw new Error(
+    `ENGINE_PROJECT must name a directory directly inside ${ROOT} — got ${JSON.stringify(PROJECT_DIRECTORY)}`)
+}
 
 /**
  * What the editor wrote most recently, per path.
@@ -87,8 +106,11 @@ async function agentPlugins() {
       const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
       const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
       const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
+      // Named from the project directory in use, not the literal `project` —
+      // the same rule the headless twin follows, or the two disagree about
+      // which file a project plugin's guide belongs to.
       const match = [...new Set([
-        `${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`,
+        `${place.scope === 'project' ? PROJECT_DIRECTORY + '/' : ''}${place.prefix}/${stem}.js`,
         ...extra
       ])]
       found.push({
@@ -126,6 +148,12 @@ function api() {
           }
 
           if (url.pathname === '/api/agent-plugins') return send(res, 200, await agentPlugins())
+
+          // Which project this server serves. A page is built with that name
+          // baked in, so a server restarted onto a different project leaves a
+          // live tab reading one project's index and fetching another project's
+          // textures — and nothing on screen says so. This is how the tab asks.
+          if (url.pathname === '/api/project') return send(res, 200, { project: PROJECT_DIRECTORY })
 
           if (url.pathname === '/api/file' && req.method === 'GET') {
             const abs = safe(url.searchParams.get('path') || '')
@@ -212,6 +240,11 @@ function bridge() {
     },
 
     configureServer(server) {
+      // Which project this server is serving, said once at start. Silence here
+      // means an editor pointed at the wrong game looks exactly like an editor
+      // pointed at the right one.
+      console.log(`[engine] serving project: ${PROJECT_DIRECTORY}`)
+
       /**
        * A watcher error must not end the session.
        *
@@ -321,6 +354,19 @@ export default defineConfig({
     api(),
     { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() }
   ],
+  /**
+   * Tell the browser half the same directory name.
+   *
+   * The browser cannot read an env var, and the two halves have to agree or the
+   * editor reads its levels from one project and fetches its textures from
+   * another. `engine/asset-path.js` is the single reader.
+   *
+   * It has to go through `import.meta.env`. A bare defined identifier is only
+   * substituted by a production build — Vite's define plugin returns without
+   * doing anything in dev — so the editor, which is the only thing anyone runs,
+   * would quietly keep using `project`.
+   */
+  define: { 'import.meta.env.ENGINE_PROJECT': JSON.stringify(PROJECT_DIRECTORY) },
   // ENGINE_NO_OPEN keeps a headless or CI run from launching a visible browser.
   server: {
     port: 5180,

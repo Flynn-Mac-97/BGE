@@ -22,6 +22,23 @@
  */
 
 /**
+ * Which directory under the repository root holds the project.
+ *
+ * The dev server reads `ENGINE_PROJECT` and declares it here, so the browser
+ * fetches from the same directory the server serves. It travels through
+ * `import.meta.env` rather than a bare defined identifier because a bare one is
+ * only substituted by a production build — Vite's define plugin returns
+ * immediately in dev — and a parameter that silently reverts to `project` the
+ * moment you actually use the editor is worse than no parameter at all.
+ *
+ * The `|| {}` is for node, which imports this same file with no bundler
+ * anywhere near it. Node is told its project directory as an argument instead,
+ * and never asks for a URL.
+ */
+const environment = import.meta.env || {}
+export const PROJECT_DIRECTORY = environment.ENGINE_PROJECT || 'project'
+
+/**
  * The project's own folders. A reference that starts with one of these is
  * project-relative; everything else lives under `assets/`.
  */
@@ -47,8 +64,13 @@ export const assetPath = reference => {
 /**
  * The same answer as a URL the browser can fetch.
  *
- * Only ASSETS gain the prefix here. `engine/index.js` spells `/project/` twice
- * more, to import project modules, so anything making the project directory a
- * parameter has to change those as well as this.
+ * The prefix is the parameter; `engine/index.js` imports `PROJECT_DIRECTORY`
+ * from here for the same reason, so the directory is named in one place and the
+ * two spellings cannot drift.
+ *
+ * `assetPath` above still strips a literal leading `project/`, deliberately: it
+ * runs in node as well, where there is no define to read, and a rule that
+ * answered differently either side of the split is worse than a stale prefix
+ * nobody writes.
  */
-export const assetURL = source => '/project/' + assetPath(source)
+export const assetURL = source => `/${PROJECT_DIRECTORY}/` + assetPath(source)
