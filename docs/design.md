@@ -39,6 +39,11 @@ placement, scene flow between levels, saving game state, parenting, raycasts,
 triggers separate from solids, particles, gamepad and touch input, pause and
 time scale, 3D model loading, and any way to export a playable build.
 
+Time scale has one piece of it now: `loop.hold(seconds)` skips whole fixed steps
+for hit stop, and `Impact` drives it. A pause and a general slow-motion are
+still not there, and a fractional time scale would need the fixed step to stop
+being fixed — which is a bigger decision than it looks.
+
 The game also runs in the editor's own page, so an infinite loop in game code
 freezes the editor — though `--headless` now gives you somewhere else to run it.
 

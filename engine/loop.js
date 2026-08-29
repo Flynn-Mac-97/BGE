@@ -62,6 +62,18 @@ export function makeLoop({ onFixed, onFrame, onError }) {
   let steps = 0
   let fixed = 0
 
+  /**
+   * Fixed steps the world is being held still for — the pause a heavy hit lands
+   * on, counted in steps rather than seconds so it cannot drift.
+   *
+   * The clock and the schedule keep running through it. Stopping those would
+   * make `context.time` a second clock that disagrees with the first, and every
+   * timer already in flight would come out late by however long the game paused.
+   * What stops is the simulation: nothing moves, and the frame still draws, so a
+   * hit reads as a punch rather than a stutter.
+   */
+  let held = 0
+
   const random = makeRandom(DEFAULT_SEED)
   let timers = []
   let nextTimer = 1
@@ -88,6 +100,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
   function fixedStep() {
     fixed = ++steps * STEP
     runTimers()
+    if (held > 0) { held--; return }
     onFixed(STEP, fixed)
   }
 
@@ -177,9 +190,29 @@ export function makeLoop({ onFixed, onFrame, onError }) {
       steps = 0
       fixed = 0
       acc = 0
+      held = 0
       timers = []
       random.reset(seed)
     },
+
+    /**
+     * Hold the world still for `seconds`, then carry on where it left off.
+     *
+     * This is hit stop: the two or three frames a game freezes on so a heavy
+     * blow lands as a blow. It is deliberately not a general time scale — a
+     * fraction of a fixed step is not a fixed step, and the determinism this
+     * module exists to protect rests on every step being the same size.
+     *
+     * The longest hold wins rather than the newest, so two hits in one step do
+     * not shorten each other.
+     */
+    hold(seconds = 0) {
+      held = Math.max(held, Math.round(Math.max(0, seconds) / STEP))
+      return held * STEP
+    },
+
+    /** Seconds of hold left. Zero when the world is running normally. */
+    get holding() { return held * STEP },
 
     // ---- scheduling, on the fixed clock ----
 
