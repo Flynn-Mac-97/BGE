@@ -161,12 +161,21 @@ async function runOne(definition, id, context) {
     error = String(e?.message || e)
   }
 
+  // `note` records a line without asserting anything, so it must not count
+  // towards whether the test tested.
+  const assertions = checks.filter(check => !check.note).length
+
   return {
     name: definition.name || id,
-    ok: !error && checks.every(c => c.ok),
+    // A test that asserted nothing is not passing, it is empty. `every` on an
+    // empty array is true, so an early return above a hundred assertions used
+    // to sit on the board as a green tick for its whole life — and a dead test
+    // is worse than a missing one, because it reads as coverage.
+    ok: !error && assertions > 0 && checks.every(check => check.ok),
+    assertions,
     ms: Math.round(performance.now() - t0),
     checks,
-    error
+    error: error || (assertions === 0 ? 'made no assertions' : null)
   }
 }
 
@@ -267,9 +276,12 @@ function summary(list) {
   return {
     passed: list.filter(r => r.ok).length,
     failed: list.filter(r => !r.ok).length,
+    // Coverage as a number rather than a tick. A passing test used to be a tick
+    // with nothing behind it, so fifty-one assertions and zero read the same.
+    assertions: list.reduce((n, r) => n + (r.assertions || 0), 0),
     ms: list.reduce((n, r) => n + (r.ms || 0), 0),
     tests: list.map(r => r.ok
-      ? { id: r.id, ok: true, ms: r.ms }
+      ? { id: r.id, ok: true, ms: r.ms, assertions: r.assertions }
       : {
           id: r.id, ok: false, ms: r.ms,
           ...(r.error ? { error: r.error } : {}),
