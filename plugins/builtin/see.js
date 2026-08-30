@@ -23,6 +23,7 @@ import { convexHull } from '../../engine/frame-facts.js'
 import { describe } from './see/describe.js'
 import { resolveView, view } from './see/views.js'
 import { occlusion, isolate, find, diff, camera } from './see/queries.js'
+import { ray } from './see/ray.js'
 
 let frameNumber = 0
 
@@ -45,6 +46,25 @@ function concealOverlays(context) {
 /** Give back what concealOverlays borrowed. Every hide is paired with a show. */
 function revealOverlays(hidden) {
   for (const child of hidden) child.visible = true
+}
+
+/**
+ * What a browser-only command needs and does not have, plus the headless verb
+ * that answers the same question without it — never a bare "browser only".
+ *
+ * `see.capture` and `see.moment` hold the plugin's only state-changing code:
+ * camera borrow and restore, overlay conceal and reveal, waiting for a model
+ * to finish loading. A refusal that stops before naming what is missing
+ * leaves that code with no automated test any lane can run, so this names
+ * every missing piece instead of the first one found.
+ */
+function needsRenderer(context, verb, instead) {
+  const missing = []
+  if (typeof document === 'undefined') missing.push('no DOM — this is a headless run')
+  if (!context.renderer) missing.push('no context.renderer')
+  if (!context.shell?.canvas) missing.push('no context.shell.canvas')
+  if (!missing.length) return null
+  return { why: `${verb} draws through the browser renderer: ${missing.join(', ')}.`, missing, instead }
 }
 
 /**
@@ -126,7 +146,8 @@ export default {
       isolate: options => isolate(context, options),
       find: predicates => find(context, predicates),
       diff: options => diff(context, options),
-      camera: () => camera(context)
+      camera: () => camera(context),
+      ray: options => ray(context, options)
     }
   },
 
@@ -168,6 +189,11 @@ export default {
       id: 'see.camera',
       label: 'Why the frame looks wrong, asked of the camera itself',
       run: context => camera(context)
+    },
+    {
+      id: 'see.ray',
+      label: 'What sits at a screen point, a grid of them, or in a direction from an entity',
+      run: (context, options) => ray(context, options || {})
     },
     {
       id: 'see.sketch',
@@ -226,9 +252,11 @@ export default {
        * pixels is an invisible entity. Advances the world; `stop` restores.
        */
       run: async (context, options = {}) => {
-        if (typeof document === 'undefined' || !context.renderer || !context.shell?.canvas) {
-          return { why: 'a moment sheet needs the browser renderer — headless, use script with simulate and see.sketch' }
-        }
+        const missing = needsRenderer(context, 'a moment sheet',
+          'headless, step to each instant yourself (simulate, or script with ["simulate", n]) and call '
+          + 'see.sketch there — the render-versus-scene comparison needs a renderer, but reading a stepped '
+          + 'moment\'s computed facts does not.')
+        if (missing) return missing
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
         // Every refusal is answered before a single mutation, so a command that
@@ -314,9 +342,10 @@ export default {
       id: 'see.capture',
       label: 'The real rendered frame, hulls outlined, with a JSON sidecar',
       run: async (context, options = {}) => {
-        if (typeof document === 'undefined' || !context.renderer || !context.shell?.canvas) {
-          return { why: 'a capture needs the browser renderer — use see.sketch headless, or open the editor' }
-        }
+        const missing = needsRenderer(context, 'a capture',
+          'headless, see.sketch takes the same options and draws a flat-colour frame from the same '
+          + 'computed facts, with no renderer — real art and lighting need the browser.')
+        if (missing) return missing
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
         return withSubject(context, options, async options => {
