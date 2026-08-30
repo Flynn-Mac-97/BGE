@@ -1959,6 +1959,8 @@ export function makeRenderer(canvas, view, viewport) {
 
     /** The ordered post-processing passes; an empty list means none at all. */
     passes: {
+      /** The current list, so a neutral draw can take it away and put it back. */
+      get list() { return [...passList] },
       set(list) {
         passList = Array.isArray(list) ? list.filter(Boolean) : []
         if (!passList.length) {

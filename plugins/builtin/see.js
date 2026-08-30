@@ -240,9 +240,12 @@ export default {
           }
           const THREE = await import('three')
           const scene = context.renderer.scene
-          studio = { scene, background: scene.background, fog: scene.fog, dimmed: [] }
+          studio = { scene, background: scene.background, fog: scene.fog, dimmed: [], passes: context.renderer.passes?.list || [] }
           scene.fog = null
           scene.background = new THREE.Color('#8b8f96')
+          // Post effects are a grade too — a vignette shades the backdrop and
+          // bloom lifts the colours — so a neutral draw runs with none.
+          context.renderer.passes?.set([])
           for (const child of scene.children) {
             if (child.isLight && child.visible) { child.visible = false; studio.dimmed.push(child) }
           }
@@ -272,26 +275,50 @@ export default {
 
         // An alone frame crops to the subject plus a margin: the point of the
         // image is the model, and every empty pixel costs the reader tokens.
+        // The crop is found in the PIXELS, not the declared box — a model's
+        // real silhouette (a tail, an attachment) can exceed its box, and a
+        // preview must never cut geometry off.
         const canvas = context.shell.canvas
+        const whole = document.createElement('canvas')
+        whole.width = canvas.width
+        whole.height = canvas.height
+        const wholePen = whole.getContext('2d')
+        wholePen.drawImage(canvas, 0, 0)
+
         let crop = null
-        const entry = studio && description.visible.find(seen => seen.id === subjectEntity.id)
-        if (entry) {
-          const margin = 0.35
-          const w = Math.min(canvas.width, entry.size[0] / 100 * canvas.width * (1 + margin * 2))
-          const h = Math.min(canvas.height, entry.size[1] / 100 * canvas.height * (1 + margin * 2))
-          crop = {
-            w: Math.max(64, Math.round(w)),
-            h: Math.max(64, Math.round(h))
+        if (studio) {
+          const pixels = wholePen.getImageData(0, 0, whole.width, whole.height).data
+          const back = [pixels[0], pixels[1], pixels[2]]
+          let left = whole.width, right = 0, top = whole.height, bottom = 0
+          for (let y = 0; y < whole.height; y += 2) {
+            for (let x = 0; x < whole.width; x += 2) {
+              const at = (y * whole.width + x) * 4
+              const away = Math.abs(pixels[at] - back[0]) + Math.abs(pixels[at + 1] - back[1]) + Math.abs(pixels[at + 2] - back[2])
+              if (away < 30) continue
+              if (x < left) left = x
+              if (x > right) right = x
+              if (y < top) top = y
+              if (y > bottom) bottom = y
+            }
           }
-          crop.x = Math.max(0, Math.min(canvas.width - crop.w, Math.round(entry.at[0] / 100 * canvas.width - crop.w / 2)))
-          crop.y = Math.max(0, Math.min(canvas.height - crop.h, Math.round(entry.at[1] / 100 * canvas.height - crop.h / 2)))
+          if (right > left && bottom > top) {
+            const pad = Math.max(16, Math.round((right - left) * 0.1))
+            crop = {
+              x: Math.max(0, left - pad),
+              y: Math.max(0, top - pad)
+            }
+            crop.w = Math.min(whole.width - crop.x, right - left + pad * 2)
+            crop.h = Math.min(whole.height - crop.y, bottom - top + pad * 2)
+          }
         }
-        const copy = document.createElement('canvas')
-        copy.width = crop ? crop.w : canvas.width
-        copy.height = crop ? crop.h : canvas.height
-        const pen = copy.getContext('2d')
-        if (crop) pen.drawImage(canvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
-        else pen.drawImage(canvas, 0, 0)
+
+        const copy = crop ? document.createElement('canvas') : whole
+        const pen = crop ? copy.getContext('2d') : wholePen
+        if (crop) {
+          copy.width = crop.w
+          copy.height = crop.h
+          copy.getContext('2d').drawImage(whole, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
+        }
 
         for (const other of concealed) other.hidden = false
         if (studio) {
@@ -299,6 +326,7 @@ export default {
           studio.scene.background = studio.background
           studio.scene.fog = studio.fog
           for (const child of studio.dimmed) child.visible = true
+          context.renderer.passes?.set(studio.passes)
         }
         if (moved) Object.assign(view, kept)
         if (moved || concealed.length) {
