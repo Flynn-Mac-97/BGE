@@ -63,11 +63,11 @@ Each of these is a decision nobody has made yet. Averaging them would produce a 
 
 These have a number, and `art.check` tests every one of them against a frame.
 
-### The frame is a bright day. Something in it is nearly white.
+### The frame is a bright day. Something in it is nearly white, and nothing is blown past white.
 
-Every one of the eight references clears 0.66 and most sit near 0.9. A dusk frame gives a phone screen nothing to hold, and a child reads a dark picture as a picture of nothing.
+Every one of the eight references clears 0.66 and most sit near 0.9. A dusk frame gives a phone screen nothing to hold, and a child reads a dark picture as a picture of nothing. The references also have a top: the brightest of the eight measures 0.927, so above that the frame is not a bright day, it is an overexposed one, and colour is being thrown away to reach a number.
 
-**Checked:** `value.p95` at least 0.66. Run `art.check` against a frame.
+**Checked:** `value.p95` at least 0.66, at most 0.93. Run `art.check` against a frame.
 
 **From:** `overcooked-2.jpg`, `overcooked-2-b.jpg`, `goose-game.jpg`, `slime-rancher.jpg`, `moving-out.jpg`, `a-short-hike.jpg`, `pikuniku.jpg`, `donut-county.jpg`
 ### The picture uses a real tonal range, never one flat band.
@@ -77,11 +77,11 @@ The narrowest reference is 0.274 and the widest 0.694. Below that the whole scre
 **Checked:** `value.spread` at least 0.27. Run `art.check` against a frame.
 
 **From:** `overcooked-2.jpg`, `overcooked-2-b.jpg`, `goose-game.jpg`, `slime-rancher.jpg`, `moving-out.jpg`, `a-short-hike.jpg`, `pikuniku.jpg`, `donut-county.jpg`
-### The middle of the picture sits at mid tone or above.
+### The middle of the picture sits at mid tone — above gloom, and below white.
 
-The darkest reference medians 0.439. A ground darker than its actors inverts the game: the player hunts the floor instead of reading the crowd.
+The darkest reference medians 0.439. A ground darker than its actors inverts the game: the player hunts the floor instead of reading the crowd. The brightest reference medians 0.821. A frame whose middle is brighter than that has no mid tone left for an actor to sit against.
 
-**Checked:** `value.median` at least 0.43. Run `art.check` against a frame.
+**Checked:** `value.median` at least 0.43, at most 0.82. Run `art.check` against a frame.
 
 **From:** `overcooked-2.jpg`, `overcooked-2-b.jpg`, `goose-game.jpg`, `slime-rancher.jpg`, `moving-out.jpg`, `a-short-hike.jpg`, `pikuniku.jpg`, `donut-county.jpg`
 ### The light is warm.

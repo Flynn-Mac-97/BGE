@@ -1,12 +1,13 @@
 [
   {
     "id": "bright-day",
-    "says": "The frame is a bright day. Something in it is nearly white.",
-    "why": "Every one of the eight references clears 0.66 and most sit near 0.9. A dusk frame gives a phone screen nothing to hold, and a child reads a dark picture as a picture of nothing.",
+    "says": "The frame is a bright day. Something in it is nearly white, and nothing is blown past white.",
+    "why": "Every one of the eight references clears 0.66 and most sit near 0.9. A dusk frame gives a phone screen nothing to hold, and a child reads a dark picture as a picture of nothing. The references also have a top: the brightest of the eight measures 0.927, so above that the frame is not a bright day, it is an overexposed one, and colour is being thrown away to reach a number.",
     "check": "measured",
     "field": "value.p95",
     "wants": {
-      "min": 0.66
+      "min": 0.66,
+      "max": 0.93
     },
     "from": [
       "overcooked-2.jpg",
@@ -41,12 +42,13 @@
   },
   {
     "id": "ground-not-gloomy",
-    "says": "The middle of the picture sits at mid tone or above.",
-    "why": "The darkest reference medians 0.439. A ground darker than its actors inverts the game: the player hunts the floor instead of reading the crowd.",
+    "says": "The middle of the picture sits at mid tone \u2014 above gloom, and below white.",
+    "why": "The darkest reference medians 0.439. A ground darker than its actors inverts the game: the player hunts the floor instead of reading the crowd. The brightest reference medians 0.821. A frame whose middle is brighter than that has no mid tone left for an actor to sit against.",
     "check": "measured",
     "field": "value.median",
     "wants": {
-      "min": 0.43
+      "min": 0.43,
+      "max": 0.82
     },
     "from": [
       "overcooked-2.jpg",

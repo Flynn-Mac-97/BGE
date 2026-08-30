@@ -786,7 +786,7 @@ for (let index = 0; index < 12; index++) {
  */
 entities.push({
   id: 'key-light', type: 'light', at: [0, 40, 0],
-  properties: { kind: 'directional', color: '#fff9ee', intensity: 8, direction: [-0.5, -0.84, -0.21], range: 34, shadow: false }
+  properties: { kind: 'directional', color: '#fff9ee', intensity: 5, direction: [-0.5, -0.84, -0.21], range: 34, shadow: false }
 })
 
 // ---------------------------------------------------------------- the player

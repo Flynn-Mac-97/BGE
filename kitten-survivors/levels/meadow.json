@@ -1321,7 +1321,7 @@
     {"id":"canopy-46","type":"meadow-prop","at":[75.09,6.638,-14.11],"mesh":{"box":[10.89,5.09,9.02],"texture":"meadow/leaf.png","tint":"#cfe0ab","tiling":0.55},"rotation":106.55},
     {"id":"canopy-47","type":"meadow-prop","at":[73.4,10.634,-14.06],"mesh":{"box":[8.41,5.14,7.86],"texture":"meadow/leaf.png","tint":"#cfe0ab","tiling":0.55},"rotation":353.29},
     {"id":"canopy-48","type":"meadow-prop","at":[75.49,14.697,-12.78],"mesh":{"box":[5.45,5.25,5.16],"texture":"meadow/leaf.png","tint":"#cfe0ab","tiling":0.55},"rotation":323.81},
-    {"id":"key-light","type":"light","at":[0,40,0],"properties":{"kind":"directional","color":"#fff9ee","intensity":8,"direction":[-0.5,-0.84,-0.21],"range":34,"shadow":false}},
+    {"id":"key-light","type":"light","at":[0,40,0],"properties":{"kind":"directional","color":"#fff9ee","intensity":5,"direction":[-0.5,-0.84,-0.21],"range":34,"shadow":false}},
     {"id":"you","type":"kitten","at":[0,0.45,0]}
   ]
 }
