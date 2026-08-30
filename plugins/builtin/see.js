@@ -122,7 +122,8 @@ function describe(context, options = {}) {
       id: entity.id, type: entity.type,
       at: [round(point.x), round(point.y)],
       size: [round(size.w), round(size.h)],
-      depth: round(point.depth)
+      depth: round(point.depth),
+      _world: { x: entity.x, y: entity.y, z: entity.z || 0, ...bounds }
     })
   }
 
@@ -153,6 +154,36 @@ function describe(context, options = {}) {
       + Math.min(100, entry.size[0]) * Math.min(100, entry.size[1]) / 100)
   }
 
+  // Whether two bodies interpenetrate is a fact about world boxes, not a
+  // judgement — answered here so nobody asks a vision model to eyeball it.
+  // Marked entities only: that is what a question names, and it bounds the
+  // pair count.
+  const overlaps = []
+  for (let a = 0; a < marked.length; a++) {
+    for (let b = a + 1; b < marked.length; b++) {
+      if (boxesTouch(marked[a]._world, marked[b]._world)) {
+        overlaps.push([marked[a].id, marked[b].id])
+      }
+    }
+  }
+
+  // The other computable pair question: how far apart two named things are.
+  let between = null
+  if (Array.isArray(options.between) && options.between.length === 2) {
+    const [first, second] = options.between.map(id => context.world.byId(id))
+    if (first && second) {
+      between = {
+        ids: options.between,
+        distance: round(Math.hypot(first.x - second.x, first.y - second.y, (first.z || 0) - (second.z || 0))),
+        touching: boxesTouch(
+          { x: first.x, y: first.y, z: first.z || 0, ...boundsOf(first) },
+          { x: second.x, y: second.y, z: second.z || 0, ...boundsOf(second) })
+      }
+    } else between = { ids: options.between, error: 'one of the two ids does not exist' }
+  }
+
+  for (const entry of visible) delete entry._world
+
   return {
     camera: {
       mode: projector.mode, x: round(view.x), y: round(view.y), z: round(view.z || 0),
@@ -167,8 +198,18 @@ function describe(context, options = {}) {
       offscreenByType
     },
     /** Percent of the screen each type's boxes cover, before overlap. */
-    coverage
+    coverage,
+    /** Marked pairs whose world boxes interpenetrate — computed, not seen. */
+    overlaps,
+    ...(between ? { between } : {})
   }
+}
+
+/** Axis-aligned world boxes, centred on the entity, feet at the centre's base. */
+function boxesTouch(a, b) {
+  return Math.abs(a.x - b.x) < (a.w + b.w) / 2
+    && Math.abs(a.y - b.y) < (a.h + b.h) / 2
+    && Math.abs(a.z - b.z) < ((a.l || 0) + (b.l || 0)) / 2
 }
 
 /** 3x5 digit stamps for marks in a sketch, where there is no font. */
@@ -309,6 +350,29 @@ export default {
             error: 'the canvas read back empty — the answering tab is not drawing (hidden, throttled, or stale). Focus one editor tab and close the others.',
             hidden: document.hidden === true
           }
+        }
+
+        // Exposure is arithmetic, not judgement: mean brightness of a 4x4
+        // grid of the frame, 0-100, so "too dark to read" is a number in the
+        // sidecar before anyone spends a vision read on it.
+        const cells = []
+        const cellW = Math.floor(copy.width / 4), cellH = Math.floor(copy.height / 4)
+        for (let gy = 0; gy < 4; gy++) for (let gx = 0; gx < 4; gx++) {
+          let sum = 0, seen = 0
+          for (let y = gy * cellH; y < (gy + 1) * cellH; y += 8) {
+            for (let x = gx * cellW; x < (gx + 1) * cellW; x += 8) {
+              const at = (y * copy.width + x) * 4
+              sum += 0.2126 * sampled[at] + 0.7152 * sampled[at + 1] + 0.0722 * sampled[at + 2]
+              seen++
+            }
+          }
+          cells.push(Math.round(sum / Math.max(1, seen) / 2.55))
+        }
+        description.light = {
+          mean: Math.round(cells.reduce((total, cell) => total + cell, 0) / cells.length),
+          darkestCell: Math.min(...cells),
+          brightestCell: Math.max(...cells),
+          grid: cells
         }
 
         if (options.marks !== false) {

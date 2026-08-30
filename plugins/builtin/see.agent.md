@@ -5,7 +5,7 @@ down; stop at the first row that answers your question.
 
 | question | use | costs |
 |---|---|---|
-| counts, positions, sizes, coverage, is X on screen | `see.describe` | nothing — computed, works everywhere |
+| counts, positions, sizes, coverage, is X on screen, do two things interpenetrate, how far apart are they | `see.describe` | nothing — computed, works everywhere |
 | layout and composition, roughly | `see.sketch` | one small PNG; headless, no browser |
 | does it actually look right — art, light, readability | `see.capture` | a real frame; browser only |
 
@@ -27,8 +27,14 @@ Options, all optional:
 - `camera` — any view fields to override: `{"camera":{"x":0,"y":40,"z":0,"pitch":-1.4,"fov":50,"mode":"perspective"}}`. Top-down map shot: high y, pitch -1.57.
 - `subject` — an entity id; the camera frames that entity by itself. Add
   `"alone": true` to hide everything else. This is how to inspect one model.
+- `between` — two entity ids: `{"between":["you","boar-3"]}` answers their
+  world distance and whether their boxes touch.
 - `marks: false` — clean frame, no tags.
 - `name` — the output file name. Without one, level name + a frame number.
+
+Also computed, never asked of vision: `overlaps` lists marked pairs whose
+world boxes interpenetrate, and a capture's sidecar carries `light` — mean
+and per-cell brightness, 0-100 — so "too dark" is a number.
 
 ## Reading a frame with a vision model
 
@@ -36,8 +42,9 @@ Options, all optional:
   the pixels are only for what it cannot say.
 - Refer to entities by mark number; answers come back in mark numbers, and
   `marks` in the command reply maps them to entity ids you can `engine.set`.
-- One question per read, multiple-choice where possible. "Is mark 3 clipping
-  into mark 7, yes or no" beats "describe the scene".
+- One question per read, multiple-choice where possible. "Does mark 3 read as
+  a rat or as a box, A or B" beats "describe the scene". Clipping, distance
+  and brightness are already in the sidecar — never ask those.
 - A subject smaller than ~5% of the frame: capture it with `subject` instead
   of squinting at the full frame — detail below ~2600px long edge is lost.
 
