@@ -167,3 +167,4 @@
 {"id":"p125","resolved":true,"at":"2026-08-30T04:33:29.019Z","note":"the tab title now names the project it serves, and the loop-3 brief pins ENGINE_PROJECT and a port per lane"}
 {"id":"p119","resolved":true,"at":"2026-08-30T04:38:05.988Z","note":"design.md's gap list no longer claims 3D model loading is missing, names the instancing cost, and records that frame systems draw only in play"}
 {"id":"p126","resolved":true,"at":"2026-08-30T04:38:06.103Z","note":"recorded in design.md as a known gap: an effect can only be checked by pressing play"}
+{"id":"p121","resolved":true,"at":"2026-08-30T04:49:46.543Z","note":"the lane guard now exempts --port and the serves check governs instead; test:offline passed 8/8 inside the loop2-effects worktree after merging mainline"}
