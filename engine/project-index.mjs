@@ -176,6 +176,12 @@ export async function buildIndex(projectDirectory) {
   }
   const inside = f => path.join(projectDirectory, f)
 
+  // Raw placements, kept only for the invariant pass below and never written
+  // to `index`: a level of nine hundred entities copied onto the index would
+  // double what `.engine/index.json` costs to write and read on every check,
+  // for data only this one pass needs.
+  const levelPlacements = {}
+
   for (const f of files) {
     const kind = KIND(f)
 
@@ -207,6 +213,17 @@ export async function buildIndex(projectDirectory) {
         if (loaded.about) entry.about = String(loaded.about)
         if (loaded.appearance) entry.appearance = String(loaded.appearance)
         if (loaded.looksWrongWhen) entry.looksWrongWhen = String(loaded.looksWrongWhen)
+        // A rule `check` enforces against every placement of this type. Kept
+        // beside `about`/`appearance` because it is the same kind of fact —
+        // written once next to the type, read by every level that places it.
+        // `meshBox`/`colliderBox` are the type's own defaults, stored only
+        // when an invariant is declared, so a type that never opts in pays
+        // nothing: see `placedHeight` below for why both are needed.
+        if (loaded.invariant) {
+          entry.invariant = loaded.invariant
+          if (Array.isArray(loaded.mesh?.box)) entry.meshBox = loaded.mesh.box
+          if (Array.isArray(loaded.collider?.box)) entry.colliderBox = loaded.collider.box
+        }
         if (loaded.animation) entry.animation = Object.keys(loaded.animation)
         // What this type composes. Listed here so "what does a crate do" is one
         // index lookup rather than opening the type and then every behaviour.
@@ -240,6 +257,7 @@ export async function buildIndex(projectDirectory) {
       try {
         const raw = JSON.parse(await fs.readFile(inside(f), 'utf8'))
         const placed = raw.entities || []
+        levelPlacements[name] = placed
 
         /**
          * Every asset the level itself names, deduped, with how many placements
@@ -312,6 +330,11 @@ export async function buildIndex(projectDirectory) {
     for (const reference of Object.keys(l.assets || {})) assetFor(reference)?.usedBy.push(ln)
   }
 
+  // Every type is loaded by this point; a level can be walked before the type
+  // it places, so checking placements while `index.types` is still filling in
+  // would miss a type read later and silently pass every placement of it.
+  index.invariantProblems = invariantProblems(index, levelPlacements)
+
   await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
   await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index, null, 2))
 
@@ -325,6 +348,7 @@ export async function buildIndex(projectDirectory) {
       ...(t.about ? { about: t.about } : {}),
       ...(t.appearance ? { appearance: t.appearance } : {}),
       ...(t.looksWrongWhen ? { looksWrongWhen: t.looksWrongWhen } : {}),
+      ...(t.invariant ? { invariant: t.invariant } : {}),
       properties: t.properties, hooks: t.hooks,
       ...(t.uses?.length ? { uses: t.uses } : {}),
       ...(t.behaviours?.length ? { behaviours: t.behaviours } : {}),
@@ -481,6 +505,100 @@ export function missingTypes(index) {
         out.push({ file: l.file, why: `level "${name}" places type "${type}" — there is no project/types/${type}.js, so those placements are empty` })
       }
     }
+  }
+  return out
+}
+
+/**
+ * The drawn height of one placement, along the same rule engine/world.js's
+ * `makeEntity` uses to build the real entity: a placement's `mesh` merges
+ * over the type's key by key, so its box wins only when it states one, but a
+ * placement's `collider` REPLACES the type's outright — a placement that
+ * gives a collider with no box has no box at all, even if the type had one.
+ * Returns null when neither the placement nor its type says a height.
+ */
+function placedHeight(type, placement) {
+  const meshBox = Array.isArray(placement.mesh?.box) ? placement.mesh.box : type.meshBox
+  const colliderBox = placement.collider
+    ? (Array.isArray(placement.collider.box) ? placement.collider.box : undefined)
+    : type.colliderBox
+  const height = meshBox?.[1] ?? colliderBox?.[1]
+  return Number.isFinite(height) ? height : null
+}
+
+/**
+ * Named invariant rules a type may declare. Each takes the declared invariant,
+ * the type's index entry and one raw placement, and returns `{ expected,
+ * actual }` to compare, or null when this placement carries too little to
+ * check — never a silent pass.
+ *
+ * `topFaceAtY`: a box centred at `at[1]` with height h has its top face at
+ * `at[1] + h/2`. This is the rule kitten-survivors/types/ground.js states in
+ * its own doc comment — the top face of the slab is the y = 0 plane every
+ * other position in the level is measured from.
+ */
+const INVARIANT_RULES = {
+  topFaceAtY: (declared, type, placement) => {
+    const y = placement?.at?.[1]
+    const height = placedHeight(type, placement)
+    if (!Number.isFinite(y) || height == null) return null
+    return { expected: declared.value, actual: y + height / 2 }
+  }
+}
+
+/**
+ * Every placement that breaks the invariant its type declares.
+ *
+ * Takes `levelPlacements` rather than reading it off `index`, because raw
+ * placements are not kept on the index — see the comment where `buildIndex`
+ * collects them. A level whose file failed to parse has no placements to
+ * check and is skipped; `missingTypes` already reports a placement naming a
+ * type that does not exist, so this only runs for placements whose type is
+ * real.
+ *
+ * An unrecognised rule name and a placement `check` cannot compute from are
+ * both reported as warnings — an invariant `check` cannot evaluate must say
+ * so, not read as one that passed.
+ */
+export function invariantProblems(index, levelPlacements) {
+  const out = []
+  for (const [levelName, placements] of Object.entries(levelPlacements || {})) {
+    const level = index.levels[levelName]
+    if (!level || level.error) continue
+
+    placements.forEach((placement, at) => {
+      const typeName = placement?.type
+      const type = typeName && index.types[typeName]
+      const declared = type?.invariant
+      if (!declared) return
+
+      const named = `level "${levelName}" placement "${placement.id ?? `#${at}`}" (type "${typeName}")`
+      const rule = INVARIANT_RULES[declared.rule]
+      if (!rule) {
+        out.push({
+          file: type.file, warning: true,
+          why: `type "${typeName}" declares invariant rule "${declared.rule}", which check does not know how to enforce`
+        })
+        return
+      }
+
+      const result = rule(declared, type, placement)
+      if (!result || !Number.isFinite(result.expected) || !Number.isFinite(result.actual)) {
+        out.push({
+          file: level.file, warning: true,
+          why: `${named} cannot be checked against its invariant "${declared.rule}" — not enough on the placement or its type to compute it`
+        })
+        return
+      }
+
+      const tolerance = Number.isFinite(declared.tolerance) ? declared.tolerance : 1e-6
+      if (Math.abs(result.actual - result.expected) > tolerance) {
+        out.push({
+          file: level.file,
+          why: `${named} breaks its invariant${declared.about ? ` — ${declared.about}` : ''} — expected ${result.expected}, got ${result.actual}`
+        })
+      }
+    })
   }
   return out
 }
@@ -669,6 +787,9 @@ export function problemsIn(index) {
     // texture, model or sound that is not on disk draws as grey or plays as
     // silence. Both are invisible in a large level, and both used to pass.
     ...missingTypes(index),
+    // A type's own declared rule, broken by a placement — built once, inside
+    // buildIndex, because it needs every type loaded first.
+    ...(index.invariantProblems || []),
     ...assetSummary(missing),
     ...missing,
     ...Object.entries(index.tests).filter(([, t]) => t.error)

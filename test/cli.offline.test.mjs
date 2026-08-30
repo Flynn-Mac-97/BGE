@@ -16,7 +16,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { lint } from '../engine/project-index.mjs'
+import { lint, invariantProblems } from '../engine/project-index.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(ROOT, 'bin/engine.mjs')
@@ -85,6 +85,75 @@ test('check passes clean with nothing running, and a warning never fails it', ()
   // Undescribed types are reported and must never fail the run: a check that
   // failed the build the day it shipped is a check somebody switches off.
   assert.ok(reply.problems.every(p => p.warning), 'anything left is a warning')
+})
+
+test('check fails on kitten-survivors, naming the ground placement its own invariant breaks', () => {
+  // The fixture this proves against: kitten-survivors/levels/meadow.json places
+  // `ground` six metres below the y = 0 its own doc comment requires. Left
+  // broken on purpose — other lanes test against it too.
+  const r = run(['check', '--project', 'kitten-survivors'])
+  const reply = JSON.parse(r.stdout)
+  assert.equal(r.code, 1, 'a broken invariant fails the check')
+  assert.equal(reply.ok, false)
+  const broken = reply.problems.find(p => !p.warning && /invariant/.test(p.why))
+  assert.ok(broken, 'the failure list names an invariant break')
+  assert.match(broken.why, /placement "floor"/)
+  assert.match(broken.why, /type "ground"/)
+  assert.match(broken.why, /top face of the slab sits at y = 0/)
+})
+
+test('invariantProblems: a placement that satisfies its type is silent', () => {
+  const index = {
+    types: { ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0 }, meshBox: [40, 1, 40] } },
+    levels: { meadow: { file: 'levels/meadow.json' } }
+  }
+  const placements = { meadow: [{ id: 'floor', type: 'ground', at: [0, -0.5, 0] }] }
+  assert.deepEqual(invariantProblems(index, placements), [])
+})
+
+test('invariantProblems: names the type, the placement, and both numbers', () => {
+  const index = {
+    types: { ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0, about: 'top face at y = 0' }, meshBox: [40, 1, 40] } },
+    levels: { meadow: { file: 'levels/meadow.json' } }
+  }
+  const placements = { meadow: [{ id: 'floor', type: 'ground', at: [0, -6.5, 0] }] }
+  const problems = invariantProblems(index, placements)
+  assert.equal(problems.length, 1)
+  assert.equal(problems[0].file, 'levels/meadow.json')
+  assert.equal(problems[0].warning, undefined, 'a proven break fails the check')
+  assert.match(problems[0].why, /level "meadow"/)
+  assert.match(problems[0].why, /placement "floor"/)
+  assert.match(problems[0].why, /type "ground"/)
+  assert.match(problems[0].why, /top face at y = 0/)
+  assert.match(problems[0].why, /expected 0, got -6/)
+})
+
+test('invariantProblems: a placement collider with no box replaces the type\'s, not merges', () => {
+  // engine/world.js makeEntity: `collider: placement.collider ?? type.collider`
+  // — whole object, never key-merged. A placement that swaps in a circle
+  // collider has no box at all, even though the type's box would have one.
+  const index = {
+    types: { ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0 }, colliderBox: [40, 1, 40] } },
+    levels: { meadow: { file: 'levels/meadow.json' } }
+  }
+  const placements = { meadow: [{ id: 'floor', type: 'ground', at: [0, -0.5, 0], collider: { circle: 2 } }] }
+  const problems = invariantProblems(index, placements)
+  assert.equal(problems.length, 1)
+  assert.equal(problems[0].warning, true, 'unmeasurable is reported, never a silent pass')
+  assert.match(problems[0].why, /cannot be checked/)
+})
+
+test('invariantProblems: an unknown rule name is reported, never ignored', () => {
+  const index = {
+    types: { ground: { file: 'types/ground.js', invariant: { rule: 'noSuchRule', value: 0 } } },
+    levels: { meadow: { file: 'levels/meadow.json' } }
+  }
+  const placements = { meadow: [{ id: 'floor', type: 'ground', at: [0, 0, 0] }] }
+  const problems = invariantProblems(index, placements)
+  assert.equal(problems.length, 1)
+  assert.equal(problems[0].warning, true)
+  assert.match(problems[0].why, /"noSuchRule"/)
+  assert.match(problems[0].why, /does not know how to enforce/)
 })
 
 test('pain records, lists and resolves against an isolated file', () => {

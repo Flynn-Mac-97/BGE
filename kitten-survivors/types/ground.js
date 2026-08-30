@@ -21,6 +21,10 @@ export default {
   appearance: 'A single flat slab of grass under everything else, with no outline. The quietest surface on screen, and deliberately so.',
   looksWrongWhen: 'entities float above it or sink into it — the slab is not placed at y = -height/2',
 
+  // The rule the comment above states, in a form `check` reads: the top of
+  // this slab (its placed y plus half its own height) must sit on y = 0.
+  invariant: { rule: 'topFaceAtY', value: 0, about: 'the top face of the slab sits at y = 0' },
+
   mesh: {
     box: [40, 1, 40],
     texture: 'meadow/grass.png',
