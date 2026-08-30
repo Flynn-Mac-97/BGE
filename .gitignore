@@ -9,3 +9,6 @@ tools/.dsh-agent.*
 # file change also produced an index diff, and a stale checked-in copy is worse
 # than no copy — the whole point of the index is that it is never behind.
 */.engine/
+
+# A dev server log is a live file, not a record of anything.
+agent-runs/dev-*.log
