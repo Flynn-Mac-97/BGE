@@ -51,7 +51,11 @@ export default {
     // `blood` by name on every hurt and kill, so a game that wants another look
     // renames the colours instead of turning the wiring off.
     context.particles?.define('blood', { colour: ['#f6e2c8', '#d8b98f', '#b9946a'] })
-    context.particles?.define('explosion', { colour: ['#ffe08a', '#f0b26b', '#c9c9c9', '#8d8d8d'] })
+    // The hairball burst weapon fires this. blend 'add' and full-saturation
+    // fire tones so the game's biggest hit reads over lit grass, not just dusk
+    // — see kitten-survivors/art/effects/bible.md. One smoke tone is kept so it
+    // still reads as an explosion and not a firework.
+    context.particles?.define('explosion', { blend: 'add', colour: ['#ff6a00', '#ffb000', '#ffffff', '#8d8d8d'] })
 
     // The play camera sits fourteen metres back and sees about thirteen metres
     // of ground top to bottom, so the builtin's half-metre default number is six
@@ -80,10 +84,14 @@ export default {
       }
       context.impact.hit({ weight: KILL, at: event.point, sound: 'squeak' })
       // A last puff where it stood, so a death is a thing that happened rather
-      // than a thing that stopped being drawn.
+      // than a thing that stopped being drawn. White at birth, full-saturation
+      // gold as it dies — colour and fadeTo are both fixed, not picked, so a
+      // kill spends no extra draw on the run's shared random stream.
       context.particles?.effect('sparks', {
         at: { x: event.entity.x, y: event.entity.y + 0.25, z: event.entity.z },
-        count: 14
+        count: 14,
+        colour: '#ffffff',
+        fadeTo: '#ffb000'
       })
     })
   },
