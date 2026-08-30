@@ -544,7 +544,16 @@ if (op === 'servers' || op === 'servers.stop') {
     process.exit(0)
   }
   if (args[0] !== undefined && named === null && args[0] !== 'all') {
-    die(1, `servers.stop takes a port number, or nothing at all to stop them all — got ${JSON.stringify(args[0])}`)
+    die(1, `servers.stop takes a port number, "all", or nothing — got ${JSON.stringify(args[0])}`)
+  }
+  // Parallel lanes each drive their own server, and a bare stop took every one
+  // of them down mid-measurement. Sweeping several at once has to be asked for.
+  if (named === null && args[0] !== 'all') {
+    const running = (await listServers(CHECKOUT, [])).servers.filter(server => server.state === 'running')
+    if (running.length > 1) {
+      die(1, `${running.length} servers are running, on ports ${running.map(server => server.port).join(', ')}. `
+        + `Name the one to stop, or say "servers.stop all" to take them all down.`)
+    }
   }
   const result = await stopServers(CHECKOUT, named)
   out(result)

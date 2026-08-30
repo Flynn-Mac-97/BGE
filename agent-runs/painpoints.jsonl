@@ -302,3 +302,4 @@
 {"id":"p223","at":"2026-08-30T20:23:11.111Z","kind":"engine","what":"kitten.arc takes positional args as an array. Passing the documented-looking object '{\"seconds\":30}' is accepted silently and the default 120 is used instead. A command that cannot read its arguments should say so."}
 {"id":"p216","resolved":true,"at":"2026-08-30T20:23:18.672Z","note":"agent.skills rewrites the generated files from the CLI, and the stale-file errors name that command instead of a function"}
 {"id":"p218","resolved":true,"at":"2026-08-30T20:23:18.815Z","note":"renderStats answers draw calls and triangles from the CLI, so measuring a rendering change needs no browser automation"}
+{"id":"p219","resolved":true,"at":"2026-08-30T20:24:50.791Z","note":"servers.stop refuses a bare sweep while more than one server runs, names the ports, and takes 'all' when a sweep is meant"}
