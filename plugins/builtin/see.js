@@ -9,15 +9,11 @@
  *   see.sketch    a flat-colour frame drawn from those facts. Works everywhere.
  *   see.capture   the real rendered frame. Browser only.
  *
- * Both image forms carry numbered marks and a JSON sidecar mapping mark
- * number to entity id, because a vision model grounds far better against
- * marks than against descriptions, and its answer comes back in numbers the
- * engine can map to entities. Counts, positions, sizes and coverage are
- * always in the sidecar — computed, never asked of vision.
- *
- * A returned `__files` list is written to disk by the CLI, so one command
- * answers with file paths from either world. Deterministic: frames are named
- * by level name and a frame number, never by a clock.
+ * Every image carries numbered marks and a JSON sidecar mapping mark to
+ * entity id — a vision model grounds reliably against marks, and everything
+ * computable is in the sidecar, never asked of vision. A `__files` reply is
+ * written to disk by the CLI. Frames are named by level name and a frame
+ * number, never by a clock.
  */
 import { makeProjector } from '../../engine/camera-project.js'
 import { boundsOf, frameSubject, facingOffset, boxesTouch } from '../../engine/frame-facts.js'
