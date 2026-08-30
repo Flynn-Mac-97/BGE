@@ -226,19 +226,48 @@ export default {
         }
 
         // `alone` must be true of the pixels, not only of the description:
-        // everything but the subject and the lights is hidden for the draw.
+        // everything but the subject is hidden, and the scene's own grade —
+        // its lights, fog, sky — is swapped for a neutral studio, because a
+        // model judged under a dusk key is a judgement of the dusk. Restored
+        // below, whole.
         const concealed = []
+        let studio = null
         if (options.alone && subjectEntity) {
           for (const other of context.world.entities) {
-            if (other === subjectEntity || other.hidden || other.type === 'light') continue
+            if (other === subjectEntity || other.hidden) continue
             other.hidden = true
             concealed.push(other)
           }
+          const THREE = await import('three')
+          const scene = context.renderer.scene
+          studio = { scene, background: scene.background, fog: scene.fog, dimmed: [] }
+          scene.fog = null
+          scene.background = new THREE.Color('#8b8f96')
+          for (const child of scene.children) {
+            if (child.isLight && child.visible) { child.visible = false; studio.dimmed.push(child) }
+          }
+          studio.rig = new THREE.Group()
+          studio.rig.add(new THREE.AmbientLight('#ffffff', 0.9))
+          const key = new THREE.DirectionalLight('#ffffff', 1.7)
+          key.position.set(2, 4, 3)
+          studio.rig.add(key)
+          scene.add(studio.rig)
         }
 
         // Always drawn fresh, never copied as-is: a hidden or throttled tab
         // stops painting, and its stale canvas reads back as nothing.
         context.renderer.sync(context.world)
+        // The sky is a sphere riding the camera and effects are scene
+        // children, not entities — in the studio, everything that is not the
+        // subject or the rig goes dark for the one draw.
+        if (studio) {
+          for (const child of studio.scene.children) {
+            if (!child.visible || child === studio.rig) continue
+            if (child.userData?.entity === subjectEntity.id) continue
+            child.visible = false
+            studio.dimmed.push(child)
+          }
+        }
         context.renderer.draw()
 
         const canvas = context.shell.canvas
@@ -249,6 +278,12 @@ export default {
         pen.drawImage(canvas, 0, 0)
 
         for (const other of concealed) other.hidden = false
+        if (studio) {
+          studio.scene.remove(studio.rig)
+          studio.scene.background = studio.background
+          studio.scene.fog = studio.fog
+          for (const child of studio.dimmed) child.visible = true
+        }
         if (moved) Object.assign(view, kept)
         if (moved || concealed.length) {
           context.renderer.sync(context.world)
