@@ -2,3 +2,8 @@
 # a checkout that silently rewrote every line would turn one real change into a
 # whole-file diff.
 * text=auto eol=lf
+
+# The pain log is append-only and every parallel lane writes to it, so a merge
+# takes both sides' lines instead of asking. Recording friction must not create
+# friction.
+agent-runs/painpoints.jsonl merge=union

@@ -260,3 +260,5 @@
 {"id":"p190","at":"2026-08-30T18:32:55.315Z","kind":"engine","what":"Correction: p184 is NOT resolved. It was marked resolved by mistake with a note about see.capture size, which belongs to p189. p184 is the boxesTouch strict-comparison defect in engine/frame-facts.js and is still open."}
 {"id":"p189","resolved":true,"at":"2026-08-30T18:32:55.427Z","note":"see.capture takes size [width,height]; the renderer draws at that shape and the window's own size is put back after"}
 {"id":"p184","resolved":true,"at":"2026-08-30T18:33:51.676Z","note":"boxesTouch compares with <= and a 0.1 mm tolerance, so exact contact counts as touching; the see-battery kitten-on-ground assertion passes"}
+{"id":"p191","at":"2026-08-30T18:35:37.689Z","kind":"engine","what":"agent-runs/painpoints.jsonl is append-only and every parallel lane writes to it, so any cherry-pick or merge between lanes conflicts on the pain log itself. Recording friction creates friction."}
+{"id":"p191","resolved":true,"at":"2026-08-30T18:35:57.485Z","note":"gitattributes marks agent-runs/painpoints.jsonl merge=union, so parallel lanes' entries both survive a merge instead of conflicting"}
