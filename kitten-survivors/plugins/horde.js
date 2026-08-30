@@ -24,13 +24,21 @@ const HUNTED = 'kitten'
 /** Where the ground is, when nothing solid is under the origin to measure against. */
 const FLOOR_TOP_WHEN_UNKNOWN = 0.5
 
-/** The ring, as multiples of how far the camera sees. Far enough that nobody watches a spawn arrive. */
+/** The ring, as multiples of how far the player's camera sees. Just past a screen corner, so nobody watches a spawn arrive. */
 const RING_NEAR = 1.15
 const RING_FAR = 1.5
 
 /** How far inside the edge of the meadow the ring is kept, and the narrowest ring worth having. */
 const ARENA_INSET = 1.5
 const SMALLEST_RING = 9
+
+/** The Game Camera's own chase defaults and the engine's field of view, for a camera rule that leaves them unsaid. */
+const CHASE_PITCH = -1.05
+const CHASE_DISTANCE = 14
+const FOV_WHEN_UNSAID = 90
+
+/** The screen shape assumed when there is no viewport to measure. */
+const ASPECT_WHEN_UNKNOWN = 16 / 9
 
 let horde = null
 
@@ -52,18 +60,11 @@ function floorTop(context) {
 }
 
 /**
- * How much meadow there is, and whether it is big enough to hide a spawn behind.
- *
- * The ring wants to be a screen and a half out. If the grass does not reach
- * that far the horde would arrive walking on sky, which is worse than arriving
- * in view — so the ring is pulled in to fit the ground, and the fact is said
- * once with the number the arena would need. Silence would mean the arena lane
- * widening the meadow and nothing changing.
- *
- * Measured from the largest solid's drawn size rather than its collider,
- * because what a player reads as ground is the mesh.
+ * The largest solid's drawn footprint, cached per level. Measured from the
+ * mesh rather than the collider, because what a player reads as ground is
+ * what is drawn.
  */
-function fitToArena(context) {
+function widestGround(context) {
   if (horde.arena !== undefined) return horde.arena
   let widest = null
   for (const entity of context.world.entities) {
@@ -78,25 +79,95 @@ function fitToArena(context) {
     }
   }
   horde.arena = widest
-  if (!widest) return widest
+  return widest
+}
+
+/**
+ * How far the PLAYER's camera sees, in metres from the followed body to the
+ * farthest ground corner of the frame.
+ *
+ * Measured from the level's camera rule, never from the editor viewport. The
+ * viewport is whichever panel arrangement the author left behind, and a spawn
+ * distance read from it changes when a dock is dragged; the rule is the camera
+ * the player actually plays behind. Only the viewport's SHAPE is read here,
+ * because the shape of the screen is part of that camera.
+ *
+ * Null until the rule has been read off disk, and null for a camera this sum
+ * does not cover — the caller falls back to the engine's own estimate.
+ */
+function cameraSeen(context) {
+  const rule = context.camera?.rule
+  if (!rule || rule.mode !== 'third-person') return null
+  const pitch = Math.abs(rule.pitch ?? CHASE_PITCH)
+  const distance = rule.distance ?? CHASE_DISTANCE
+  const halfVertical = ((rule.fov ?? FOV_WHEN_UNSAID) * Math.PI / 180) / 2
+  const width = context.viewport?.width
+  const height = context.viewport?.height
+  const aspect = width > 0 && height > 0 ? width / height : ASPECT_WHEN_UNKNOWN
+  const halfHorizontal = Math.atan(Math.tan(halfVertical) * aspect)
+
+  // The eye hangs behind and above the body, and the frame's top corner ray is
+  // the one that lands farthest away. Follow it from the eye to the ground.
+  const sink = Math.sin(pitch) - Math.tan(halfVertical) * Math.cos(pitch)
+  if (sink <= 0) return null // the horizon is on screen, so there is no far edge
+  const eyeHeight = distance * Math.sin(pitch) + (rule.offsetY ?? 0)
+  const along = eyeHeight / sink
+  const across = Math.tan(halfHorizontal) * along
+  const ahead = (Math.tan(halfVertical) * Math.sin(pitch) + Math.cos(pitch)) * along
+    - distance * Math.cos(pitch)
+  return Math.hypot(across, ahead)
+}
+
+/**
+ * The ring for this level: a band just past what the player's camera shows,
+ * pulled in to fit the meadow.
+ *
+ * If the grass does not reach a screen and a bit out, the horde would arrive
+ * walking on sky, which is worse than arriving in view — so the ring fits the
+ * ground, and the fact is said once with the number the arena would need.
+ * Silence would mean the arena lane widening the meadow and nothing changing.
+ *
+ * Cached only once the camera rule has produced a measurement. The rule is
+ * read from disk after `level:loaded`, and an estimate taken inside that gap
+ * must not become the level's spawn distance.
+ */
+function ringNow(context) {
+  if (horde.ringNear !== null) {
+    return { near: horde.ringNear, far: horde.ringFar, seen: horde.seen, tooSmall: horde.arenaTooSmall }
+  }
+  const measured = cameraSeen(context)
+  const seen = measured ?? context.spawnRing.visibleRadius()
+  let near = seen * RING_NEAR
+  let far = seen * RING_FAR
+  let tooSmall = false
 
   // The ring has to fit inside the grass from wherever the player is standing,
   // and the player can stand at the edge. The honest radius is therefore the
   // shorter half-extent, not the diagonal.
-  const room = Math.min(widest.halfWidth, widest.halfDepth) - ARENA_INSET
-  if (room >= horde.ringFar) return widest
+  const widest = widestGround(context)
+  const room = widest ? Math.min(widest.halfWidth, widest.halfDepth) - ARENA_INSET : Infinity
+  if (room < far) {
+    tooSmall = true
+    far = Math.max(SMALLEST_RING, room)
+    near = Math.max(SMALLEST_RING * 0.7, far - 8)
+    if (!horde.saidTooSmall) {
+      horde.saidTooSmall = true
+      console.error(
+        `[horde] "${widest.id}" gives ${round(widest.halfWidth * 2)}m by ${round(widest.halfDepth * 2)}m of ground, ` +
+        `so the spawn ring has been pulled in to ${round(near)}-${round(far)}m and enemies will ` +
+        `appear in view. The player's camera sees ${round(seen)}m to a corner, so the meadow needs to be about ` +
+        `${round(seen * 3)}m across for a survivor's crowd to arrive unseen.`
+      )
+    }
+  }
 
-  horde.ringFar = Math.max(SMALLEST_RING, room)
-  horde.ringNear = Math.max(SMALLEST_RING * 0.7, horde.ringFar - 8)
-  horde.arenaTooSmall = true
-  const seen = context.spawnRing.visibleRadius()
-  console.error(
-    `[horde] "${widest.id}" gives ${round(widest.halfWidth * 2)}m by ${round(widest.halfDepth * 2)}m of ground, ` +
-    `so the spawn ring has been pulled in to ${round(horde.ringNear)}-${round(horde.ringFar)}m and enemies will ` +
-    `appear in view. The camera sees ${round(seen)}m to a corner, so the meadow needs to be about ` +
-    `${round(seen * 3)}m across for a survivor's crowd to arrive unseen.`
-  )
-  return widest
+  if (measured !== null) {
+    horde.seen = seen
+    horde.ringNear = near
+    horde.ringFar = far
+    horde.arenaTooSmall = tooSmall
+  }
+  return { near, far, seen, tooSmall }
 }
 
 /** Gone, and worth something to whoever was killing it. */
@@ -157,8 +228,12 @@ export default {
       horde.floorTop = null
       horde.arena = undefined
       horde.arenaTooSmall = false
-      horde.ringNear = context.spawnRing.visibleRadius() * RING_NEAR
-      horde.ringFar = context.spawnRing.visibleRadius() * RING_FAR
+      horde.saidTooSmall = false
+      // Null until ringNow measures it from the level's camera rule — measuring
+      // here would race the rule being read off disk and win with the wrong number.
+      horde.seen = null
+      horde.ringNear = null
+      horde.ringFar = null
     }
 
     horde = {
@@ -170,8 +245,10 @@ export default {
       floorTop: null,
       arena: undefined,
       arenaTooSmall: false,
-      ringNear: 26,
-      ringFar: 34,
+      saidTooSmall: false,
+      seen: null,
+      ringNear: null,
+      ringFar: null,
       /** By type rather than by id, so the kitten lane may replace the entity and the horde follows. */
       target: () => context.world.find(HUNTED) || context.world.byId('you') || null
     }
@@ -186,8 +263,8 @@ export default {
       get enemies() { return crowd.members },
       get count() { return crowd.size },
       get minutes() { return context.time / 60 },
-      get ringNear() { fitToArena(context); return horde.ringNear },
-      get ringFar() { fitToArena(context); return horde.ringFar },
+      get ringNear() { return ringNow(context).near },
+      get ringFar() { return ringNow(context).far },
       target: () => horde.target(),
 
       near: (x, z, radius, into) => crowd.near(x, z, radius, into),
@@ -290,6 +367,7 @@ export default {
       get stats() {
         const minutes = context.time / 60
         const wave = schedule.waveAt(minutes)
+        const ring = ringNow(context)
         return {
           time: round(context.time),
           minute: round(minutes),
@@ -305,15 +383,19 @@ export default {
           killed: horde.killed,
           killedByFamily: horde.killedByFamily,
           forgotten: horde.forgotten,
-          ring: [round(horde.ringNear), round(horde.ringFar)],
+          // How far the player's camera sees, and the band just past it that
+          // the crowd arrives on. Both from the level's camera rule, so they
+          // are the same on every screen and in a headless run.
+          cameraSees: round(ring.seen),
+          ring: [round(ring.near), round(ring.far)],
           // Said in the answer as well as on the console: the arena being too
           // small to hide a spawn is the one thing about this plugin that
           // another lane has to fix.
           arena: horde.arena
             ? {
                 ground: [round(horde.arena.halfWidth * 2), round(horde.arena.halfDepth * 2)],
-                bigEnough: !horde.arenaTooSmall,
-                wantsAcross: round(context.spawnRing.visibleRadius() * 3)
+                bigEnough: !ring.tooSmall,
+                wantsAcross: round(ring.seen * 3)
               }
             : null
         }
@@ -348,7 +430,13 @@ export default {
     {
       id: 'horde.stats',
       label: 'What is on the meadow right now',
-      run: context => context.horde?.stats ?? { error: 'Horde did not load' }
+      run: async context => {
+        if (!context.horde) return { error: 'Horde did not load' }
+        // The ring is measured from the level's camera rule, which is read off
+        // disk; wait for it so a headless run reports the played numbers.
+        await context.camera?.ruleRead
+        return context.horde.stats
+      }
     },
     {
       id: 'horde.clear',
