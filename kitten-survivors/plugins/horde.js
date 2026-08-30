@@ -55,7 +55,7 @@ const RING_FAR = 1.14
  * family covers 6.2 metres a second. This is about a second of a wasp's travel,
  * so nothing arrives as a hit with no warning.
  */
-const LEAST_WARNING = 6.5
+const LEAST_WARNING = 8.5
 
 /** The least depth of the band once the floor has raised its near edge, so a cluster still arrives spread rather than on one line. */
 const LEAST_BAND = 1.5
