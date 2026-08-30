@@ -1,8 +1,8 @@
 ---
-skill: see-the-game
+name: see-the-game
 description: Look at or inspect anything in the running game — models, effects, screens, what is visible or hidden. Use this INSTEAD of browser screenshots; it answers in exact facts and marked frames for a fraction of the cost.
-triggers: look, look at, looks, visual, screenshot, frame, capture, render, hidden, occlud, blocking, on screen, off screen, camera, viewport, what does, appearance, model look, effect
 ---
+<!-- generated from plugins/builtin/see.agent.md at server start; edits are lost -->
 
 # See
 

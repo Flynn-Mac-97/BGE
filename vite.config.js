@@ -381,6 +381,47 @@ async function writeAgentDoc() {
   try { await fs.access(claude) } catch {
     await fs.writeFile(claude, 'See [AGENTS.md](AGENTS.md) — it is generated and always current.\n', 'utf8')
   }
+
+  await writeGuideSkills()
+}
+
+/**
+ * An enabled plugin's guide can register as a HARNESS skill — an entry in the
+ * skill listing every agent reads before its first tool call. Documentation
+ * loses to that listing every time: five fresh agents in a row chose the
+ * browser skill by name and never opened a file. A guide opts in with `skill:`
+ * and `description:` frontmatter; the body written here is the guide itself.
+ * Toggling the plugin off removes the skill at the next server start, because
+ * this directory is cleared and rebuilt from enabled guides alone.
+ */
+async function writeGuideSkills() {
+  const generated = path.join(ROOT, '.claude/skills')
+  const plugins = await agentPlugins()
+  const mine = new Set()
+  for (const node of plugins) {
+    if (!node.enabled) continue
+    const guide = await fs.readFile(path.join(ROOT, node.scope === 'engine' ? node.file : path.join(PROJECT_DIRECTORY, node.file)), 'utf8').catch(() => '')
+    const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
+    const skillName = declared?.match(/^skill:\s*(.+)$/m)?.[1]?.trim()
+    const description = declared?.match(/^description:\s*(.+)$/m)?.[1]?.trim()
+    if (!skillName || !description) continue
+    mine.add(skillName)
+    const body = guide.replace(/^---\s*\n[\s\S]*?\n---\s*/, '')
+    await fs.mkdir(path.join(generated, skillName), { recursive: true })
+    await fs.writeFile(path.join(generated, skillName, 'SKILL.md'),
+      `---\nname: ${skillName}\ndescription: ${description}\n---\n<!-- generated from ${node.file} at server start; edits are lost -->\n\n${body}`, 'utf8')
+  }
+  // Skills this generator wrote before but did not write now belong to guides
+  // that were disabled or dropped — remove them, or a dead plugin stays
+  // registered. Only generated skills are touched; a hand-written one has no
+  // generated marker and is left alone.
+  let names = []
+  try { names = await fs.readdir(generated) } catch { return }
+  for (const name of names) {
+    if (mine.has(name)) continue
+    const text = await fs.readFile(path.join(generated, name, 'SKILL.md'), 'utf8').catch(() => '')
+    if (text.includes('<!-- generated from ')) await fs.rm(path.join(generated, name), { recursive: true, force: true })
+  }
 }
 
 const AGENT_DOC = await fs.readFile(path.join(ROOT, 'agents/bootstrap.md'), 'utf8')
