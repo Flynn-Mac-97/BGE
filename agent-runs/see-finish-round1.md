@@ -91,6 +91,50 @@ It also shows p138 is milder than first recorded: the guide points at a
 information as a `mark` field on each `visible` entry and copes. It is still
 wrong and still worth fixing — it just is not what would fail this row.
 
+## Row 3, Battery green and restore-safe — PASS on everything a machine can check
+
+After the loop's work merged:
+
+- headless `tests.run`: 2 of 2 tests pass, 57 assertions, no red
+- in the browser through the bridge: 2 of 2 pass, 61 assertions — the four
+  extra are the ones that need a real renderer
+- every image command's failure case leaves the world exactly as it found
+  it: 15 of 15 error paths produce an empty diff of entities, camera, clock
+  and holders, against a probe that produces a 7-field leak on the pre-fix
+  code
+
+The battery grew from 20 assertions with one of them red at HEAD to 45, and
+now covers hull marks and the legend, `ui: false`, subject shots and `aim`,
+and one restore check per error path. The red at HEAD was a test asserting
+where the kitten happened to walk while claiming to test that `between`
+answered; it asserts what it says now.
+
+What a machine cannot check is left for the owner: clicking the See tests in
+the browser panel and seeing the frames render.
+
+## Row 4, Marks spend where questions point — PASS
+
+Measured headless on two seeds and two cameras by the lane, and again live in
+the browser after merging.
+
+| where | scenery in first 12 | brief bytes |
+|---|---|---|
+| baseline at HEAD | 11 of 12 | 9127 |
+| seed 7 and seed 21, headless, two cameras each | 1 of 12 | 7690–7875 |
+| live browser, meadow at 0:30 through `meadow-play` | 1 of 12 | 15854 sidecar, 9241 with `brief` |
+
+Marks are now dealt out by type rather than by size: every type on screen
+takes its first mark before any type takes a second, rarest first, and a
+type's turn then comes round in proportion to how much of it the camera
+holds. The 40 marks on the live frame went to 21 rats, 15 gems, the kitten,
+a projectile and 2 props.
+
+There is a knock-on worth recording. `occlusions` is computed over marked
+entities only, so when scenery held the marks, "who hides whom" could only
+ever answer about hills — the first six pairs on the old frame were all
+hill-on-hill. On the new frame the pairs name a prop hiding gems and rats.
+Fixing what gets marked fixed what the occlusion answer is about.
+
 ## What the probes exposed about cheap models
 
 All three said the model looked good. Not one was critical, and not one named

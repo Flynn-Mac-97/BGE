@@ -1,0 +1,48 @@
+{
+  "frame": "agent-runs/see/round2-busy.png",
+  "palette": {
+    "kitten": "#4a4ad9",
+    "meadow-prop": "#b7e7f0",
+    "projectile": "#a4e78d",
+    "rat": "#e06c72",
+    "xp-gem": "#e2abed"
+  },
+  "q1": {
+    "type": "kitten",
+    "colour": "#4a4ad9"
+  },
+  "q2": {
+    "type": "rat",
+    "markedCount": 21,
+    "colour": "#e06c72",
+    "totalVisible": 46
+  },
+  "q3": [
+    [
+      "patch-1",
+      "xp-gem-469"
+    ],
+    [
+      "patch-1",
+      "rat-531"
+    ],
+    [
+      "patch-1",
+      "rat-496"
+    ]
+  ],
+  "q4": {
+    "atX": 50,
+    "answer": "middle third"
+  },
+  "counts": {
+    "visible": 110,
+    "offscreen": 737,
+    "offscreenByType": {
+      "meadow-prop": 709,
+      "light": 4,
+      "xp-gem": 2,
+      "rat": 22
+    }
+  }
+}
