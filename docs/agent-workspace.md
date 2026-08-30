@@ -20,9 +20,9 @@ long as it is true.
 
 An instruction node that **ranks the options for a job** is the most valuable
 shape. `agents/art.md` is the worked example: a character is a Blender model, a
-few solids are `mesh.parts`, a box is a blockout. It exists because a lane
-built a character from 18 boxes; the Blender skill was available but never
-loaded, because its triggers did not match the task words.
+few solids are `mesh.parts`, a box is a blockout. Without a ranking, an agent
+takes the first route it can see, and a gated skill it never triggers may as
+well not exist.
 
 So when a run teaches something:
 
@@ -87,8 +87,8 @@ process and worktree management is CLI behavior.
 
 ## Several agents at once
 
-Read this before fanning out. Two of the guarantees this file used to state are
-not enforced, and the difference matters.
+Read this before fanning out. Not everything here is enforced — the table below
+says which guarantees are real.
 
 **One checkout, or a worktree each?** One checkout is safe when lanes own
 different files and none of them touch `<project>/`. The index is written
@@ -114,9 +114,9 @@ conflict.
 node bin/engine.mjs agent.context <project>/plugins/probe.js --project <project>
 ```
 
-Check the `lanes` list, not just that a packet came back. A thin one means no
-rule matched, and it looks exactly like a full one — five lanes once ran on 810
-characters with neither Plugin Master nor the Game lane, and nothing errored.
+Check the `lanes` list, not just that a packet came back. A packet with no
+matched rules is not an error — it returns successfully and looks like a full
+one, only shorter.
 
 **Give every lane a claim of its own.** A claim promises that two writers never
 edit one file, so claim the files a lane will own. A folder claim is for a lane
@@ -149,10 +149,10 @@ lanes fight over exactly the files that are not in it.
   more: every reply names the checkout it serves and the CLI refuses a
   mismatch, which is also what lets a lane drive its own dev server with
   `--port`.
-- Browser automation tabs are one shared pool across every lane. A lane that
-  browses must open its own tab, verify the PORT in the address bar before
-  every click, and close the tab when done — one lane's keypress landed in
-  another lane's editor after a tab was navigated out from under it.
+- Browser automation tabs are one shared pool across every lane, and another
+  lane can navigate a tab at any time. A lane that browses must open its own
+  tab, verify the PORT in the address bar before every click, and close the
+  tab when done.
 - Worktrees resolve `three` and `vite` only because `.agent-worktrees/` sits
   inside the main checkout and node walks up. Moving them needs `npm install`.
 - Give each lane real file paths, never a bare glob — a claim starting with a

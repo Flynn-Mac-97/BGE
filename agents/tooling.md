@@ -15,10 +15,9 @@ direction is the game's.**
   PNG and WAV encoding, seam checks. No game nouns.
 - `tools/make-<game>-<thing>.mjs` — what *this* game's surfaces look like. Its
   palette, its structures, its list. Name the game here; that is the point.
-- **Look in `tools/lib/` before writing a generator.** `make-kitten-survivors-textures.mjs`
-  was written as a fresh 864-line file with 250 lines line-identical to the
-  Counter-Strike tool — same random, hashes, noise, encoder. Copies drift, and
-  a fix lands in one of them.
+- **Look in `tools/lib/` before writing a generator.** It already holds the
+  random, noise, colour, and encoding helpers. Copies drift, and a fix lands in
+  only one of them.
 - Extract when you copy the second time, not the third. A tool is a small file:
   moving a helper costs minutes, and the next agent pays for every copy.
 - Prove an extraction by regenerating and diffing the output. Same bytes, or it

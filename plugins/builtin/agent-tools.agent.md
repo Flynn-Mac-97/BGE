@@ -19,8 +19,7 @@ match: tools/**
 - **Anything reusable goes in `tools/lib/`.** Wrapping noise, a colour operation,
   an encoder, a seam check — if a second generator would want it, it belongs
   there and not inside one game's file. Two copies of the same helper drift, and
-  the fix lands in one of them: `grain` was rewritten to wrap on the torus in one
-  texture tool while the other kept laying a seam, for weeks, silently.
+  a fix lands in only one of them.
 - Extract when you copy the second time, not the third.
 - Add the leading `/** … */` — its first sentence is what `tools.list` shows.
   A file nobody described costs its whole length to understand, and `tools.list`
