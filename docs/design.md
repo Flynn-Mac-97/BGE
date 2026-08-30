@@ -36,8 +36,15 @@
 
 The runtime is much thinner than the tooling. Missing: tilemaps and bulk
 placement, scene flow between levels, saving game state, parenting, raycasts,
-triggers separate from solids, gamepad and touch input, time scale,
-3D model loading, and any way to export a playable build.
+triggers separate from solids, gamepad and touch input, time scale, and any
+way to export a playable build. 3D model loading is no longer on this list —
+`mesh: { model: '<file>.glb' }` loads a GLB and `entity.pose` swings its named
+nodes. GLB crowds do not instance yet, which is the current cost of using them
+for enemies.
+
+Frame-phase systems only run while the world is playing, so anything drawn by
+one — particles, damage numbers — is invisible in edit mode. An effect can only
+be checked by pressing play.
 
 Pause is now in the kernel: `loop.hold(reason)` stops the clock while every
 system and update still runs with a step of zero seconds, so a screen drawn over
@@ -55,7 +62,9 @@ freezes the editor — though `--headless` now gives you somewhere else to run i
 
 Two editor tabs on one dev server both answer the bridge and the first reply
 wins, so a state-dependent CLI call can read the other tab's world. Keep one tab
-open, and use `--headless` when you want more than one world.
+open per server, and use `--headless` when you want more than one world. Across
+servers this is now fenced: every bridge reply names the checkout it serves and
+the CLI refuses a mismatch.
 
 `History` covers the editor's own edits, not everything. A step is exactly as
 lossy as reopening the level — it replays the placements `toLevel` would have
