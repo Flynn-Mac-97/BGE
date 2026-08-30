@@ -36,7 +36,7 @@
 
 The runtime is much thinner than the tooling. Missing: tilemaps and bulk
 placement, scene flow between levels, saving game state, parenting, raycasts,
-triggers separate from solids, particles, gamepad and touch input, time scale,
+triggers separate from solids, gamepad and touch input, time scale,
 3D model loading, and any way to export a playable build.
 
 Pause is now in the kernel: `loop.hold(reason)` stops the clock while every
