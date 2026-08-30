@@ -4,8 +4,8 @@
  *
  *   node tools/make-kitten-survivors-meadow.mjs
  *
- * WHY A TOOL AND NOT A HAND-WRITTEN FILE. The meadow is about four hundred and
- * fifty placements. `docs/design.md` lists "tilemaps and bulk placement" as a
+ * WHY A TOOL AND NOT A HAND-WRITTEN FILE. The meadow is several hundred
+ * placements. `docs/design.md` lists "tilemaps and bulk placement" as a
  * known gap, and it is the gap you feel: there is no repeat, no array, no group
  * and no prefab in the level format, so a hedgerow is thirty literal JSON
  * objects and a tree is four. Scattering two hundred tufts by hand is not
@@ -355,10 +355,10 @@ for (let index = 0; index < 54; index++) {
  * from the air.
  */
 const tuftPlaces = []
-for (let index = 0; index < 132; index++) {
-  const spot = findSpot({ reach: FIELD - 1.5, apart: 2.1, placed: tuftPlaces })
+for (let index = 0; index < 320; index++) {
+  const spot = findSpot({ reach: FIELD - 1.5, apart: 1.5, placed: tuftPlaces })
   if (!spot) continue
-  const height = between(0.26, FIELD_CEILING)
+  const height = between(0.16, FIELD_CEILING)
   const dark = random() < 0.62
   prop('tuft', {
     x: spot[0], z: spot[1],
@@ -384,8 +384,8 @@ for (let index = 0; index < 132; index++) {
 
 // Flowers in threes, because one flower is a speck and three is a plant.
 const flowerPlaces = []
-for (let index = 0; index < 26; index++) {
-  const spot = findSpot({ reach: FIELD - 3, apart: 4.2, placed: flowerPlaces })
+for (let index = 0; index < 46; index++) {
+  const spot = findSpot({ reach: FIELD - 3, apart: 3.2, placed: flowerPlaces })
   if (!spot) continue
   const tint = pick([FLOWER_GOLD, FLOWER_GOLD, FLOWER_CREAM, FLOWER_MAUVE])
   for (let head = 0; head < 3; head++) {
@@ -398,10 +398,10 @@ for (let index = 0; index < 26; index++) {
 }
 
 const rockPlaces = []
-for (let index = 0; index < 26; index++) {
-  const spot = findSpot({ reach: FIELD - 2, apart: 5, placed: rockPlaces })
+for (let index = 0; index < 46; index++) {
+  const spot = findSpot({ reach: FIELD - 2, apart: 3.6, placed: rockPlaces })
   if (!spot) continue
-  const height = between(0.2, FIELD_CEILING)
+  const height = between(0.14, FIELD_CEILING)
   prop('rock', {
     x: spot[0], z: spot[1],
     size: [between(0.6, 1.6), height, between(0.5, 1.4)],
@@ -418,8 +418,8 @@ for (let index = 0; index < 26; index++) {
 }
 
 const logPlaces = []
-for (let index = 0; index < 11; index++) {
-  const spot = findSpot({ reach: FIELD - 4, apart: 9, placed: logPlaces })
+for (let index = 0; index < 18; index++) {
+  const spot = findSpot({ reach: FIELD - 4, apart: 7, placed: logPlaces })
   if (!spot) continue
   const fallen = random() < 0.6
   prop('log', {
@@ -427,6 +427,41 @@ for (let index = 0; index < 11; index++) {
     size: fallen ? [between(1.8, 3.4), between(0.3, 0.44), between(0.34, 0.5)] : [between(0.6, 0.9), between(0.34, FIELD_CEILING), between(0.6, 0.9)],
     yaw: between(0, 360), texture: BARK, tiling: 1.5
   })
+}
+
+// Twigs: thinner and lower than a log, and far more of them. Each one is
+// still tall enough to catch the low side light and throw its own shadow.
+const twigPlaces = []
+for (let index = 0; index < 70; index++) {
+  const spot = findSpot({ reach: FIELD - 1, apart: 1.3, placed: twigPlaces })
+  if (!spot) continue
+  prop('twig', {
+    x: spot[0], z: spot[1],
+    size: [between(0.35, 0.9), between(0.05, 0.09), between(0.06, 0.12)],
+    yaw: between(0, 360), texture: BARK, tiling: 2
+  })
+}
+
+// Molehills: a mound of turned earth, not a painted patch — it stands proud
+// of the ground, so it takes a highlight on top and casts a real shadow.
+const molehillPlaces = []
+for (let index = 0; index < 40; index++) {
+  const spot = findSpot({ reach: FIELD - 2, apart: 3, placed: molehillPlaces })
+  if (!spot) continue
+  const height = between(0.1, 0.22)
+  prop('molehill', {
+    x: spot[0], z: spot[1],
+    size: [between(0.5, 0.9), height, between(0.45, 0.8)],
+    yaw: between(0, 360), texture: EARTH, tiling: 1
+  })
+  // A smaller mound shouldered against it, so a molehill is a heap and not a block.
+  if (random() < 0.5) {
+    prop('molehill', {
+      x: spot[0] + between(-0.4, 0.4), z: spot[1] + between(-0.4, 0.4),
+      size: [between(0.3, 0.5), height * between(0.5, 0.8), between(0.25, 0.45)],
+      yaw: between(0, 360), texture: EARTH, tiling: 1
+    })
+  }
 }
 
 // ----------------------------------------------------------------- the boundary
