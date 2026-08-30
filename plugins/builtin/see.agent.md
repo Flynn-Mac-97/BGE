@@ -42,6 +42,17 @@ measurably get wrong:
   whether either entity faces the other in degrees.
 - `light` in a capture's sidecar — mean and 4x4-cell brightness, 0-100.
 
+## Looking at a simulated moment
+
+One call, one world — simulate to the moment, then look:
+
+```sh
+node bin/engine.mjs --headless --project <p> script \
+  '[["simulate",30],["run","see.describe"],["run","see.sketch",{"name":"at-30s"}]]'
+```
+
+Deterministic, so the same seed gives the same frame every run.
+
 ## Reading a frame with a vision model
 
 - Send the PNG and its `.json` sidecar together. The sidecar is ground truth;
