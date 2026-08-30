@@ -207,9 +207,16 @@ export async function generatedAgentFiles(root, projectDirectory) {
     { path: 'CLAUDE.md', source: BOOTSTRAP, text: bootstrap }
   ]
   for (const guide of await pluginGuides(root, projectDirectory)) {
-    // A disabled plugin registers nothing: its commands are not there, and a
-    // listed skill for a missing command is worse than no listing.
-    if (!guide.enabled || !listedForAgents(guide)) continue
+    // The listing belongs to the engine, not to whichever game is open. It is
+    // written when the workspace opens and does not change when the project
+    // does, so two games in one checkout cannot overwrite each other's. A
+    // game's own plugins reach an agent through its instruction packet, which
+    // the words in the task already route.
+    //
+    // A game that switches a builtin off is reported by
+    // `skillRegistrationProblems`, because the listing then names a command
+    // that game does not have.
+    if (guide.scope !== 'engine' || !listedForAgents(guide)) continue
     const skill = skillNameFor(guide)
     const description = describedBy(guide)
     if (!description || !SKILL_NAME.test(skill)) continue
@@ -231,7 +238,10 @@ async function generatedSkillsOnDisk(root) {
   for (const name of names) {
     const file = `${SKILL_DIRECTORY}/${name}/SKILL.md`
     const text = await fs.readFile(path.join(root, file), 'utf8').catch(() => '')
-    if (text.includes(GENERATED_MARKER)) found.push({ name, path: file })
+    // An empty file is a write that did not finish. It carries no marker, so
+    // treating "no marker" as hand-written would leave it on disk for good —
+    // and the harness lists it, with no name and no description.
+    if (text.includes(GENERATED_MARKER) || !text.trim()) found.push({ name, path: file })
   }
   return found
 }
@@ -302,7 +312,18 @@ export async function skillRegistrationProblems(root, projectDirectory) {
   for (const guide of await pluginGuides(root, projectDirectory)) {
     // An opt-out is a decision, not a broken declaration: the guide still
     // arrives in a packet when the task names the plugin.
-    if (!guide.enabled || !listedForAgents(guide)) continue
+    if (!listedForAgents(guide)) continue
+    // The listing is the engine's and does not change with the open project, so
+    // a game that switches a builtin off is listing a command it does not have.
+    if (guide.scope === 'engine' && !guide.enabled) {
+      problems.push({
+        warning: true,
+        file: guide.fileFromRoot,
+        why: `is listed as \`${skillNameFor(guide)}\` and ${projectDirectory} switches it off, so this game lists a tool whose commands it does not have. Enable it, or expect an agent to try a command that is not there`
+      })
+      continue
+    }
+    if (!guide.enabled) continue
     const { skill, description, triggers, match } = guide.frontmatter
 
     if (skill && !SKILL_NAME.test(skill)) {
