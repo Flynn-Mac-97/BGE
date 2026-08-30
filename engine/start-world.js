@@ -291,6 +291,10 @@ export async function startWorld({
       bus.emit('play:stopped')
       loadLevel(editor.levelName)
     } else {
+      // Before the start hooks, so a plugin is listening when a hook spawns.
+      // `loop.running` is therefore FALSE inside a `play:started` handler — a
+      // handler that tests it does nothing at all. Hold, subscribe or schedule;
+      // never gate on `running` here.
       bus.emit('play:started')
       for (const e of [...world.entities]) world.hook(e, 'start', context)
       loop.start()

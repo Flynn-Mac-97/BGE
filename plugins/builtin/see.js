@@ -553,6 +553,14 @@ export default {
           // A layer is laid out for the window, so at a stated size it can only
           // be stretched. Left out unless the caller asked for it by name.
           if (options.ui !== false && (!sized || options.ui === true)) {
+            // A hidden tab runs no frames, so the layers hold whatever was
+            // painted last. The world is drawn fresh above and is fine; the
+            // interface would be a picture of an older screen.
+            if (document.hidden) {
+              throw new Error(
+                'this tab is hidden, so the HUD and screen layers hold a stale picture. '
+                + 'Bring the tab to the front, or pass {"ui":false} to capture the world alone.')
+            }
             for (const layer of document.querySelectorAll('canvas.hud-layer, canvas.screen-layer')) {
               if (layer.width && layer.height) pen.drawImage(layer, 0, 0, copy.width, copy.height)
             }

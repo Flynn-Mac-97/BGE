@@ -218,6 +218,11 @@ size is put back after), `marks` (`"tags"` for the old numbered stamps, `false` 
 `see.capture` needs the dev server. Under `--headless` there is no renderer and
 it says so.
 
+The tab must be in front. A hidden tab runs no frames, so the HUD and screen
+layers hold whatever was painted last while the world is drawn fresh — capture
+refuses rather than hand back half a stale picture. `{"ui":false}` captures the
+world alone and works in any tab.
+
 Marks are HULLS: each marked entity is outlined in its TYPE's colour, drawn
 on its own pixels — one colour per type, so a busy frame is a handful of
 colours. The reply and sidecar both carry `palette` (type → hex), `marks`
