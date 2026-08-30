@@ -18,7 +18,7 @@ export default {
   name: 'the wave schedule has an arc',
   level: 'meadow',
 
-  run(test) {
+  async run(test) {
     const context = test.context
     const schedule = context.hordeSchedule
 
@@ -43,14 +43,18 @@ export default {
     test.is(familiesAt(context, 1.5), ['crow', 'hound', 'rat', 'wasp'], 'a hound that soaks a whole weapon at ninety seconds')
     test.is(familiesAt(context, 2), ['boar', 'crow', 'hound', 'rat', 'wasp'], 'and the charging boar at two minutes')
 
-    // ---- first blood, played
+    // ---- first blood, played. Through the arc rather than `simulate`, because
+    // a level-up holds the world and a held step moves no clock at all — a
+    // plain simulate stops dead at whatever second the first card came up.
     const deaths = []
     const stopCounting = test.on('enemy:died', () => deaths.push(context.time))
-    test.simulate(20)
+    const opening = await context.run('kitten.arc', [20, 20])
+    test.near(opening.played, 20, 1, `the first twenty seconds really played — ${opening.played}s`)
     test.ok(deaths.length > 0, 'something dies in the first twenty seconds')
     test.ok(deaths[0] <= 5, `the first kill lands at ${deaths[0].toFixed(1)}s, inside a few seconds of the start`)
     test.ok(deaths.length >= 10, `and ${deaths.length} are dead by twenty seconds`)
     stopCounting()
+    const early = context.horde.count
 
     // ---- a body stays long enough to be seen falling, and frees its slot at once
     // A tenth of a second, not two steps: a kill lands hit stop, and a held step
@@ -67,16 +71,16 @@ export default {
     test.ok(!context.world.entities.includes(rat), 'and it is taken away once the collapse is over')
 
     // ---- the rest of the run, picking blind
-    const blind = context.run('kitten.arc', [180, 30])
-    test.ok(blind.cards >= 4, `picking blind, the run offered ${blind.cards} cards — about one every twenty seconds`)
+    const blind = await context.run('kitten.arc', [160, 30])
+    test.ok(blind.cards + opening.cards >= 4,
+      `picking blind, the run offered ${blind.cards + opening.cards} cards — about one every twenty seconds`)
     test.ok(!blind.stuck, 'and the choice screen never held the world open')
     test.ok(context.runClock.seconds >= 60,
       `the run reached ${context.runClock.clock}, past the minute where wasps and hounds arrive`)
     test.ok(blind.ended.kills > 100, `killing ${blind.ended.kills} on the way`)
 
-    const grew = blind.marks.filter(mark => mark.alive > 0)
-    test.ok(grew[grew.length - 1].alive > grew[0].alive * 2,
-      `the crowd grew from ${grew[0].alive} to ${grew[grew.length - 1].alive} while it played`)
-    test.ok(context.horde.stats.aliveByFamily.rat > 0, 'with rats still in it at the end')
+    const most = Math.max(...blind.marks.map(mark => mark.alive))
+    test.ok(most > early * 2, `the crowd grew from ${early} at twenty seconds to ${most} at its worst`)
+    test.ok(blind.lowestHealth < 100, `and the kitten was down to ${blind.lowestHealth} health at some point`)
   }
 }

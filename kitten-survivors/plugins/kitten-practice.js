@@ -239,15 +239,14 @@ function playRun(context, seconds, every, drafted) {
   // marks is exactly the moment the run was hardest.
   let lowest = Infinity
   while (!ended && context.time - from < seconds && !stuck) {
-    const taken = takeCards(context)
-    cards += taken
+    cards += takeCards(context)
     stuck = context.choiceScreen.isOpen
-    lowest = Math.min(lowest, Math.round(context.world.byId('you')?.properties.health ?? Infinity))
+    const you = context.world.byId('you')
+    lowest = Math.min(lowest, Math.round(you?.properties.health ?? Infinity))
     if (context.time >= nextMark) {
       marks.push(mark(context))
       nextMark = context.time + every
     }
-    const you = context.world.byId('you')
     if (you) steer(context, kite(context, you, context.time - from))
     context.engine.simulate(SLICE)
   }

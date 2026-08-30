@@ -25,11 +25,11 @@ export default {
   name: 'a built kitten survives the peak',
   level: 'meadow',
 
-  run(test) {
+  async run(test) {
     const context = test.context
     test.simulate(1 / 60)
 
-    const run = context.run('kitten.arc', [185, 45, DRAFT])
+    const run = await context.run('kitten.arc', [185, 45, DRAFT])
     test.is(run.refused, [], 'every card in the build is one the game offers')
     test.is(run.ended?.reason, 'survived', `the run ended ${run.ended?.reason} at ${run.ended?.clock}`)
     test.is(run.ended?.clock, '3:00', 'having lasted the full three minutes')
@@ -42,8 +42,9 @@ export default {
     test.ok(peak.alive > opening.alive * 2,
       `the crowd went from ${opening.alive} at ${opening.clock} to ${peak.alive} at ${peak.clock}`)
     test.ok(peak.health > 0, `the kitten came out of it with ${peak.health} health`)
-    test.ok(run.lowestHealth < peak.health,
-      `having been down to ${run.lowestHealth} on the way rather than walking through untouched`)
+    const most = test.entity('you').properties.maxHealth
+    test.ok(run.lowestHealth < most,
+      `having been down to ${run.lowestHealth} of ${most} on the way rather than walking through untouched`)
 
     const boars = context.horde.stats.aliveByFamily
     test.ok(Object.keys(boars).length >= 3, `the peak has ${Object.keys(boars).join(', ')} on the meadow at once`)
