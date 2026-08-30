@@ -23,6 +23,16 @@ const SLICE = 0.2
 const MOST_CARDS = 30
 
 /**
+ * Slices in a row that move no clock before the arc gives up.
+ *
+ * A held loop makes `simulate` a no-op, so a loop that only watches the clock
+ * spins forever. Hit stop holds for a few steps at a time and its budget caps it
+ * at a third of play, so this is far more than any real hold and short enough to
+ * report rather than hang.
+ */
+const MOST_STILL_SLICES = 30
+
+/**
  * Seconds the arc's kitten takes to come round one full circle when nothing is
  * close enough to run from. Moving keeps it collecting gems.
  */
@@ -247,11 +257,13 @@ function playRun(context, seconds, every, drafted) {
   const draft = [].concat(drafted || []).map(id => context.kittenUpgrades.apply(String(id)))
 
   let stuck = false
+  let held = null
+  let still = 0
   let nextMark = from
   // The lowest health seen at any slice, not only at a mark: a dip between two
   // marks is exactly the moment the run was hardest.
   let lowest = Infinity
-  while (!ended && context.time - from < seconds && !stuck) {
+  while (!ended && context.time - from < seconds && !stuck && !held) {
     cards += takeCards(context)
     stuck = context.choiceScreen.isOpen
     const you = context.world.byId('you')
@@ -261,7 +273,12 @@ function playRun(context, seconds, every, drafted) {
       nextMark = context.time + every
     }
     if (you) steer(context, kite(context, you, context.time - from))
+    const was = context.time
     context.engine.simulate(SLICE)
+    still = context.time > was ? 0 : still + 1
+    // Something holds the loop and will not let go, so the clock cannot reach
+    // the end of the run. Name the holder rather than spin.
+    if (still >= MOST_STILL_SLICES) held = context.loop.holds.join(', ') || 'nothing named'
   }
   stopWatching()
   for (const code of Object.values(STEERING)) context.input.release(code)
@@ -276,6 +293,7 @@ function playRun(context, seconds, every, drafted) {
     // build that quietly did not happen.
     refused: draft.filter(taken => !taken.ok).map(taken => taken.reason),
     stuck: stuck || undefined,
+    heldBy: held || undefined,
     ended: ended ? { clock: ended.clock, reason: ended.reason, kills: ended.kills, level: ended.level } : null,
     carried: context.kittenUpgrades.taken().map(entry => `${entry.name} ${entry.rank}`),
     marks

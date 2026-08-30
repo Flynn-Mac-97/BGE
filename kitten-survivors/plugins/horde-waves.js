@@ -12,6 +12,8 @@
  *   the swarm    once a minute, one family from one bearing, all at once
  *   the recycle  at the cap, the furthest over-represented enemies are taken
  *                away so new ones can arrive
+ *   the sweep    anything that has fallen out of the picture is put back on
+ *                the edge of it, so the fight stays where the player is looking
  *
  * A cluster is one family on one bearing, so eight crows come in as a flock
  * rather than as eight birds. That is the difference between a wave and a
@@ -26,9 +28,21 @@ const CLUSTER_SPREAD = 0.4
 const SWARM_SPREAD = 0.5
 const SWARM_AHEAD = 0.7
 
-/** How far past the ring an enemy has to be before it is behind the player and pointless. */
-const FORGET_BEYOND = 2.4
-const FORGET_EVERY = 0.5
+/**
+ * How far past its own spawn band an enemy may drift before it is sent back to
+ * the edge of the frame, as a multiple of that band.
+ *
+ * The kitten runs at 5 and a rat walks at 1.95, so three of the five families
+ * cannot keep up and trail off the bottom of the screen. Left alone they hold
+ * places under the population cap where nobody can see them: measured at half a
+ * minute, 29 of 34 alive were outside the frame and the player was fighting
+ * five. Sending them round is what puts the crowd back in the picture.
+ */
+const BRING_BACK = 1.1
+const SWEEP_EVERY = 0.5
+
+/** How hard a return is pulled toward where the kitten is running. Lower than a fresh cluster's, so the same slow rat is not put in its path over and over. */
+const BACK_IN_AHEAD = 0.25
 
 /**
  * How many seconds of spawn debt may bank while the meadow is full.
@@ -63,20 +77,18 @@ function makeRoom(context, needed) {
   const target = horde.target()
   if (!target || needed <= 0) return 0
 
-  // Out of sight means out of the camera's sight, not outside the spawn ring.
-  // The two are the same on a meadow big enough for the ring; on a small one
-  // the ring is pulled inside what the player can see, and recycling against it
-  // would delete enemies out of the middle of the screen.
-  const beyond = Math.max(horde.ringNear, context.spawnRing.visibleRadius() * 1.15)
   const wanted = context.hordeSchedule.waveAt(context.time / 60).weights
   const alive = horde.census()
   const living = Math.max(1, horde.count)
 
+  // Out of sight is measured against the frame, bearing by bearing. The bar is
+  // the sweep's, not the band's: an enemy a step outside the picture is on its
+  // way in, and deleting it would spend a spawn to gain nothing.
   const outOfSight = []
   for (const entity of horde.enemies) {
     if (entity._hordeOut) continue
-    const distance = Math.hypot(entity.x - target.x, entity.z - target.z)
-    if (distance <= beyond) continue
+    const distance = pastTheBand(context, entity, target)
+    if (distance <= BRING_BACK) continue
     outOfSight.push({
       entity,
       distance,
@@ -101,6 +113,40 @@ function makeRoom(context, needed) {
   return made
 }
 
+/**
+ * Where a cluster is born: one bearing each, pushed out to just past the edge
+ * of the frame on that bearing.
+ *
+ * Spawn Ring picks the bearings, including the pull toward where the kitten is
+ * running, so its `cluster` is asked for them at unit distance and each point is
+ * then pushed out. Its own band is a circle and the screen is a trapezoid: one
+ * radius is either outside the far corners, and so far outside the top and
+ * bottom edges that the crowd walks in unseen, or inside the corners, and enemies
+ * appear in the middle of the picture.
+ *
+ * Explicit metres from a caller are obeyed as a plain circle — `horde.spawn hound
+ * 12 minimum 30` is asking for a distance, not for the frame.
+ */
+function ringPoints(context, target, count, options) {
+  const bearings = context.spawnRing.cluster(target, count, {
+    ahead: options.ahead ?? AHEAD,
+    spread: options.spread ?? CLUSTER_SPREAD,
+    minimum: 1,
+    maximum: 1
+  })
+  const asked = options.minimum !== undefined || options.maximum !== undefined
+  const points = []
+  for (const point of bearings) {
+    const angle = Math.atan2(point.x - target.x, point.z - target.z)
+    const band = asked
+      ? { near: options.minimum ?? 0, far: Math.max(options.minimum ?? 0, options.maximum ?? 0) }
+      : context.horde.ringToward(angle)
+    const distance = context.random.range(band.near, band.far)
+    points.push({ x: target.x + Math.sin(angle) * distance, z: target.z + Math.cos(angle) * distance })
+  }
+  return points
+}
+
 /** One family, one bearing, count of them. The unit a wave is made of. */
 function spawnCluster(context, family, count, options = {}) {
   const horde = context.horde
@@ -119,29 +165,39 @@ function spawnCluster(context, family, count, options = {}) {
   const wanted = Math.min(count, Math.max(0, room))
   if (!wanted) return 0
 
-  const points = context.spawnRing.cluster(target, wanted, {
-    ahead: options.ahead ?? AHEAD,
-    spread: options.spread ?? CLUSTER_SPREAD,
-    minimum: options.minimum ?? horde.ringNear,
-    maximum: options.maximum ?? horde.ringFar
-  })
+  const points = ringPoints(context, target, wanted, options)
   for (const point of points) horde.admit(family, point.x, point.z)
   return points.length
 }
 
-/** Too far behind to matter. The backstop for anything the recycler never reached. */
-function forgetTheLost(context) {
+/** How far past its own spawn band this enemy has drifted. 1 is on the far edge of the band it would be born on. */
+function pastTheBand(context, entity, target) {
+  const dx = entity.x - target.x
+  const dz = entity.z - target.z
+  return Math.hypot(dx, dz) / context.horde.ringToward(Math.atan2(dx, dz)).far
+}
+
+/**
+ * Everything that has fallen out of the picture, put back on the edge of it.
+ *
+ * The band is measured per bearing and its near edge is already outside the
+ * frame, so anything past `BRING_BACK` of it is off screen whichever way it
+ * lies — nothing a player is watching is ever moved.
+ */
+function bringBackTheLost(context) {
   const horde = context.horde
   const target = horde.target()
   if (!target) return
-  const beyond = horde.ringFar * FORGET_BEYOND
-  const members = horde.enemies
-  for (let i = members.length - 1; i >= 0; i--) {
-    const entity = members[i]
+  const lost = []
+  for (const entity of horde.enemies) {
     if (entity._hordeOut) continue
-    if (Math.hypot(entity.x - target.x, entity.z - target.z) <= beyond) continue
-    horde.forget(entity)
+    if (pastTheBand(context, entity, target) > BRING_BACK) lost.push(entity)
   }
+  if (!lost.length) return
+  // One bearing for the whole batch, as a cluster gets: a wave that re-forms
+  // from one side reads as a wave, and one sprinkled evenly round reads as fog.
+  const points = ringPoints(context, target, lost.length, { ahead: BACK_IN_AHEAD })
+  for (let i = 0; i < lost.length; i++) horde.sendBackIn(lost[i], points[i].x, points[i].z)
 }
 
 export default {
@@ -219,9 +275,9 @@ export default {
       const mostOwed = schedule.rateAt(minutes) * OWED_SECONDS
       if (clock.owed > mostOwed) clock.owed = mostOwed
 
-      if (context.time - clock.sweptAt >= FORGET_EVERY) {
+      if (context.time - clock.sweptAt >= SWEEP_EVERY) {
         clock.sweptAt = context.time
-        forgetTheLost(context)
+        bringBackTheLost(context)
       }
     }
   }],

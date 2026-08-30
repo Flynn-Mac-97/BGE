@@ -101,8 +101,10 @@ export default {
     // Play to thirty seconds, taking the first card at each level-up screen.
     // A level-up holds the world, and a held step moves no clock at all, so the
     // screen has to be answered inside the loop or `simulate(30)` stops early
-    // at whatever second the first card came up.
-    for (let slice = 0; slice < 60; slice++) {
+    // at whatever second the first card came up. The loop counts CLOCK seconds
+    // rather than slices, because a card that opens mid-slice holds the rest of
+    // it and a fixed count of slices lands short.
+    for (let slice = 0; slice < 400 && context.runClock.seconds < 30; slice++) {
       while (context.choiceScreen?.isOpen) await test.run('choice.pick', 1)
       test.simulate(0.5)
     }
@@ -114,7 +116,13 @@ export default {
     // schedule's business, and a crowd is what this is asking about.
     const families = context.hordeSchedule.families
     const crowd = during.visible.filter(entry => families.includes(entry.type))
-    test.ok(crowd.length >= 8, `a crowd is on screen at 0:30 — ${crowd.length} enemies visible`)
+    // The bar is the ring's, not the spawner's. Born just past the edge of the
+    // frame on their own bearing, and put back on it when they fall behind, the
+    // whole live crowd is in the picture: 28 measured here against 8 when the
+    // ring was one circle outside the far corners.
+    test.ok(crowd.length >= 18, `a crowd is on screen at 0:30 — ${crowd.length} enemies visible`)
+    test.ok(crowd.length >= context.horde.count * 0.6,
+      `and most of what is alive is in it — ${crowd.length} of ${context.horde.count}`)
     test.ok(during.visible.some(entry => entry.id === 'you'), 'the kitten is still on screen')
     test.ok(during.counts.offscreen > 0, 'more of the horde is arriving from off screen')
 

@@ -10,6 +10,14 @@
     and it is the beat the player feels the run escalate on.
   - **the recycle** — at the cap, the furthest enemies the camera cannot see are
     taken away so new ones can arrive. Over-represented families go first.
+  - **the sweep** — every `SWEEP_EVERY` seconds, anything that has drifted
+    `BRING_BACK` times past its own spawn band is moved back to the edge of the
+    frame. The kitten outruns three of the five families, so without it the slow
+    ones hold places under the cap where nobody can see them. Moving rather than
+    destroying costs no spawn and leaves the population where the schedule set it.
+- Spawn points are on the FRAME's edge, not on a circle: Spawn Ring picks the
+  bearings and `horde.ringToward` says how far out that bearing's edge is. Pass
+  `minimum`/`maximum` to `horde.spawn` to get a plain circle instead.
 - The drip pays its debt down by what actually arrived, never by what it asked
   for. A full meadow banks the rest — up to `OWED_SECONDS` of the current rate —
   and rests for `REST_WHEN_FULL` before asking again. Subtracting the whole

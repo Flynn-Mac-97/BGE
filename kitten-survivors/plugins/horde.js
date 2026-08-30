@@ -34,9 +34,31 @@ const FLOOR_TOP_WHEN_UNKNOWN = 0.5
  */
 const BODY_LINGER = 0.35
 
-/** The ring, as multiples of how far the player's camera sees. Just past a screen corner, so nobody watches a spawn arrive. */
-const RING_NEAR = 1.15
-const RING_FAR = 1.5
+/**
+ * The ring, as multiples of how far the frame reaches ON THAT BEARING.
+ *
+ * The screen is a trapezoid, not a circle: it reaches about 8m ahead of the
+ * kitten, 4m behind it and 15m to a far corner. One radius that clears the
+ * corner is twice the frame's reach ahead and four times its reach behind, so
+ * most of the crowd is born well outside the picture and much of it dies before
+ * it is ever in frame. A multiple of the EDGE clears the picture everywhere by
+ * the same small margin, so an enemy is in frame a step or two after it is born.
+ */
+const RING_NEAR = 1.05
+const RING_FAR = 1.14
+
+/**
+ * The nearest anything may be born, in metres, whatever the frame edge is on
+ * that bearing.
+ *
+ * The frame reaches only about four metres behind the kitten, and the fastest
+ * family covers 6.2 metres a second. This is about a second of a wasp's travel,
+ * so nothing arrives as a hit with no warning.
+ */
+const LEAST_WARNING = 6.5
+
+/** The least depth of the band once the floor has raised its near edge, so a cluster still arrives spread rather than on one line. */
+const LEAST_BAND = 1.5
 
 /** How far inside the edge of the meadow the ring is kept, and the narrowest ring worth having. */
 const ARENA_INSET = 1.5
@@ -93,19 +115,18 @@ function widestGround(context) {
 }
 
 /**
- * How far the PLAYER's camera sees, in metres from the followed body to the
- * farthest ground corner of the frame.
+ * The ground the PLAYER's camera shows, as a trapezoid measured from the body it
+ * follows: metres forward to the top edge, back to the bottom edge, and the
+ * half-width at each end.
  *
- * Measured from the level's camera rule, never from the editor viewport. The
- * viewport is whichever panel arrangement the author left behind, and a spawn
- * distance read from it changes when a dock is dragged; the rule is the camera
- * the player actually plays behind. Only the viewport's SHAPE is read here,
+ * From the level's camera rule, never from the editor viewport, whose size is
+ * whatever panel arrangement the author left. Only the viewport's SHAPE is read,
  * because the shape of the screen is part of that camera.
  *
  * Null until the rule has been read off disk, and null for a camera this sum
  * does not cover — the caller falls back to the engine's own estimate.
  */
-function cameraSeen(context) {
+function cameraFrame(context) {
   const rule = context.camera?.rule
   if (!rule || rule.mode !== 'third-person') return null
   const pitch = Math.abs(rule.pitch ?? CHASE_PITCH)
@@ -114,70 +135,121 @@ function cameraSeen(context) {
   const width = context.viewport?.width
   const height = context.viewport?.height
   const aspect = width > 0 && height > 0 ? width / height : ASPECT_WHEN_UNKNOWN
-  const halfHorizontal = Math.atan(Math.tan(halfVertical) * aspect)
+  const up = Math.tan(halfVertical)
+  const side = up * aspect
 
-  // The eye hangs behind and above the body, and the frame's top corner ray is
-  // the one that lands farthest away. Follow it from the eye to the ground.
-  const sink = Math.sin(pitch) - Math.tan(halfVertical) * Math.cos(pitch)
-  if (sink <= 0) return null // the horizon is on screen, so there is no far edge
+  // The eye hangs behind and above the body. Each edge of the frame is one ray
+  // from the eye to the ground; `sink` is how fast that ray falls, and the top
+  // edge falls slowest, so it is the one that can miss the ground.
   const eyeHeight = distance * Math.sin(pitch) + (rule.offsetY ?? 0)
-  const along = eyeHeight / sink
-  const across = Math.tan(halfHorizontal) * along
-  const ahead = (Math.tan(halfVertical) * Math.sin(pitch) + Math.cos(pitch)) * along
-    - distance * Math.cos(pitch)
-  return Math.hypot(across, ahead)
+  const behind = distance * Math.cos(pitch)
+  const sinkFar = Math.sin(pitch) - up * Math.cos(pitch)
+  if (sinkFar <= 0) return null // the horizon is on screen, so there is no far edge
+  const alongFar = eyeHeight / sinkFar
+  const alongNear = eyeHeight / (Math.sin(pitch) + up * Math.cos(pitch))
+
+  const frame = {
+    yaw: rule.yaw ?? 0,
+    forward: (Math.cos(pitch) + up * Math.sin(pitch)) * alongFar - behind,
+    back: behind - (Math.cos(pitch) - up * Math.sin(pitch)) * alongNear,
+    wideFar: side * alongFar,
+    wideNear: side * alongNear
+  }
+  if (frame.forward <= 0 || frame.back <= 0) return null // the body is not in its own frame
+  frame.corner = Math.hypot(frame.forward, frame.wideFar)
+  return frame
 }
 
 /**
- * The ring for this level: a band just past what the player's camera shows,
- * pulled in to fit the meadow.
+ * Metres from the body to the edge of the frame along one world bearing, as
+ * `spawnRing` measures a bearing: 0 is +Z, turning toward +X.
  *
- * If the grass does not reach a screen and a bit out, the horde would arrive
- * walking on sky, which is worse than arriving in view — so the ring fits the
- * ground, and the fact is said once with the number the arena would need.
- * Silence would mean the arena lane widening the meadow and nothing changing.
- *
- * Cached only once the camera rule has produced a measurement. The rule is
- * read from disk after `level:loaded`, and an estimate taken inside that gap
- * must not become the level's spawn distance.
+ * Four straight edges, so the answer is the nearest of the four crossings.
+ * Screen up is -Z and screen right is +X at yaw 0, which is where the two
+ * components come from.
  */
-function ringNow(context) {
-  if (horde.ringNear !== null) {
-    return { near: horde.ringNear, far: horde.ringFar, seen: horde.seen, tooSmall: horde.arenaTooSmall }
+function edgeToward(frame, angle) {
+  const local = angle - frame.yaw
+  const ahead = -Math.cos(local)
+  const across = Math.sin(local)
+  const run = frame.forward + frame.back
+  const rise = frame.wideFar - frame.wideNear
+  const offset = run * frame.wideNear + rise * frame.back
+  // Each edge as `a*ahead + b*across + c`, written so the body is on the
+  // positive side of all four.
+  const edges = [
+    [-1, 0, frame.forward],
+    [1, 0, frame.back],
+    [rise, -run, offset],
+    [rise, run, offset]
+  ]
+  let nearest = Infinity
+  for (const [a, b, c] of edges) {
+    const closing = -(a * ahead + b * across)
+    if (closing <= 0) continue
+    nearest = Math.min(nearest, c / closing)
   }
-  const measured = cameraSeen(context)
-  const seen = measured ?? context.spawnRing.visibleRadius()
-  let near = seen * RING_NEAR
-  let far = seen * RING_FAR
-  let tooSmall = false
+  return nearest
+}
+
+/**
+ * What the camera shows, and how much of the ring the meadow has room for.
+ *
+ * Grass that does not reach the ring would have the horde arrive walking on sky,
+ * so the ring is scaled to fit and the fact is said once with the width the
+ * arena needs. Silence would mean the arena lane widening the meadow and
+ * nothing changing.
+ *
+ * Cached only once the camera rule has produced a frame: the rule is read from
+ * disk after `level:loaded`, and an estimate taken inside that gap must not
+ * become the level's spawn distance.
+ */
+function measure(context) {
+  if (horde.measured) return horde.measured
+  const frame = cameraFrame(context)
+  const seen = frame ? frame.corner : context.spawnRing.visibleRadius()
+  let fit = 1
 
   // The ring has to fit inside the grass from wherever the player is standing,
   // and the player can stand at the edge. The honest radius is therefore the
   // shorter half-extent, not the diagonal.
   const widest = widestGround(context)
   const room = widest ? Math.min(widest.halfWidth, widest.halfDepth) - ARENA_INSET : Infinity
-  if (room < far) {
-    tooSmall = true
-    far = Math.max(SMALLEST_RING, room)
-    near = Math.max(SMALLEST_RING * 0.7, far - 8)
+  const wanted = seen * RING_FAR
+  if (room < wanted) {
+    fit = Math.max(SMALLEST_RING, room) / wanted
     if (!horde.saidTooSmall) {
       horde.saidTooSmall = true
       console.error(
         `[horde] "${widest.id}" gives ${round(widest.halfWidth * 2)}m by ${round(widest.halfDepth * 2)}m of ground, ` +
-        `so the spawn ring has been pulled in to ${round(near)}-${round(far)}m and enemies will ` +
-        `appear in view. The player's camera sees ${round(seen)}m to a corner, so the meadow needs to be about ` +
-        `${round(seen * 3)}m across for a survivor's crowd to arrive unseen.`
+        `so the spawn ring has been scaled to ${round(fit * 100)}% and enemies will appear well inside the frame. ` +
+        `The player's camera sees ${round(seen)}m to a corner, so the meadow needs to be about ` +
+        `${round(wanted * 2)}m across for the crowd to arrive from the edge of the picture.`
       )
     }
   }
 
-  if (measured !== null) {
-    horde.seen = seen
-    horde.ringNear = near
-    horde.ringFar = far
-    horde.arenaTooSmall = tooSmall
-  }
-  return { near, far, seen, tooSmall }
+  const measured = { frame, seen, fit, tooSmall: fit < 1 }
+  if (frame) horde.measured = measured
+  return measured
+}
+
+/** The band a spawn on this bearing lands in: just past the frame edge, held out to LEAST_WARNING, scaled to fit the meadow. */
+function bandFor(edge, fit) {
+  const near = Math.max(edge * RING_NEAR, LEAST_WARNING * fit)
+  return { near, far: Math.max(edge * RING_FAR, near + LEAST_BAND) }
+}
+
+/** The band on one world bearing. */
+function ringToward(context, angle) {
+  const { frame, seen, fit } = measure(context)
+  return bandFor((frame ? edgeToward(frame, angle) : seen) * fit, fit)
+}
+
+/** The widest band any bearing gives — the far corners. What recycling measures "definitely out of sight" against. */
+function widestRing(context) {
+  const { seen, fit } = measure(context)
+  return bandFor(seen * fit, fit)
 }
 
 /**
@@ -232,7 +304,7 @@ export default {
         ['alive', `${stats.alive} of ${stats.aliveCap}`],
         ['health', `${stats.healthScale}x`],
         ['killed', stats.killed],
-        ['ring', `${stats.ring[0]}-${stats.ring[1]}m`],
+        ['ring', `${stats.ring.ahead[0]}-${stats.ring.ahead[1]}m ahead, ${stats.ring.behind[0]}-${stats.ring.behind[1]}m behind`],
         ['families', Object.entries(stats.aliveByFamily).map(([f, n]) => `${f} ${n}`).join('  ') || '—']
       ]
     }]
@@ -251,16 +323,14 @@ export default {
       horde.born = 0
       horde.killed = 0
       horde.forgotten = 0
+      horde.sentBack = 0
       horde.killedByFamily = {}
       horde.floorTop = null
       horde.arena = undefined
-      horde.arenaTooSmall = false
       horde.saidTooSmall = false
-      // Null until ringNow measures it from the level's camera rule — measuring
-      // here would race the rule being read off disk and win with the wrong number.
-      horde.seen = null
-      horde.ringNear = null
-      horde.ringFar = null
+      // Null until `measure` reads the level's camera rule — measuring here
+      // would race the rule coming off disk and win with the wrong number.
+      horde.measured = null
     }
 
     horde = {
@@ -268,14 +338,12 @@ export default {
       born: 0,
       killed: 0,
       forgotten: 0,
+      sentBack: 0,
       killedByFamily: {},
       floorTop: null,
       arena: undefined,
-      arenaTooSmall: false,
       saidTooSmall: false,
-      seen: null,
-      ringNear: null,
-      ringFar: null,
+      measured: null,
       /** By type rather than by id, so the kitten lane may replace the entity and the horde follows. */
       target: () => context.world.find(HUNTED) || context.world.byId('you') || null
     }
@@ -290,8 +358,12 @@ export default {
       get enemies() { return crowd.members },
       get count() { return crowd.size },
       get minutes() { return context.time / 60 },
-      get ringNear() { return ringNow(context).near },
-      get ringFar() { return ringNow(context).far },
+      // The widest bearing, which is what "definitely out of sight" means. Where
+      // a spawn actually lands is `ringToward`, because the frame is a trapezoid
+      // and every bearing has its own edge.
+      get ringNear() { return widestRing(context).near },
+      get ringFar() { return widestRing(context).far },
+      ringToward: angle => ringToward(context, angle),
       target: () => horde.target(),
 
       near: (x, z, radius, into) => crowd.near(x, z, radius, into),
@@ -361,6 +433,26 @@ export default {
         return entity
       },
 
+      /**
+       * Move one enemy to a new place on the ring, keeping it alive.
+       *
+       * Destroying it and letting the drip send another costs a spawn the rate
+       * has to pay for and leaves the crowd under its cap. This holds the
+       * population exactly where the schedule set it. A locked heading is
+       * cleared: a boar teleported mid-charge would go on charging at where the
+       * kitten used to be.
+       */
+      sendBackIn(entity, x, z) {
+        if (!entity || entity._hordeOut) return false
+        entity.x = x
+        entity.z = z
+        entity.y = entity._hordeRestHeight ?? entity.y
+        entity.headingX = 0
+        entity.headingZ = 0
+        horde.sentBack++
+        return true
+      },
+
       /** Taken away rather than killed. Nothing is owed for it — it was never fought. */
       forget(entity) {
         if (!entity || entity._hordeOut) return false
@@ -394,7 +486,13 @@ export default {
       get stats() {
         const minutes = context.time / 60
         const wave = schedule.waveAt(minutes)
-        const ring = ringNow(context)
+        const { frame, seen, fit, tooSmall } = measure(context)
+        // Bearings are given as a turn from the top of the screen, so the rows
+        // below read the same whatever the camera's yaw is.
+        const band = turn => {
+          const one = ringToward(context, (frame?.yaw ?? 0) + Math.PI + turn)
+          return [round(one.near), round(one.far)]
+        }
         return {
           time: round(context.time),
           minute: round(minutes),
@@ -412,19 +510,33 @@ export default {
           // it, and a reading taken at ten seconds would show minute ten.
           killedByFamily: { ...horde.killedByFamily },
           forgotten: horde.forgotten,
-          // How far the player's camera sees, and the band just past it that
-          // the crowd arrives on. Both from the level's camera rule, so they
-          // are the same on every screen and in a headless run.
-          cameraSees: round(ring.seen),
-          ring: [round(ring.near), round(ring.far)],
+          // How many times an enemy that fell out of the picture was moved back
+          // to its edge. High is normal: the kitten outruns three of the five
+          // families, so the slow ones are sent round rather than left behind.
+          sentBack: horde.sentBack,
+          // How far the player's camera sees, and the band just past its edge
+          // that the crowd arrives on. Both from the level's camera rule, so
+          // they are the same on every screen and in a headless run. The bands
+          // differ by bearing because the frame does: `ahead` is the top of the
+          // screen, `behind` the bottom, `corner` the farthest point of all.
+          cameraSees: round(seen),
+          frame: frame
+            ? { ahead: round(frame.forward), behind: round(frame.back), side: round(edgeToward(frame, frame.yaw + Math.PI / 2)) }
+            : null,
+          ring: {
+            ahead: band(0),
+            behind: band(Math.PI),
+            side: band(Math.PI / 2),
+            corner: [round(widestRing(context).near), round(widestRing(context).far)]
+          },
           // Said in the answer as well as on the console: the arena being too
           // small to hide a spawn is the one thing about this plugin that
           // another lane has to fix.
           arena: horde.arena
             ? {
                 ground: [round(horde.arena.halfWidth * 2), round(horde.arena.halfDepth * 2)],
-                bigEnough: !ring.tooSmall,
-                wantsAcross: round(ring.seen * 3)
+                bigEnough: !tooSmall,
+                wantsAcross: round(seen * RING_FAR * 2)
               }
             : null
         }
