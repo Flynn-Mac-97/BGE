@@ -224,7 +224,17 @@ test('small tasks stay put and parallel tasks receive worktrees', async t => {
 
   const parallel = await prepareAgent(root, 'parallel-fix', { files: ['engine/world.js'], parallel: true })
   assert.equal(parallel.mode, 'worktree')
-  assert.ok(fs.existsSync(path.join(parallel.workspace, 'project/.engine/agent-task.json')))
+  assert.equal(parallel.packet, path.join(parallel.workspace, 'project', '.engine/agent-task.json'))
+  assert.ok(fs.existsSync(parallel.packet))
+
+  // The packet is written beside the game the lane works on, so a run under one
+  // project never writes into another's directory.
+  const named = await prepareAgent(root, 'named-project', { files: ['engine/render.js'], parallel: true }, 'kitten-survivors')
+  assert.equal(named.packet, path.join(named.workspace, 'kitten-survivors', '.engine/agent-task.json'))
+  assert.ok(fs.existsSync(named.packet))
+  releaseAgent(root, 'named-project', { status: 'blocked', note: 'no engine in the fixture' })
+  mergeAgent(root, 'named-project')
+
   assert.equal(readAgentRegistry(root).runs.filter(run => run.status === 'active').length, 1)
   releaseAgent(root, 'parallel-fix', { status: 'blocked', note: 'no engine in the fixture' })
 

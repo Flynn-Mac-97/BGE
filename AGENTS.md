@@ -19,8 +19,8 @@ rule sets it withheld and why. Ask for one by id with
 `'{"task":"...","nodes":["editor"]}'`.
 
 Give a sub-agent the packet, not a summary of it. `agent.prepare` writes the
-whole text to `<workspace>/project/.engine/agent-task.json`; point the brief at
-that file.
+whole text beside the game it is for, and returns that path as `packet`; point
+the brief at that file.
 
 ## Style — this holds for every file you write
 
