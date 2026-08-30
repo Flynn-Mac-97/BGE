@@ -12,9 +12,14 @@
  * What the type does carry is the art language, in one place, so that no
  * placement has to remember it:
  *
- *   toon, four steps, a light rim outline. Chunky and banded, because the screen
+ *   toon, four steps, a pale rim outline. Chunky and banded, because the screen
  *   will be full of enemies and a surface with a smooth gradient on it is a
  *   surface the eye keeps checking. Four bands and it is read once and dismissed.
+ *
+ * The keyline is PALE, not black, and thin. It has to separate a prop from a
+ * pale floor without spending the frame's edge budget: `detail-stays-cheap`
+ * caps edgeDensity at 0.045, and a black outline round every prop in a sparse
+ * field is a large share of that on its own.
  *
  * NO COLLIDER. Scenery does not stop anything by default — an entity is only in
  * the 3D physics world when its `collider.box` has three numbers, so leaving it
@@ -35,7 +40,8 @@ export default {
     box: [1, 1, 1],
     material: 'toon',
     steps: 4,
-    outline: 0.22
+    outline: 0.14,
+    outlineColour: '#fffaf0'
   }
 
   // NO `tint` HERE, AND THAT IS THE WHOLE NOTE. A placement's `mesh` merges into
