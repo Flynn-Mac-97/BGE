@@ -1,11 +1,47 @@
 {
   "rat": {
-    "tint": "#6d5844",
+    "tint": "#a3552b",
     "model": "models/rat.glb",
     "box": [
       0.42,
       0.32,
       0.62
+    ]
+  },
+  "boar": {
+    "tint": "#c1502b",
+    "model": "models/boar.glb",
+    "box": [
+      0.8,
+      0.65,
+      1.3
+    ]
+  },
+  "hound": {
+    "tint": "#9c8570",
+    "model": "models/hound.glb",
+    "box": [
+      0.95,
+      0.85,
+      1.5
+    ]
+  },
+  "crow": {
+    "tint": "#3a2a20",
+    "model": "models/crow.glb",
+    "box": [
+      0.28,
+      0.5,
+      0.34
+    ]
+  },
+  "wasp": {
+    "tint": "#f0b428",
+    "model": "models/wasp.glb",
+    "box": [
+      0.24,
+      0.22,
+      0.44
     ]
   }
 }

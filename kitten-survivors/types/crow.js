@@ -18,13 +18,13 @@ const LENGTH = 0.34
 
 export default {
   about: 'the swarming enemy. Arrives in flocks from one bearing, so the threat is the flock, not a bird',
-  appearance: 'Narrow, tall and near-black, flying at chest height. It reads as a layer above the enemies on the floor, and it is the darkest family on the meadow.',
+  appearance: 'Narrow, tall and warm near-black, flying at chest height. It reads as a layer above the enemies on the floor, and it is the darkest family on the meadow.',
   looksWrongWhen: 'it is a plain tinted box — models/crow.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   // The spread wings overshoot the hull on purpose: the hull is what a weapon
   // hits, the wings are what says "bird" from a camera looking down.
-  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#2e2a38' },
+  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#3a2a20' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

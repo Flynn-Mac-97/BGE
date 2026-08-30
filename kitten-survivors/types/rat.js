@@ -12,11 +12,11 @@ export default {
   // it is held to 100 characters. None of these may restate a number from
   // `properties` below: the copy is the part that goes stale.
   about: 'the weakest and commonest enemy, and the one every other enemy is measured against',
-  appearance: 'A low, long, dull-brown quadruped a third of the kitten tall. Reads as ground clutter rather than as a threat.',
+  appearance: 'A low, rust-brown quadruped a third of the kitten tall, with oversized round ears and a long tail dragging behind. Reads as ground clutter rather than as a threat.',
   looksWrongWhen: 'it is a plain tinted box — models/rat.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#6d5844' },
+  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#a3552b' },
 
   // A trigger, not a body: the horde moves itself, and the crowd it moves in
   // would cost more in Physics 3D than everything else in the game put

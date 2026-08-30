@@ -7,8 +7,9 @@
  * straight line the player can simply step out of.
  *
  * Tiny, bright yellow and above head height: the only thing on the meadow
- * higher than a crow, and the only warm colour in the horde. Both cues exist so
- * a wasp is visible against a screen already full of dark bodies.
+ * higher than a crow, and the palest, most saturated colour in a horde that
+ * now runs warm throughout. Both cues exist so a wasp is visible against a
+ * screen already full of bodies.
  */
 const WIDTH = 0.24
 const HEIGHT = 0.22
@@ -20,7 +21,7 @@ export default {
   looksWrongWhen: 'it is a plain tinted box — models/wasp.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#e6b032' },
+  mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#f0b428' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {
