@@ -6,7 +6,7 @@
  * number of minutes, so the whole design can be printed without playing it —
  * `run horde.curve` — and tuned by editing eight constants.
  *
- *   rateAt         spawns a second, 2.2 climbing to a cap of 26
+ *   rateAt         spawns a second, 6 climbing to a cap of 30
  *   aliveCapAt     how many may stand on the meadow at once
  *   healthScaleAt  what an enemy's health is multiplied by
  *   speedScaleAt   the same for speed, with a low ceiling — a horde that
@@ -25,8 +25,8 @@ export const FAMILIES = ['rat', 'crow', 'hound', 'wasp', 'boar']
  * game still needs chaff, or there is nothing cheap left to kill.
  */
 const SCHEDULE = [
-  { minute: 0,    cluster: [1, 2], weights: { rat: 10 } },
-  { minute: 0.75, cluster: [1, 4], weights: { rat: 10, crow: 5 } },
+  { minute: 0,    cluster: [2, 4], weights: { rat: 10 } },
+  { minute: 0.75, cluster: [2, 5], weights: { rat: 10, crow: 5 } },
   { minute: 2,    cluster: [2, 5], weights: { rat: 9, crow: 7, hound: 1 } },
   { minute: 3.5,  cluster: [2, 6], weights: { rat: 7, crow: 7, hound: 2, wasp: 4 } },
   { minute: 5,    cluster: [3, 7], weights: { rat: 6, crow: 6, hound: 3, wasp: 5, boar: 2 } },
@@ -35,9 +35,20 @@ const SCHEDULE = [
   { minute: 14,   cluster: [5, 12], weights: { rat: 2, crow: 5, hound: 6, wasp: 8, boar: 6 } }
 ]
 
-const RATE_AT_START = 2.2
-const RATE_PER_MINUTE = 1.5
-const MOST_PER_SECOND = 26
+/**
+ * Spawns a second. The rate has one job: outpace the weapons.
+ *
+ * The crowd's size is whichever of two limits binds — the alive cap, or the
+ * kill rate. A survivor's screen is meant to be cap-limited, so the rate must
+ * beat the kill rate with room to spare in every minute. Measured with the real
+ * four weapons taking a card at every level: they kill about 5 a second by
+ * minute four, and at 2.2 + 1.5/min the crowd sagged to 60% of its cap while
+ * the drip fell behind. Vampire Survivors is 50-100 on screen in the first
+ * minute and 300+ late; these numbers hold the crowd at its cap the whole run.
+ */
+const RATE_AT_START = 6
+const RATE_PER_MINUTE = 2.4
+const MOST_PER_SECOND = 30
 
 const ALIVE_AT_START = 60
 const ALIVE_PER_MINUTE = 55
