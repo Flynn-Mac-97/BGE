@@ -27,39 +27,47 @@ const rows = []
 for (const seed of seeds.length ? seeds : [7, 21]) {
   // `entities: false` keeps simulate's snapshot compact: the default dumps all
   // 842 entities and this script only wants the describe reply at the end.
+  //
+  // Two views, because a mark rule must hold from more than one camera. `aim`
+  // moves the LIVE camera, so it runs last and the fixed-camera reads happen
+  // before it; it reproduces the view the contract's repro was shot from.
   const script = JSON.stringify([
     ['seed', seed],
     ['simulate', 8, { entities: false }],
     ['run', 'choice.pick', 1],
     ['simulate', 22, { entities: false }],
     ['run', 'see.describe', { brief: true, camera: PLAY_CAMERA }],
-    ['run', 'see.describe', { camera: PLAY_CAMERA }]
+    ['run', 'see.describe', { camera: PLAY_CAMERA }],
+    ['run', 'see.view', { aim: 'you', back: 3 }],
+    ['run', 'see.describe', { brief: true }]
   ])
   const { stdout } = await run(process.execPath,
     [join(root, 'bin/engine.mjs'), '--headless', '--project', 'kitten-survivors', 'script', script],
     { cwd: root, maxBuffer: 1 << 28 })
   const replies = JSON.parse(stdout)
-  const brief = replies[replies.length - 2]
-  const full = replies[replies.length - 1]
-  const bytes = Buffer.byteLength(JSON.stringify(brief))
+  const [briefPlay, full, , briefAimed] = replies.slice(4)
+  rows.push({ seed, view: 'play camera', ...read(briefPlay, full) })
+  rows.push({ seed, view: 'see.view aim you back 3', ...read(briefAimed) })
+  await writeFile(join(here, `${label}-seed${seed}.json`), JSON.stringify(briefPlay, null, 1))
+  await writeFile(join(here, `${label}-aimed-seed${seed}.json`), JSON.stringify(briefAimed, null, 1))
+}
+console.log(JSON.stringify(rows, null, 1))
+
+function read(brief, full) {
   const marked = (brief.visible || []).filter(entry => entry.mark).sort((a, b) => a.mark - b.mark)
   const firstTwelve = marked.slice(0, 12)
-  rows.push({
-    seed,
+  return {
     visible: brief.counts?.visible,
     creaturesVisible: countCreatures(brief),
-    byTypeVisible: countByType(full),
+    ...(full ? { byTypeVisible: countByType(full) } : {}),
     marks: marked.length,
     marksByType: countByType({ visible: marked }),
     firstTwelve: firstTwelve.map(entry => `${entry.mark}:${entry.type}`),
     sceneryInFirstTwelve: firstTwelve.filter(entry => SCENERY.has(entry.type)).length,
     nonCreatureInFirstTwelve: firstTwelve.filter(entry => !CREATURES.has(entry.type)).length,
-    briefBytes: bytes,
-    fullBytes: Buffer.byteLength(JSON.stringify(full))
-  })
-  await writeFile(join(here, `${label}-seed${seed}.json`), JSON.stringify(brief, null, 1))
+    briefBytes: Buffer.byteLength(JSON.stringify(brief))
+  }
 }
-console.log(JSON.stringify(rows, null, 1))
 
 function countCreatures(described) {
   // regions counts EVERY visible entity by type, marked or not, so a brief
