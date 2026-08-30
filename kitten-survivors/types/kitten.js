@@ -27,6 +27,11 @@
  * origin at the hip, and the run cycle below drives them unchanged. The nose
  * points at -Z, which is the direction the camera faces at yaw 0, so
  * `entity.yaw` turns the body the right way round.
+ *
+ * The proportions are a character's, not an animal's: the head is wider than
+ * the ribs and nearly half the standing height, and the legs are short stubs.
+ * At 5% of a phone screen a correctly proportioned cat is a smudge, and only
+ * the head-to-body ratio survives.
  */
 
 /** The hull it collides with: an upright box round the animal, not round the art. */
@@ -35,18 +40,24 @@ const HEIGHT = 0.45
 const LENGTH = 0.8
 
 /**
- * A ginger tabby. The colours are painted into the model's materials by
- * `tools/blender/make-kitten-survivors-kitten.py`, which builds the model and
- * is the file to edit to change it.
+ * A ginger kitten. The colours are painted into the model's materials by
+ * `agent-runs/creatures/blender/make-kitten.py`, which builds the model and is
+ * the file to edit to change it.
  *
- * The markings that matter are the ones on TOP, because the camera looks down:
- * five dark bars across the back and down the flank, a ringed tail held
- * upright, dark ear backs, a face a shade lighter than the body, and cream
- * paws. From nine metres back they are most of what you see of the kitten, and
- * without them it is one brown lump. This constant only paints the stand-in box
- * while the file loads.
+ * The kitten is the only WHITE thing in the game. A hundred enemies are warm
+ * mid-tones on a green field, so white is the one value nothing else claims,
+ * and it is spent on the face, the forehead, the chest, the four paws and the
+ * tail tip — the parts a camera looking down at 60 degrees actually sees. The
+ * tail is held up and hooked, because a vertical line at the centre of the
+ * frame is the fastest thing on screen to find.
+ *
+ * There are no tabby bars. Five bands across the back is surface pattern,
+ * which art/world/bible.md forbids, and at phone size it reads as noise. One
+ * darker cap over the head and shoulders does the same job as a single shape.
+ *
+ * This constant only paints the stand-in box while the model file loads.
  */
-const FUR = '#e0a05a'
+const FUR = '#f5a03c'
 
 /** How long the body takes to come round to a new heading, in seconds. */
 const TURN_EASE = 0.05
@@ -66,7 +77,7 @@ const STRIDE_EASE = 0.06    // in and out over about a fifth of a second
 
 export default {
   about: 'the player. Steered on the ground plane; weapons fire themselves, so movement is the input',
-  appearance: 'A small pale cat. The camera follows it, so it sits at the centre of the frame, and it stops dead the moment the player lets go rather than sliding.',
+  appearance: 'A bright ginger kitten with a head wider than its body, big eyes, a white face, white paws and a thick upright white-tipped tail. The only white thing on the meadow, and always centred in the frame.',
   looksWrongWhen: 'it is not near the centre of the frame — the camera follows it, so a kitten off centre means the camera lost its target',
 
   mesh: {
