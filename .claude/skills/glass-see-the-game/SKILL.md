@@ -1,5 +1,5 @@
 ---
-name: see-the-game
+name: glass-see-the-game
 description: What the running game actually shows a player, and what each thing on screen is — answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, or instead of reading type files to work out what an object is.
 ---
 <!-- generated from plugins/builtin/see.agent.md at server start; edits are lost -->

@@ -23,6 +23,60 @@ import path from 'node:path'
 const SKILL_DIRECTORY = '.claude/skills'
 
 /**
+ * The engine's name, and the prefix on every skill it registers.
+ *
+ * A skill listing holds whatever else the user has installed. One prefix makes
+ * this engine's tools one search — `/glass` — rather than sixty names to
+ * recognise among strangers.
+ */
+const ENGINE = 'glass'
+
+/**
+ * What a guide is listed as when it declares no skill name.
+ *
+ * Sixty of sixty-two guides declare none, so a rule that only registers a
+ * declared name registers almost nothing. The file's own stem is already the
+ * plugin's name and is already unique in its directory.
+ */
+const skillNameFor = guide => `${ENGINE}-${guide.frontmatter.skill || guide.stem}`
+
+/**
+ * How long a derived description may run.
+ *
+ * Every agent reads every description at session start, so the listing's whole
+ * cost is this number times the number of plugins. Enough for a title and two
+ * clauses.
+ */
+const DESCRIPTION_LIMIT = 200
+
+/**
+ * What a guide is listed as, from the guide itself.
+ *
+ * The listing is read before any tool call, so a plugin with no description is
+ * one nothing finds. A declared `description:` always wins; otherwise the
+ * heading names the subject and the opening lines say what it does, which is
+ * what these guides already hold.
+ */
+function describedBy(guide) {
+  if (guide.frontmatter.description) return guide.frontmatter.description
+  const title = guide.body.match(/^#\s+(.+)$/m)?.[1]?.trim()
+  const opening = guide.body
+    .replace(/^#[^\n]*\n+/, '')
+    .split(/\n\s*\n/)
+    .map(block => block.trim())
+    .find(block => block && !block.startsWith('#') && !block.startsWith('```') && !block.startsWith('|'))
+  if (!title && !opening) return null
+  const sentences = (opening || '')
+    .split('\n')
+    .map(line => line.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+  const full = [title, sentences].filter(Boolean).join(' — ')
+  return full.length > DESCRIPTION_LIMIT ? `${full.slice(0, DESCRIPTION_LIMIT - 3)}...` : full
+}
+
+/**
  * How a generated skill is told from a hand-written one.
  *
  * Cleanup deletes only files carrying this, so a skill a person wrote by hand
@@ -146,8 +200,9 @@ export async function generatedAgentFiles(root, projectDirectory) {
     // A disabled plugin registers nothing: its commands are not there, and a
     // listed skill for a missing command is worse than no listing.
     if (!guide.enabled) continue
-    const { skill, description } = guide.frontmatter
-    if (!skill || !description || !SKILL_NAME.test(skill)) continue
+    const skill = skillNameFor(guide)
+    const description = describedBy(guide)
+    if (!description || !SKILL_NAME.test(skill)) continue
     files.push({
       path: `${SKILL_DIRECTORY}/${skill}/SKILL.md`,
       source: guide.fileFromRoot,
