@@ -153,8 +153,8 @@ async function findPlugins(root, projectDirectory, loader) {
       if (!name.endsWith('.js')) continue
       const file = path.join(directory, name)
       const definition = await importPlugin({
-        // Named the way a person types it, so the report reads as a path they
-        // can open rather than as wherever this process happens to be.
+        // Relative to the checkout, so the report names a path the reader can
+        // open.
         file: path.relative(root, file).replaceAll('\\', '/'),
         load: () => import(pathToFileURL(file).href),
         loader,

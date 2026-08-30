@@ -70,13 +70,12 @@ export function makeLog(bus) {
 
 export function makeInspect({ world, loader, loop, files, bus, editor, view, log, reload }) {
   /**
-   * A fact the kernel learned while booting, said once and then not again.
+   * Add the reload note to a reply, once.
    *
-   * A page reload rebuilds the world, and a rebuilt world nobody announced is
-   * one an agent goes on reading as though it were the world it left. The
-   * kernel knows; this is how it gets to say so. One field, named for what
-   * happened — `worldWasRestored` or `worldWasReset` — and absent whenever
-   * there is nothing to say, so it can never become noise.
+   * A page reload rebuilds the world. Unreported, an agent keeps reading the
+   * new world as the old one. The field is named for the outcome —
+   * `worldWasRestored` or `worldWasReset` — and is absent when there is
+   * nothing to report, so it never becomes noise.
    */
   const note = out => {
     const said = reload?.()
@@ -194,10 +193,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
       if (command.toolbar !== false && loader.contrib.menus.includes(command)) editor.context.redraw()
-      // A reply is where an agent is certainly looking, so a waiting note rides
-      // on one — but only on a reply with room for it. A command that answers
-      // with a number or a list answers with exactly that, and the note waits
-      // for the next question shaped to carry it.
+      // A waiting note rides on a reply the agent is already reading, but only
+      // on a plain object. A command answering with a number or a list answers
+      // with exactly that; the note waits for the next reply that can hold it.
       return plainReply(out) ? note({ ...out }) : out
     },
 
@@ -225,10 +223,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      * real time or a visible tab. Returns the resulting snapshot, so a single
      * call answers "what happens if I let this run".
      *
-     * Compact by default, the same as `snapshot`, and `{ entities: true }`
-     * asks for the list. A step in the middle of a script is almost never the
-     * reply anybody wanted, and answering every one of them with the whole
-     * meadow cost more than the measurement that followed it.
+     * Compact by default, the same as `snapshot`. Pass `{ entities: true }`
+     * for the list. A simulate step inside a script is rarely the reply the
+     * caller wants, and the full entity dump costs 63KB a call.
      */
     simulate(seconds = 1, options = {}) {
       const started = loop.running

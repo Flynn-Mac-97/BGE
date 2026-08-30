@@ -6,12 +6,12 @@ triggers: look, look at, looks, visual, screenshot, frame, capture, render, hidd
 
 # See
 
-The gap this closes: your model of the game and what a player actually sees
-can disagree, and no amount of reading code will tell you. A shape you did
-not expect has no name, and working out what an object is means opening its
-files. See answers from the engine's own data — what is on screen, where,
-what it is, what is hidden, and whether it looks right — so a visual question
-costs a query instead of a screenshot and a guess.
+The gap this closes: your model of the game and what a player sees can
+disagree, and the code does not say so. An unexpected shape on screen has no
+name. Working out what an object is means opening its files. See answers from
+the engine's own data — what is on screen, where, what it is, what is hidden,
+whether it looks right — so a visual question costs a query, not a screenshot
+and a guess.
 
 Query first, pixels last. Route every question to the cheapest exact
 authority — scene graph, then geometry, then renderer queries, then
@@ -61,15 +61,13 @@ compare it against the sidecar; absence is a query, not a look.
   `visibleFraction` and `blockedBy` name the hider. Zero blockers? Run
   `see.isolate` on it: `hidden`, `onScreen: false`, or an off-frame world
   position is the answer.
-- Something is on screen and you do not know what it is: this is the one
-  question See cannot yet answer, and it is worth saying so rather than
-  letting you hunt. The renderer's ID buffer knows which entity drew every
-  pixel, but the only verb that reads it, `see.occlusion`, takes `of: "<id>"`
-  — so you must already know what the thing is to ask what it is. For now:
-  `see.describe` and match the shape against the marked entries' `at` and
-  `size`, and treat the answer as a guess. A thing the ID buffer cannot name
-  at all is a particle, a decal, a HUD overlay, or a material that failed to
-  load — none of which are entities.
+- Something is on screen and you do not know what it is: See cannot answer
+  this yet. The ID buffer knows which entity drew each pixel, but the only
+  verb reading it, `see.occlusion`, takes `of: "<id>"` — you must know the
+  answer to ask the question. Until a verb exists: run `see.describe` and
+  match the shape against the marked entries' `at` and `size`, and treat the
+  result as a guess. Particles, decals, HUD overlays and a material that
+  failed to load are not entities, so the ID buffer cannot name them at all.
 - Did it move, spawn, or die correctly: `see.diff '{"steps":30}'`.
 - Inspect one thing: `see.isolate '{"subject":"<id>"}'` — the full dossier
   in one call.
