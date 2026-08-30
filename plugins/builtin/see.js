@@ -21,7 +21,7 @@
  */
 import { makeProjector } from '../../engine/camera-project.js'
 import { boundsOf, frameSubject, facingOffset, boxesTouch } from '../../engine/frame-facts.js'
-import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet } from '../../engine/frame-sketch.js'
+import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
 
 /** Marks past this are noise: tags start overlapping and reads degrade. */
 const MOST_MARKS = 40
@@ -225,10 +225,7 @@ export default {
           if (drawn.error) return drawn
           return {
             dataUrl: drawn.dataUrl,
-            __files: [
-              { path: `agent-runs/see/${name}.png`, base64: drawn.dataUrl.split(',')[1] },
-              { path: `agent-runs/see/${name}.json`, base64: btoa(unescape(encodeURIComponent(JSON.stringify(drawn.description)))) }
-            ],
+            __files: browserFiles(name, drawn.dataUrl.split(',')[1], drawn.description),
             marks: Object.fromEntries(drawn.description.visible.filter(v => v.mark).map(v => [v.mark, v.id])),
             counts: drawn.description.counts
           }
@@ -285,10 +282,7 @@ export default {
         const sheet = composeSheet(cells, { columns: lenses.length })
         const name = options.name || `${context.editor.levelName}-moment-${++frameNumber}`
         return {
-          __files: [
-            { path: `agent-runs/see/${name}.png`, base64: sheet.toDataURL('image/png').split(',')[1] },
-            { path: `agent-runs/see/${name}.json`, base64: btoa(unescape(encodeURIComponent(JSON.stringify(moments)))) }
-          ],
+          __files: browserFiles(name, sheet.toDataURL('image/png').split(',')[1], moments),
           dataUrl: sheet.toDataURL('image/png'),
           steps, lenses, moments: moments.map(moment => ({ afterSteps: moment.afterSteps, visible: moment.counts.visible }))
         }

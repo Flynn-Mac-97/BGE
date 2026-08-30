@@ -79,6 +79,17 @@ export function composeSheet(cells, options = {}) {
 }
 
 /**
+ * The browser cannot write, so a frame travels as `__files` — the CLI lands
+ * them under the checkout when the call came from a terminal.
+ */
+export function browserFiles(name, pngBase64, sidecar) {
+  return [
+    { path: `agent-runs/see/${name}.png`, base64: pngBase64 },
+    { path: `agent-runs/see/${name}.json`, base64: btoa(unescape(encodeURIComponent(JSON.stringify(sidecar)))) }
+  ]
+}
+
+/**
  * In node the frames land on disk right here, so a test or a plugin gets real
  * paths back, not a payload — the `__files` route exists only for the
  * browser, which cannot write and hands its bytes to the CLI instead.
