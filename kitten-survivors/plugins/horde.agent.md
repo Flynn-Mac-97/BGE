@@ -20,10 +20,13 @@
 - Enemies are `body: 'trigger'` — the Horde moves them, not Physics 3D. The
   collider is there so a weapon can raycast one and so touching the kitten
   reports a contact.
-- The spawn ring is measured from the camera and then **pulled in to fit the
-  meadow**. If the grass is smaller than the ring it says so once, on the console
-  and in `horde.stats.arena`, with the width the arena needs. A meadow narrower
-  than about three times the visible radius makes enemies appear in view.
+- The spawn ring is measured from the LEVEL's camera rule — the camera the
+  player plays behind — never from the editor viewport, whose size is whatever
+  panel arrangement the author left. Only the screen's shape is read. It is then
+  **pulled in to fit the meadow**: if the grass is smaller than the ring it says
+  so once, on the console and in `horde.stats.arena`, with the width the arena
+  needs. A meadow narrower than about three times `horde.stats.cameraSees` makes
+  enemies appear in view.
 - It spawns through `world.spawn`, not `context.spawn`, deliberately: the latter
   announces an editor edit and redraws every dock, twenty times a second.
 - `run horde.stats` · `run horde.clear`
