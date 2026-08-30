@@ -2,10 +2,23 @@
  * Rat — the floor of the whole game. Every other enemy is tuned against it, so
  * a change to these numbers is a change to what every other enemy means.
  *
- * It is drawn from `models/rat.glb`. The renderer swings a named node of a
- * model exactly as it swings a named part — `applyPose` in engine/render.js —
- * so the model keeps four legs named `legFrontLeft` through `legBackRight`,
- * each with its origin at the hip, and the scurry below drives them unchanged.
+ * Its outline says TWIN DISCS AND A TRAILING LINE: two ear discs whose rims are
+ * 0.34 m apart on a 0.19 m body, and a 0.20 m tail behind the rump at a fifth
+ * of their thickness. That is the one thing no other family's outline says, and
+ * it is what tells a rat from a boar with the colour taken away.
+ *
+ * Both are held inside the cat's own size. A rat that draws more pixels than
+ * the player is a rat the player looks at instead of the player.
+ *
+ * Warm rust at 0.29 luminance. The five enemy families are held under 0.38 and
+ * every prop above 0.44, so an enemy crossing a prop never shares its value.
+ *
+ * It is drawn from `models/rat.glb`, built by
+ * `agent-runs/creatures/blender/make-rat.py`. The renderer swings a named node
+ * of a model exactly as it swings a named part — `applyPose` in
+ * engine/render.js — so the model keeps four legs named `legFrontLeft` through
+ * `legBackRight`, each with its origin at the hip, and the scurry below drives
+ * them unchanged.
  */
 const WIDTH = 0.42
 const HEIGHT = 0.32
@@ -26,11 +39,13 @@ export default {
   // it is held to 100 characters. None of these may restate a number from
   // `properties` below: the copy is the part that goes stale.
   about: 'the weakest and commonest enemy, and the one every other enemy is measured against',
-  appearance: 'A stubby rosy-rust quadruped a third of the kitten tall, carrying two enormous pink ear discs and two white front teeth. The ears are wider than the body and are what names it at a glance.',
+  appearance: 'A dark rust quadruped a third of the kitten tall, carrying two ear discs nearly twice the width of its body and dragging one thin straight tail. The discs and the tail name it at a glance.',
   looksWrongWhen: 'it is a plain tinted box — models/rat.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#c2603f' },
+  // The ear discs and the tail overshoot the hull: the hull is what a weapon
+  // hits, the silhouette is what is read.
+  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#8f3d25' },
 
   // A trigger, not a body: the horde moves itself, and the crowd it moves in
   // would cost more in Physics 3D than everything else in the game put

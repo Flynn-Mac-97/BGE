@@ -40,24 +40,29 @@ const HEIGHT = 0.45
 const LENGTH = 0.8
 
 /**
- * A ginger kitten. The colours are painted into the model's materials by
- * `agent-runs/creatures/blender/make-kitten.py`, which builds the model and is
- * the file to edit to change it.
+ * A ginger-and-white kitten. The colours are painted into the model's materials
+ * by `agent-runs/creatures/blender/make-kitten.py`, which builds the model and
+ * is the file to edit to change it.
  *
- * The kitten is the only WHITE thing in the game. A hundred enemies are warm
- * mid-tones on a green field, so white is the one value nothing else claims,
- * and it is spent on the face, the forehead, the chest, the four paws and the
- * tail tip — the parts a camera looking down at 60 degrees actually sees. The
- * tail is held up and hooked, because a vertical line at the centre of the
- * frame is the fastest thing on screen to find.
+ * Its outline says A HOOK: the tail runs back out of the rump, rises, and
+ * curls hard to one side, so from above the cat is a compact body with a thick
+ * J behind it. That is the one thing no other family's outline says. The hook
+ * is in the ground plane rather than in height, because this camera is close
+ * to plan and a purely vertical tail foreshortens to nothing.
+ *
+ * It is the only BRIGHT family. The play frame runs a median of 0.72 luminance
+ * and the five enemy families are held under 0.38, so the top surfaces of the
+ * cat — back, head and the whole upper tail — are 0.92 white and it is the one
+ * thing on screen above the ground. Ginger is kept for the ears, the legs, the
+ * flanks and the base of the tail, which this camera sees edge-on.
  *
  * There are no tabby bars. Five bands across the back is surface pattern,
- * which art/world/bible.md forbids, and at phone size it reads as noise. One
- * darker cap over the head and shoulders does the same job as a single shape.
+ * which art/world/bible.md forbids, and at phone size it reads as noise.
  *
- * This constant only paints the stand-in box while the model file loads.
+ * This constant only paints the stand-in box while the model file loads, so it
+ * is the mass colour, not the marks.
  */
-const FUR = '#f5a03c'
+const FUR = '#f4e8d5'
 
 /** How long the body takes to come round to a new heading, in seconds. */
 const TURN_EASE = 0.05
@@ -77,7 +82,7 @@ const STRIDE_EASE = 0.06    // in and out over about a fifth of a second
 
 export default {
   about: 'the player. Steered on the ground plane; weapons fire themselves, so movement is the input',
-  appearance: 'A bright ginger kitten with a head wider than its body, big eyes, a white face, white paws and a thick upright white-tipped tail. The only white thing on the meadow, and always centred in the frame.',
+  appearance: 'A white-backed ginger kitten with a head wider than its body, ginger ears and legs, and a thick white tail hooking out behind it. The brightest thing on the meadow, always centred in the frame.',
   looksWrongWhen: 'it is not near the centre of the frame — the camera follows it, so a kitten off centre means the camera lost its target',
 
   mesh: {

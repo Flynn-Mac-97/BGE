@@ -6,17 +6,21 @@
 # Feet on the origin, nose at Blender +Y, four leg objects legFrontLeft..
 # legBackRight with their origin at the hip and the hip inside the body mass.
 #
-# The identity is a HUGE PALE MANE, a scalloped collar half again as wide as
-# the shoulders, with a small dark muzzle poking out of the front of it. From
-# directly above a hound is a pale flower with a dark centre, and nothing else
-# on the meadow is that shape or that size.
+# THE OUTLINE SAYS: daylight underneath. The body is carried 0.48 m clear of
+# the ground on four thin legs set wide apart, so the shape has holes in it and
+# the bright meadow shows through. Every other family is a solid mass on the
+# floor. It is also the tallest thing in the game at 1.08 m, more than twice
+# the cat. Six families have to be told apart with the colour removed, so the
+# hound owns "tall, and you can see under it" and nothing else may be it.
 #
-# Cool slate blue, and the only cool family in the game. The type file used to
-# call it warm grey, chosen so it would not be confused with the crow's
-# near-black. Grey solves that by having no colour at all, which loses against
-# art/world/bible.md: the actors have to out-saturate the arena or the floor
-# becomes the loudest thing on screen. A saturated cool blue keeps the hound
-# well above the crow in value AND gives it a hue no other family uses.
+# Size is not shape. Three families at three sizes read as one family; height
+# and a gap read as two different things.
+#
+# The scalloped mane is a step in value, not a pale ring. A pale collar
+# measures about 0.85 luminance, which is inside the band the ground occupies.
+#
+# Cool slate blue, mass 0.33, and the only cool family in the game. Every prop
+# is held above 0.44, so a hound crossing one never shares its value.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -27,41 +31,42 @@ exec(open(globals().get(
 MODEL_PATH = globals().get(
     "MODEL_PATH", "Z:/Code/browser game engine/kitten-survivors/assets/models/hound.glb")
 
-# types/hound.js declares the hull [0.95, 0.85, 1.5].
-HIP_HEIGHT = 0.360
+# types/hound.js declares the hull [0.95, 0.85, 1.5]. The model stands 1.08 m
+# and overshoots it, the same way the crow's wings and the rat's ears do: the
+# hull is what a weapon hits, the silhouette is what is read.
+HIP_HEIGHT = 0.600
 
 COLOURS = {
-    "houndCoat": "#5f74a4",    # saturated cool slate — the only cool family
-    "houndMane": "#cdd9ee",    # the pale collar, the whole find cue
-    "houndMuzzle": "#39456a",  # muzzle and paws, a step down from the coat
+    "houndCoat": "#3e4d73",    # 0.300 luminance, saturated cool slate — the only cool family
+    "houndMane": "#4c5e82",    # 0.364, the collar; a step up from the coat, still under the props
+    "houndMuzzle": "#28304a",  # 0.189, muzzle, legs and paws
     "houndWhite": "#fffdf5",   # eye whites and the two lower fangs
-    "dark": "#1b2136",         # pupils, nose
-    "houndOutline": "#0d1122", # the inverted hull
+    "dark": "#141828",         # pupils, nose
 }
-MATERIAL_ORDER = ["houndCoat", "houndMane", "houndMuzzle", "houndWhite",
-                  "dark", "houndOutline"]
+MATERIAL_ORDER = ["houndCoat", "houndMane", "houndMuzzle", "houndWhite", "dark"]
 SLOT = {name: index for index, name in enumerate(MATERIAL_ORDER)}
 
 
 # ------------------------------------------------------------------ the body
 
-# Tail to neck, as (y, centre z, half width, half height). Heavy and level:
-# a hound walks in a straight line and its job is to be in the way.
+# Tail to neck, as (y, centre z, half width, half height). Carried 0.24 m
+# higher than it used to be and a little narrower, so the legs under it are
+# four separate columns with meadow between them rather than a skirt.
 BODY_RINGS = [
-    (-0.560, 0.470, 0.088, 0.084),   # rump cap
-    (-0.470, 0.470, 0.208, 0.196),
-    (-0.330, 0.462, 0.248, 0.232),   # hips
-    (-0.130, 0.456, 0.226, 0.216),   # waist
-    (0.060, 0.466, 0.262, 0.244),    # shoulders, the widest point
-    (0.180, 0.494, 0.196, 0.184),    # neck
+    (-0.560, 0.710, 0.078, 0.074),   # rump cap
+    (-0.470, 0.710, 0.184, 0.172),
+    (-0.330, 0.702, 0.218, 0.204),   # hips
+    (-0.130, 0.696, 0.198, 0.190),   # waist
+    (0.060, 0.706, 0.230, 0.216),    # shoulders, the widest point
+    (0.180, 0.734, 0.172, 0.162),    # neck
 ]
 BODY_SECTIONS = 10
 BELLY_ABOVE = -0.55
 
-HEAD_CENTRE = (0.0, 0.470, 0.596)
+HEAD_CENTRE = (0.0, 0.470, 0.836)
 HEAD_HALF = (0.210, 0.196, 0.172)
 
-MANE_CENTRE = (0.0, 0.235, 0.500)
+MANE_CENTRE = (0.0, 0.235, 0.740)
 
 
 def body_profile(y):
@@ -87,19 +92,17 @@ def build_body(materials):
         sections.append((y,) + body_profile(y))
     rings = [ring(bm, *values, sides=8, squareness=0.6) for values in sections]
 
-    silhouette = loft(bm, rings)
-    for face in silhouette:
+    body = loft(bm, rings)
+    for face in body:
         centre = face.calc_center_median()
         centre_z, _, half_height = body_profile(centre.y)
         above = (centre.z - centre_z) / max(half_height, 1e-6)
         face.material_index = (SLOT["houndMuzzle"] if above < BELLY_ABOVE
                                else SLOT["houndCoat"])
 
-    silhouette += build_tail(bm)
-    silhouette += build_head(bm)
-    silhouette += build_mane(bm)
-
-    add_shell(bm, silhouette, 0.030, SLOT, "houndOutline")
+    build_tail(bm)
+    build_head(bm)
+    build_mane(bm)
     return finish(bm, "houndBody", materials)
 
 
@@ -140,19 +143,20 @@ def build_head(bm):
 
 
 def build_mane(bm):
-    # Two scalloped plates, the pale one in front of the dark one, standing
-    # across the body behind the head. 0.84 m across against 0.52 m of
-    # shoulder: size is the only cue that survives three hundred bodies, so
-    # the mane is simply much wider rather than a little wider.
+    # Two scalloped plates, the lighter one in front of the darker one,
+    # standing across the body behind the head. It sits at the top of a shape
+    # that is mostly legs, so it says where the mass is; smaller than it was,
+    # because a collar wide enough to reach past the shoulders closes the gap
+    # under the body when the camera is anywhere but straight overhead.
     made = plate(bm, (MANE_CENTRE[0], MANE_CENTRE[1] - 0.030, MANE_CENTRE[2]),
-                 0.386, 0.340, 0.150, sides=14, tilt=(1.5708, 0.0, 0.0),
+                 0.318, 0.290, 0.140, sides=14, tilt=(1.5708, 0.0, 0.0),
                  scallop=0.24)
     paint(made, SLOT, "houndMuzzle")
 
     # Thick, not a sheet. A thin plate reads as a blanket laid on the back from
     # every angle but straight down; a ruff with depth reads as fur.
     front = plate(bm, (MANE_CENTRE[0], MANE_CENTRE[1] + 0.058, MANE_CENTRE[2]),
-                  0.420, 0.372, 0.170, sides=14, tilt=(1.5708, 0.0, 0.0),
+                  0.348, 0.318, 0.160, sides=14, tilt=(1.5708, 0.0, 0.0),
                   scallop=0.32)
     paint(front, SLOT, "houndMane")
     return made + front
@@ -161,10 +165,10 @@ def build_mane(bm):
 def build_tail(bm):
     # Short, thick and held up. A hound needs one thing above the mane line so
     # it is not a perfect disc from directly overhead.
-    made = rings_along(bm, [(-0.556, 0.480, 0.072),
-                            (-0.606, 0.560, 0.062),
-                            (-0.628, 0.646, 0.052),
-                            (-0.620, 0.722, 0.044)], sides=6, squareness=0.35)
+    made = rings_along(bm, [(-0.556, 0.720, 0.072),
+                            (-0.606, 0.800, 0.062),
+                            (-0.628, 0.886, 0.052),
+                            (-0.620, 0.962, 0.044)], sides=6, squareness=0.35)
     faces = loft(bm, made)
     paint(faces, SLOT, "houndMane")
     return faces
@@ -172,28 +176,30 @@ def build_tail(bm):
 
 # ------------------------------------------------------------------ the legs
 
-# Local to the hip: (z, y offset, radius). Columns, not limbs — the hound is
-# heavy and its legs carry that by being thick and barely tapering.
+# Local to the hip: (z, y offset, radius). Long and thin, because the gap they
+# hold the body over is what names this family. A thick leg at this length
+# fills that gap back in and the hound is a solid mass again.
 LEG = [
-    (0.060, 0.000, 0.104),
-    (-0.060, 0.004, 0.096),
-    (-0.200, 0.008, 0.082),
-    (-0.320, 0.010, 0.076),
-    (-0.360, 0.010, 0.076),
+    (0.060, 0.000, 0.086),
+    (-0.100, 0.004, 0.070),
+    (-0.300, 0.008, 0.056),
+    (-0.530, 0.010, 0.048),
+    (-0.600, 0.010, 0.048),
 ]
 
+# Set wide and far apart, so the four columns are four shapes rather than two
+# pairs. The front pair is under the shoulders, the back pair under the hips.
 LEGS = {
-    "legFrontLeft": (-0.184, 0.078),
-    "legFrontRight": (0.184, 0.078),
-    "legBackLeft": (-0.176, -0.318),
-    "legBackRight": (0.176, -0.318),
+    "legFrontLeft": (-0.200, 0.100),
+    "legFrontRight": (0.200, 0.100),
+    "legBackLeft": (-0.190, -0.370),
+    "legBackRight": (0.190, -0.370),
 }
 
 
 def build():
     clear_scene()
     materials = build_materials(COLOURS, MATERIAL_ORDER)
-    flat_dark("houndOutline")
     build_body(materials)
     for name, (hip_x, hip_y) in LEGS.items():
         build_leg(name, hip_x, hip_y, HIP_HEIGHT, LEG, 0.020, materials,

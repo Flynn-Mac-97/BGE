@@ -6,13 +6,17 @@
  * hard on the way in, which is what stops a swarm of them from being a
  * straight line the player can simply step out of.
  *
- * Tiny, bright yellow and above head height: the only thing on the meadow
- * higher than a crow, and the palest, most saturated colour in the horde. Both
- * cues exist so a wasp is visible against a screen already full of bodies.
+ * Its outline says A NEEDLE: 0.61 m from nose to sting against 0.12 m across,
+ * five times as long as it is wide where nothing else in the game passes two,
+ * and the wings stay inside that line so it never reads as a small crow. That
+ * is the one thing no other family's outline says.
  *
- * From directly above it is a yellow oval with two fat black bands, a long
- * pale sting out the back and two pale wings. Two bands, not six — six is a
- * pattern, and art/world/bible.md spends no detail on pattern.
+ * Deep amber with two fat black bands, mass 0.26 luminance, and the most
+ * saturated hue in the horde. The five enemy families are held under 0.38 and
+ * every prop above 0.44, so an enemy crossing a prop never shares its value.
+ *
+ * Two bands, not six — six is a pattern, and art/world/bible.md spends no
+ * detail on pattern.
  *
  * It is drawn from `models/wasp.glb`, which keeps two wings named `wingLeft`
  * and `wingRight` with their origin at the root, swept back so the X rotation
@@ -33,11 +37,13 @@ const BEAT_SWING = 0.22
 
 export default {
   about: 'the fastest enemy. It cannot be outrun, so it is answered with firepower rather than movement',
-  appearance: 'The smallest enemy and the only yellow one, black-banded, with a long pale sting, flying higher than a crow. It weaves on the way in rather than approaching in a straight line.',
+  appearance: 'A deep amber needle five times as long as it is wide, black-banded, with a straight pale sting out the back, flying higher than a crow. It weaves rather than arriving in a straight line.',
   looksWrongWhen: 'it is a plain tinted box — models/wasp.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#ffc31f' },
+  // The abdomen and sting overshoot the hull: the hull is what a weapon hits,
+  // the length is the shape that is read.
+  mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#a85a06' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

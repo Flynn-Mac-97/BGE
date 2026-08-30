@@ -5,17 +5,15 @@
  * that follows you. Its job is to make the player's route matter: a screen with
  * six hounds in it has corridors in it, and the rats pour through the gaps.
  *
- * Big, wide and cool slate blue. Size is the only silhouette cue that survives
- * a screen with three hundred things on it, so the hound is simply larger than
- * everything else by a clear margin rather than by a subtle one. A pale
- * scalloped mane 0.84 m across stands behind the head, half again the width of
- * the shoulders — the one shape mark a top-down camera resolves on a body this
- * broad, and from directly above it reads as a pale ring with a dark muzzle in
- * the middle of it.
+ * Its outline says DAYLIGHT UNDERNEATH: the body is carried 0.48 m clear of the
+ * ground on four thin legs set wide apart, so the shape has holes in it and the
+ * bright meadow shows through. It is also the tallest thing in the game at
+ * 1.08 m, more than twice the cat. Every other family is a solid mass on the
+ * floor, so that gap is the one thing no other family's outline says.
  *
- * It is the only cool-coloured family. The value sits well above the crow's
- * near-black, so the two dark families are never one family, and the hue keeps
- * it off the boar, which is the other large enemy and shares its screen.
+ * Cool slate blue at 0.33 mass luminance, and the only cool family. The five
+ * enemy families are held under 0.38 and every prop above 0.44, so an enemy
+ * crossing a prop never shares its value.
  *
  * It is drawn from `models/hound.glb`, which keeps four legs named
  * `legFrontLeft` through `legBackRight` with their origin at the hip, so
@@ -36,11 +34,13 @@ const STRIDE_SWING = 0.5
 
 export default {
   about: 'the enemy that soaks hits. Too slow to threaten alone; it blocks routes and makes corridors',
-  appearance: 'The largest enemy by far, in cool slate blue, with a pale scalloped mane half again as wide as its shoulders and a dark muzzle out the front of it. The only cool-coloured family.',
+  appearance: 'The tallest enemy, in cool slate blue, on four long thin legs with a clear gap of meadow under its belly, a scalloped mane behind the head and a dark muzzle. The only cool family.',
   looksWrongWhen: 'it is a plain tinted box — models/hound.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  mesh: { model: 'models/hound.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#5f74a4' },
+  // The model stands 1.08 m and overshoots the hull: the hull is what a weapon
+  // hits, the height is the shape that is read.
+  mesh: { model: 'models/hound.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#3e4d73' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {
