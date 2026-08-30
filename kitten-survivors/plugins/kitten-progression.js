@@ -2,16 +2,14 @@
  * Kitten Progression — the loop that makes a run a run.
  *
  * Something dies, it leaves a gem, the gem flies to the kitten, the bar fills,
- * the world stops and you choose. Nothing in that sentence is engine work and
- * nothing in it is weapons work; it is the wiring between them, and it is all
- * this file does.
+ * the world stops and you choose. That wiring is all this file does, plus the
+ * cards the choice is made on.
  *
  * The lanes it depends on may not exist yet, so none of them is imported and
- * none of them is required:
+ * none is required:
  *
  * - **The horde** announces a death. Several names are listened for, and
- *   `context.progression.enemyDied(entity)` is the plain door if none of them
- *   fits. A run with no enemies still levels — `experience.gain` still works.
+ *   `context.progression.enemyDied(entity)` is the plain door if none fits.
  * - **The weapons lane** is handed picks by Kitten Upgrades, off `context`.
  * - **The kitten** is whatever is called `you`, then whatever type is `kitten`,
  *   then whoever the camera follows.
@@ -20,24 +18,25 @@
  *
  *   context.progression.stats()   { damage, area, cooldown, speed, pickupRadius, maxHealth }
  *   the kitten's properties       damageScale, areaScale, cooldownScale — all seeded at 1
+ *
+ * Choice Screen keeps the queue, the hold on the world and the keys; its own
+ * card row comes down and `kitten-level-up` goes up, so the cards match the
+ * rest of the interface. The look is `art/interface/bible.md`.
  */
 
 /**
- * The curve. Five points for the first level, then five more each time up to
- * level twenty, then a flatter climb.
+ * The curve. Five points for the first level, five more each time up to level
+ * twenty, then a flatter climb.
  *
  * A gem is worth one, so the first level-up is five kills and arrives in the
- * first few seconds — which is the whole reason the first minute of a survivor
- * feels generous. By level twenty a level is twenty kills, and the run has
+ * first few seconds. By level twenty a level is twenty kills, and the run has
  * turned into a defence of what you already built.
  */
 const CURVE = level => (level <= 20 ? 5 * level : 100 + (level - 20) * 12)
 
 /** What a gem looks like at each worth. Blue is one kill, red is a boss's worth. */
 const GEM_TIERS = [
-  { from: 25, tint: '#ff6b8a', size: 0.34 },
-  { from: 5, tint: '#8ee6a0', size: 0.27 },
-  { from: 0, tint: '#5ec8ff', size: 0.22 }
+  { from: 25, tint: '#ff6b8a', size: 0.34 }, { from: 5, tint: '#8ee6a0', size: 0.27 }, { from: 0, tint: '#5ec8ff', size: 0.22 }
 ]
 
 /** How far the kitten reaches for a gem before any upgrade widens it. */
@@ -46,13 +45,25 @@ const PICKUP_RADIUS = 2.2
 /** Death is announced under several names. Any of them is a kill. */
 const DEATH_EVENTS = ['enemy:died', 'enemy:killed', 'entity:died', 'damage:died', 'damage:killed']
 
+// The card look, fixed by `kitten-survivors/art/interface/bible.md` and matched
+// to Kitten Run HUD's: one wide heavy face, one near-black edge, strong colour.
+const DISPLAY = "Verdana, 'Trebuchet MS', system-ui, sans-serif"
+const OUTLINE = '#0a1430'
+const INK = '#ffffff'
+const QUIET = '#c1f4f9'
+const GOLD = '#ffb703'
+
+/** One card, and the gap between two. Three at 320 fit a 1280 box with room. */
+const CARD = { width: 320, height: 340, gap: 34, margin: 80, radius: 28, band: 120 }
+
 /** The live wiring, published so the declared systems reach this world's own. */
 export const progression = { tick: null }
 
 export default {
   name: 'Kitten Progression',
-  needs: ['Experience', 'Pickups', 'Choice Screen', 'Run Clock', 'Modifiers', 'Kitten Upgrades'],
-  about: 'Gems from the dead, a bar that fills, and a level-up that stops the world.',
+  // Kitten Run HUD registers the `plate` painter this screen puts numbers on.
+  needs: ['Experience', 'Pickups', 'Choice Screen', 'Screen', 'Run Clock', 'Modifiers', 'Kitten Upgrades', 'Kitten Run HUD'],
+  about: 'Gems from the dead, a bar that fills, and a level-up that stops the world and offers three cards.',
   inspect: context => [{
     title: 'This run',
     rows: [
@@ -157,6 +168,45 @@ export default {
       })
     })
 
+    context.screen.painter('kittenCard', { draw: drawCard, describe: describeCard })
+
+    /** The cards, read from Choice Screen's own view so every way in still works. */
+    function drawLevelUp() {
+      const shown = context.choiceScreen?.view()
+      if (!shown?.open) return []
+      const count = shown.options.length
+      const width = Math.min(CARD.width, (context.screen.box.width - CARD.margin * 2 - CARD.gap * (count - 1)) / Math.max(count, 1))
+
+      const items = [
+        { dim: 0.72 },
+        { text: shown.title, at: [0, 48], anchor: 'top', size: 64, weight: 900, color: GOLD, font: DISPLAY, outline: OUTLINE },
+        { plate: String(context.experience.level), cap: 'LV', at: [0, 126], anchor: 'top', size: [124, 90], textSize: 42, capColor: GOLD }
+      ]
+      shown.options.forEach((option, index) => items.push({
+        kittenCard: option,
+        // The chosen card is lifted rather than grown, so the row does not move
+        // under the eye that is reading it.
+        at: [(index - (count - 1) / 2) * (width + CARD.gap), index === shown.selected ? 48 : 60],
+        anchor: 'center',
+        size: [width, CARD.height],
+        selected: index === shown.selected
+      }))
+      items.push({
+        plate: shown.options.map((_, index) => index + 1).join('  '),
+        cap: '↵', at: [0, -34], anchor: 'bottom', size: [270, 88], textSize: 36, capColor: GOLD
+      })
+      if (shown.waiting) items.push({ plate: `+${shown.waiting}`, at: [-24, -34], anchor: 'bottom-right', size: [110, 88], textSize: 36, color: GOLD })
+      return items
+    }
+
+    // `choice:offered` is emitted after Choice Screen shows its own card row,
+    // so hiding it here wins.
+    context.bus.on('choice:offered', () => {
+      context.screen.hide('choice-screen')
+      context.screen.show('kitten-level-up', drawLevelUp, { order: 100 })
+    })
+    context.bus.on('choice:closed', () => context.screen.hide('kitten-level-up'))
+
     // Health is capped by a bigger belly, and Modifiers may have just raised it.
     context.bus.on('modifiers:changed', ({ entity }) => {
       if (!entity?.properties) return
@@ -193,13 +243,9 @@ export default {
     arm()
     context.bus.on('level:loaded', arm)
 
-    /**
-     * R plays again once the run is over.
-     *
-     * Reloading the level is the whole restart: it clears the world, resets the
-     * clock and the random stream, and every plugin here empties itself on
-     * `level:loaded`. Nothing else has to be undone by hand.
-     */
+    // R plays again once the run is over. Reloading the level is the whole
+    // restart: it clears the world, resets the clock and the random stream, and
+    // every plugin here empties itself on `level:loaded`.
     context.input?.bind('kittenRestart', ['KeyR'])
     const spent = new Set()
     context.bus.on('step:end', () => spent.clear())
@@ -209,10 +255,11 @@ export default {
       if (!context.runClock?.over) return
       if (!context.input?.pressed('kittenRestart') || spent.has('restart')) return
       spent.add('restart')
-      // Loading is asynchronous and this is a fixed step, so the failure has to
-      // be caught here — an unhandled rejection would be a restart that silently
-      // did nothing.
+      // Loading is asynchronous inside a fixed step, so an unhandled rejection
+      // would be a restart that silently did nothing.
       context.editor.loadLevel(context.level())
+        // Straight back in: a player who asked to play again answered the title.
+        .then(() => context.kittenScreens?.start())
         .catch(error => console.error('[kitten-progression] could not restart the level', error))
     }
   },
@@ -248,4 +295,104 @@ export default {
       }
     }
   ]
+}
+
+/**
+ * One level-up card: a fat rounded panel with a heavy dark edge, a coloured
+ * head band carrying the glyph, then the name, the rank and one line. The
+ * number is a badge on the band, because the number is what a thumb presses.
+ */
+function drawCard(g, item, screen) {
+  const card = item.kittenCard || {}
+  const size = item.size || [CARD.width, CARD.height]
+  const [x, y] = screen.boxAt(item, size)
+  const colour = card.color || GOLD
+
+  screen.roundedRect(g, x, y, size[0], size[1], CARD.radius)
+  g.fillStyle = 'rgba(9, 21, 74, 0.96)'
+  g.fill()
+
+  g.save()
+  screen.roundedRect(g, x, y, size[0], size[1], CARD.radius)
+  g.clip()
+  g.fillStyle = colour
+  g.fillRect(x, y, size[0], CARD.band)
+  g.restore()
+
+  screen.roundedRect(g, x, y, size[0], size[1], CARD.radius)
+  g.lineWidth = item.selected ? 10 : 6
+  g.strokeStyle = item.selected ? INK : OUTLINE
+  g.stroke()
+
+  const middle = x + size[0] / 2
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.font = `400 72px ${DISPLAY}`
+  write(g, String(card.glyph ?? ''), middle, y + CARD.band / 2 + 6, 72, OUTLINE, colour)
+
+  if (card.number != null) {
+    g.beginPath()
+    g.arc(x + 34, y + 34, 24, 0, Math.PI * 2)
+    g.fillStyle = OUTLINE
+    g.fill()
+    g.font = `900 27px ${DISPLAY}`
+    g.fillStyle = INK
+    g.fillText(String(card.number), x + 34, y + 35)
+  }
+
+  if (card.tag) {
+    g.font = `800 15px ${DISPLAY}`
+    g.fillStyle = OUTLINE
+    g.fillText(String(card.tag).toUpperCase(), x + size[0] - 56, y + 26)
+  }
+
+  let cursor = y + CARD.band + 42
+  g.font = `900 30px ${DISPLAY}`
+  write(g, String(card.title ?? ''), middle, cursor, 30, OUTLINE, INK)
+  cursor += 40
+
+  if (card.rank) {
+    g.font = `900 19px ${DISPLAY}`
+    write(g, String(card.rank).toUpperCase(), middle, cursor, 19, OUTLINE, colour)
+    cursor += 34
+  }
+
+  g.font = `700 18px ${DISPLAY}`
+  g.fillStyle = QUIET
+  for (const line of wrap(g, card.line, size[0] - 44)) {
+    g.fillText(line, middle, cursor)
+    cursor += 26
+  }
+}
+
+/** What a card reads as. The chosen one is marked, because that is the question. */
+function describeCard(item) {
+  const card = item.kittenCard || {}
+  const out = [`${item.selected ? '> ' : '  '}${card.number ?? ''}. ${card.title ?? ''}`.trimEnd()]
+  if (card.rank) out.push(`    ${card.rank}`)
+  if (card.line) out.push(`    ${card.line}`)
+  return out
+}
+
+/** Dark-outlined text, so a card stays legible over whatever the dim lets through. */
+function write(g, text, x, y, size, edge, colour) {
+  g.lineWidth = Math.max(3, size / 5)
+  g.lineJoin = 'round'
+  g.strokeStyle = edge
+  g.strokeText(text, x, y)
+  g.fillStyle = colour
+  g.fillText(text, x, y)
+}
+
+/** Break a line that does not fit, so a card written in prose still fits its card. */
+function wrap(g, line, width) {
+  const out = []
+  let current = ''
+  for (const word of String(line || '').split(/\s+/).filter(Boolean)) {
+    const next = current ? `${current} ${word}` : word
+    if (current && g.measureText(next).width > width) { out.push(current); current = word }
+    else current = next
+  }
+  if (current) out.push(current)
+  return out
 }
