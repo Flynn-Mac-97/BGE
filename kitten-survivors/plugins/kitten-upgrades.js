@@ -110,6 +110,13 @@ const PASSIVES = [
 /** The card that is always available, so a full build still has something to take. */
 const MILK = { id: 'saucer-of-milk', kind: 'refill', name: 'Saucer of Milk', glyph: '♨', line: 'Drink 30 health back.', heal: 30 }
 
+// Colours per kitten-survivors/art/interface/bible.md: saturation.p95 >= 0.73.
+// Matches Kitten Run HUD's carried-icon colours, so a card and the icon it
+// leaves on the HUD read as the same thing.
+const WEAPON_COLOR = '#ffb703'
+const PASSIVE_COLOR = '#00e676'
+const MILK_COLOR = '#3ec8ff'
+
 /** How many ranks each kind goes to. */
 const MAXIMUM = { weapon: 5, passive: 5 }
 
@@ -169,7 +176,7 @@ export default {
         line: lineFor(entry, nextRank),
         rank: nextRank > 1 ? `Rank ${nextRank}` : 'New',
         tag: entry.kind === 'weapon' ? 'Weapon' : 'Passive',
-        color: entry.kind === 'weapon' ? '#ffd166' : '#8ee6a0'
+        color: entry.kind === 'weapon' ? WEAPON_COLOR : PASSIVE_COLOR
       }
     }
 
@@ -189,7 +196,7 @@ export default {
         cards.push(cardFor(entry))
       }
       while (cards.length < count) {
-        cards.push({ id: MILK.id, title: MILK.name, glyph: MILK.glyph, line: MILK.line, rank: '', tag: 'Refill', color: '#9fd7ff' })
+        cards.push({ id: MILK.id, title: MILK.name, glyph: MILK.glyph, line: MILK.line, rank: '', tag: 'Refill', color: MILK_COLOR })
       }
       return cards
     }

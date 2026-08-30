@@ -13,9 +13,17 @@
  * answers with the same words a player is looking at.
  */
 
-const GEM = '#5ec8ff'
-const BLOOD = '#ff6b8a'
-const QUIET = 'rgba(255, 255, 255, 0.55)'
+// Colours per kitten-survivors/art/interface/bible.md: saturation.p95 >= 0.73
+// and value.p95 >= 0.66, measured against a bright warm meadow, not a dusk
+// mock-up. GEM is drawn straight from the bible's reference palette.
+const GEM = '#31cdfd'
+const BLOOD = '#ff3355'
+const WEAPON = '#ffb703'
+const PASSIVE = '#00e676'
+// A dark backing so a bar reads whether the ground under it is grass, dirt or
+// a monster. A pale track (the Screen default) washes out over bright grass.
+const TRACK = 'rgba(8, 12, 20, 0.85)'
+const QUIET = 'rgba(255, 255, 255, 0.7)'
 
 /** How many carried things fit on one row before it wraps. */
 const PER_ROW = 8
@@ -53,7 +61,7 @@ export default {
         // The live box, not the design box: the bar has to touch both edges of
         // the window it is actually in.
         at: [0, 0], anchor: 'top', size: [context.screen.box.width, 22],
-        radius: 0, color: GEM, back: 'rgba(8, 12, 20, 0.85)'
+        radius: 0, color: GEM, back: TRACK
       })
       // Clear of the editor's STOP button, which sits in the same corner while
       // the game runs inside the editor.
@@ -82,7 +90,7 @@ export default {
         const x = 20 + column * 44
         const y = 96 + row * 48
         return [
-          { text: entry.glyph, at: [x, y], anchor: 'top-left', size: 26, color: entry.kind === 'weapon' ? '#ffd166' : '#8ee6a0' },
+          { text: entry.glyph, at: [x, y], anchor: 'top-left', size: 26, color: entry.kind === 'weapon' ? WEAPON : PASSIVE },
           { text: String(entry.rank), at: [x + 26, y + 14], anchor: 'top-left', size: 12, color: QUIET }
         ]
       })
@@ -97,10 +105,10 @@ export default {
       // The number sits beside the bar on the same line rather than above it,
       // where it collided with the bar's own top edge.
       return [
-        { bar: now / most, at: [24, -30], anchor: 'bottom-left', size: [280, 16], color: BLOOD },
+        { bar: now / most, at: [24, -30], anchor: 'bottom-left', size: [280, 20], color: BLOOD, back: TRACK },
         {
           text: `${Math.round(now)} / ${Math.round(most)}`,
-          at: [316, -38], anchor: 'bottom-left', size: 14, baseline: 'middle', color: QUIET
+          at: [316, -40], anchor: 'bottom-left', size: 14, baseline: 'middle', color: QUIET
         }
       ]
     }
@@ -118,12 +126,12 @@ export default {
       const items = [
         { dim: 0.86 },
         { panel: true, at: [0, 0], anchor: 'center', size: [640, 400] },
-        { text: died ? 'THE KITTEN IS DOWN' : 'YOU MADE IT', at: [0, -150], anchor: 'center', size: 30, weight: 800, color: died ? BLOOD : '#8ee6a0' },
+        { text: died ? 'THE KITTEN IS DOWN' : 'YOU MADE IT', at: [0, -150], anchor: 'center', size: 30, weight: 800, color: died ? BLOOD : PASSIVE },
         { text: 'you lasted', at: [0, -104], anchor: 'center', size: 15, color: QUIET },
         { text: summary.clock, at: [0, -62], anchor: 'center', size: 76, weight: 800 },
         { text: `Level ${summary.level ?? 1}`, at: [-110, 34], anchor: 'center', size: 20 },
         { text: `${summary.kills ?? 0} killed`, at: [110, 34], anchor: 'center', size: 20 },
-        { text: 'R to try again', at: [0, 150], anchor: 'center', size: 16, color: '#ffd166' }
+        { text: 'R to try again', at: [0, 150], anchor: 'center', size: 16, color: WEAPON }
       ]
 
       // Three to a line. One long line of everything a full build carries ran
