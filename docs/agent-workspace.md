@@ -159,8 +159,12 @@ lanes fight over exactly the files that are not in it.
 - Give each lane real file paths, never a bare glob — a claim starting with a
   wildcard has an empty prefix and claims the whole repository.
 
-Write leftovers to `agent-runs/<date>-<name>/`, and record what was expensive
-with `node bin/engine.mjs pain`.
+Write leftovers to `agent-runs/<date>-<name>/`, and record what the ENGINE made
+hard with `node bin/engine.mjs pain`. The pain log is the engine's friction
+ledger, not a bug tracker for the game being built: "the spawn ring is too wide"
+is a finding for your report; "nothing told me the level file is generated" is a
+pain. The test is who has to act — a pain is fixed by changing the engine, its
+tools, or its instructions.
 
 ## Writing files while it runs
 

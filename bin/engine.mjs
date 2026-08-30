@@ -54,7 +54,8 @@ drive     select <id...>       set <id> <key> <value>
           run <command-id> [arg]              commands
 run       play    stop    simulate <seconds>    seed <n>
 debug     errors    log [n]    watch    eval '<js>'
-friction  pain "<what was hard or expensive>" [--kind engine|cli|docs|editor]
+friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
+               engine friction only — a game defect goes in your report, not here
                [--cost <tokens>] [--reads <n>] [--where path] [--fix "..."]
           pain.list [--all]    pain.resolve <id> "<what you did>"
 agents    agent.context [file...]
