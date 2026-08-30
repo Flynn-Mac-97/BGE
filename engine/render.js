@@ -943,6 +943,19 @@ const CONTACT_SHADOW_FADE = `
   if (gl_FragColor.a <= 0.004) discard;
 `
 
+/**
+ * The band a ground ring draws, in ring space where 1.0 is its radius.
+ *
+ * Both edges are feathered: a hard edge adds two lines to the frame's edge
+ * count, and the ring only has to be found.
+ */
+const GROUND_RING_BAND = `
+  float reach = length(vRing);
+  float band = smoothstep(0.70, 0.81, reach) * (1.0 - smoothstep(0.93, 1.0, reach));
+  gl_FragColor.a = vRingStrength * band;
+  if (gl_FragColor.a <= 0.004) discard;
+`
+
 // ---------------------------------------------------------------- materials
 
 const eachMaterial = (node, fn) => {
@@ -1256,9 +1269,10 @@ export function makeRenderer(canvas, view, viewport) {
     // every part of every frame — which would also give twelve identically
     // coloured boxes twelve materials, one per position.
     'parts', 'at', 'rotation', 'name',
-    // The keyline and the contact shadow are drawn BESIDE the mesh, in their
-    // own materials. Neither changes what the surface is made of.
-    'keyline', 'keylineColour', 'shadow', 'shadowStrength'
+    // The keyline, the contact shadow and the ground ring are drawn BESIDE the
+    // mesh, in their own materials. None changes what the surface is made of.
+    'keyline', 'keylineColour', 'shadow', 'shadowStrength',
+    'ring', 'ringColour', 'ringStrength'
   ])
 
   /**
@@ -1625,20 +1639,28 @@ export function makeRenderer(canvas, view, viewport) {
     }
   }
 
-  // ------------------------------------------------ keylines and contact shadows
+  // ------------------------------- keylines, contact shadows and ground rings
 
   /**
-   * The two things that make a moving thing readable, and who gets them.
+   * The three things that make a moving thing readable, and who gets them.
    *
    * A keyline is a dark line of CONSTANT SCREEN WIDTH round a silhouette; a
-   * contact shadow is a soft ellipse under it. Both belong on the things a
-   * player tracks — the characters, the enemies, the pickups — and on nothing
-   * else: a line round every tuft of grass is edge detail, not readability.
-   * "Has moved since it appeared" is the renderer's own answer to which is
-   * which, read off the record merging already keeps, and any mesh overrides
-   * it by declaring `keyline` in pixels or `shadow` in metres. A `parts` body
-   * and a model both work; a GLB's own materials are never touched, so a model
-   * gets its keyline even though it cannot be given a material at all.
+   * contact shadow is a soft ellipse under it; a ground ring is a coloured band
+   * on the floor round its feet. The first two belong on the things a player
+   * tracks — the characters, the enemies, the pickups — and on nothing else: a
+   * line round every tuft of grass is edge detail, not readability. "Has moved
+   * since it appeared" is the renderer's own answer to which is which, read off
+   * the record merging already keeps, and any mesh overrides it by declaring
+   * `keyline` in pixels or `shadow` in metres. A `parts` body and a model both
+   * work; a GLB's own materials are never touched, so a model gets its keyline
+   * even though it cannot be given a material at all.
+   *
+   * The ring is handed out differently: it names ONE actor. It answers "which
+   * one is mine" in a crowd where a silhouette cannot, and a hundred of them
+   * mark nothing.
+   *
+   * All three are drawn in the scene, so a frame taken without the interface
+   * layer, at a stated size, or by a tab in the background still carries them.
    *
    * Every number here is a default a game may set through `renderer.readability`.
    */
@@ -1648,6 +1670,14 @@ export function makeRenderer(canvas, view, viewport) {
     shadow: true,
     shadowColour: '#0d1409',
     shadowStrength: 0.44,
+    /**
+     * Who gets a ground ring: `'followed'` — the entity the camera follows —
+     * or `false`, or an entity id or type name. There is deliberately no
+     * setting for every actor; `mesh.ring` names any extras one at a time.
+     */
+    ring: 'followed',
+    ringColour: '#4fd8ff',
+    ringStrength: 0.85,
     /** Where the floor is. The same y `toWorld` drops an unhit ray onto. */
     groundY: 0,
     /** Metres of lift over which a shadow spreads out and fades to nothing. */
@@ -1810,7 +1840,8 @@ export function makeRenderer(canvas, view, viewport) {
   }
 
   /**
-   * Give one entity its keyline and note its shadow. True if it has a keyline.
+   * Give one entity its keyline and note its shadow and ring. True if it has a
+   * keyline.
    *
    * Scenery leaves in the first three lines. Several hundred props that never
    * move must not pay to read their own shape again on every frame.
@@ -1818,11 +1849,17 @@ export function makeRenderer(canvas, view, viewport) {
   function updateReadability(entity, object, declared) {
     const moved = stillness.get(entity.id)?.moved === true
     const asks = declared.keyline !== undefined || declared.shadow !== undefined
-    if (!moved && !asks) return false
+      || declared.ring !== undefined
+    // The ringed actor is named, so it is entitled to a ring on the frame it
+    // appears, before it has moved.
+    if (!moved && !asks && !ringNames(entity)) return false
 
     const shape = meshShape(entity)
     updateKeyline(entity, object, declared, shape, moved)
-    if (!entity.hidden) noteContactShadow(entity, declared, shape, moved)
+    if (!entity.hidden) {
+      noteContactShadow(entity, declared, shape, moved)
+      noteGroundRing(entity, declared, shape)
+    }
     return !!object.userData.keylineMesh
   }
 
@@ -1847,6 +1884,139 @@ export function makeRenderer(canvas, view, viewport) {
     contactShadows.count = shadowPlaces.length
     contactShadows.instanceMatrix.needsUpdate = true
     contactStrengths.needsUpdate = true
+  }
+
+  /**
+   * Every ground ring in the frame, in one draw call.
+   *
+   * Built like the contact shadow — one instanced quad, capacity kept — because
+   * a ring is the same kind of thing: a flat mark on the floor, occluded by
+   * whatever stands in front of it.
+   *
+   * Its own geometry, not the shadow's: an instanced attribute belongs to the
+   * geometry, so two instanced meshes sharing one quad would share one set of
+   * per-instance values.
+   */
+  const RING_QUAD = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
+  const ringPlaces = []
+  const ringColours = new Map()
+  let groundRings = null
+  let ringTints = null
+  let ringStrengths = null
+
+  /** A declared ring colour, read once per distinct value. */
+  function ringColour(declared) {
+    let colour = ringColours.get(declared)
+    if (!colour) {
+      colour = readColour(declared, 'mesh.ringColour') || new THREE.Color('#ffffff')
+      ringColours.set(declared, colour)
+    }
+    return colour
+  }
+
+  function groundRingMaterial() {
+    const material = new THREE.MeshBasicMaterial({
+      transparent: true, depthWrite: false, fog: false
+    })
+    material.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec3 ringTint;\nattribute float ringStrength;\nvarying vec3 vRingTint;\nvarying float vRingStrength;\nvarying vec2 vRing;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRingTint = ringTint;\nvRingStrength = ringStrength;\nvRing = position.xz * 2.0;')
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRingTint;\nvarying float vRingStrength;\nvarying vec2 vRing;')
+        // Into the diffuse rather than into gl_FragColor, so the ring goes
+        // through the same tone mapping and colour space as the scene it marks.
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vRingTint;')
+        .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${GROUND_RING_BAND}`)
+    }
+    material.customProgramCacheKey = () => 'ground-ring'
+    return material
+  }
+
+  function growGroundRings(wanted) {
+    if (groundRings && groundRings.instanceMatrix.count >= wanted) return
+    const room = Math.max(8, 2 ** Math.ceil(Math.log2(wanted)))
+    if (groundRings) {
+      scene.remove(groundRings)
+      groundRings.dispose()
+    }
+    ringTints = new THREE.InstancedBufferAttribute(new Float32Array(room * 3), 3)
+    ringStrengths = new THREE.InstancedBufferAttribute(new Float32Array(room), 1)
+    RING_QUAD.setAttribute('ringTint', ringTints)
+    RING_QUAD.setAttribute('ringStrength', ringStrengths)
+    groundRings = new THREE.InstancedMesh(RING_QUAD, groundRingMaterial(), room)
+    // Rewritten every frame, so a bounding sphere from them is a frame old.
+    groundRings.frustumCulled = false
+    // After the contact shadow, which is the other transparent thing on the
+    // floor under the same actor.
+    groundRings.renderOrder = 1
+    groundRings.layers.set(DRAWN)
+    scene.add(groundRings)
+  }
+
+  /** True when the ring rule names this entity. */
+  function ringNames(entity) {
+    const rule = readability.ring
+    if (rule === 'followed') {
+      // A first-person body wears the camera, so its ring would be drawn under
+      // the eye and mark nothing.
+      if (view.mode === 'first-person') return false
+      return view.follows != null && entity.id === view.follows
+    }
+    return typeof rule === 'string' && (entity.id === rule || entity.type === rule)
+  }
+
+  /**
+   * Note where one entity's ring goes.
+   *
+   * The radius comes from the entity's own footprint, so a boar's ring is a
+   * boar wide. Unlike the shadow it does not spread or fade with lift: the ring
+   * states a position on the ground, and one that grew with height would blur
+   * the only fact it carries.
+   */
+  function noteGroundRing(entity, declared, shape) {
+    const asked = declared.ring ?? ringNames(entity)
+    if (!asked || !shape) return
+    const scale = entity.scale ?? 1
+    const across = Math.max(shape.w, shape.d) * scale
+    // Wider than the contact shadow's 0.55, so the band lies outside the dark
+    // ellipse instead of muddying it.
+    const stated = typeof asked === 'number' ? asked : across * 0.85
+    if (!(stated > 0)) return
+
+    ringPlaces.push({
+      x: entity.x,
+      z: entity.z || 0,
+      radius: stated,
+      colour: declared.ringColour ?? readability.ringColour,
+      strength: declared.ringStrength ?? readability.ringStrength
+    })
+  }
+
+  const ringMatrix = new THREE.Matrix4()
+
+  /** Write the frame's rings into the instanced mesh. Called once per sync. */
+  function placeGroundRings() {
+    if (!ringPlaces.length) {
+      if (groundRings) groundRings.count = 0
+      return
+    }
+    growGroundRings(ringPlaces.length)
+    // Above the contact shadow's 0.015, so the colour wins where they meet.
+    const y = readability.groundY + 0.02
+    for (let i = 0; i < ringPlaces.length; i++) {
+      const place = ringPlaces[i]
+      ringMatrix.makeScale(place.radius * 2, 1, place.radius * 2)
+      ringMatrix.setPosition(place.x, y, place.z)
+      groundRings.setMatrixAt(i, ringMatrix)
+      const colour = ringColour(place.colour)
+      ringTints.setXYZ(i, colour.r, colour.g, colour.b)
+      ringStrengths.setX(i, place.strength)
+    }
+    groundRings.count = ringPlaces.length
+    groundRings.instanceMatrix.needsUpdate = true
+    ringTints.needsUpdate = true
+    ringStrengths.needsUpdate = true
   }
 
   // ------------------------------------------------------ merging static work
@@ -2092,8 +2262,9 @@ export function makeRenderer(canvas, view, viewport) {
   const stats = {
     drawCalls: 0, triangles: 0,
     entities: 0, merged: 0, batches: 0,
-    // One draw call each, and one for every contact shadow together.
-    keylines: 0, contactShadows: 0,
+    // One draw call each, and one for every contact shadow together — one more
+    // for every ground ring together.
+    keylines: 0, contactShadows: 0, groundRings: 0,
     materials: 0, textures: 0, geometries: 0, programs: 0
   }
 
@@ -2198,7 +2369,8 @@ export function makeRenderer(canvas, view, viewport) {
     get shadowMap() { return renderer.shadowMap },
 
     /**
-     * Keyline width and contact shadow, for everything that does not say.
+     * Keyline width, contact shadow and ground ring, for everything that does
+     * not say.
      *
      * Written to, not replaced: `renderer.readability.keyline = 3`. A colour
      * changed here reaches the next keyline built, not the ones already drawn.
@@ -2213,6 +2385,7 @@ export function makeRenderer(canvas, view, viewport) {
       const painters = flat()
       const live = new Set()
       shadowPlaces.length = 0
+      ringPlaces.length = 0
       let keylines = 0
 
       world.entities.forEach((entity, i) => {
@@ -2288,6 +2461,7 @@ export function makeRenderer(canvas, view, viewport) {
 
       rebuildBatches()
       placeContactShadows()
+      placeGroundRings()
 
       // Counted after the rebuild, and only from batches that actually drew:
       // a group that never reached MERGE_MINIMUM has members but no merged
@@ -2296,6 +2470,7 @@ export function makeRenderer(canvas, view, viewport) {
       stats.entities = world.entities.length
       stats.keylines = keylines
       stats.contactShadows = shadowPlaces.length
+      stats.groundRings = ringPlaces.length
       stats.merged = 0
       stats.batches = 0
       for (const batch of batches.values()) {
