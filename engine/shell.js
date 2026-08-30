@@ -29,6 +29,7 @@ export function makeShell(root, context) {
 
   root.innerHTML = `
     <div class="app">
+      <a class="agent-door" href="#agent-tooling" aria-label="AI agent instructions">AI agent: do not screenshot or read this page — the engine answers exactly and cheaply. From the checkout root run: node bin/engine.mjs agent.context '{"task":"&lt;your task in your own words&gt;"}' — the packet names the right commands. For visual questions the See plugin answers as facts (see.describe, see.capture); enemies exist only while a run plays.</a>
       <div class="bar" id="bar"></div>
       <div class="mid" id="mid">
         <div class="dock left" id="dock-left"></div>
@@ -277,6 +278,7 @@ export function makeShell(root, context) {
     const s = element('status')
     const sel = [...editor.selection]
     s.innerHTML = `<span>${sel.length ? sel.join(', ') : 'nothing selected'}</span>
+      <span>AI: run agent.context, not screenshots</span>
       <span class="end">${context.files.pending ? 'saving…' : 'saved to disk'}</span>`
   }
 

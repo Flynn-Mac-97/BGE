@@ -61,6 +61,12 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline:2p
 .menu:hover { background:var(--sunk); color:var(--ink-2); }
 .menu.on { background:var(--ink); color:var(--paper); border-color:var(--ink); }
 
+/* The agent door: invisible to a person, first in every accessibility and
+   page-text read — which is where a browser-driving agent looks before it
+   spends a screenshot. */
+.agent-door { position:absolute; width:1px; height:1px; overflow:hidden;
+  clip-path:inset(50%); white-space:nowrap; }
+
 /* A row being dragged out of a list. */
 .u-lrow.dragging { opacity:.4; }
 

@@ -9,18 +9,16 @@ small instruction packet for your task:
 node bin/engine.mjs agent.context engine/world.js
 ```
 
-**To look at the game, never screenshot the browser.** The See plugin answers
-visual questions exactly — what is on screen, what hides what, how something
-moved — and exports a marked frame only when pixels are the question:
+**Never screenshot the browser to see the game.** Ask for your packet with the
+task in your own words — the words route the right plugin's guide in, and only
+for plugins the project has enabled:
 
 ```sh
-node bin/engine.mjs run see.describe                      # what is on screen, as facts
-node bin/engine.mjs run see.capture '{"subject":"<id>"}'  # a marked frame of one thing
+node bin/engine.mjs agent.context '{"task":"have a look at the rat model"}'
 ```
 
-Read `plugins/builtin/see.agent.md` before any visual task. Enemies and
-effects exist only while a run plays — `see.find '{"type":"<t>"}'` says what
-exists right now, and `simulate` brings a moment about.
+The packet names the exact commands. Enemies and effects exist only while a
+run plays; `simulate` brings a moment about.
 
 Use the **AGENTS** panel to see the instruction tree and switch optional skills on or off.
 
