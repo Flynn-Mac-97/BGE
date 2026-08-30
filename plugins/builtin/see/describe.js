@@ -223,6 +223,23 @@ export function describe(context, options = {}) {
     } else between = { ids: options.between, error: 'one of the two ids does not exist' }
   }
 
+  // Every other field is a projection, so a fault in world space cannot be seen
+  // in them, and `depth` — distance from the lens — reads as height to anyone
+  // looking for one. A span per TYPE costs ten lines rather than one per
+  // entity, and a gap between two spans is what a structural fault looks like.
+  const verticalSpan = {}
+  for (const entry of visible) {
+    const world = entry._world
+    const bottom = world.y - world.h / 2
+    const top = world.y + world.h / 2
+    const span = verticalSpan[entry.type]
+    if (!span) verticalSpan[entry.type] = [round(bottom), round(top)]
+    else {
+      span[0] = Math.min(span[0], round(bottom))
+      span[1] = Math.max(span[1], round(top))
+    }
+  }
+
   for (const entry of visible) delete entry._world
 
   // A whole editor scene lists hundreds of props nobody asked about. Brief
@@ -245,6 +262,12 @@ export function describe(context, options = {}) {
     },
     /** Percent of the screen each type's boxes cover, before overlap. */
     coverage,
+    /**
+     * Bottom and top face of each visible type in WORLD units, y up. The only
+     * field here that is not a projection, and the one that answers whether a
+     * thing rests on, floats above or sinks into another.
+     */
+    verticalSpan,
     /** One colour per marked type — the colour each See drawing uses for it. */
     palette,
     /**

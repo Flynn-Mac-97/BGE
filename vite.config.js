@@ -496,9 +496,8 @@ function serverRegistry() {
  *
  * The rule for what they contain is in engine/agent-registration.mjs, and this
  * calls it rather than repeating it, so `node bin/engine.mjs check` reports
- * them against the same rule that writes them. The copy that used to be here
- * held the bootstrap text in a constant read once at startup, so editing the
- * source while the server ran wrote the old text back.
+ * them against the same rule that writes them. It also reads the source per
+ * write, so an edit while the server runs reaches the generated files.
  */
 const writeAgentDoc = () => writeGeneratedAgentFiles(ROOT, PROJECT_DIRECTORY)
 

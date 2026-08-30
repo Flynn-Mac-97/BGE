@@ -186,12 +186,9 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const projectOverrides = new Set(selected
     .filter(node => node.scope === 'project' && node.override)
     .map(node => node.override))
-  // An `always` rule is never replaced, only added to. A project override is
-  // scoped to its own files but eviction is scoped to the whole packet, so one
-  // project file in the list would drop the rule for the engine files beside
-  // it. The overrides also defer back — `project/agents/overrides/` says "this
-  // game follows the engine comment style" — so evicting one sent no rule at
-  // all. The project's rule comes after, and later text wins on a conflict.
+  // An `always` rule is added to, never replaced. An override is scoped to its
+  // own files and eviction is scoped to the whole packet, so the two cannot be
+  // made to agree. The project's rule comes after, and later text wins.
   const replaced = new Set(selected
     .filter(node => node.scope === 'engine' && node.override && !node.always && projectOverrides.has(node.override))
     .map(node => node.id))

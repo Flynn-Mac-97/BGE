@@ -90,10 +90,9 @@ test('a project style rule replaces its named engine default', async () => {
 })
 
 test('a project rule adds to an always rule and never evicts it', async () => {
-  // An override is scoped to its own files; eviction was scoped to the whole
-  // packet, so one project file dropped the universal rule for the engine files
-  // beside it. The project overrides on disk also defer back to the engine
-  // rule, so evicting it sent no rule at all.
+  // Two routes, because an override is scoped to its own files while eviction
+  // is scoped to the whole packet: a project file must not cost the engine
+  // files beside it their universal rule.
   const files = new Map([
     ['engine:agents/manifest.json', JSON.stringify({ version: 2, nodes: [
       { id: 'root', kind: 'group' },
