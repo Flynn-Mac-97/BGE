@@ -68,6 +68,24 @@ export function makeUI(state, redraw) {
     section: (title, children) =>
       append(h('div', 'u-section'), [h('div', 'u-cap', { text: title }), ...[].concat(children || [])]),
 
+    /**
+     * Collapsible group. Closed until the reader opens it, so many folds cost
+     * one summary line each. `o.meta` is a right-aligned count or note;
+     * `o.open` starts it open.
+     */
+    fold(title, children, o = {}) {
+      const element = h('details', 'u-fold')
+      if (o.open) element.open = true
+      const summary = h('summary', 'u-fsum')
+      append(summary, [h('span', 'u-flabel', { text: title })])
+      if (o.meta != null) append(summary, [h('span', 'u-meta', { text: String(o.meta) })])
+      append(element, [summary])
+      return append(element, children)
+    },
+
+    /** Even columns of picture cells. Layout only — `grid` is for picking. */
+    gallery: children => append(h('div', 'u-gallery'), children),
+
     scroll: children => append(h('div', 'u-scroll'), children),
 
     // ---- text ----

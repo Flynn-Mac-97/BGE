@@ -232,6 +232,23 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline:2p
   font:12px/1.45 var(--mono); outline:none; }
 .u-textarea:focus { border-color:var(--ink); }
 
+/* Open or closed is carried by the marker alone — no hue, matching the rest. */
+.u-fold { border-top:1px solid var(--rule-soft); }
+.u-fsum { display:flex; align-items:baseline; gap:8px; padding:5px 10px;
+  font:10.5px var(--mono); color:var(--ink-3); cursor:pointer; list-style:none; user-select:none; }
+.u-fsum::-webkit-details-marker { display:none; }
+.u-fsum::before { content:'▸'; font:9px var(--mono); color:var(--ink-4); }
+.u-fold[open] > .u-fsum::before { content:'▾'; }
+.u-fsum:hover { background:var(--sunk); color:var(--ink); }
+.u-fsum .u-meta { margin-left:auto; }
+.u-flabel { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.u-gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:8px; padding:6px 10px; }
+.u-gallery .u-picture { margin:0; }
+/* Fill the column so cells line up whatever size the frames were saved at. */
+.u-gallery .u-picture img { width:100%; max-width:100%; max-height:none; }
+
 .u-grid { display:grid; grid-template-columns:repeat(var(--cols,3),1fr); gap:1px; background:var(--rule-soft); }
 .u-cell { background:var(--surface); padding:7px 5px 6px; cursor:pointer; display:flex; flex-direction:column;
   align-items:center; gap:4px; min-width:0; }

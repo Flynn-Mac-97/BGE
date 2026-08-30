@@ -1902,6 +1902,35 @@ export function makeRenderer(canvas, view, viewport) {
       stats.programs = renderer.info.programs?.length || 0
     },
 
+    /**
+     * One draw of the world scene into a caller-owned render target, the
+     * pixels read straight back into `buffer`.
+     *
+     * This is how a query consumes a frame as data — the See plugin's ID
+     * buffer — without the canvas being touched: the bound target and the
+     * clear colour are restored before returning. The clear colour is forced
+     * to zero for the draw so an unwritten pixel reads back as nothing rather
+     * than as whatever the page background is. What the caller changed for
+     * its pass — materials, layers, visibility, the scene background — is the
+     * caller's to restore. `region` is in target pixels from the bottom left,
+     * because that is the orientation GL reads back in.
+     */
+    drawInto(target, buffer, region = null) {
+      const camera = readyCamera()
+      scene.updateMatrixWorld()
+      const keptTarget = renderer.getRenderTarget()
+      const keptColour = renderer.getClearColor(new THREE.Color())
+      const keptAlpha = renderer.getClearAlpha()
+      renderer.setClearColor(0x000000, 0)
+      renderer.setRenderTarget(target)
+      renderer.clear()
+      renderer.render(scene, camera)
+      const read = region || { x: 0, y: 0, width: target.width, height: target.height }
+      renderer.readRenderTargetPixels(target, read.x, read.y, read.width, read.height, buffer)
+      renderer.setRenderTarget(keptTarget)
+      renderer.setClearColor(keptColour, keptAlpha)
+    },
+
     // ---- the two hook points ----
 
     /**

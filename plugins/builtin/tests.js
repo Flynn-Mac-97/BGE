@@ -91,11 +91,18 @@ export default {
           onPick: id => runAll(context, id)
         }),
         // Frames the tests left behind, for the reader whose eyes are better
-        // than the assertions. Stamped by run time so a rerun's picture wins
-        // over the browser cache.
-        ...ids.flatMap(id => (results.get(id)?.checks || [])
-          .filter(check => check.frame)
-          .map(check => ui.picture(check.frame, { label: check.message, stamp: `${id}-${results.get(id).ms}` }))),
+        // than the assertions. One closed fold per test, so many frames do not
+        // push the verdict line out of the panel. Stamped by run time so a
+        // rerun's picture wins over the browser cache.
+        ...ids.map(id => {
+          const result = results.get(id)
+          const frames = (result?.checks || []).filter(check => check.frame)
+          if (!frames.length) return null
+          return ui.fold(id,
+            ui.gallery(frames.map(check =>
+              ui.picture(check.frame, { label: check.message, stamp: `${id}-${result.ms}` }))),
+            { meta: `${frames.length} frame${frames.length === 1 ? '' : 's'}` })
+        }),
         ui.text(running ? 'running…' : ran ? `${pass}/${ran} passing` : 'not run yet', { dim: true })
       ])
     }

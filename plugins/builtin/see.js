@@ -6,6 +6,8 @@
  * cheapest form that answers them:
  *
  *   see.describe  computed facts, no pixels. Works everywhere, costs nothing.
+ *   see.occlusion, see.isolate, see.find, see.diff, see.camera
+ *                 query verbs over the same facts — see/queries.js.
  *   see.sketch    a flat-colour frame drawn from those facts. Works everywhere.
  *   see.capture   the real rendered frame. Browser only.
  *
@@ -15,12 +17,9 @@
  * written to disk by the CLI. Frames are named by level name and a frame
  * number, never by a clock.
  */
-import { boundsOf } from '../../engine/frame-facts.js'
 import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
 import { describe } from './see/describe.js'
-
-/** Marks past this are noise: tags start overlapping and reads degrade. */
-const MOST_MARKS = 40
+import { occlusion, isolate, find, diff, camera } from './see/queries.js'
 
 let frameNumber = 0
 
@@ -32,7 +31,12 @@ export default {
   onLoad(context) {
     context.see = {
       describe: options => describe(context, options),
-      sketch: options => sketchPixels(describe(context, options), options)
+      sketch: options => sketchPixels(describe(context, options), options),
+      occlusion: options => occlusion(context, options),
+      isolate: options => isolate(context, options),
+      find: predicates => find(context, predicates),
+      diff: options => diff(context, options),
+      camera: () => camera(context)
     }
   },
 
@@ -41,6 +45,31 @@ export default {
       id: 'see.describe',
       label: 'What is on screen, as computed facts — no pixels, no vision read',
       run: (context, options) => describe(context, options || {})
+    },
+    {
+      id: 'see.occlusion',
+      label: 'How much of one entity the camera sees, and who blocks the rest',
+      run: (context, options) => occlusion(context, options || {})
+    },
+    {
+      id: 'see.isolate',
+      label: 'One entity in full — world box, screen box, cover, velocity, camera relation',
+      run: (context, options) => isolate(context, options || {})
+    },
+    {
+      id: 'see.find',
+      label: 'Every entity matching the given predicates, on screen or off',
+      run: (context, options) => find(context, options || {})
+    },
+    {
+      id: 'see.diff',
+      label: 'What appeared, moved, or left over exact fixed steps',
+      run: (context, options) => diff(context, options || {})
+    },
+    {
+      id: 'see.camera',
+      label: 'Why the frame looks wrong, asked of the camera itself',
+      run: context => camera(context)
     },
     {
       id: 'see.sketch',
