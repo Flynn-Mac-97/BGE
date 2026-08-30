@@ -504,7 +504,9 @@ export function describeReload(capture, outcome) {
         : `${trigger}${when}; the world was put back as it was — ${was}. `)
         + `A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. `
         + `NOT restored: ${outcome.restored.notRestored.join('; ')}. `
-        + `engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.`,
+        + (outcome.restored.lookOnly
+          ? 'engine.reloadNotice() repeats this.'
+          : 'engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.'),
       detail
     }
   }
