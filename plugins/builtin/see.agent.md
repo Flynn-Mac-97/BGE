@@ -1,10 +1,17 @@
 ---
 skill: see-the-game
-description: Look at or inspect anything in the running game — models, effects, screens, what is visible or hidden. Use this INSTEAD of browser screenshots; it answers in exact facts and marked frames for a fraction of the cost.
-triggers: look, look at, looks, visual, screenshot, frame, capture, render, hidden, occlud, blocking, on screen, off screen, camera, viewport, what does, appearance, model look, effect
+description: What the running game actually shows a player, and what each thing on screen is — answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, or instead of reading type files to work out what an object is.
+triggers: look, look at, looks, visual, screenshot, frame, capture, render, hidden, occlud, blocking, on screen, off screen, camera, viewport, what does, appearance, model look, effect, what is that, what is this, unidentified, identify, looks wrong, wrong on screen, unexpected
 ---
 
 # See
+
+The gap this closes: your model of the game and what a player actually sees
+can disagree, and no amount of reading code will tell you. A shape you did
+not expect has no name, and working out what an object is means opening its
+files. See answers from the engine's own data — what is on screen, where,
+what it is, what is hidden, and whether it looks right — so a visual question
+costs a query instead of a screenshot and a guess.
 
 Query first, pixels last. Route every question to the cheapest exact
 authority — scene graph, then geometry, then renderer queries, then
@@ -54,9 +61,15 @@ compare it against the sidecar; absence is a query, not a look.
   `visibleFraction` and `blockedBy` name the hider. Zero blockers? Run
   `see.isolate` on it: `hidden`, `onScreen: false`, or an off-frame world
   position is the answer.
-- What is drawn at a spot / what is this pixel: the renderer's ID buffer,
-  through `see.occlusion` — `method: "id-buffer"` means real rendered
-  pixels answered. Never a vision read.
+- Something is on screen and you do not know what it is: this is the one
+  question See cannot yet answer, and it is worth saying so rather than
+  letting you hunt. The renderer's ID buffer knows which entity drew every
+  pixel, but the only verb that reads it, `see.occlusion`, takes `of: "<id>"`
+  — so you must already know what the thing is to ask what it is. For now:
+  `see.describe` and match the shape against the marked entries' `at` and
+  `size`, and treat the answer as a guess. A thing the ID buffer cannot name
+  at all is a particle, a decal, a HUD overlay, or a material that failed to
+  load — none of which are entities.
 - Did it move, spawn, or die correctly: `see.diff '{"steps":30}'`.
 - Inspect one thing: `see.isolate '{"subject":"<id>"}'` — the full dossier
   in one call.
