@@ -76,9 +76,13 @@ function describe(context, options = {}) {
   visible.sort(subject
     ? (a, b) => a.depth - b.depth
     : (a, b) => b.size[0] * b.size[1] - a.size[0] * a.size[1])
-  const subjectDepth = subject && visible.find(entry => entry.id === subject.id)?.depth
+  const subjectEntry = subject && visible.find(entry => entry.id === subject.id)
+  const subjectDepth = subjectEntry?.depth
   const marked = []
+  // The subject of a subject shot is always mark 1 — the question is about it.
+  if (subjectEntry) { subjectEntry.mark = marked.push(subjectEntry) }
   for (const entry of visible) {
+    if (entry === subjectEntry) continue
     if (entry.size[0] > 50 || entry.size[1] > 50) continue
     // In a subject shot the horizon is context, not content — no tags out there.
     if (subjectDepth && entry.depth > subjectDepth * 8) continue

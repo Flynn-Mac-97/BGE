@@ -32,15 +32,21 @@ export default {
     test.ok(during.between.touching === false || during.between.distance < 1,
       'between answers for a named pair')
 
-    // The frames a human checks, shown in the Tests panel. A headless run
-    // writes them to agent-runs/see/; a browser run answers a data URL and
-    // the panel shows that directly.
-    const sketch = await test.run('see.sketch', { camera: PLAY_CAMERA, name: 'test-battery-30s' })
-    test.ok(sketch.files || sketch.dataUrl, 'the 0:30 sketch answered with a frame')
-    test.frame(sketch.files || sketch.dataUrl, 'the field at 0:30, play camera')
+    // The frames a human checks, shown in the Tests panel. In the browser the
+    // renderer is right there, so the frames are real renders; headless has no
+    // renderer and sketches the same facts to agent-runs/see/ instead.
+    const inBrowser = typeof document !== 'undefined'
+    const look = (options, name) =>
+      test.run(inBrowser ? 'see.capture' : 'see.sketch', { ...options, name })
+    const asFrame = shot => shot.files || shot.dataUrl
+      || (shot.__files && `data:image/png;base64,${shot.__files[0].base64}`)
 
-    const portrait = await test.run('see.sketch', { subject: 'you', name: 'test-battery-kitten' })
+    const field = await look({ camera: PLAY_CAMERA }, 'test-battery-30s')
+    test.ok(!!asFrame(field), 'the 0:30 frame answered')
+    test.frame(asFrame(field), `the field at 0:30, play camera${inBrowser ? '' : ' (sketch — run in the browser for the render)'}`)
+
+    const portrait = await look({ subject: 'you' }, 'test-battery-kitten')
     test.ok(portrait.marks?.['1'] === 'you', 'the subject is mark 1 in its own portrait')
-    test.frame(portrait.files || portrait.dataUrl, 'the kitten, framed as the subject')
+    test.frame(asFrame(portrait), 'the kitten, framed as the subject')
   }
 }
