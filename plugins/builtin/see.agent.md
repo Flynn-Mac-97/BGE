@@ -44,7 +44,11 @@ are exact, and every reply's `method` field names how it was computed.
 - `see.describe '{...}'` — the index every other answer builds on: camera,
   visible entities with screen positions (percent, x right, y down), sizes,
   depth, marks, off-screen counts, coverage, overlaps, occlusions, regions.
-- `see.occlusion '{"of":"you"}'` — `visibleFraction` 0–1 and `blockedBy`.
+- `see.occlusion '{"of":"you"}'` — off frame answers `offscreen`, not zero.
+  `visibleFraction` divides visible pixels by the PROJECTED BOX, so a shaped
+  model reads below 1 with nothing blocking it — compare against its own
+  uncrowded baseline, not against 1. Particles, decals and damage numbers are
+  not entities, so the ID buffer cannot name them as blockers yet. — `visibleFraction` 0–1 and `blockedBy`.
   ID buffer when a renderer answers; rays from the eye otherwise. Optional
   `rows`/`columns` set the sample grid (default 5x5).
 - `see.isolate '{"subject":"rat-3"}'` — world and screen boxes, cut,

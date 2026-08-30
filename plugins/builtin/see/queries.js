@@ -38,15 +38,24 @@ export async function occlusion(context, options = {}) {
   const rows = options.rows || 5
   const columns = options.columns || 5
 
+  // Off frame is not occluded — zero visible pixels would read as "something
+  // blocks it" when the truth is the camera does not point at it.
+  const framed = describe(context, {})
+  if (!framed.visible.some(entry => entry.id === entity.id)) {
+    return { id: entity.id, offscreen: true, why: 'outside the frame of the current camera — nothing occludes it, nothing shows it' }
+  }
+
   const buffer = await loadIdBuffer()
   if (buffer?.visibility) {
     try {
-      const read = await buffer.visibility(context, { of: entity.id, rows, columns })
+      // visibility takes a list of ids and answers a measure per id.
+      const read = (await buffer.visibility(context, [entity.id]))?.[0]
       if (Number.isFinite(read?.visibleFraction)) {
         return {
           id: entity.id,
           visibleFraction: round(read.visibleFraction),
-          blockedBy: read.blockedBy || [],
+          blockedBy: read.occludedBy || read.blockedBy || [],
+          visiblePixels: read.visiblePixels,
           method: 'id-buffer'
         }
       }
