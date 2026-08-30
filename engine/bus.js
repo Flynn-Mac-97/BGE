@@ -12,9 +12,9 @@ export function makeBus() {
       return () => map.get(event)?.delete(fn)
     },
 
-    emit(event, payload) {
+    emit(event, ...payload) {
       for (const fn of map.get(event) || []) {
-        try { fn(payload) }
+        try { fn(...payload) }
         catch (e) { console.error(`[bus] listener for "${event}" threw`, e) }
       }
     }

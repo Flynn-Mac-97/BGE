@@ -239,7 +239,11 @@ export async function startWorld({
     }
 
     bus.emit('world:changed')
-    bus.emit('level:loaded', name)
+    // The camera rule rides along, because the kernel has already paid to parse
+    // the file: a listener that re-read it from disk lost the race against a
+    // one-shot headless run, which booted, played and simulated inside the read
+    // and spent the whole run behind the editor's ortho view.
+    bus.emit('level:loaded', name, raw.camera || {})
   }
 
   /**
