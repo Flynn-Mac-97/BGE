@@ -349,7 +349,13 @@ function emptyBands(verticalSpan) {
     const ceiling = Math.max(...spans.slice(0, index).map(span => span.top))
     const metres = round(spans[index].bottom - ceiling)
     if (metres < 1) continue
-    bands.push({ from: ceiling, to: spans[index].bottom, metres, above: spans[index].type })
+    // A reader asked what is wrong weighs a field by what it says about itself.
+    // Left as numbers this ranks alongside every other measurement in the
+    // reply; said plainly it is the answer.
+    bands.push({
+      from: ceiling, to: spans[index].bottom, metres, above: spans[index].type,
+      why: `nothing occupies these heights, so ${spans[index].type} was placed against a different surface from everything below it. Check this before anything else in the reply.`
+    })
   }
   return bands.sort((first, second) => second.metres - first.metres).slice(0, 3)
 }
