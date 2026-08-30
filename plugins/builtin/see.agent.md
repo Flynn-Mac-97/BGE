@@ -45,6 +45,25 @@ are exact, and every reply's `method` field names how it was computed.
   in one call.
 - Only after these: an image, for judgement a number cannot carry.
 
+## From a terminal
+
+- With the editor open, plain `node bin/engine.mjs run see.<verb> '{...}'`
+  drives it over the bridge. `--project` is only for `--headless` runs, and it
+  takes the project DIRECTORY NAME (`kitten-survivors`), never `.`.
+- `script '[...]'` is headless-only. Over the bridge, run one verb per call —
+  the browser world keeps its state between calls.
+- Add `"brief": true` to describe in a busy scene: only marked entities are
+  listed, with every count kept. A full meadow lists 700 props without it.
+
+## Inspect one model, in four calls
+
+```sh
+node bin/engine.mjs run see.find '{"type":"rat"}'        # exists? get an id
+node bin/engine.mjs spawn rat '{"at":[0,0.2,2]}'         # only if count was 0
+node bin/engine.mjs run see.capture '{"subject":"rat-0","alone":true}'
+node bin/engine.mjs destroy rat-0                        # remove what you spawned
+```
+
 ## Query commands
 
 - `see.describe '{...}'` — the index every other answer builds on: camera,

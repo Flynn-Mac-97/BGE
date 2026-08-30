@@ -151,14 +151,19 @@ export function describe(context, options = {}) {
 
   for (const entry of visible) delete entry._world
 
+  // A whole editor scene lists hundreds of props nobody asked about. Brief
+  // keeps the marked entities — the ones a question names — and the totals.
+  const listed = options.brief ? visible.filter(entry => entry.mark) : visible
+
   return {
+    ...(options.brief ? { brief: true, listedOnlyMarked: true } : {}),
     camera: {
       mode: projector.mode, x: round(view.x), y: round(view.y), z: round(view.z || 0),
       yaw: round(view.yaw || 0), pitch: round(view.pitch || 0),
       ...(projector.mode === 'ortho' ? { zoom: view.zoom } : { fov: view.fov || 90 })
     },
     viewport: { ...context.viewport },
-    visible,
+    visible: listed,
     counts: {
       visible: visible.length,
       offscreen: Object.values(offscreenByType).reduce((sum, n) => sum + n, 0),
