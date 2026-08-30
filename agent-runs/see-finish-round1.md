@@ -26,6 +26,19 @@ could never pass. **Round 1 verdict: pass, 3 of 3, on the discovery-only
 meter.** The meter itself is written down here so later rounds do not
 re-argue it.
 
+Two objections to that verdict stand, and both are the owner's to settle.
+The first: no independent party can check any of these numbers. The matrix
+cell says "transcripts kept" and none were — this harness reports a token
+total to the running session and to nobody else, so every figure above is
+prose. The tool-call count is observable; the token count is not. The
+second: subtracting a fixed 20.4k floor from a fixed 30k cap leaves about
+9,500 tokens of headroom, which is more than five tool calls can plausibly
+spend — so under this reading the token term cannot fail while the 5-call
+term holds, and a test that cannot fail is not a test. Either the meter
+becomes "tokens from session start to the first valid call, minus a floor
+measured that day and written into the tree", or the token term is struck
+and the tool-call term carries the row by itself.
+
 ## What the probes exposed about grounding — three real defects
 
 These came out of watching cheap agents use the plugin, which is the reason
@@ -91,6 +104,26 @@ It also shows p138 is milder than first recorded: the guide points at a
 information as a `mark` field on each `visible` entry and copes. It is still
 wrong and still worth fixing — it just is not what would fail this row.
 
+**And the row does not measure what it is called.** An independent critic
+wrote fifty lines of JavaScript that never opens the PNG and scored 4 of 4 on
+both frames. Every question is a direct field read: question one is
+`palette[type]`, question two is a count of `mark` by type, question three is
+`occlusions[0]`, question four is `at[0] < 33.34`. A model with its image
+channel switched off passes this row, and so would a build whose renderer
+drew a black rectangle.
+
+The fourth question was written to catch exactly that — a reader answering
+from the picture's feel rather than the sidecar's numbers — and it failed to,
+twice, because on both frames the player sits at `at.x = 50`, dead centre,
+the one value where feel and fact cannot disagree. Both evaluators did in
+fact answer it by eye, and both got away with it.
+
+Row 2 as written is a JSON-parsing test. Making it a vision test needs at
+least one question the sidecar cannot answer — whether a hull follows the
+model or its bounding box, whether a marked thing is clipping through the
+ground, which of two marked rats is mid-stride. That is a change to the
+matrix, so it is the owner's to make.
+
 ## Row 3, Battery green and restore-safe — PASS on everything a machine can check
 
 After the loop's work merged:
@@ -98,10 +131,28 @@ After the loop's work merged:
 - headless `tests.run`: 2 of 2 tests pass, 57 assertions, no red
 - in the browser through the bridge: 2 of 2 pass, 61 assertions — the four
   extra are the ones that need a real renderer
-- every image command's failure case leaves the world exactly as it found
-  it: 15 of 15 error paths produce an empty diff of entities, camera, clock
-  and holders, against a probe that produces a 7-field leak on the pre-fix
-  code
+- the restore probe reports 15 of 15 error paths producing an empty diff of
+  entities, camera, clock and holders, against a probe that produces a
+  7-field leak on the pre-fix code
+
+**That 15 of 15 is worth less than it sounds, and the critic was right to say
+so.** Five of the fifteen are `see.capture` cases, and headless `capture`
+returns at its first line — `typeof document === 'undefined'` — before the
+camera moves, before entities are hidden, before the pass chain is emptied.
+Five differently-named cases produce one identical refusal. `see.moment`'s
+held-clock case sits below the same guard and is unreachable too. So six of
+the fifteen prove a guard clause, not a restore. The blank-tab case, which
+the evaluator names first, is the ONLY one where the world has really been
+borrowed at the moment of failure, and it is precisely the one a headless
+probe cannot reach.
+
+The probe also reads only `snapshot({entities:true})` and `see.camera`, and
+neither carries the scene grade or the pass chain — two of the four things
+the evaluator asks to be unchanged. A leaked `passes.set([])` would show an
+empty diff. The battery's own `fingerprint()` does capture passes,
+background, fog and overlay visibility, and it runs in the browser; the
+honest claim is that the BATTERY covers restore safety and the headless probe
+mostly covers refusals.
 
 The battery grew from 20 assertions with one of them red at HEAD to 45, and
 now covers hull marks and the legend, `ui: false`, subject shots and `aim`,
@@ -110,18 +161,46 @@ where the kitten happened to walk while claiming to test that `between`
 answered; it asserts what it says now.
 
 What a machine cannot check is left for the owner: clicking the See tests in
-the browser panel and seeing the frames render.
+the browser panel and seeing the frames render. Driving `tests.run` over the
+bridge is NOT a substitute for that, and it should not be reported as one.
+`test.frame` in `plugins/builtin/tests.js` pushes `ok: true`
+unconditionally — a blank frame passes, an all-black frame passes, and a
+capture that refuses pushes no check at all and silently lowers the count.
+The only pixel assertion anywhere is a range check that both a pure-black and
+a pure-white frame satisfy. So the 61 green assertions in the browser say
+nothing about whether anything was drawn. The panel is the term because a
+human's eyes are the only thing currently checking that.
 
 ## Row 4, Marks spend where questions point — PASS
 
 Measured headless on two seeds and two cameras by the lane, and again live in
 the browser after merging.
 
-| where | scenery in first 12 | brief bytes |
+| where | scenery in first 12 | brief `describe` bytes |
 |---|---|---|
 | baseline at HEAD | 11 of 12 | 9127 |
 | seed 7 and seed 21, headless, two cameras each | 1 of 12 | 7690–7875 |
-| live browser, meadow at 0:30 through `meadow-play` | 1 of 12 | 15854 sidecar, 9241 with `brief` |
+| live browser, meadow at 0:30 through `meadow-play` | 1 of 12 | 7684 |
+
+**A correction, because the first version of this table was wrong.** It read
+"15854 sidecar, 9241 with brief" against a mark count taken from a different
+frame, and the 9241 came from `agent-runs/see/brief-on.json` — a frame shot
+through a stale browser module after a hot reload, which shows the OLD rule
+putting twelve of twelve marks on scenery. It was pre-fix evidence quoted
+inside a post-fix row. That file is deleted and the trap is recorded as p162;
+a sidecar that cannot say which build made it can always be read as evidence
+for a build it predates.
+
+The numbers above now come from ONE post-fix live-browser frame, measured
+directly: a brief `describe` reply is **7,684 bytes**, against 7,674 headless
+from the same view.
+
+One thing the row does not measure, and should. `describe` is not the artifact
+a vision reader receives — a capture sidecar is, and that one traces
+silhouettes, which `describe` never does. The same frame, `see.capture` with
+`brief`, is **9,829 bytes**: over the threshold, by the same hull-tracing the
+loop shipped. Row 4 names `describe`, so row 4 passes; the thing that actually
+leaves the machine does not. That gap belongs to the owner, not to a lane.
 
 Marks are now dealt out by type rather than by size: every type on screen
 takes its first mark before any type takes a second, rarest first, and a
