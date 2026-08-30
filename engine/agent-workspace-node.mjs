@@ -301,7 +301,11 @@ export function releaseAgent(root, id, result = {}) {
 export function mergeAgent(root, id) {
   validateId(id)
   const main = mainWorktree(root)
-  const run = readAgentRegistry(main).runs.find(entry => entry.id === id)
+  // The newest run with this id. An id is reused across sessions, and an older
+  // merged record answering for a finished lane skips the merge and reports
+  // success.
+  const runs = readAgentRegistry(main).runs.filter(entry => entry.id === id)
+  const run = runs[runs.length - 1]
   if (!run) throw new Error(`no agent task "${id}"`)
   if (run.status === 'active') throw new Error(`agent task "${id}" is still active; release it first`)
   if (run.status === 'merged') return { ...run, already: true }

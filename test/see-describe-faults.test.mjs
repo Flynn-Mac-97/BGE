@@ -96,14 +96,23 @@ test('a live double-drop is caught as two entities on one point', () => {
 })
 
 test('a live mesh override is caught as a size outlier', () => {
+  // The gem is the one this run dropped, read back from the drop. An id
+  // written into the test names an entity that any change to the schedule or
+  // the level moves.
+  const dropped = JSON.parse(execFileSync(process.execPath, [
+    CLI, 'script', '[["play"],["simulate",30],["run","kitten.drop",5]]',
+    '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
+  ], { encoding: 'utf8' }))[2].id
+  assert.ok(dropped, 'the drop names the gem it made')
+
   const stdout = execFileSync(process.execPath, [
     CLI, 'script',
     '[["play"],["simulate",30],["run","kitten.drop",5],'
-      + '["set","xp-gem-196","mesh",{"box":[10,10,10]}],["run","see.describe"]]',
+      + `["set",${JSON.stringify(dropped)},"mesh",{"box":[10,10,10]}],["run","see.describe"]]`,
     '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
   ], { encoding: 'utf8' })
   const description = JSON.parse(stdout)[4]
-  const found = description.sizeOutliers?.find(entry => entry.id === 'xp-gem-196')
+  const found = description.sizeOutliers?.find(entry => entry.id === dropped)
   assert.ok(found, 'the oversized gem is named')
   assert.ok(found.factor > 10, `expected a large factor, got ${found.factor}`)
 })
