@@ -24,6 +24,16 @@ const HUNTED = 'kitten'
 /** Where the ground is, when nothing solid is under the origin to measure against. */
 const FLOOR_TOP_WHEN_UNKNOWN = 0.5
 
+/**
+ * Seconds a body stays on the meadow after it dies.
+ *
+ * Matches Health's own default linger, so a corpse this file takes away and one
+ * Health takes away go at the same moment and a death reads the same either
+ * way. It is long enough for the collapse to be seen and short enough that a
+ * screen at the population cap never holds more corpses than enemies.
+ */
+const BODY_LINGER = 0.35
+
 /** The ring, as multiples of how far the player's camera sees. Just past a screen corner, so nobody watches a spawn arrive. */
 const RING_NEAR = 1.15
 const RING_FAR = 1.5
@@ -170,12 +180,24 @@ function ringNow(context) {
   return { near, far, seen, tooSmall }
 }
 
-/** Gone, and worth something to whoever was killing it. */
+/**
+ * Dead, and worth something to whoever was killing it.
+ *
+ * The body is not destroyed here. Health holds a corpse for its `linger` and
+ * Hit Reaction spends those frames collapsing it; destroying on the step the
+ * death landed cut that off, so every death in this game happened in one frame
+ * and had to be carried by particles alone.
+ *
+ * The roster is the other half, and it changes here rather than when the body
+ * goes: the enemy leaves the crowd at once, so a corpse neither steers nor
+ * holds a place under the population cap.
+ */
 function kill(context, entity, by) {
   if (!entity || entity._hordeOut) return false
   entity._hordeOut = true
   horde.killed++
   horde.killedByFamily[entity.type] = (horde.killedByFamily[entity.type] || 0) + 1
+  horde.crowd.remove(entity)
   // Announced before the entity goes, so a listener can still read where it was
   // standing and what it was. This is the seam the experience lane picks up.
   context.bus.emit('enemy:died', {
@@ -186,7 +208,12 @@ function kill(context, entity, by) {
     bounty: entity.properties.bounty ?? 1,
     by: by || null
   })
-  context.world.destroy(entity)
+  // Health collects a body it declared dead. It never saw a death that only
+  // set `properties.health` to zero, so that one is taken away here, after the
+  // same wait — a body nobody removes would stand on the meadow all run.
+  const pool = entity.damageable
+  if (pool?.alive === false && pool.removeOnDeath !== false) return true
+  context.after(BODY_LINGER, () => context.world.destroy(entity))
   return true
 }
 
@@ -381,7 +408,9 @@ export default {
           aliveByFamily: context.horde.census(),
           born: horde.born,
           killed: horde.killed,
-          killedByFamily: horde.killedByFamily,
+          // Copied: the live map would go on counting until the caller printed
+          // it, and a reading taken at ten seconds would show minute ten.
+          killedByFamily: { ...horde.killedByFamily },
           forgotten: horde.forgotten,
           // How far the player's camera sees, and the band just past it that
           // the crowd arrives on. Both from the level's camera rule, so they
