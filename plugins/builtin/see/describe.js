@@ -15,7 +15,7 @@ export function describe(context, options = {}) {
   if (options.subject) {
     subject = context.world.byId(options.subject)
     if (!subject) return { error: `no entity "${options.subject}"` }
-    Object.assign(view, frameSubject(subject, boundsOf(subject)), options.camera || {})
+    Object.assign(view, frameSubject(subject, boundsOf(subject), options.shot), options.camera || {})
     if (view.mode === 'third-person-still') view.mode = 'perspective'
   }
   const projector = makeProjector(view, context.viewport)

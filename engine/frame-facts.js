@@ -52,19 +52,35 @@ function hueToRgb(hue, saturation, lightness) {
  * is judged by its face and silhouette and a straight-behind view shows
  * neither. The subject's own facing decides where "front" is.
  */
-export function frameSubject(entity, bounds) {
-  const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * 2.5)
-  const pitch = -0.35
+/**
+ * The named shots a subject can be framed with. `azimuth` is measured from
+ * the subject's own facing — front means its face, whichever way it points —
+ * and `distance` scales its largest extent. Absent a name, three-quarter:
+ * the view a model is judged by, face and silhouette at once.
+ */
+export const SHOTS = {
+  'three-quarter': { azimuth: Math.PI - 0.6, pitch: -0.35, distance: 2.5 },
+  front: { azimuth: Math.PI, pitch: -0.2, distance: 2.5 },
+  back: { azimuth: 0, pitch: -0.2, distance: 2.5 },
+  'side-left': { azimuth: -Math.PI / 2, pitch: -0.12, distance: 2.5 },
+  'side-right': { azimuth: Math.PI / 2, pitch: -0.12, distance: 2.5 },
+  top: { azimuth: Math.PI, pitch: -1.35, distance: 2.2 },
+  low: { azimuth: Math.PI - 0.6, pitch: -0.05, distance: 2.2 }
+}
+
+export function frameSubject(entity, bounds, shotName) {
+  const shot = SHOTS[shotName] || SHOTS['three-quarter']
+  const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * shot.distance)
   const facing = Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
-  // The eye is placed past the nose and off to one side; its yaw looks back.
-  const azimuth = facing + Math.PI - 0.6
-  const flat = distance * Math.cos(-pitch)
+  // The eye is placed out along the shot's bearing; its yaw looks back.
+  const azimuth = facing + shot.azimuth
+  const flat = distance * Math.cos(-shot.pitch)
   return {
     mode: 'third-person-still',
     x: entity.x + Math.sin(azimuth) * flat,
-    y: entity.y + distance * Math.sin(-pitch),
+    y: entity.y + distance * Math.sin(-shot.pitch),
     z: (entity.z || 0) + Math.cos(azimuth) * flat,
-    yaw: azimuth, pitch, fov: 50
+    yaw: azimuth, pitch: shot.pitch, fov: 50
   }
 }
 

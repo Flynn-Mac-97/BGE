@@ -85,7 +85,11 @@ are exact, and every reply's `method` field names how it was computed.
   the world; `stop` restores.
 
 Image options: `camera` (view field overrides; top-down map shot: high y,
-pitch -1.57), `subject` (frame one entity; add `"alone": true` to hide the
+pitch -1.57), `shot` (a named angle with `subject`: `three-quarter` default,
+`front`, `back`, `side-left`, `side-right`, `top`, `low` — measured from the
+subject's facing), `view` (a saved camera by name — `see.view '{"save":"arena-south"}'`
+keeps the current camera, saved in `<project>/views.json`, committed;
+`see.view` alone lists), `subject` (frame one entity; add `"alone": true` to hide the
 rest), `between` (two ids — distance, touching, relative screen position,
 facing), `marks: false`, `name`.
 

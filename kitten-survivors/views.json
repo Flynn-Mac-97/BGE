@@ -1,0 +1,11 @@
+{
+  "kitten-side": {
+    "x": 2.2,
+    "y": 0.65,
+    "z": 0,
+    "yaw": 1.5708,
+    "pitch": -0.12,
+    "fov": 50,
+    "mode": "perspective"
+  }
+}

@@ -19,6 +19,7 @@
  */
 import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
 import { describe } from './see/describe.js'
+import { resolveView, view } from './see/views.js'
 import { occlusion, isolate, find, diff, camera } from './see/queries.js'
 
 let frameNumber = 0
@@ -44,7 +45,15 @@ export default {
     {
       id: 'see.describe',
       label: 'What is on screen, as computed facts — no pixels, no vision read',
-      run: (context, options) => describe(context, options || {})
+      run: async (context, options) => {
+        const resolved = await resolveView(context, options || {})
+        return resolved.error ? resolved : describe(context, resolved)
+      }
+    },
+    {
+      id: 'see.view',
+      label: 'Save, list, or drop a named camera — a view worth returning to is a word',
+      run: (context, options) => view(context, options || {})
     },
     {
       id: 'see.occlusion',
@@ -75,6 +84,8 @@ export default {
       id: 'see.sketch',
       label: 'A flat-colour frame with numbered marks, drawn without a renderer',
       run: async (context, options = {}) => {
+        options = await resolveView(context, options)
+        if (options.error) return { error: options.error }
         const name = options.name || `${context.editor.levelName}-sketch-${++frameNumber}`
         // In the browser a 2D canvas encodes the PNG itself — no zlib, and
         // the caller gets a dataUrl it can show without touching disk.
@@ -109,6 +120,8 @@ export default {
         if (typeof document === 'undefined' || !context.renderer || !context.shell?.canvas) {
           return { why: 'a moment sheet needs the browser renderer — headless, use script with simulate and see.sketch' }
         }
+        options = await resolveView(context, options)
+        if (options.error) return { error: options.error }
         const steps = options.steps || [0, 6, 30]
         const lenses = options.lenses || ['render', 'types']
         if (!context.loop.running && !context.world.simulated) {
@@ -149,10 +162,12 @@ export default {
     {
       id: 'see.capture',
       label: 'The real rendered frame, with numbered marks and a JSON sidecar',
-      run: (context, options = {}) => {
+      run: async (context, options = {}) => {
         if (typeof document === 'undefined' || !context.renderer || !context.shell?.canvas) {
           return { why: 'a capture needs the browser renderer — use see.sketch headless, or open the editor' }
         }
+        options = await resolveView(context, options)
+        if (options.error) return { error: options.error }
         const description = describe(context, options)
         if (description.error) return description
 
