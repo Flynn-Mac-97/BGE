@@ -25,7 +25,7 @@
  * meadow has none.
  */
 export default {
-  about: 'every static piece the arena is built from — tufts, rocks, fence posts, barn walls. One type; each placement gives its own size and surface. Nothing interacts with it',
+  about: 'every static piece the arena is built from. Each placement gives its own size and surface',
   appearance: 'Chunky banded surfaces with a light rim outline, in many sizes. Scenery: it never moves and never reacts, so a shape that stays put across frames is probably one of these.',
   looksWrongWhen: 'a prop is among the largest things in frame and marked like a creature — a placement has the wrong size',
 

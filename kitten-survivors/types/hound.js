@@ -19,7 +19,7 @@ const HEIGHT = 0.85
 const LENGTH = 1.5
 
 export default {
-  about: 'the enemy that soaks hits. Too slow to threaten the player directly; it blocks routes, and turns an open screen into corridors the rest of the horde pours through',
+  about: 'the enemy that soaks hits. Too slow to threaten alone; it blocks routes and makes corridors',
   appearance: 'The largest enemy by a clear margin, in cold mid-grey. Size is the cue that survives a crowded screen; the grey sits above the crow in value so two dark families cannot be confused.',
   looksWrongWhen: 'it is a plain tinted box — models/hound.glb has not loaded',
 

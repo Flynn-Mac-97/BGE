@@ -17,7 +17,7 @@ const HEIGHT = 0.5
 const LENGTH = 0.34
 
 export default {
-  about: 'the swarming enemy. It arrives in flocks from one bearing, so the threat is the shape of the flock rather than any single bird',
+  about: 'the swarming enemy. Arrives in flocks from one bearing, so the threat is the flock, not a bird',
   appearance: 'Narrow, tall and near-black, flying at chest height. It reads as a layer above the enemies on the floor, and it is the darkest family on the meadow.',
   looksWrongWhen: 'it is a plain tinted box — models/crow.glb has not loaded',
 
