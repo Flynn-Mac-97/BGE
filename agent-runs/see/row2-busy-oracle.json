@@ -1,0 +1,72 @@
+{
+  "frame": "agent-runs/see/row2-busy.png",
+  "sidecar": "agent-runs/see/row2-busy.json",
+  "palette": {
+    "kitten": "#4a4ad9",
+    "meadow-prop": "#b7e7f0",
+    "projectile": "#a4e78d",
+    "rat": "#e06c72",
+    "xp-gem": "#e2abed"
+  },
+  "markedByType": {
+    "meadow-prop": 18,
+    "rat": 12,
+    "kitten": 1,
+    "projectile": 1,
+    "xp-gem": 8
+  },
+  "markedTotal": 40,
+  "q1_subject": {
+    "note": "no alone-subject in this frame; the kitten \"you\" is the player",
+    "id": "you",
+    "type": "kitten",
+    "colour": "#4a4ad9"
+  },
+  "q2_mostCommonMarkedCreature": {
+    "type": "rat",
+    "markedCount": 12,
+    "colour": "#e06c72",
+    "totalVisibleOfType": 32
+  },
+  "q3_occlusionPairs_nearerFirst": [
+    [
+      "hill-7",
+      "hill-6"
+    ],
+    [
+      "hill-6",
+      "hill-5"
+    ],
+    [
+      "bank-south-west-1",
+      "hill-6"
+    ],
+    [
+      "patch-10",
+      "hill-6"
+    ],
+    [
+      "mown-2",
+      "hill-6"
+    ],
+    [
+      "bank-3",
+      "hill-6"
+    ]
+  ],
+  "q4_subjectThird": {
+    "id": "you",
+    "atX": 50,
+    "answer": "middle third"
+  },
+  "counts": {
+    "visible": 161,
+    "offscreen": 691,
+    "offscreenByType": {
+      "meadow-prop": 642,
+      "light": 4,
+      "xp-gem": 8,
+      "rat": 37
+    }
+  }
+}

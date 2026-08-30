@@ -36,6 +36,22 @@ matrix row is a question for the owner, not a lane's call.
 - After each loop: run the matrix's build checks, fix every pain raised,
   and check whether the packets or instructions caused the friction.
 
+## Every round, without being asked
+
+- Run the discovery probe with a FRESH LOW-POWER model, in a human's words,
+  not an engineer's. See exists so a cheap agent can answer a visual question
+  correctly; a plugin only the flagship can drive has failed. The probe
+  prompt and its scale live in `agent-runs/see-finish-evaluators.md`. One
+  round per loop, and the result is reported whether it improved or not.
+- Watch each lane's direction and its spend. A lane reading widely instead
+  of measuring, or re-deriving what its packet already told it, is a brief
+  that pointed badly — fix the brief, and log the friction as a pain.
+- Vision research feeds the next round's briefs. What models are measurably
+  bad at (counting, depth order, small subjects) is what See must answer
+  with a query; what they are good at (art, light, style, A/B judgement) is
+  what an image is for. Findings land in `agent-runs/see-vision-research.md`
+  and change the plugin's instruction sheet, not just this file.
+
 ## Traps — work around them, then FIX them
 
 Each trap below is engine friction paid for repeatedly. Log each as a pain
