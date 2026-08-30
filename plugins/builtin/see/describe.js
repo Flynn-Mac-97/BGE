@@ -110,7 +110,7 @@ export function describe(context, options = {}) {
   }
 
   // A tag floating above a thing is a guess about what it tags; a hull IS the
-  // thing's screen shape. Every marked entry carries one, and `palette` maps
+  // thing's screen shape. Most marked entries carry one, and `palette` maps
   // each marked type to the one colour every See drawing strokes it with —
   // one colour per TYPE, so a busy frame is a handful of colours, not a
   // hundred. Hues come from the type's name hash, so a type keeps its colour
@@ -121,7 +121,10 @@ export function describe(context, options = {}) {
   // outcome is deterministic.
   for (const entry of marked) {
     const hull = screenHull(entry._world, projector)
-    if (hull) entry.hull = hull
+    if (hull) {
+      const simplified = simplifyHull(hull, Math.max(entry.size[0], entry.size[1]))
+      if (simplified) entry.hull = simplified
+    }
   }
   const hues = new Map()
   for (const entry of visible) {
@@ -248,6 +251,12 @@ export function describe(context, options = {}) {
   // out, so the comparison is done here and the band is named.
   const heightGaps = emptyBands(verticalSpan)
 
+  // Two more faults, measured over the level rather than the frame, for the
+  // same reason heightGaps is: a wrong box or a wrong position is true
+  // whether or not the camera is pointed at it.
+  const sizeOutliers = findSizeOutliers(context, options)
+  const stackedEntities = findStackedEntities(context, options)
+
   for (const entry of visible) delete entry._world
 
   // A whole editor scene lists hundreds of props nobody asked about. Brief
@@ -282,6 +291,17 @@ export function describe(context, options = {}) {
      * against a different surface from the rest.
      */
     ...(heightGaps.length ? { heightGaps } : {}),
+    /**
+     * An entity whose declared box does not match the one size every other
+     * instance of its type uses. A type placed at many sizes on purpose (a
+     * hand-placed prop) has no one size to depart from, so it is left alone.
+     */
+    ...(sizeOutliers.length ? { sizeOutliers } : {}),
+    /**
+     * Entities with real geometry sharing the exact same world position: one
+     * draws directly over the other, and only the frontmost is ever seen.
+     */
+    ...(stackedEntities.length ? { stackedEntities } : {}),
     /** One colour per marked type — the colour each See drawing uses for it. */
     palette,
     /**
@@ -325,6 +345,66 @@ export function aboutTypes(context, typeNames) {
   return { about, ...(undescribed.length ? { undescribed } : {}) }
 }
 
+/**
+ * A silhouette's point budget scales with how big the entity draws: a body
+ * that fills the frame earns real shape, a speck earns a plain box, and
+ * anything smaller than `HULL_INVISIBLE_PERCENT` shows no readable silhouette
+ * at all — a thing too small to show a shape does not need one. `sizePercent`
+ * is the entity's larger screen dimension, percent of the frame.
+ *
+ * Repeated points are dropped first — they cost bytes and add no shape —
+ * then Visvalingam-Whyatt decimation removes whichever point changes the
+ * outline least, one at a time, until the budget is met. Returns null when
+ * the entity is too small for a hull, or too degenerate to be one (fewer
+ * than three points survive dedup).
+ */
+const HULL_INVISIBLE_PERCENT = 0.6
+const HULL_FULL_DETAIL_PERCENT = 15
+const HULL_MIN_POINTS = 4
+const HULL_MAX_POINTS = 8
+
+export function simplifyHull(points, sizePercent) {
+  if (sizePercent < HULL_INVISIBLE_PERCENT) return null
+  const deduped = dropRepeatedPoints(points)
+  if (deduped.length < 3) return null
+  const grow = Math.min(1, sizePercent / HULL_FULL_DETAIL_PERCENT)
+  const budget = Math.round(HULL_MIN_POINTS + (HULL_MAX_POINTS - HULL_MIN_POINTS) * grow)
+  return decimate(deduped, Math.max(3, budget))
+}
+
+/** A point equal to the one before it, or closing the ring back to the first, buys nothing. */
+function dropRepeatedPoints(points) {
+  const kept = points.filter((point, index) => index === 0
+    || point[0] !== points[index - 1][0] || point[1] !== points[index - 1][1])
+  const first = kept[0]
+  const last = kept[kept.length - 1]
+  if (kept.length >= 2 && first[0] === last[0] && first[1] === last[1]) kept.pop()
+  return kept
+}
+
+/**
+ * Visvalingam-Whyatt: drop the point whose triangle with its two neighbours
+ * has the smallest area, one at a time, until `maxPoints` remain. The
+ * smallest-area point is the one whose removal changes the outline least.
+ */
+function decimate(points, maxPoints) {
+  const kept = [...points]
+  while (kept.length > maxPoints) {
+    let smallestArea = Infinity
+    let smallestAt = -1
+    for (let index = 0; index < kept.length; index++) {
+      const before = kept[(index - 1 + kept.length) % kept.length]
+      const point = kept[index]
+      const after = kept[(index + 1) % kept.length]
+      const area = Math.abs((point[0] - before[0]) * (after[1] - before[1])
+        - (after[0] - before[0]) * (point[1] - before[1])) / 2
+      if (area < smallestArea) { smallestArea = area; smallestAt = index }
+    }
+    kept.splice(smallestAt, 1)
+  }
+  return kept
+}
+
 const round = n => Math.round(n * 100) / 100
 
 /**
@@ -358,6 +438,93 @@ function emptyBands(verticalSpan) {
     })
   }
   return bands.sort((first, second) => second.metres - first.metres).slice(0, 3)
+}
+
+/** A type's instances need this large a majority sharing one box before that box counts as the norm. */
+const SIZE_NORM_MAJORITY = 0.5
+/** An instance this many times the norm's largest dimension, or this many times under it, is a fault. */
+const SIZE_FAULT_FACTOR = 3
+
+/**
+ * An entity whose box is nothing like the box every other instance of its
+ * type has. Skipped for a type with no settled size to depart from: a level
+ * built from one prop type at many hand-placed sizes has no norm, so no
+ * instance of it can be an outlier.
+ *
+ * The norm is the exact box (rounded) most instances of a type share. A
+ * three-way tie or a type with no majority size answers nothing, because
+ * naming a "typical" size that most instances disagree with would be a
+ * guess, not a measurement.
+ */
+export function findSizeOutliers(context, options) {
+  const byType = {}
+  for (const entity of context.world.entities) {
+    if (entity.hidden && !options.includeHidden) continue
+    const bounds = boundsOf(entity)
+    const key = [bounds.w, bounds.h, bounds.l].map(round).join('x')
+    const list = byType[entity.type] || (byType[entity.type] = [])
+    list.push({ entity, bounds, key })
+  }
+
+  const found = []
+  for (const list of Object.values(byType)) {
+    if (list.length < 3) continue
+    const counts = {}
+    for (const item of list) counts[item.key] = (counts[item.key] || 0) + 1
+    const [normKey, normCount] = Object.entries(counts).sort((first, second) => second[1] - first[1])[0]
+    if (normCount / list.length <= SIZE_NORM_MAJORITY) continue
+    const norm = list.find(item => item.key === normKey).bounds
+    const normLargest = Math.max(norm.w, norm.h, norm.l) || 1
+    for (const item of list) {
+      if (item.key === normKey) continue
+      const largest = Math.max(item.bounds.w, item.bounds.h, item.bounds.l)
+      const factor = round(Math.max(largest / normLargest, normLargest / largest))
+      if (factor < SIZE_FAULT_FACTOR) continue
+      found.push({
+        id: item.entity.id, type: item.entity.type,
+        worldSize: [round(item.bounds.w), round(item.bounds.h), round(item.bounds.l)],
+        typicalSize: [round(norm.w), round(norm.h), round(norm.l)],
+        factor,
+        why: `${item.entity.id}, type ${item.entity.type}, is sized ${factor}x every other ${item.entity.type} in the level — its own box is wrong, not its kind's shape.`
+      })
+    }
+  }
+  return found.sort((first, second) => second.factor - first.factor)
+}
+
+/** True when an entity has geometry a player could see — a light or a trigger volume does not. */
+function hasGeometry(entity) {
+  return Boolean(entity.mesh || entity._definition?.mesh || entity.sprite || entity._definition?.sprite)
+}
+
+/**
+ * Entities with real geometry sharing the exact same world position. Nothing
+ * places two drawn bodies on one point by chance, so an exact match — to two
+ * decimal places, the same rounding every other field in this reply uses —
+ * is always a placement fault: one entity draws directly over the other, and
+ * only the frontmost is ever visible.
+ */
+export function findStackedEntities(context, options) {
+  const groups = {}
+  for (const entity of context.world.entities) {
+    if (entity.hidden && !options.includeHidden) continue
+    if (!hasGeometry(entity)) continue
+    const key = [entity.x, entity.y, entity.z || 0].map(round).join(',')
+    const list = groups[key] || (groups[key] = [])
+    list.push(entity)
+  }
+
+  const found = []
+  for (const [key, entities] of Object.entries(groups)) {
+    if (entities.length < 2) continue
+    const at = key.split(',').map(Number)
+    const ids = entities.map(entity => entity.id)
+    found.push({
+      ids, types: [...new Set(entities.map(entity => entity.type))], at,
+      why: `${ids.join(', ')} sit at the exact same world position — only the frontmost is ever visible, so the rest are wasted or misplaced.`
+    })
+  }
+  return found
 }
 
 /** Nearest first, and the id settles a tie, so one world answers one order. */
