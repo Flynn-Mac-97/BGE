@@ -9,6 +9,11 @@
  * It carries no physics body on purpose. Pickups moves it, and a gem that also
  * fell under gravity would fight the magnet all the way in.
  */
+
+/** Radians a second the size pulse runs at, and how much of the size it moves. */
+const PULSE_RATE = 5.5
+const PULSE_DEPTH = 0.08
+
 export default {
   about: 'what a dead enemy drops, and the whole economy. Every level gained came from collecting these',
   appearance: 'A small bright cyan cube that never stops turning. It carries no physics body, so it never falls — the Pickups plugin draws it towards the player instead.',
@@ -30,9 +35,15 @@ export default {
     bobSpeed: 4
   },
 
-  update(entity, seconds) {
+  update(entity, seconds, context) {
     // Turning, not tumbling: one axis, slowly, so a hundred of them on screen
     // read as one shimmering field rather than as noise.
     entity.rotation = (entity.rotation + seconds * 1.8) % (Math.PI * 2)
+
+    // A pulse in size, phased off where the gem stands, so two hundred of them
+    // twinkle instead of throbbing as one. Engine time, so a replay twinkles
+    // the same. Small: the gem must still read as an object, not an effect.
+    const phase = entity.x * 1.7 + entity.z * 2.3
+    entity.scale = 1 + Math.sin(context.time * PULSE_RATE + phase) * PULSE_DEPTH
   }
 }

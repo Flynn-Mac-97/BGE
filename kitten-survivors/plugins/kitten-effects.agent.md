@@ -1,7 +1,10 @@
 # Kitten Effects
 
-- Owns this game's particle looks, as tables at the top of the file: hit sparks per weapon (`weapon:hit`), fur death puffs (`enemy:died`), gem sparkle — idle glints, a latch trail, a collect pop (`pickup:latched` / `pickup:collected`) — and the gold level-up burst (`experience:levelled`).
-- Tune the game's feel here and only here. The machinery is the Particles builtin; the generic hurt-and-kill dust is Combat Effects plus Kitten Hit Feel's `define('blood', ...)` recolour.
-- Idle gem glints tick on the fixed clock through the engine's seeded random — a replay sparkles the same.
-- `kitten.effects.preview` fires one of each look at the kitten, for a browser frame or a headless `particles.recent` read.
+- Owns this game's particle looks, as tables at the top of the file: hit sparks per weapon plus a white core (`weapon:hit`), the death pop (`enemy:died`), gem sparkle — idle glints, a latch trail, a landing pop (`pickup:latched` / `pickup:collected`) — and the gold level-up burst (`experience:levelled`).
+- Also owns what may mark the ground: `place` on the decal wall is wrapped to refuse a mark with no texture, because an untextured decal draws as a solid tinted square. The engine ships no decal art, so this game puts down no marks. Name a picture in `context.particles.art` and marks come back with no change here.
+- The vocabulary is one thing at three sizes: small, fully saturated, gone in under a quarter second. Never a cloud, never a dark stain — see `art/effects/rulings.json` and `agent-runs/2026-08-31-brawl-stars/reference/what-the-frames-show.md`.
+- Counts stay small because a hundred enemies die at once. Gem landings and idle glints are pooled on the fixed clock: forty gems arriving is one swelling pop, and one gem glints per beat, not two hundred.
+- Tune the game's feel here and only here. The machinery is the Particles builtin; how hard a hit punches is Kitten Hit Feel.
+- Idle glints and landing pops tick on the fixed clock through the engine's seeded random — a replay sparkles the same.
+- `kitten.effects.preview` fires one of each look at the kitten. `kitten.marks` says how many marks were refused and what decal art the project has named.
 - It refuses nothing loudly: a missing point or a level with no `you` simply does nothing.
