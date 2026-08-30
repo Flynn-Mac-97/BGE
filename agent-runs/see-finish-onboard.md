@@ -3,6 +3,17 @@
 Run a gauntlet loop to finish the See plugin in this engine. Engine work,
 not a game. Max 6 agents per loop. Judge and fix pain points as lanes land.
 
+## Design licence
+
+The orchestrator may expand and improve See's architecture and design. The
+owner's assumptions about how vision is gathered and delivered — hull marks,
+the sidecar's shape, mark priority, the studio, what a sketch draws — are
+open to challenge and replacement where a lane can show the replacement
+grounds an agent better. Two things are protected: the query-first ladder
+(queries before pixels), and the acceptance matrix in the contract — a
+redesign must still pass it. A change that would alter the ladder or a
+matrix row is a question for the owner, not a lane's call.
+
 ## Read first, in this order
 
 1. `agent-runs/see-finish-contract.md` — the finish line. The acceptance
@@ -25,17 +36,33 @@ not a game. Max 6 agents per loop. Judge and fix pain points as lanes land.
 - After each loop: run the matrix's build checks, fix every pain raised,
   and check whether the packets or instructions caused the friction.
 
-## Known traps
+## Traps — work around them, then FIX them
 
-- Editing any See file under a running dev server HMR-RESETS the world:
-  re-simulate (`simulate 40`, `choice.pick 1`) before reshooting frames.
-- The discovery test (matrix row 1) only counts from a FRESH session —
-  skill listings are session-start snapshots. Hard cap 30k tokens a round;
-  measure discovery only, never how the agent solves the question after.
-- A failed plugin import loses all its commands silently — after editing
-  `see.js`, prove one command answers before moving on.
+Each trap below is engine friction paid for repeatedly. Log each as a pain
+and fix it during the loop; the workaround is only for lanes that hit it
+before the fix lands.
+
+- Editing any plugin file under a running dev server HMR-RESETS the world
+  silently — a simulated moment vanishes and the next frame shows a
+  different world with no warning. Workaround: re-simulate before
+  reshooting. FIX: preserve or restore world state across a plugin
+  hot-reload, or at least surface "the world was reset by a reload" in
+  snapshot and in the next command's reply.
+- A failed plugin import loses ALL of that plugin's commands silently —
+  the only symptom is `no command "see.capture"`. Workaround: prove one
+  command answers after every edit. FIX: the loader must surface a failed
+  plugin import loudly — in `snapshot.errors`, in `engine.mjs check`, and
+  in the "no command" reply itself (name the plugin that failed to load
+  and why).
+- Lanes start dev servers and browser tabs that nothing tracks or stops —
+  stale hidden tabs answer captures with blank frames, rogue servers serve
+  the wrong project. Workaround: kill every server and tab a lane starts,
+  every loop. FIX: give the engine a way to list and stop what it started
+  (server + attached tabs), so cleanup is one command instead of a hunt.
+- Skill listings are session-start snapshots (harness-side, NOT fixable in
+  the engine): the discovery test (matrix row 1) only counts from a fresh
+  session. Hard cap 30k tokens a round; measure discovery only.
 - Never screenshot or read the editor page. See answers visual questions.
-- Kill every dev server and browser tab a lane starts, every loop.
 
 ## Do not
 

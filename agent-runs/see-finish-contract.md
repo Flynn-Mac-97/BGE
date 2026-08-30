@@ -22,6 +22,13 @@ the frame is a database.
 - USER: marks must not float over game text; hull outlines, colour per type,
   legend packet. Reference/A-B art comparison is a SEPARATE future plugin.
 - USER: pain ledger records engine friction only; fix pains during the loop.
+- USER, 2026-08-30: the loop MAY redesign See's architecture and challenge
+  the owner's vision-delivery assumptions; the query-first ladder and this
+  matrix are what is protected, not the current implementation. Ladder or
+  matrix changes go back to the owner.
+- USER, 2026-08-30: the session's known traps (HMR world reset, silent
+  command loss on failed plugin import, untracked servers and tabs) are
+  themselves work — fix them in the loop, not only warn about them.
 - LOCAL: `plugins/builtin/see.agent.md:2` @ 1efa62a — guide ships as the
   `see-the-game` skill with routing triggers.
 
