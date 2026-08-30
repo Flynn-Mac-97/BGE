@@ -5,6 +5,9 @@
   player reads more often than anything else in the game.
 - `context.kittenUpgrades.offer(3)` returns cards for Choice Screen — different
   every time, never the same card twice in one row.
+- Card colours follow `kitten-survivors/art/interface/bible.md` — vivid gold
+  for a weapon, vivid green for a passive, vivid blue for the milk refill —
+  and match the glyph colour Kitten Run HUD draws for the same pick.
 - `apply(id, entity)` takes one: a passive becomes a `Modifiers` source named
   `upgrade:<id>`, a weapon is handed to the weapons lane and recorded.
 - Ranks go to 5. A weapon and its upgrades are the **same card** — taking it
