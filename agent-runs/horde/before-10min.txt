@@ -1,0 +1,39 @@
+min  1  alive  92/115  (80% of cap)   3.7/s  born   191  killed    99  forgotten    0  nearest 4.138m  0.255 ms/step (1.5%)  rat:43 crow:49
+min  2  alive 136/170  (80% of cap)   5.2/s  born   457  killed   321  forgotten    0  nearest 2.471m  0.287 ms/step (1.7%)  rat:79 crow:57
+min  3  alive 136/225  (60% of cap)   6.7/s  born   742  killed   606  forgotten    0  nearest 1.225m  0.349 ms/step (2.1%)  rat:97 hound:7 crow:32
+min  4  alive 252/280  (90% of cap)   8.2/s  born  1221  killed   969  forgotten    0  nearest 5.392m  0.454 ms/step (2.7%)  rat:109 hound:37 crow:90 wasp:16
+min  5  alive 335/335  (100% of cap)   9.7/s  born  1662  killed  1283  forgotten   44  nearest 1.966m  0.599 ms/step (3.6%)  rat:135 hound:70 crow:91 wasp:39
+min  6  alive 390/390  (100% of cap)  11.2/s  born  2075  killed  1450  forgotten  235  nearest 2.072m  0.881 ms/step (5.3%)  rat:144 hound:82 crow:92 wasp:56 boar:16
+min  7  alive 445/445  (100% of cap)  12.7/s  born  2584  killed  1607  forgotten  532  nearest 3.096m  1.044 ms/step (6.3%)  rat:150 hound:72 crow:119 wasp:83 boar:21
+min  8  alive 500/500  (100% of cap)  14.2/s  born  3017  killed  1725  forgotten  792  nearest  4.27m  1.157 ms/step (6.9%)  rat:159 hound:92 crow:127 wasp:95 boar:27
+min  9  alive 555/555  (100% of cap)  15.7/s  born  3607  killed  1896  forgotten 1156  nearest 4.656m  1.315 ms/step (7.9%)  rat:162 hound:72 crow:145 wasp:134 boar:42
+min 10  alive 600/600  (100% of cap)  17.2/s  born  4261  killed  2103  forgotten 1558  nearest  3.02m  1.429 ms/step (8.6%)  rat:158 hound:77 crow:170 wasp:142 boar:53
+
+{
+  "walking": true,
+  "minutes": 10,
+  "choiceCardsPicked": 25,
+  "meanShareOfCap": "91.0%",
+  "slowestStepMilliseconds": 1.429,
+  "budgetUsedAtWorst": "8.6%",
+  "atTheMarks": [
+    {
+      "minute": 1,
+      "alive": 92,
+      "cap": 115,
+      "msPerStep": 0.255
+    },
+    {
+      "minute": 5,
+      "alive": 335,
+      "cap": 335,
+      "msPerStep": 0.599
+    },
+    {
+      "minute": 10,
+      "alive": 600,
+      "cap": 600,
+      "msPerStep": 1.429
+    }
+  ]
+}

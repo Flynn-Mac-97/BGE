@@ -3,23 +3,31 @@
  *
  * Everything walks at the kitten. That is the whole of the genre and it is not
  * negotiable: the moment an enemy can be out-thought rather than out-run, the
- * game becomes about something else. So there is no pathfinding here, no state
- * beyond one family's, and nothing that could make a rat interesting.
+ * game becomes about something else. So there is no pathfinding here, and no
+ * state beyond each family's own beat.
  *
  * What there is instead is the difference between a crowd and a queue.
  * Three hundred things seeking one point converge onto one line, and a line of
  * three hundred rats looks exactly like one rat. Crowd's separation is what
  * spreads them into a ring; this file only says how hard to push and gives
- * each family the small motion that makes it tellable apart at a glance:
+ * each family the gait that makes it tellable apart at a glance:
  *
+ *   rat          scurries: runs a beat, freezes a beat, runs again
+ *   hound        lopes, and pounces a short locked lunge from close range
  *   crow, wasp   bob as they fly, at different rates and heights
  *   boar         stalks, braces, and charges in a locked straight line
- *   rat, hound   nothing. Two of the five must be plain or none of them read
+ *
+ * Every gait runs on engine time and each member's `_crowdPhase`, which Crowd
+ * drew from the engine's stream — so a replay of the same seed scurries,
+ * pounces and charges on exactly the same frames. All of it is speed, heading
+ * and height on the entity; nothing assumes what mesh the family wears.
  *
  * The order matters and it is visible in one place: flavour first, then one
  * pass over the whole crowd. Nothing here touches health, spawning or death —
  * those are the Horde plugin next door.
  */
+
+const TAU = Math.PI * 2
 
 /**
  * How hard a crowded enemy turns aside, against how hard it seeks.
@@ -37,6 +45,128 @@ const RELAX = 0.55
 const BOB = {
   crow: { rate: 6.5, amplitude: 0.13 },
   wasp: { rate: 12, amplitude: 0.2 }
+}
+
+/**
+ * The rat's scurry: run a beat, freeze a beat, run again.
+ *
+ * The freezes are what make two hundred rats read as vermin rather than as a
+ * tide. Each rat runs its cycle from its own `_crowdPhase`, so at any moment
+ * about a third of the carpet is stock-still and a different third a step
+ * later. The run speed is raised so the pauses cost no ground overall — a
+ * scurrying rat still arrives when a gliding one would have.
+ */
+const SCURRY_RATE = 1.15      // cycles a second
+const SCURRY_PORTION = 0.62   // the running part of each cycle
+const SCURRY_SPEED = 1.6      // of its base speed, while running
+
+/**
+ * The hound's lope, and the pounce off the end of it.
+ *
+ * The lope is a heavy rise and fall in its stride, slow enough to read as
+ * weight rather than as flicker. The pounce is the boar's charge in miniature —
+ * a hitch, then a short locked lunge — but from ambush range and over in half a
+ * second, so the two never read as the same move. The lunge lands just under
+ * the kitten's own speed: a pounce you can still walk out of is pressure, and
+ * one you cannot is a tax.
+ */
+const LOPE_RATE = 3.2         // radians a second through the stride
+const LOPE_SWING = 0.38       // how far the stride rises and falls, as a fraction of its speed
+const LUNGE_RANGE = 4.6       // metres; inside this it may pounce
+const CROUCH_SECONDS = 0.25
+const LUNGE_SECONDS = 0.5
+const LUNGE_SPEED = 2.9       // of its base speed, for the lunge only
+const RECOVER_SECONDS = 0.8
+const LUNGE_REST_SECONDS = 2.4
+
+/** What it does while crouching and while recovering, as a fraction of its lope. */
+const CROUCH_SPEED = 0.2
+const RECOVER_SPEED = 0.55
+
+/** Seconds of extra wait dealt out by phase, so a pack in range never pounces as one. */
+const LUNGE_SPREAD = 1.6
+
+/**
+ * One rat, one step: a hard on-off duty cycle over engine time.
+ *
+ * Speed is written to zero outright rather than eased. The snap is the point —
+ * a rat that slows into its pause reads as a glide with a wobble, and Crowd
+ * holds the rat's facing while it stands (rotation only follows a velocity that
+ * exists), so a frozen rat stays pointed at the kitten mid-stride.
+ */
+function driveRat(entity, context) {
+  const properties = entity.properties
+  if (entity._ratRunSpeed === undefined) entity._ratRunSpeed = properties.speed
+  const cycle = context.time * SCURRY_RATE + (entity._crowdPhase || 0) / TAU
+  const through = cycle - Math.floor(cycle)
+  properties.speed = through < SCURRY_PORTION ? entity._ratRunSpeed * SCURRY_SPEED : 0
+}
+
+/**
+ * One hound, one step.
+ *
+ * The lunge heading is locked the moment the crouch ends, exactly as the
+ * boar's charge is — `headingX`/`headingZ` tell Crowd this member has already
+ * decided — and cleared when the lunge lands, so a hound that missed swings
+ * straight back into the seek instead of running to the horizon.
+ */
+function driveHound(entity, context, target) {
+  const properties = entity.properties
+  if (entity._houndLopeSpeed === undefined) {
+    entity._houndLopeSpeed = properties.speed
+    entity._houndState = 'lope'
+    entity._houndUntil = 0
+    entity._houndNextLunge = -1
+  }
+
+  const state = entity._houndState
+  const time = context.time
+  const lopeSpeed = entity._houndLopeSpeed
+
+  if (state === 'lope') {
+    properties.speed = lopeSpeed *
+      (1 + Math.sin(time * LOPE_RATE + (entity._crowdPhase || 0)) * LOPE_SWING)
+    const distance = Math.hypot(target.x - entity.x, target.z - entity.z)
+    if (distance > LUNGE_RANGE) return
+    if (entity._houndNextLunge < 0) {
+      // First time in range: take a number. A pack arrives together, and
+      // without this every hound in it would crouch on the same frame.
+      entity._houndNextLunge = time + ((entity._crowdPhase || 0) / TAU) * LUNGE_SPREAD
+      return
+    }
+    if (time < entity._houndNextLunge) return
+    entity._houndState = 'crouch'
+    entity._houndUntil = time + CROUCH_SECONDS
+    return
+  }
+
+  if (state === 'crouch') {
+    properties.speed = lopeSpeed * CROUCH_SPEED
+    if (time < entity._houndUntil) return
+    const dx = target.x - entity.x
+    const dz = target.z - entity.z
+    const length = Math.hypot(dx, dz) || 1
+    entity.headingX = dx / length
+    entity.headingZ = dz / length
+    entity._houndState = 'lunge'
+    entity._houndUntil = time + LUNGE_SECONDS
+    return
+  }
+
+  if (state === 'lunge') {
+    properties.speed = lopeSpeed * LUNGE_SPEED
+    if (time < entity._houndUntil) return
+    entity.headingX = 0
+    entity.headingZ = 0
+    entity._houndState = 'recover'
+    entity._houndUntil = time + RECOVER_SECONDS
+    return
+  }
+
+  properties.speed = lopeSpeed * RECOVER_SPEED
+  if (time < entity._houndUntil) return
+  entity._houndState = 'lope'
+  entity._houndNextLunge = time + LUNGE_REST_SECONDS + ((entity._crowdPhase || 0) / TAU) * LUNGE_SPREAD
 }
 
 /**
@@ -134,7 +264,9 @@ export default {
       for (const entity of crowd.members) {
         if (entity._hordeOut) continue
         const family = entity.properties.family
-        if (family === 'boar') driveBoar(entity, context, target)
+        if (family === 'rat') driveRat(entity, context)
+        else if (family === 'hound') driveHound(entity, context, target)
+        else if (family === 'boar') driveBoar(entity, context, target)
 
         // Height is the crowd's one blind spot on purpose — it moves things on
         // the ground plane and leaves y to whoever owns them. The bob is what

@@ -29,7 +29,7 @@
  *   The top of the ground is y = 0, and a prop of height h is placed at y = h/2.
  *   Inside the fence nothing the arena draws is taller than 0.5 m.
  *
- * The second one is the whole game. The camera looks down at about 63 degrees,
+ * The second one is the whole game. The camera looks down at 60 degrees,
  * so an object of height h hides roughly 2h of ground behind it. Half a metre
  * hides one metre — less than one enemy. A fence post at 1.2 m hides two and a
  * half, which is three enemies the player never saw coming, so fence posts live
@@ -676,9 +676,11 @@ for (let index = 0; index < 7; index++) {
  * DUSK HERE IS A COLOUR DECISION, NOT A SUN-ANGLE ONE. A real evening sun sits a
  * few degrees off the horizon and throws shadows twenty metres long, and twenty
  * metres of shadow across a field full of enemies is twenty metres the player
- * cannot read. So the key sits at about thirty-two degrees — short shadows — and
+ * cannot read. So the key sits at about sixty degrees — short shadows — and
  * every bit of the evening comes from its colour, from the cool violet ambient
- * it is set against, and from the sky behind it.
+ * it is set against, and from the sky behind it. It began at thirty-four
+ * degrees, and at thirty-four the hedge and trees just past the east fence
+ * raked their shadows metres into the play field.
  *
  * The key is a light ENTITY rather than `world.sun`, because only a light entity
  * can cast a shadow, and the shadow is what tells the player which things are
@@ -699,9 +701,12 @@ for (let index = 0; index < 7; index++) {
  * an earth patch is lying flat, and is what puts the cat's own shadow beside it
  * so it reads as being ON the field rather than drawn over it.
  */
+// Centred over the field: a directional light's shadow box sits round its
+// entity, so from [0, 40, 0] the ±48 m box covers the whole arena — parked
+// over a corner it clipped the far half and those shadows simply vanished.
 entities.push({
-  id: 'key-light', type: 'light', at: [26, 40, 34],
-  properties: { kind: 'directional', color: '#ffe0bc', intensity: 1.35, direction: [-0.78, -0.56, -0.28], range: 96, shadow: true }
+  id: 'key-light', type: 'light', at: [0, 40, 0],
+  properties: { kind: 'directional', color: '#ffe0bc', intensity: 1.35, direction: [-0.47, -0.87, -0.17], range: 96, shadow: true }
 })
 entities.push({
   id: 'barn-glow', type: 'light', at: [BARN_X - 3.4, 4.2, BARN_Z + 7],
@@ -735,18 +740,20 @@ const level = {
   // so pressing play left you at grass level looking down at your own back.
   // `distance` is what holds the eye behind the kitten, and the arena is built
   // for this height — inside the fence nothing is taller than 0.5 m because the
-  // camera looks down at about 60 degrees from nine metres back.
+  // camera looks down at 60 degrees from fourteen metres back. The horde plugin
+  // measures its spawn ring from this rule, so these numbers ARE the game's
+  // spawn distance: move the camera and the ring moves with it.
   camera: {
     follow: 'you',
     mode: 'third-person',
-    pitch: -1.02,
+    pitch: -1.05,
     yaw: 0,
-    distance: 9,
+    distance: 14,
     offsetY: 0.15,
     lerp: 0.18,
     lookAhead: 0.22,
-    // The play field, so the eye never swings out over the hedge.
-    bounds: [-22, -22, 22, 22],
+    // The whole field, so the follow only lets go at the fence itself.
+    bounds: [-46.5, -46.5, 46.5, 46.5],
     fov: 50,
     at: [0, 12],
     zoom: 32

@@ -351,7 +351,11 @@ function bridge() {
         server.ws.send('engine:call', { id, op, args })
 
         const reply = await pending
-        return send(res, reply.ok ? 200 : 502, reply)
+        // Which checkout this server serves, on every reply. A CLI run from a
+        // lane worktree compares it against its own root and refuses a
+        // mismatch — the only proof there is that a `spawn` is not about to
+        // land in somebody else's workspace through a shared port.
+        return send(res, reply.ok ? 200 : 502, { ...reply, serves: ROOT })
       })
     }
   }

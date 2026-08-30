@@ -1,0 +1,61 @@
+min  1  alive 115/115  (100% of cap)   8.4/s  born   391  killed   172  forgotten  104  nearest 3.583m  0.340 ms/step (2.0%)  rat:96 crow:19
+min  2  alive 170/170  (100% of cap)  10.8/s  born   878  killed   452  forgotten  256  nearest 6.368m  0.349 ms/step (2.1%)  rat:139 crow:31
+min  3  alive 225/225  (100% of cap)  13.2/s  born  1474  killed   796  forgotten  453  nearest 2.951m  0.477 ms/step (2.9%)  rat:148 hound:27 crow:50
+min  4  alive 280/280  (100% of cap)  15.6/s  born  2174  killed  1112  forgotten  782  nearest 0.416m  0.584 ms/step (3.5%)  rat:149 hound:28 crow:78 wasp:25
+min  5  alive 335/335  (100% of cap)    18/s  born  2984  killed  1430  forgotten 1219  nearest  0.19m  0.717 ms/step (4.3%)  rat:154 hound:45 crow:84 wasp:52
+min  6  alive 390/390  (100% of cap)  20.4/s  born  3940  killed  1664  forgotten 1886  nearest 4.607m  0.953 ms/step (5.7%)  rat:152 hound:57 crow:87 wasp:87 boar:7
+min  7  alive 445/445  (100% of cap)  22.8/s  born  5014  killed  1808  forgotten 2761  nearest 1.917m  1.024 ms/step (6.1%)  rat:159 hound:59 crow:102 wasp:99 boar:26
+min  8  alive 500/500  (100% of cap)  25.2/s  born  6267  killed  1944  forgotten 3823  nearest 0.043m  1.186 ms/step (7.1%)  rat:159 hound:64 crow:110 wasp:126 boar:41
+min  9  alive 555/555  (100% of cap)  27.6/s  born  7600  killed  2106  forgotten 4939  nearest 2.723m  1.289 ms/step (7.7%)  rat:162 hound:75 crow:135 wasp:143 boar:40
+min 10  alive 600/600  (100% of cap)    30/s  born  8999  killed  2293  forgotten 6106  nearest 3.493m  1.315 ms/step (7.9%)  rat:168 hound:80 crow:143 wasp:166 boar:43
+min 11  alive 600/600  (100% of cap)    30/s  born 10025  killed  2426  forgotten 6999  nearest 0.128m  1.475 ms/step (8.8%)  rat:169 hound:65 crow:143 wasp:178 boar:45
+min 12  alive 600/600  (100% of cap)    30/s  born 11323  killed  2614  forgotten 8109  nearest 0.054m  1.535 ms/step (9.2%)  rat:172 hound:52 crow:142 wasp:187 boar:47
+min 13  alive 600/600  (100% of cap)    30/s  born 12798  killed  2851  forgotten 9347  nearest 0.468m  1.529 ms/step (9.2%)  rat:162 crow:129 wasp:199 hound:55 boar:55
+min 14  alive 599/600  (100% of cap)    30/s  born 14003  killed  3023  forgotten 10381  nearest  0.51m  1.566 ms/step (9.4%)  rat:164 crow:121 wasp:195 boar:54 hound:65
+min 15  alive 600/600  (100% of cap)    30/s  born 15391  killed  3226  forgotten 11565  nearest 0.629m  1.526 ms/step (9.2%)  rat:160 crow:119 wasp:207 boar:43 hound:71
+min 16  alive 600/600  (100% of cap)    30/s  born 16734  killed  3405  forgotten 12729  nearest 0.079m  1.642 ms/step (9.9%)  rat:160 crow:115 wasp:215 hound:51 boar:59
+min 17  alive 600/600  (100% of cap)    30/s  born 18262  killed  3650  forgotten 14012  nearest 1.009m  1.550 ms/step (9.3%)  rat:151 crow:106 wasp:219 hound:57 boar:67
+min 18  alive 600/600  (100% of cap)    30/s  born 19632  killed  3870  forgotten 15162  nearest 3.192m  1.546 ms/step (9.3%)  rat:151 wasp:212 crow:95 hound:58 boar:84
+min 19  alive 599/600  (100% of cap)    30/s  born 21111  killed  4087  forgotten 16425  nearest 1.193m  1.610 ms/step (9.7%)  rat:150 wasp:202 crow:103 boar:75 hound:69
+min 20  alive 599/600  (100% of cap)    30/s  born 22537  killed  4321  forgotten 17617  nearest 3.527m  1.634 ms/step (9.8%)  rat:159 wasp:198 crow:105 hound:63 boar:74
+
+{
+  "walking": true,
+  "minutes": 20,
+  "choiceCardsPicked": 35,
+  "meanShareOfCap": "100.0%",
+  "slowestStepMilliseconds": 1.642,
+  "budgetUsedAtWorst": "9.9%",
+  "atTheMarks": [
+    {
+      "minute": 1,
+      "alive": 115,
+      "cap": 115,
+      "msPerStep": 0.34
+    },
+    {
+      "minute": 5,
+      "alive": 335,
+      "cap": 335,
+      "msPerStep": 0.717
+    },
+    {
+      "minute": 10,
+      "alive": 600,
+      "cap": 600,
+      "msPerStep": 1.315
+    },
+    {
+      "minute": 15,
+      "alive": 600,
+      "cap": 600,
+      "msPerStep": 1.526
+    },
+    {
+      "minute": 20,
+      "alive": 599,
+      "cap": 600,
+      "msPerStep": 1.634
+    }
+  ]
+}

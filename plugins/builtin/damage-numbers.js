@@ -35,11 +35,20 @@ let shown = 0
 /** Past this, the oldest goes. A number nobody can read is not worth a draw call. */
 const MOST = 240
 
-/** How a number behaves unless the caller says otherwise. */
-const RISE = 1.8          // metres a second, up
-const DRIFT = 0.7         // metres a second, sideways, so two hits do not stack
-const LIFE = 0.85         // seconds
-const SIZE = 0.55         // metres tall
+/**
+ * How a number behaves unless the caller says otherwise. Live, and published as
+ * `context.damageNumbers.defaults`, because the right size is a fact about the
+ * game's camera, not about this plugin: 0.55 m read fine at nine metres and was
+ * six percent of the screen at fourteen. The automatic `entity:hurt` listener
+ * goes through the same defaults, so a game sets them once and every number —
+ * including the ones it never shows itself — comes out to its own scale.
+ */
+const defaults = {
+  rise: 1.8,          // metres a second, up
+  drift: 0.7,         // metres a second, sideways, so two hits do not stack
+  life: 0.85,         // seconds
+  size: 0.55          // metres tall
+}
 
 /** What an ordinary hit and a big one are coloured. */
 const PLAIN = '#ffffff'
@@ -91,12 +100,12 @@ export default {
         z: at.z,
         // Sideways drift comes out of the engine's own stream, so two runs of
         // the same fight scatter their numbers identically.
-        driftX: context.random.range(-DRIFT, DRIFT),
-        driftZ: context.random.range(-DRIFT, DRIFT),
-        rise: Number(how.rise) || (critical ? RISE * 1.25 : RISE),
+        driftX: context.random.range(-defaults.drift, defaults.drift),
+        driftZ: context.random.range(-defaults.drift, defaults.drift),
+        rise: Number(how.rise) || (critical ? defaults.rise * 1.25 : defaults.rise),
         colour: how.colour || (critical ? CRITICAL : PLAIN),
-        size: (Number(how.size) || SIZE) * (critical ? 1.45 : 1),
-        life: Number(how.life) || (critical ? LIFE * 1.3 : LIFE),
+        size: (Number(how.size) || defaults.size) * (critical ? 1.45 : 1),
+        life: Number(how.life) || (critical ? defaults.life * 1.3 : defaults.life),
         age: 0,
         critical
       }
@@ -108,6 +117,8 @@ export default {
 
     context.damageNumbers = {
       show,
+      /** Set these once — `defaults.size = 1` — and every number follows, automatic ones included. */
+      defaults,
       /** What is on screen right now, rounded — what a test compares. */
       rising: () => rising.map(record => ({
         text: record.text,

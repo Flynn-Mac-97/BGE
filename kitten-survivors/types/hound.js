@@ -19,7 +19,8 @@ const HEIGHT = 0.85
 const LENGTH = 1.5
 
 export default {
-  mesh: { box: [WIDTH, HEIGHT, LENGTH], tint: '#7d8794' },
+  // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
+  mesh: { model: 'models/hound.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#7d8794' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

@@ -213,32 +213,19 @@ export default {
     }
 
     /**
-     * Reading the level file is asynchronous, and a run with no screen can boot,
-     * load and press play inside that read. So the handler below resets at once
-     * and the rule catches up here — including applying itself, if play got
-     * there first and found nothing to follow.
+     * The rule used to be re-read from disk here, and the read is asynchronous:
+     * a run with no screen can boot, load and press play inside it, and such a
+     * run spent its whole simulation behind the editor's ortho view. The kernel
+     * has already parsed the level, so it hands the camera block over on the
+     * event itself and there is nothing left to wait for. `ruleRead` stays as a
+     * settled promise because commands learned to await it.
      */
-    let loadedFor = null
-    async function readRule(name) {
-      let rule = {}
-      try { rule = JSON.parse(await context.files.read(`levels/${name}.json`)).camera || {} }
-      catch { rule = {} }
-      // A newer level may have loaded while this read was in flight. It wins.
-      if (loadedFor !== name) return
-      cam.rule = rule
-      if (context.loop.running) applyRule()
-    }
-
-    // The level's camera block is the rule; re-read it whenever a level loads.
-    context.bus.on('level:loaded', name => {
+    context.bus.on('level:loaded', (name, camera) => {
       cam.target = null
-      cam.rule = {}
       forget(cam)
-      loadedFor = name
-      // Held so a command can wait for it rather than report an empty rule as
-      // though the level had declared none — the difference matters to an agent
-      // asking what the camera is doing a millisecond after boot.
-      cam.ruleRead = readRule(name)
+      cam.rule = camera || {}
+      cam.ruleRead = Promise.resolve()
+      if (context.loop.running) applyRule()
     })
 
     context.bus.on('play:started', () => {

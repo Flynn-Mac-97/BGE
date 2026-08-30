@@ -53,6 +53,12 @@ export default {
     context.particles?.define('blood', { colour: ['#f6e2c8', '#d8b98f', '#b9946a'] })
     context.particles?.define('explosion', { colour: ['#ffe08a', '#f0b26b', '#c9c9c9', '#8d8d8d'] })
 
+    // The play camera sits fourteen metres back and sees about thirteen metres
+    // of ground top to bottom, so the builtin's half-metre default number is six
+    // percent of the screen — set once here, every number follows, including the
+    // automatic ones the builtin throws itself.
+    if (context.damageNumbers) context.damageNumbers.defaults.size = 1
+
     context.bus.on('entity:hurt', event => {
       if (!(event.dealt > 0)) return
       const hurtingYou = event.entity?.id === PLAYER

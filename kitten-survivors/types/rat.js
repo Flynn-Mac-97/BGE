@@ -15,7 +15,8 @@ const HEIGHT = 0.32
 const LENGTH = 0.62
 
 export default {
-  mesh: { box: [WIDTH, HEIGHT, LENGTH], tint: '#6d5844' },
+  // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
+  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#6d5844' },
 
   // A trigger, not a body: the horde moves itself, and the crowd it moves in
   // would cost more in Physics 3D than everything else in the game put
