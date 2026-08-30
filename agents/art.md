@@ -32,6 +32,13 @@ Search before you generate. Fourteen procedural textures cost roughly ten times
 what downloading and retinting fourteen would have. Write a generator only when
 you can say what a downloaded one would get wrong.
 
+## Checking what it looks like
+
+Use the `See` plugin — `see.describe` for counts, positions and coverage
+(computed, free, headless), `see.sketch` for layout as a small PNG, and
+`see.capture` for the real frame with numbered marks. Read
+`plugins/builtin/see.agent.md` before spending a vision read.
+
 ## Screens and interface
 
 - A game screen — pause, upgrade cards, result — is `context.screen`. Never `ui.*`; that is editor panels.

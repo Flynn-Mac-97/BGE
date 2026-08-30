@@ -195,10 +195,31 @@ async function get(pathname) {
  */
 const pretty = flags.pretty || (process.stdout.isTTY && !flags.raw)
 
+/**
+ * A command may answer with files: `__files: [{ path, base64 }]`. The browser
+ * cannot write to disk, so the bytes come back over the bridge and land here,
+ * under the checkout this CLI runs from. The reply then names the written
+ * paths instead of carrying the bytes.
+ */
+function materialise(value) {
+  if (!Array.isArray(value?.__files)) return value
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const written = []
+  for (const file of value.__files) {
+    if (typeof file?.path !== 'string' || typeof file?.base64 !== 'string') continue
+    const target = path.join(root, file.path)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, Buffer.from(file.base64, 'base64'))
+    written.push(file.path)
+  }
+  const { __files, ...rest } = value
+  return { ...rest, files: written }
+}
+
 // Always JSON, including bare strings. A caller that has to guess whether the
 // output is quoted has to parse two formats, and that is the caller's bug to
 // hit at the worst moment.
-const out = v => process.stdout.write(JSON.stringify(v, null, pretty ? 2 : 0) + '\n')
+const out = v => process.stdout.write(JSON.stringify(materialise(v), null, pretty ? 2 : 0) + '\n')
 
 function die(code, message, detail) {
   process.stderr.write(message + '\n')
