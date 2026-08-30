@@ -19,9 +19,19 @@
 # The tail fan is small on purpose. A wide fan fills the notch and the chevron
 # collapses into a blob.
 #
-# Blue-black, and the darkest family in the game at 0.14 luminance. Every prop
-# is held above 0.44, so a crow crossing one never shares its value. The orange
-# beak is the only mark above that band and it is small.
+# Saturated violet-indigo, mass 0.34 luminance. It was blue-black at 0.14 and
+# read as a hole: the keyline is a near-black line at constant screen width on
+# everything that moves, and a near-black line on a near-black body separates
+# nothing.
+#
+# The wing is close to the body in value rather than a clear step under it. The
+# key light comes from almost overhead, so a wing turned by the flap takes only
+# the 0.26 ambient and drops to a tenth of its own colour; the step the wing
+# needs is the one the flap already gives it.
+#
+# Violet rather than blue because the hound is the blue family, and a mid-value
+# blue crow would have taken its hue. Violet is what a corvid's gloss is anyway.
+# The orange beak stays the one hot mark, and it is small.
 #
 # The feet are modelled INTO the body, tucked up. A separate leg object under a
 # hovering body leaves a gap of clear air that reads as breakage, and the gap
@@ -41,9 +51,9 @@ MODEL_PATH = globals().get(
 SHOULDER = (0.062, 0.030, 0.225)
 
 COLOURS = {
-    "crowBody": "#262b4a",   # 0.174 luminance; a neutral dark reads as a hole, a blue dark reads as a bird
-    "crowWing": "#1b1f38",   # 0.126, a step darker so the wing edge shows on the body
-    "crowBeak": "#ff8a12",   # 0.605, the one mark above the prop band, and small
+    "crowBody": "#6746b3",   # 0.333 luminance, hue 259, saturated violet-indigo
+    "crowWing": "#603fab",   # 0.305, and 65% of the model's area, so it sets the mass
+    "crowBeak": "#ff8a12",   # 0.605, the one hot mark, and small
     "crowWhite": "#f4f1ff",  # eye whites
     "dark": "#0f111a",       # pupils
 }

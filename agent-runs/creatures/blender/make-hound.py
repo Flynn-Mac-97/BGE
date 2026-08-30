@@ -19,8 +19,13 @@
 # The scalloped mane is a step in value, not a pale ring. A pale collar
 # measures about 0.85 luminance, which is inside the band the ground occupies.
 #
-# Cool slate blue, mass 0.33, and the only cool family in the game. Every prop
-# is held above 0.44, so a hound crossing one never shares its value.
+# Saturated slate blue, mass 0.37, and the only BLUE family — the crow is the
+# other cool one and it is violet. It was 0.33 and read as a dark mass: the
+# keyline is a near-black line at constant screen width on everything that
+# moves, and a near-black line on a near-black body separates nothing.
+#
+# The muzzle, legs and paws stay near-black. Dark legs against lit ground are
+# the strongest contrast the model can make, and that gap is the whole claim.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -37,9 +42,9 @@ MODEL_PATH = globals().get(
 HIP_HEIGHT = 0.600
 
 COLOURS = {
-    "houndCoat": "#3e4d73",    # 0.300 luminance, saturated cool slate — the only cool family
-    "houndMane": "#4c5e82",    # 0.364, the collar; a step up from the coat, still under the props
-    "houndMuzzle": "#28304a",  # 0.189, muzzle, legs and paws
+    "houndCoat": "#46679f",    # 0.392 luminance, hue 218, saturated slate blue
+    "houndMane": "#5b7cb8",    # 0.476, the collar; a step up from the coat, still under the lit ground
+    "houndMuzzle": "#29334d",  # 0.199, muzzle, legs and paws — the model's dark end
     "houndWhite": "#fffdf5",   # eye whites and the two lower fangs
     "dark": "#141828",         # pupils, nose
 }

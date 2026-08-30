@@ -21,9 +21,14 @@
 # The ears are discs rather than cones because a disc keeps its full outline
 # when the camera looks down at it, and the camera always looks down at it.
 #
-# Warm rust at 0.29 luminance. Every prop is held above 0.44, so a rat crossing
-# one never shares its value; the hue keeps it off the crow and the hound,
-# which are the other dark families.
+# Saturated warm rust, mass 0.38 luminance. The keyline is a near-black line at
+# constant screen width on everything that moves, and a near-black line on a
+# near-black body separates nothing, so the body carries mid value and the line
+# does the separating. The rat is the middle rung of the three warm families:
+# wasp amber 0.45, rat 0.38, boar 0.30.
+#
+# The belly and the ear rims stay near-black. A mid-value mass with a dark
+# underside reads as a form; one flat mid tone reads as a sticker.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -38,9 +43,9 @@ MODEL_PATH = globals().get(
 HIP_HEIGHT = 0.072
 
 COLOURS = {
-    "ratFur": "#8f3d25",     # 0.301 luminance, warm rust, saturated against a green field
-    "ratBelly": "#6d3a2e",   # 0.266, belly and paws — faces down, so it carries no shape
-    "ratEar": "#82384a",     # 0.287, ear discs, nose and tail; deep rose, still the rat's own hue
+    "ratFur": "#b45a2a",     # 0.414 luminance, hue 21, saturated warm rust
+    "ratBelly": "#63291a",   # 0.205, belly and paws — the shadow side, and the model's dark end
+    "ratEar": "#b85c72",     # 0.444, ear discs, nose and tail; rose, brighter than the fur so the discs lead
     "ratWhite": "#fffdf5",   # eye whites and the two front teeth
     "dark": "#2a1c20",       # 0.123, pupils and the ear rims behind the discs
 }

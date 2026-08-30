@@ -10,8 +10,12 @@
  * Both are held inside the cat's own size. A rat that draws more pixels than
  * the player is a rat the player looks at instead of the player.
  *
- * Warm rust at 0.29 luminance. The five enemy families are held under 0.38 and
- * every prop above 0.44, so an enemy crossing a prop never shares its value.
+ * Saturated warm rust, mass 0.35 luminance, fur 0.41. The horde carries mid
+ * value and the near-black keyline does the separating: a near-black line on a
+ * near-black body separates nothing. The belly and the ear rims stay near-black
+ * so the body still reads as a form rather than as a flat sticker.
+ *
+ * The middle rung of the three warm families — wasp 0.45, rat 0.35, boar 0.29.
  *
  * It is drawn from `models/rat.glb`, built by
  * `agent-runs/creatures/blender/make-rat.py`. The renderer swings a named node
@@ -39,13 +43,13 @@ export default {
   // it is held to 100 characters. None of these may restate a number from
   // `properties` below: the copy is the part that goes stale.
   about: 'the weakest and commonest enemy, and the one every other enemy is measured against',
-  appearance: 'A dark rust quadruped a third of the kitten tall, carrying two ear discs nearly twice the width of its body and dragging one thin straight tail. The discs and the tail name it at a glance.',
+  appearance: 'A warm rust quadruped a third of the kitten tall, carrying two rose ear discs nearly twice the width of its body and dragging one thin straight tail. The discs and the tail name it at a glance.',
   looksWrongWhen: 'it is a plain tinted box — models/rat.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   // The ear discs and the tail overshoot the hull: the hull is what a weapon
   // hits, the silhouette is what is read.
-  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#8f3d25' },
+  mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#b45a2a' },
 
   // A trigger, not a body: the horde moves itself, and the crowd it moves in
   // would cost more in Physics 3D than everything else in the game put
