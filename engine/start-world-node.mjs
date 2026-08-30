@@ -85,6 +85,10 @@ export function onDisk(projectDirectory) {
         const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
         const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
         const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
+        // A guide may declare its own trigger words (comma-separated) — the
+        // same reading the dev server makes, or the two twins route
+        // differently.
+        const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
         // Named from the project directory in use, not the literal `project`.
         // A guide whose match path points into the other project attaches to
         // tasks about a file that is not there, and never to the real one.
@@ -96,7 +100,8 @@ export function onDisk(projectDirectory) {
           id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
           scope: place.scope, file: `${place.prefix}/${name}`,
           match,
-          triggers: [stem.replaceAll('-', ' '), plugin.toLowerCase()], enabled: !disabled.has(plugin), plugin
+          triggers: [...new Set([stem.replaceAll('-', ' '), plugin.toLowerCase(), ...saidTriggers])],
+          enabled: !disabled.has(plugin), plugin
         })
       }
     }

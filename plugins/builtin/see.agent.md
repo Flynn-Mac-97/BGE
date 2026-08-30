@@ -1,3 +1,7 @@
+---
+triggers: look, look at, looks, visual, screenshot, frame, capture, render, hidden, occlud, blocking, on screen, off screen, camera, viewport, what does, appearance, model look, effect
+---
+
 # See
 
 Query first, pixels last. Route every question to the cheapest exact

@@ -97,7 +97,12 @@ async function loadAgentGraph(read, pluginNodes = []) {
     }
   }
 
-  for (const node of nodes) node.enabled = node.kind !== 'skill' || !disabled.has(node.id)
+  // A node that arrived already disabled stays disabled — a plugin guide
+  // carries the plugin's own toggle, and overwriting it here advertised
+  // guides for plugins the project had switched off.
+  for (const node of nodes) {
+    node.enabled = node.enabled !== false && (node.kind !== 'skill' || !disabled.has(node.id))
+  }
   return { version: 2, nodes, settings: { disabled: [...disabled] }, problems }
 }
 

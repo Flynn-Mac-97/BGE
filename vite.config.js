@@ -128,6 +128,11 @@ async function agentPlugins() {
       const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
       const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
       const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
+      // A guide may declare its own trigger words (comma-separated), so a task
+      // that says "look at x" pulls the plugin that answers looking — and a
+      // disabled plugin's words pull nothing, because the node is disabled
+      // with it. This is what makes a guide a skill.
+      const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
       // Named from the project directory in use, not the literal `project` —
       // the same rule the headless twin follows, or the two disagree about
       // which file a project plugin's guide belongs to.
@@ -139,7 +144,8 @@ async function agentPlugins() {
         id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
         scope: place.scope, file: `${place.prefix}/${name}`,
         match,
-        triggers: [stem.replaceAll('-', ' '), plugin.toLowerCase()], enabled: !disabled.has(plugin), plugin
+        triggers: [...new Set([stem.replaceAll('-', ' '), plugin.toLowerCase(), ...saidTriggers])],
+        enabled: !disabled.has(plugin), plugin
       })
     }
   }
