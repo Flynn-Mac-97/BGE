@@ -4,32 +4,30 @@
  *
  *   node tools/make-kitten-survivors-textures.mjs
  *
- * The meadow is a dusk field a cat is about to be swarmed in, drawn chunky and
- * saturated. That sets what every texture here has to be: LOW CONTRAST and
- * MID VALUE. The screen will be full of enemies, and a ground that competes for
- * attention with the crowd is a ground that gets the player killed. So the whole
- * set is painted inside a narrow band — nothing darker than #2a4a28, nothing
- * lighter than #a8b862 — and the contrast that reads on screen comes from the
- * light and from the props standing on it, not from the picture.
+ * The meadow is a bright warm day a cat is about to be swarmed in, drawn flat
+ * and chunky, sticker-book style. That sets what every texture here has to be:
+ * LOW CONTRAST and LOW CHROMA. The screen will be full of enemies, and a ground
+ * that competes for attention with the crowd is a ground that gets the player
+ * killed — `arena-sits-under-the-actors` in the art bible. So every surface here
+ * stays inside a few flat bands, and the contrast that reads on screen comes
+ * from the light and from the props standing on it, not from the picture.
  *
  * They are painted as CELLS rather than as grain, because the meadow is drawn
  * with the `toon` material and toon banding on top of fine noise reads as dirt
- * on the lens. Every surface here lays down a base colour, breaks it into a few
- * large quantised patches, draws the one structure the material actually has —
- * blades, boards, courses, shingles — and finishes with grain small enough to
- * disappear at a metre.
+ * on the lens. Every surface here lays down a base colour, breaks it into a
+ * small number of quantised bands, draws the one structure the material
+ * actually has — blades, boards, courses, shingles — and stops. `edgeDensity`
+ * in the art bible caps at 0.045: detail here is not a virtue, it is a cost.
  *
  * Everything is generated on a torus: coordinates wrap modulo the size and every
  * lattice wraps with them, so a texture tiled across a 140 metre field never
  * draws a grid over it. The tool checks its own work with `seamRatio` and says so
  * on the console rather than leaving a bad tile to be found in the viewport.
- * `sky-dusk` is the exception and says so: it is one image wrapped once round the
- * world, so it joins on x and must not repeat up the sky.
  *
  * This is a build tool rather than game code, so `Math.random` would be allowed.
  * It still seeds its own generator from each texture's name, so that re-running
- * it leaves every file byte-identical and adding one texture does not rewrite the
- * other twelve.
+ * it leaves every file byte-identical and adding one texture does not rewrite
+ * any other.
  *
  * PNG is written by hand with node's own zlib, following
  * tools/make-counter-strike-textures.mjs, so the project keeps zero build
@@ -48,9 +46,9 @@ import {
   colour, courses, crack, crc32, crcTable, decodePngHeader,
   drawCourses, encodePng, fractalNoise, get, grain, grainPerPixel,
   groundShade, hashCell, indexOf, luminance, makeRandom, mix,
-  mixColour, over, paint, patch, periodicNoise, quantise,
-  scaleColour, seamRatio, seedFromName, set, smoothstep, stain,
-  surface, toBytes, weather, wrap, wrapDelta
+  mixColour, over, paint, patch, quantise,
+  scaleColour, seamRatio, seedFromName, set, stain,
+  surface, toBytes, weather, wrap
 } from './lib/texture.mjs'
 
 
@@ -60,51 +58,33 @@ const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../kitte
 /**
  * The meadow floor, and the most important texture in the game.
  *
- * Everything else is seen briefly or from far away; this is under the player for
- * the whole run. It is deliberately quiet: a saturated mid green, four levels of
- * large patchwork so a 140 metre field is not one flat colour, and blades sparse
- * enough that at one repeat per metre they read as texture rather than as a
- * pattern. Contrast is held under about twelve per cent, because every point of
- * contrast here is a point of contrast competing with an enemy.
+ * Everything else is seen briefly or from far away; this is under the player
+ * for the whole run. Two flat bands of green, quantised large so a 140 metre
+ * field is not one flat colour, and the blades carry the only real contrast —
+ * a field with a second layer of blobby patches over that base read as
+ * camouflage at the game camera, not as grass, so the base stays plain and the
+ * blades do the work of saying "grass".
  */
 function grass(image, random) {
-  const patchwork = fractalNoise(random, 4, 4, 3)
-  const drift = fractalNoise(random, 2, 2, 2)
+  const patchwork = fractalNoise(random, 3, 3, 2)
 
-  // Yellow-greens, all under 90 degrees of hue. The first set sat at 111 to 117,
-  // which is the blue side of green: lit by a warm key it still measured
+  // Yellow-greens, all under 90 degrees of hue. A blue-green field measured
   // warmShare 0.05 against the eight references' 0.37 to 0.97, because a
   // blue-green field cannot read as sunlit whatever the lamp does.
   const deep = colour('#557a2e')
   const base = colour('#6b9437')
   const bright = colour('#8ab04a')
-  const dry = colour('#c2b862')
 
-  paint(image, (x, y, u, v) => {
-    const level = quantise(patchwork(u, v) * 0.75 + drift(u, v) * 0.25, 4)
-    let pixel = mixColour(deep, bright, level)
-    // A little warmth where the field is thinner, so the green is not one hue.
-    pixel = mixColour(pixel, dry, 0.16 * clamp01(drift(u, v) * 1.6 - 0.7))
-    return pixel
-  })
+  paint(image, (x, y, u, v) => mixColour(deep, bright, quantise(patchwork(u, v), 2)))
 
-  // Clumps: the large shapes the eye reads before it reads any blade.
-  for (let index = 0; index < 26; index++) {
-    const tint = random() < 0.5 ? deep : bright
-    patch(image, random() * image.width, random() * image.height,
-      12 + random() * 26, tint, 0.3 + random() * 0.22, 0.35)
-  }
-
-  // Blades last, short and mostly upright, in both a darker and a lighter tone
-  // so the field has depth without having contrast.
-  for (let index = 0; index < 900; index++) {
-    const up = -Math.PI / 2 + (random() - 0.5) * 1.1
-    const tint = random() < 0.45 ? scaleColour(base, 0.82) : scaleColour(bright, 1.1)
+  // Blades: short, mostly upright, in a darker and a lighter tone than the
+  // field under them, so the field has depth without a second patch layer.
+  for (let index = 0; index < 480; index++) {
+    const up = -Math.PI / 2 + (random() - 0.5) * 1.0
+    const tint = random() < 0.5 ? scaleColour(base, 0.78) : scaleColour(bright, 1.15)
     blade(image, random() * image.width, random() * image.height,
-      3 + random() * 5, up, 0.8, tint, 0.3 + random() * 0.25)
+      3 + random() * 5, up, 0.9, tint, 0.4)
   }
-
-  grain(image, random, 0.06)
 }
 
 /** Cut grass: the same field, lighter, with the mower's stripes still in it. */
@@ -186,28 +166,29 @@ function earth(image, random) {
   grain(image, random, 0.1)
 }
 
-/** Moss and the shaded green under a hedge. */
+/** Moss and the shaded green under a hedge, in the same warm daylight as the field. */
 function moss(image, random) {
   const clumps = fractalNoise(random, 6, 6, 3)
-  const deep = colour('#25482f')
-  const base = colour('#33603a')
-  const bright = colour('#417046')
+  const deep = colour('#526635')
+  const base = colour('#718f47')
+  const bright = colour('#8fad5e')
 
   paint(image, (x, y, u, v) => mixColour(deep, bright, quantise(clumps(u, v), 3)))
   for (let index = 0; index < 40; index++) {
     patch(image, random() * image.width, random() * image.height,
       4 + random() * 10, random() < 0.5 ? base : bright, 0.4, 0.45)
   }
-  grain(image, random, 0.08)
 }
 
 // ------------------------------------------------------------------ the hard
 /** Chunky faceted stone: rocks, the dry wall, the standing stones. */
 function stone(image, random) {
   const facets = fractalNoise(random, 4, 4, 2)
-  const deep = colour('#4a4757')
-  const base = colour('#65627a')
-  const pale = colour('#7d7a92')
+  // A warm grey, not the cool blue-grey of a dusk stone: this stone sits under
+  // the same warm daylight as the field.
+  const deep = colour('#666156')
+  const base = colour('#8a8275')
+  const pale = colour('#a69c8f')
 
   paint(image, (x, y, u, v) => {
     // Three levels only. Stone in this language is FACETS — a rock is a few flat
@@ -220,12 +201,11 @@ function stone(image, random) {
     patch(image, random() * image.width, random() * image.height,
       5 + random() * 12, random() < 0.5 ? deep : base, 0.4, 0.5)
   }
-  // A pale lichen or two, the only warm note allowed on stone.
+  // A pale lichen or two, the one green note on the stone.
   for (let index = 0; index < 6; index++) {
     patch(image, random() * image.width, random() * image.height,
       2 + random() * 4, colour('#8d9463'), 0.4, 0.6)
   }
-  grain(image, random, 0.09)
 }
 
 /** Weathered fence timber, grain running up the post. */
@@ -246,7 +226,7 @@ function timber(image, random) {
   grain(image, random, 0.11)
 }
 
-/** Dark bark, near black at dusk, so a trunk reads as a silhouette. */
+/** Dark bark, near black, so a trunk reads as a silhouette against the field. */
 function bark(image, random) {
   const ridges = fractalNoise(random, 3, 10, 3)
   const deep = colour('#2c2018')
@@ -259,21 +239,22 @@ function bark(image, random) {
  * Canopy: clumps of leaf, opaque, drawn as flat masses.
  *
  * No alpha and no leaf shapes. A tree in this game is three boxes seen from
- * above at dusk, and cut-out leaves on a box read as a printed picture of a tree
- * rather than as one. Masses of two greens is what a lowpoly canopy is.
+ * above in daylight, and cut-out leaves on a box read as a printed picture of a
+ * tree rather than as one. Masses of two greens is what a lowpoly canopy is.
+ * Yellow-green, under 90 degrees of hue, the same warm daylight family as the
+ * field under it.
  */
 function leaf(image, random) {
   const masses = fractalNoise(random, 4, 4, 3)
-  const deep = colour('#1f4a2b')
-  const base = colour('#2d6635')
-  const bright = colour('#3d7c3c')
+  const deep = colour('#456125')
+  const base = colour('#658c35')
+  const bright = colour('#83ad49')
 
   paint(image, (x, y, u, v) => mixColour(deep, bright, quantise(masses(u, v), 4)))
   for (let index = 0; index < 30; index++) {
     patch(image, random() * image.width, random() * image.height,
       6 + random() * 14, random() < 0.5 ? deep : base, 0.45, 0.5)
   }
-  grain(image, random, 0.07)
 }
 
 /** Barn boards: the one saturated red in the world, and it lives outside the fence. */
@@ -317,13 +298,15 @@ function hay(image, random) {
   grain(image, random, 0.1)
 }
 
-/** Still water at dusk: violet sky in it, and the weed under it. */
+/** Still water under a bright day sky: the day-sky blue in it, and the weed under it. */
 function pond(image, random) {
   const ripple = fractalNoise(random, 3, 3, 3)
   const weed = fractalNoise(random, 7, 7, 2)
-  const deep = colour('#2b4258')
-  const sky = colour('#5f6392')
-  const green = colour('#2f5148')
+  // The sky colour the level sets is `#8ecae6`; this is that blue, darker where
+  // the water is deep and lighter where it holds the sky.
+  const deep = colour('#326070')
+  const sky = colour('#88bad1')
+  const green = colour('#658040')
 
   paint(image, (x, y, u, v) => {
     let pixel = mixColour(deep, sky, quantise(ripple(u, v), 4))
@@ -334,86 +317,18 @@ function pond(image, random) {
   // allowed to be near white.
   for (let index = 0; index < 14; index++) {
     patch(image, random() * image.width, random() * image.height,
-      1.5 + random() * 3, colour('#c9c0d8'), 0.4, 0.5)
+      1.5 + random() * 3, colour('#f7f0da'), 0.4, 0.5)
   }
-  grain(image, random, 0.05)
-}
-
-// -------------------------------------------------------------------- the sky
-/**
- * Dusk, wrapped once round the world. Horizon at v = 0.5.
- *
- * The sun is a warm bloom low on one side rather than a disc, because a disc in
- * a panorama is a hard circle that never lines up with the key light and always
- * looks like a sticker. The gradient runs indigo at the zenith through violet to
- * apricot at the horizon, and below the horizon it goes straight to a dark
- * ground haze — nothing under the horizon is ever seen except through fog.
- */
-function skyDusk(image, random) {
-  const cloud = fractalNoise(random, 6, 3, 4)
-  const edge = periodicNoise(random, 20, 6)
-
-  const zenith = colour('#171a3e')
-  const upper = colour('#312c60')
-  const violet = colour('#5c4478')
-  const rose = colour('#a05c76')
-  const apricot = colour('#d98a5c')
-  const ground = colour('#241f3a')
-
-  // Where the sun sits, as a fraction round the panorama. It has to agree with
-  // the level's key light direction, which comes from +X and +Z; a panorama's u
-  // runs anticlockwise from -Z, so three eighths round puts the glow behind the
-  // camera's right shoulder where the level puts the light.
-  const sunU = 0.375
-
-  paint(image, (x, y, u, v) => {
-    let pixel
-    if (v < 0.5) {
-      // The warm band is kept in the last tenth of the sky on purpose. A dusk
-      // whose orange reaches a third of the way up reads as a sunset poster; a
-      // dusk whose orange is a thin line under a violet sky reads as evening,
-      // and leaves the top two thirds dark enough for the arena to sit against.
-      const down = v / 0.5
-      pixel = mixColour(zenith, upper, smoothstep(clamp01(down * 1.6)))
-      pixel = mixColour(pixel, violet, smoothstep(clamp01((down - 0.5) / 0.38)))
-      pixel = mixColour(pixel, rose, clamp01((down - 0.86) / 0.11) ** 1.3)
-      pixel = mixColour(pixel, apricot, clamp01((down - 0.965) / 0.035) ** 1.4)
-    } else {
-      // Below the horizon is only ever seen through fog, so it goes dark fast.
-      const below = (v - 0.5) / 0.5
-      pixel = mixColour(apricot, ground, smoothstep(clamp01(below * 5)))
-    }
-
-    // The sun's bloom, as an ellipse sitting on the horizon rather than a shaft
-    // running up it. Wide across and shallow up, which is what a low sun in haze
-    // actually is, and what keeps it from reading as a searchlight.
-    const around = wrapDelta(u - sunU, 1)
-    const above = 0.5 - v
-    const glow = Math.exp(-((around / 0.115) ** 2 + (above / 0.055) ** 2))
-    pixel = mixColour(pixel, colour('#f2b479'), 0.85 * glow)
-    pixel = mixColour(pixel, colour('#ffdcae'), 0.9 * Math.exp(-((around / 0.035) ** 2 + (above / 0.016) ** 2)))
-
-    // Bands of cloud, only in the upper half, thinning to nothing well above the
-    // horizon so they never become a line lying along it.
-    const band = clamp01((0.42 - v) / 0.34)
-    const puff = clamp01((cloud(u, v) - 0.5) * 2.8 + 0.2 * (edge(u, v) - 0.5))
-    const lit = mixColour(colour('#3d3462'), colour('#b8748a'), clamp01(1 - Math.abs(around) / 0.4))
-    pixel = mixColour(pixel, lit, 0.6 * puff * smoothstep(band))
-
-    // One step of dither: an eight-bit gradient over half a screen bands, and
-    // the sky is the one surface with nothing on it to hide the bands.
-    const dither = ((x * 7 + y * 13) % 3 - 1) / 255
-    return [pixel[0] + dither, pixel[1] + dither, pixel[2] + dither]
-  })
 }
 
 // ------------------------------------------------------------------- the list
-// `wrap` says which axes a texture must join itself on.
-//   'xy' a material, tiled both ways across a surface.
-//   'x'  a composition down its height — the sky runs zenith to nadir and must
-//        not repeat vertically.
-// Sizes are powers of two because a wrapped mip chain wants them. Nothing here
-// is a 1:1 picture: every one of these is a material.
+// There is no sky texture here. The level sets `world.sky` to a flat colour
+// and has no `skyTexture`, so a generated panorama would never be drawn — a
+// dusk panorama shipped in this set once anyway, wrong for the daylight game
+// and dead weight either way.
+// `wrap` says which axes a texture must join itself on. Every texture below is
+// 'xy', a material tiled both ways across a surface — nothing here is a 1:1
+// picture. Sizes are powers of two because a wrapped mip chain wants them.
 const TEXTURES = [
   { name: 'grass', width: 256, height: 256, note: 'the field — under the player the whole run', draw: grass },
   { name: 'grass-mown', width: 128, height: 128, note: 'cut grass, mower stripes', draw: grassMown },
@@ -422,13 +337,12 @@ const TEXTURES = [
   { name: 'moss', width: 64, height: 64, note: 'shade under the hedge', draw: moss },
   { name: 'stone', width: 64, height: 64, note: 'rocks, dry wall, standing stones', draw: stone },
   { name: 'timber', width: 64, height: 64, note: 'fence posts and rails', draw: timber },
-  { name: 'bark', width: 64, height: 64, note: 'trunks, near black at dusk', draw: bark },
+  { name: 'bark', width: 64, height: 64, note: 'trunks, near black', draw: bark },
   { name: 'leaf', width: 128, height: 128, note: 'canopy masses, opaque', draw: leaf },
   { name: 'barn-board', width: 128, height: 128, note: 'the barn, the one saturated red', draw: barnBoard },
   { name: 'roof-shingle', width: 64, height: 64, note: 'barn roof, dark and cool', draw: roofShingle },
   { name: 'hay', width: 64, height: 64, note: 'bales and the stack', draw: hay },
-  { name: 'pond', width: 64, height: 64, note: 'still water with the dusk sky in it', draw: pond },
-  { name: 'sky-dusk', width: 1024, height: 512, note: 'panorama, horizon at v=0.5, sun glow at u=0.375', wrap: 'x', draw: skyDusk }
+  { name: 'pond', width: 64, height: 64, note: 'still water with the day sky in it', draw: pond }
 ]
 
 // --------------------------------------------------------------------- write
