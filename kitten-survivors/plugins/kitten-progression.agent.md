@@ -23,7 +23,15 @@
   per `kitten-survivors/art/interface/bible.md`. `choice.pick` and the number
   keys work exactly as before.
 - Adds the `kittenCard` item kind to Screen: a fat panel, a coloured head band
-  with the glyph, a number badge a thumb presses, then the name, the rank and
-  one line. `run screen.read` reads the cards and marks the chosen one.
+  carrying the upgrade's drawn picture in near-black, a number badge, then the
+  name, the rank and one line. `run screen.read` reads the cards and marks the
+  chosen one.
+- **Every card sits on one baseline.** The chosen card is ringed in white and
+  haloed outside its own box; it is never lifted or grown, because a row that
+  moves as the pick changes cannot be read.
+- Behind the cards the world is frosted, never blacked out — `frost()` in
+  Kitten Screen Look. The player has to recognise the scene they go back to.
+- The row ends with the same green action plate every other screen ends with,
+  capped `1 2 3`. This game is played on a keyboard and says so everywhere.
 - Commands: `kitten.progress`, `kitten.drop <worth>` (a gem beside the kitten,
   for trying the magnet with no enemies in the world).
