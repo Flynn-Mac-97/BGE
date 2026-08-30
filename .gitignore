@@ -16,3 +16,8 @@ agent-runs/dev-*.log
 # measure.mjs regenerates these; nineteen thousand lines of run output is
 # not evidence anyone reads.
 agent-runs/see-marks/*seed*.json
+
+# Captures a lane regenerates to prove one claim. The claim is in the report;
+# the frame is a working file, and committing it means every run is a diff.
+agent-runs/see/**/*.png
+agent-runs/see/**/*.json
