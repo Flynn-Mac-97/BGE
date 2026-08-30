@@ -1713,6 +1713,21 @@ export function makeRenderer(canvas, view, viewport) {
     updateCamera()
   }
 
+  /**
+   * Draw at a stated size instead of the window's.
+   *
+   * A game is designed for a screen shape, and the shape of the window an
+   * agent happens to have is not it. `resize()` puts the window's own size
+   * back.
+   */
+  function frameSize(width, height) {
+    viewport.width = Math.max(1, Math.round(width))
+    viewport.height = Math.max(1, Math.round(height))
+    renderer.setSize(viewport.width, viewport.height, false)
+    composer?.setSize(viewport.width, viewport.height)
+    updateCamera()
+  }
+
   const flat = () => view.mode === 'ortho'
   const activeCamera = () => (flat() ? orthographic : perspective)
 
@@ -1787,6 +1802,7 @@ export function makeRenderer(canvas, view, viewport) {
     get shadowMap() { return renderer.shadowMap },
 
     resize,
+    frameSize,
 
     /** Push entity state into the scene graph. Called every frame. */
     sync(world) {

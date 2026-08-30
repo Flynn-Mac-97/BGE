@@ -152,7 +152,14 @@ export async function prepareAgent(root, id, request = {}, projectDirectory = 'p
       throw new Error('parallel work needs a clean tracked baseline; commit or stash current changes first')
     }
     workspace = path.join(main, '.agent-worktrees', id)
-    if (fs.existsSync(workspace)) throw new Error(`worktree path already exists: ${workspace}`)
+    if (fs.existsSync(workspace)) {
+      throw new Error(
+        `worktree path already exists: ${workspace}\n` +
+        `A released lane keeps its worktree until it is merged. Land it with\n` +
+        `  node bin/engine.mjs agent.merge ${id}\n` +
+        `or throw the work away with\n` +
+        `  git worktree remove --force ${path.join('.agent-worktrees', id)} && git branch -D agent/${id}`)
+    }
     branch = `agent/${id}`
     try {
       git(main, ['worktree', 'add', '-b', branch, workspace, 'HEAD'])
@@ -189,14 +196,17 @@ export async function prepareAgent(root, id, request = {}, projectDirectory = 'p
     throw error
   }
 
-  const taskFile = path.join(workspace, 'project/.engine/agent-task.json')
+  // Beside the game the lane works on, so a run never writes into another
+  // project's directory.
+  const taskFile = path.join(workspace, projectDirectory, '.engine/agent-task.json')
   fs.mkdirSync(path.dirname(taskFile), { recursive: true })
   fs.writeFileSync(taskFile, JSON.stringify({ run, context: packet }, null, 2) + '\n', 'utf8')
 
   return {
     ...run,
+    packet: taskFile,
     context: packet,
-    next: `cd ${JSON.stringify(workspace)} then work only on the claimed files and run the required checks`
+    next: `cd ${JSON.stringify(workspace)} then read ${JSON.stringify(taskFile)}, work only on the claimed files, and run the required checks`
   }
 }
 

@@ -242,6 +242,26 @@ function die(code, message, detail) {
   process.exit(code)
 }
 
+/**
+ * Did the op report a failure inside its answer?
+ *
+ * A gate reads the exit code, so a reply that says a check failed must exit
+ * non-zero. `tests.run` answers with a list of results; each carries its own
+ * `ok`.
+ */
+function reportedFailure(value) {
+  if (!value || typeof value !== 'object') return false
+  if (Array.isArray(value)) return value.some(reportedFailure)
+  if (value.ok === false) return true
+  return Array.isArray(value.tests) && value.tests.some(reportedFailure)
+}
+
+// One exit code for every path: the op ran, and the answer says whether it passed.
+const finish = value => {
+  out(value === undefined ? { ok: true } : value)
+  process.exit(reportedFailure(value) ? 1 : 0)
+}
+
 // ------------------------------------------------------------------ painpoints
 /**
  * Was this engine easy to work in, and what did it cost? The agent doing the
@@ -603,8 +623,7 @@ if (flags.headless) {
       catch (e) { die(1, `step ${results.length + 1} (${stepOp}): ${String(e?.message || e)}`, e?.stack) }
     }
     console.log = original
-    out(results.map(result => result === undefined ? { ok: true } : result))
-    process.exit(0)
+    finish(results.map(result => result === undefined ? { ok: true } : result))
   }
 
   const verb = engine[op]
@@ -617,9 +636,8 @@ if (flags.headless) {
   catch (e) { die(1, String(e?.message || e), e?.stack) }
 
   console.log = original
-  out(result === undefined ? { ok: true } : result)
   // The loop may hold a timer open. The op is done, so leave rather than wait.
-  process.exit(0)
+  finish(result)
 }
 
 if (op === 'watch') {
@@ -644,4 +662,4 @@ if (op === 'watch') {
 const ms = op === 'simulate' ? Math.max(timeout, 2000 + Number(words[0] || 1) * 1000) : timeout
 
 const result = await call(op, args, ms)
-out(result === undefined ? { ok: true } : result)
+finish(result)

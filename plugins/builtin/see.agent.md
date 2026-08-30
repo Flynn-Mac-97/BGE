@@ -204,9 +204,19 @@ rest — the studio: neutral light, no post, cropped to the drawn pixels, TRANSP
 background by default, and UNMARKED, with `silhouette` giving the subject's
 traced outline in the crop's own coordinates; pass `background` with a colour
 when a test needs a known backdrop), `between` (two ids — distance, touching, relative screen position,
-facing), `ui: false` (hide player-facing overlays — damage numbers and
-anything marked `userData.overlay` — when the question is the world, not the
-HUD), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`.
+facing), `ui: false` (hide everything player-facing — the HUD, any game screen,
+damage numbers, anything marked `userData.overlay` — when the question is the
+world; leave it on to judge the interface, which is drawn over the frame and is
+in it by default), `size` (`[width, height]` in pixels — draw at the shape the
+game is designed for instead of the window's; the HUD is laid out for the window
+so it is left out unless `ui: true` asks for it stretched, and the window's own
+size is put back after), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`
+(writes `agent-runs/see/<name>.png`), `file` (the whole path, which must end
+`.png` and stay under `agent-runs/`; the sidecar takes the same path with a
+`.json` ending).
+
+`see.capture` needs the dev server. Under `--headless` there is no renderer and
+it says so.
 
 Marks are HULLS: each marked entity is outlined in its TYPE's colour, drawn
 on its own pixels — one colour per type, so a busy frame is a handful of

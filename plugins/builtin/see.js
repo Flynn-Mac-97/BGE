@@ -358,8 +358,16 @@ export default {
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
         return withSubject(context, options, async options => {
-        const description = describe(context, options)
+        let description = describe(context, options)
         if (description.error) return description
+        // A game is designed for a screen shape, and the window an agent has is
+        // not it. `size` states the shape to judge — [width, height] in pixels.
+        const sized = Array.isArray(options.size) && options.size.length === 2
+          ? options.size.map(Number)
+          : null
+        if (options.size && !sized) {
+          return { error: `size is [width, height] in pixels, for example {"size":[540,960]}` }
+        }
 
         const view = context.view
         const kept = keepView(view)
@@ -383,6 +391,12 @@ export default {
         // a throw mid-draw all hand the editor back the world it lent.
         try {
         if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
+        // Before every measurement below, so screen positions belong to the
+        // frame delivered rather than to the window.
+        if (sized) {
+          context.renderer.frameSize(sized[0], sized[1])
+          description = describe(context, options)
+        }
 
         // A declared model may still be downloading — a preview spawned a
         // moment ago always is — and drawing now captures the placeholder box.
@@ -532,6 +546,17 @@ export default {
           copy.height = canvas.height
           pen = copy.getContext('2d')
           pen.drawImage(canvas, 0, 0)
+          // The HUD and every game screen draw on their own 2D canvases over
+          // the GL one, so a frame taken from GL alone shows a game with no
+          // interface. They are stretched to the GL canvas because a layer is
+          // sized in CSS pixels and the GL canvas in device pixels.
+          // A layer is laid out for the window, so at a stated size it can only
+          // be stretched. Left out unless the caller asked for it by name.
+          if (options.ui !== false && (!sized || options.ui === true)) {
+            for (const layer of document.querySelectorAll('canvas.hud-layer, canvas.screen-layer')) {
+              if (layer.width && layer.height) pen.drawImage(layer, 0, 0, copy.width, copy.height)
+            }
+          }
         }
 
         // Where the renderer can say, a marked hull is upgraded from box
@@ -557,6 +582,7 @@ export default {
         }
 
         } finally {
+          if (sized) context.renderer.resize()
           for (const other of concealed) other.hidden = false
           revealOverlays(overlays)
           if (studio) {
@@ -567,7 +593,7 @@ export default {
             context.renderer.passes?.set(studio.passes)
           }
           if (moved) Object.assign(view, kept)
-          if (moved || studio || concealed.length || overlays.length) {
+          if (sized || moved || studio || concealed.length || overlays.length) {
             // The editor's own picture is stale after a borrowed camera or a
             // dimmed scene; a repaint that fails must not become the answer.
             try {
@@ -702,6 +728,14 @@ export default {
         }
 
         const name = options.name || `${context.editor.levelName}-${++frameNumber}`
+        // `file` names the whole path, `name` names one inside the run
+        // directory. Both stay under agent-runs/, so a frame never lands in the
+        // project or at the root.
+        const target = options.file ? String(options.file).replace(/^\.\//, '') : `agent-runs/see/${name}.png`
+        if (!target.startsWith('agent-runs/') || !target.endsWith('.png')) {
+          throw new Error(`file must be a .png path under agent-runs/, not "${target}"`)
+        }
+        const sidecarFile = target.replace(/\.png$/, '.json')
         const base64 = copy.toDataURL('image/png').split(',')[1]
         // The sidecar carries every binding the reply carries. A vision reader
         // is handed the PNG and the JSON and never sees the reply, so a map
@@ -712,13 +746,21 @@ export default {
           : btoa(unescape(encodeURIComponent(JSON.stringify(description))))
         return {
           __files: [
-            { path: `agent-runs/see/${name}.png`, base64 },
-            { path: `agent-runs/see/${name}.json`, base64: sidecar }
+            { path: target, base64 },
+            { path: sidecarFile, base64: sidecar }
           ],
           marks,
           ...(crop
             ? { subject: subjectEntity.id, unmarked: description.unmarked }
             : { palette: description.palette }),
+          ...(sized
+            ? {
+              size: [copy.width, copy.height],
+              interface: options.ui === true
+                ? 'stretched from the window layout — judge the world here, the interface at window size'
+                : 'left out: a HUD is laid out for the window and can only be stretched to this size'
+            }
+            : {}),
           counts: description.counts
         }
         })
