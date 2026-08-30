@@ -17,6 +17,15 @@ const MAX_CATCHUP = 5
 const DEFAULT_SEED = 1
 
 /**
+ * How far mulberry32 moves its state on every draw.
+ *
+ * Named because it is more than an implementation detail: the state advances by
+ * this one addition and by nothing else, which is what makes a stream rejoinable
+ * at a point without replaying every draw that led there.
+ */
+const STREAM_STEP = 0x6d2b79f5
+
+/**
  * mulberry32: small, fast, and identical everywhere. The exact algorithm
  * matters less than the fact that it is ours — `Math.random` is seeded by the
  * browser and cannot be replayed.
@@ -24,7 +33,7 @@ const DEFAULT_SEED = 1
 function mulberry32(seed) {
   let a = seed >>> 0
   return () => {
-    a = (a + 0x6d2b79f5) >>> 0
+    a = (a + STREAM_STEP) >>> 0
     let t = Math.imul(a ^ (a >>> 15), 1 | a)
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
@@ -33,15 +42,37 @@ function mulberry32(seed) {
 
 function makeRandom(seed) {
   let current = seed
-  let next = mulberry32(current)
+  let drawn = 0
+  let generator = mulberry32(current)
+  // Counted in one place, so `range`, `int`, `pick` and `chance` are all counted
+  // by being written in terms of it. A helper that reached past this would make
+  // the count a lie exactly where the stream was used most.
+  const next = () => { drawn++; return generator() }
 
   const random = () => next()
   random.range = (lo, hi) => lo + next() * (hi - lo)
   random.int = (lo, hi) => Math.floor(lo + next() * (hi - lo + 1))
   random.pick = list => list[Math.floor(next() * list.length)]
   random.chance = p => next() < p
-  random.reset = s => { current = s ?? current; next = mulberry32(current) }
+  random.reset = s => { current = s ?? current; drawn = 0; generator = mulberry32(current) }
+
+  /**
+   * Rejoin a stream where it had got to, rather than starting it again.
+   *
+   * The state after n draws from a seed is the seed plus n stream steps, in
+   * 32-bit arithmetic and nothing else, so a generator started there gives the
+   * same next number the original would have given and every number after it.
+   * That is what lets a world be put back mid-run and still be the same run.
+   */
+  random.resume = (s, n = 0) => {
+    current = s ?? current
+    drawn = Math.max(0, Math.round(n))
+    generator = mulberry32((current + Math.imul(drawn, STREAM_STEP)) >>> 0)
+  }
+
   Object.defineProperty(random, 'seed', { get: () => current })
+  /** How many numbers have been taken since the stream was seeded. Half of where it is. */
+  Object.defineProperty(random, 'draws', { get: () => drawn })
   return random
 }
 
@@ -172,6 +203,13 @@ export function makeLoop({ onFixed, onFrame, onError }) {
     get time() { return fixed },
     get elapsed() { return fixed },
 
+    /**
+     * Fixed steps run. The clock is derived from this, so this is the honest
+     * form of "where the clock is" — a time in seconds is a rounding of it and
+     * would not survive a round trip.
+     */
+    get steps() { return steps },
+
     random,
 
     /** Stop time under this name. Naming it is what lets two holders overlap. */
@@ -221,6 +259,34 @@ export function makeLoop({ onFixed, onFrame, onError }) {
       // with nothing on screen saying why.
       holds.clear()
       random.reset(seed)
+    },
+
+    /**
+     * Pick a run up where it was, without having run it.
+     *
+     * Deliberately not part of `reset`. Resetting means "this is the beginning",
+     * and it has to go on meaning only that — a clock that could be set by
+     * accident is a clock nothing can be reasoned from. This is the other thing:
+     * a world was captured mid-run and rebuilt somewhere else, and the clock and
+     * the random stream have to arrive at the same place the entities did or
+     * every reading taken afterwards is quietly wrong.
+     *
+     * The step count is what is restored, not a time in seconds, because the
+     * clock is derived from the count — restoring a rounded time would leave the
+     * two disagreeing from the next step onwards.
+     *
+     * Timers already in flight were scheduled against the old clock, so they
+     * move with it: one due in half a second is still due in half a second.
+     */
+    resume({ steps: to = 0, seed, draws = 0 } = {}) {
+      const target = Math.max(0, Math.round(to))
+      const shift = (target - steps) * STEP
+      steps = target
+      fixed = steps * STEP
+      acc = 0
+      for (const t of timers) { t.start += shift; t.at += shift }
+      random.resume(seed ?? random.seed, draws)
+      return { time: fixed, steps, seed: random.seed, draws: random.draws }
     },
 
     /**

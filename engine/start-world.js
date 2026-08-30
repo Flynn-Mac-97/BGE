@@ -15,6 +15,7 @@
  * the same engine with nothing drawing it. The moment it becomes a second
  * implementation, the two start to disagree and neither can be trusted.
  */
+import { carryWorldThroughReload } from './reload-notice.js'
 import { makeBus } from './bus.js'
 import { makeWorld } from './world.js'
 import { makeLoop } from './loop.js'
@@ -386,6 +387,13 @@ export async function startWorld({
 
   const engine = makeInspect({ world, loader, loop, files, bus, editor, view })
   context.engine = engine
+
+  // Editing engine or plugin source is a full page reload, and a page reload
+  // takes the world with it. Put the moment back where the last page left one,
+  // and say what happened either way — a rebuilt world nobody announced is a
+  // world an agent will go on debugging as though it were the old one. Nothing
+  // here costs a headless world anything: there is no session to restore from.
+  await carryWorldThroughReload({ world, loop, editor, view, bus, context, engine })
 
   return { context, engine, world, loop, loader, bus, files, editor, view, viewport }
 }

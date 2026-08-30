@@ -1,0 +1,137 @@
+
+world A — boot kitten-survivors, simulate 5s, then edit it by hand
+------------------------------------------------------------------
+level            meadow
+entities         782
+clock            5s   seed 1   simulated true
+selection        ["ground-37"]
+capture size     338376 characters
+fields dropped   none
+
+world B — a fresh boot, restored from the capture through a fake session
+------------------------------------------------------------------------
+before restore   749 entities, clock 0s, simulated false
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was put back as it was — level "meadow", 782 entities, simulated. A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. NOT restored: the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for "world:restored". engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.
+after restore    782 entities, clock 5s, simulated true
+session emptied  true
+
+diff 1 — snapshot before the reload against snapshot after the restore
+----------------------------------------------------------------------
+errors.length: 0 -> 1
+errors[0].t: absent -> 376
+errors[0].level: absent -> "error"
+errors[0].source: absent -> "console"
+errors[0].message: absent -> "[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was put back as it was — level \"meadow\", 782 entities, simulated. A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. NOT restored: the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for \"world:restored\". engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored."
+
+diff 2 — the captured moment against a fresh capture of the restored world
+--------------------------------------------------------------------------
+identical
+(cause, time and timers are excluded — the clock and the schedule are the parts that cannot come back)
+
+diff 3 — the hand-made state, read back one field at a time
+-----------------------------------------------------------
+world.state          {"level":1,"experience":0,"experienceNeeded":5,"experienceFraction":0,"runSeconds":4,"runClock":"0:04","runOver":false,"kills":1,"enemies":27,"score":1234,"wave":3}
+planted entity       ground-37 at [11.5, 2.25, -3]
+runtime field        velocityX = 4.5
+entity reference     chasing -> pond-1 (was pond-1)
+selection            ["ground-37"]
+camera               x 21.5, zoom 55
+simulated flag       true
+
+the notice, exactly as it is written
+------------------------------------
+key        worldWasRestored
+sentence   a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was put back as it was — level "meadow", 782 entities, simulated. A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. NOT restored: the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for "world:restored". engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.
+reload     {
+  "file": "plugins/builtin/see.js",
+  "at": "2026-08-30T11:20:12.292Z",
+  "cause": "proof",
+  "from": {
+    "level": "meadow",
+    "entities": 782,
+    "simulated": true,
+    "playing": false,
+    "time": 5,
+    "seed": 1
+  },
+  "restored": {
+    "level": "meadow",
+    "entities": 782,
+    "simulated": true,
+    "playing": false
+  },
+  "notRestored": [
+    "the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for \"world:restored\""
+  ]
+}
+
+delivery — the first snapshot carries it, the second does not
+-------------------------------------------------------------
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was put back as it was — level "meadow", 782 entities, simulated. A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. NOT restored: the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for "world:restored". engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.
+snapshot 1 carries   worldWasRestored, reload
+snapshot 2 carries   nothing
+engine.reloadNotice() still answers: true
+
+delivery — the same notice riding on a command reply instead
+------------------------------------------------------------
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was put back as it was — level "meadow", 782 entities, simulated. A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. NOT restored: the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for "world:restored". engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.
+run("bridge.status") -> {"open":false,"transport":"vite ws","worldWasRestored":"a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was put back as it was — level \"meadow\", 782 entities, simulated. A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. NOT restored: the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for \"world:restored\". engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.","reload":{"file":"plugins/builtin/see.js","at":"2026-08-30T11:20:12.292Z","cause":"proof","from":{"level":"meadow","entities":782,"simulated":true,"playing":false,"time":5,"seed":1},"restored":{"level":"meadow","entities":782,"simulated":true,"playing":false},"notRestored":["the lists plugins keep of what they spawned — 33 of the 782 entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for \"world:restored\""]}}
+the next one         -> {"open":false,"transport":"vite ws"}
+
+the clock and the random stream, which are the moment as much as the entities are
+---------------------------------------------------------------------------------
+clock        5s / 300 steps  ->  5s / 300 steps
+stream       seed 1, 904 draws  ->  seed 1, 904 draws
+next 12 numbers  identical
+
+running both worlds on from the same moment — where the restore stops being exact
+---------------------------------------------------------------------------------
+after 3s more: 799 entities against 802, clock 8s against 8s
+differing fields: 181
+  counts.entities: 799 -> 802
+  entities.length: 799 -> 802
+  entities[749].at[0]: -7.66 -> -10.775
+  entities[749].at[2]: -12.381 -> -16.972
+  entities[749].rotation: -155.034 -> -154.949
+  entities[750].at[0]: 0.032 -> 0.204
+  ... and 175 more, all of them positions of enemies
+
+This is the loss the notice names, and it is a real one. The horde is a list
+a project plugin keeps of what it spawned; the entities came back but the list
+did not, so nothing drives them and the two runs part. It is fixed in the
+plugin that owns the list, not here — `world:restored` now fires for it.
+
+the floor — what is said when the moment could not be kept
+----------------------------------------------------------
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (the moment was 6000000 characters, larger than a session will hold). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+
+too large for a session
+  worldWasReset: a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (the moment was 6000000 characters, larger than a session will hold). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+  world after: 749 entities, simulated false
+[reload] a hot reload of engine/render.js reloaded the page at 11:20:12 UTC; the world was rebuilt from level "meadow" and nothing was lost — it had not been simulated and held only what the level holds. engine.reloadNotice() repeats this.
+
+nothing was lost
+  worldWasReset: a hot reload of engine/render.js reloaded the page at 11:20:12 UTC; the world was rebuilt from level "meadow" and nothing was lost — it had not been simulated and held only what the level holds. engine.reloadNotice() repeats this.
+  world after: 749 entities, simulated false
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (the moment belonged to project "some-other-game" and this page serves "kitten-survivors"). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+
+a different project
+  worldWasReset: a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (the moment belonged to project "some-other-game" and this page serves "kitten-survivors"). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+  world after: 749 entities, simulated false
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (putting it back failed — Cannot read properties of null (reading 'filter')). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+
+putting it back failed
+  worldWasReset: a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (putting it back failed — Cannot read properties of null (reading 'filter')). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+  world after: 749 entities, simulated false
+[reload] a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (the moment was written by a different version of the engine). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+
+written by another engine
+  worldWasReset: a hot reload of plugins/builtin/see.js reloaded the page at 11:20:12 UTC; the world was rebuilt from the level and your simulated moment is gone (the moment was written by a different version of the engine). It was level "meadow", 782 entities at 5s, simulated. Re-simulate before you look again. engine.reloadNotice() repeats this.
+  world after: 749 entities, simulated false
+
+verdict
+-------
+snapshot differences        5 (errors.length, errors[0].t, errors[0].level, errors[0].source, errors[0].message)
+unexpected ones             none
+capture differences         none
+notice delivered once       true then true
