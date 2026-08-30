@@ -23,6 +23,7 @@
  * card row comes down and `kitten-level-up` goes up, so the cards match the
  * rest of the interface. The look is `art/interface/bible.md`.
  */
+import { drawGlyph, outlined, frost, DISPLAY, INK, OUTLINE, QUIET, GOLD, GREEN } from './kitten-screen-look.js'
 
 /**
  * The curve. Five points for the first level, five more each time up to level
@@ -45,24 +46,17 @@ const PICKUP_RADIUS = 2.2
 /** Death is announced under several names. Any of them is a kill. */
 const DEATH_EVENTS = ['enemy:died', 'enemy:killed', 'entity:died', 'damage:died', 'damage:killed']
 
-// The card look, fixed by `kitten-survivors/art/interface/bible.md` and matched
-// to Kitten Run HUD's: one wide heavy face, one near-black edge, strong colour.
-const DISPLAY = "Verdana, 'Trebuchet MS', system-ui, sans-serif"
-const OUTLINE = '#0a1430'
-const INK = '#ffffff'
-const QUIET = '#c1f4f9'
-const GOLD = '#ffb703'
-
-/** One card, and the gap between two. Three at 320 fit a 1280 box with room. */
-const CARD = { width: 320, height: 340, gap: 34, margin: 80, radius: 28, band: 120 }
+/** One card, the gap between two, and how far above the middle the row sits. */
+const CARD = { width: 320, height: 340, gap: 34, margin: 80, radius: 28, band: 120, row: 54 }
 
 /** The live wiring, published so the declared systems reach this world's own. */
 export const progression = { tick: null }
 
 export default {
   name: 'Kitten Progression',
-  // Kitten Run HUD registers the `plate` painter this screen puts numbers on.
-  needs: ['Experience', 'Pickups', 'Choice Screen', 'Screen', 'Run Clock', 'Modifiers', 'Kitten Upgrades', 'Kitten Run HUD'],
+  // Kitten Screen Look registers the `plate` and `frost` painters this screen
+  // is built from, and owns the palette the cards share with the HUD.
+  needs: ['Experience', 'Pickups', 'Choice Screen', 'Screen', 'Run Clock', 'Modifiers', 'Kitten Upgrades', 'Kitten Screen Look'],
   about: 'Gems from the dead, a bar that fills, and a level-up that stops the world and offers three cards.',
   inspect: context => [{
     title: 'This run',
@@ -178,24 +172,27 @@ export default {
       const width = Math.min(CARD.width, (context.screen.box.width - CARD.margin * 2 - CARD.gap * (count - 1)) / Math.max(count, 1))
 
       const items = [
-        { dim: 0.72 },
+        frost(0.26),
         { text: shown.title, at: [0, 48], anchor: 'top', size: 64, weight: 900, color: GOLD, font: DISPLAY, outline: OUTLINE },
         { plate: String(context.experience.level), cap: 'LV', at: [0, 126], anchor: 'top', size: [124, 90], textSize: 42, capColor: GOLD }
       ]
       shown.options.forEach((option, index) => items.push({
         kittenCard: option,
-        // The chosen card is lifted rather than grown, so the row does not move
-        // under the eye that is reading it.
-        at: [(index - (count - 1) / 2) * (width + CARD.gap), index === shown.selected ? 48 : 60],
+        // Every card on one baseline. The chosen one is ringed rather than
+        // moved, so nothing under the reading eye shifts as the pick changes.
+        at: [(index - (count - 1) / 2) * (width + CARD.gap), CARD.row],
         anchor: 'center',
         size: [width, CARD.height],
         selected: index === shown.selected
       }))
+      // The same action plate every other screen ends with, and its cap names
+      // the keys. This game is played on a keyboard and says so everywhere.
       items.push({
-        plate: shown.options.map((_, index) => index + 1).join('  '),
-        cap: '↵', at: [0, -34], anchor: 'bottom', size: [270, 88], textSize: 36, capColor: GOLD
+        plate: '▶ TAKE ONE',
+        cap: shown.options.map((_, index) => index + 1).join(' '),
+        at: [0, -24], anchor: 'bottom', size: [320, 92], fill: GREEN, textSize: 38
       })
-      if (shown.waiting) items.push({ plate: `+${shown.waiting}`, at: [-24, -34], anchor: 'bottom-right', size: [110, 88], textSize: 36, color: GOLD })
+      if (shown.waiting) items.push({ plate: `+${shown.waiting}`, at: [-24, -24], anchor: 'bottom-right', size: [110, 92], textSize: 36, color: GOLD })
       return items
     }
 
@@ -324,11 +321,25 @@ function drawCard(g, item, screen) {
   g.strokeStyle = item.selected ? INK : OUTLINE
   g.stroke()
 
+  if (item.selected) {
+    // Outside the card's own box, so the mark that says "this one" cannot move
+    // the row it is marking.
+    screen.roundedRect(g, x - 9, y - 9, size[0] + 18, size[1] + 18, CARD.radius + 9)
+    g.lineWidth = 6
+    g.strokeStyle = 'rgba(255, 255, 255, 0.42)'
+    g.stroke()
+  }
+
   const middle = x + size[0] / 2
+  const bandMiddle = y + CARD.band / 2 + 4
   g.textAlign = 'center'
   g.textBaseline = 'middle'
-  g.font = `400 72px ${DISPLAY}`
-  write(g, String(card.glyph ?? ''), middle, y + CARD.band / 2 + 6, 72, OUTLINE, colour)
+  // Near-black on the coloured band: the band already carries the card's
+  // colour, so a picture in that colour would read only by its outline.
+  if (!drawGlyph(g, card.id, middle, bandMiddle, 88, OUTLINE)) {
+    g.font = `400 72px ${DISPLAY}`
+    outlined(g, String(card.glyph ?? ''), middle, bandMiddle, 72, colour)
+  }
 
   if (card.number != null) {
     g.beginPath()
@@ -348,12 +359,12 @@ function drawCard(g, item, screen) {
 
   let cursor = y + CARD.band + 42
   g.font = `900 30px ${DISPLAY}`
-  write(g, String(card.title ?? ''), middle, cursor, 30, OUTLINE, INK)
+  outlined(g, String(card.title ?? ''), middle, cursor, 30, INK)
   cursor += 40
 
   if (card.rank) {
     g.font = `900 19px ${DISPLAY}`
-    write(g, String(card.rank).toUpperCase(), middle, cursor, 19, OUTLINE, colour)
+    outlined(g, String(card.rank).toUpperCase(), middle, cursor, 19, colour)
     cursor += 34
   }
 
@@ -372,16 +383,6 @@ function describeCard(item) {
   if (card.rank) out.push(`    ${card.rank}`)
   if (card.line) out.push(`    ${card.line}`)
   return out
-}
-
-/** Dark-outlined text, so a card stays legible over whatever the dim lets through. */
-function write(g, text, x, y, size, edge, colour) {
-  g.lineWidth = Math.max(3, size / 5)
-  g.lineJoin = 'round'
-  g.strokeStyle = edge
-  g.strokeText(text, x, y)
-  g.fillStyle = colour
-  g.fillText(text, x, y)
 }
 
 /** Break a line that does not fit, so a card written in prose still fits its card. */
