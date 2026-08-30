@@ -11,19 +11,31 @@
  * look is tuned in one place — none of it belongs in a builtin.
  */
 
-/** The glint each weapon's hit throws, keyed the way damage names its source. */
+/**
+ * The glint each weapon's hit throws, keyed the way damage names its source.
+ *
+ * Full saturation and a white draw in every entry: the meadow is a bright day
+ * at low saturation on purpose (kitten-survivors/art/world/bible.md), so a
+ * pastel spark now sits inside the ground's own colour range instead of
+ * standing off it. Full chroma plus white is the one combination lit grass
+ * never produces — see kitten-survivors/art/effects/bible.md.
+ */
 const HIT_SPARKS = {
-  'claw dart': { colour: ['#ffe9b8', '#ffffff'], count: 4 },
-  'yarn ball': { colour: ['#ffd2e8', '#ffffff'], count: 5 },
-  'purr wave': { colour: ['#cfe4ff', '#ffffff'], count: 3 },
-  hairball: { colour: ['#d9c39a', '#a9906f'], count: 5 },
-  'hairball burst': { colour: ['#ffe08a', '#f0b26b'], count: 9 }
+  'claw dart': { colour: ['#ffb000', '#ffffff'], count: 4 },
+  'yarn ball': { colour: ['#ff0080', '#ffffff'], count: 5 },
+  'purr wave': { colour: ['#0080ff', '#ffffff'], count: 3 },
+  // Hue-matched to the hairball projectile's own tint (kitten-weapons.js),
+  // pushed from a muddy tan to the same colour at full saturation.
+  hairball: { colour: ['#8a2a0a', '#ffffff'], count: 5 },
+  'hairball burst': { colour: ['#ff2200', '#ffcc00', '#ffffff'], count: 9 }
 }
 
 /** A hit nothing named — contact, a script — still glints, just faintly. */
 const UNNAMED_SPARK = { colour: ['#ffffff'], count: 2 }
 
-const SPARK = { speed: [2, 4.5], life: [0.08, 0.2], size: 0.03, blend: 'add', drag: 1, gravity: -6 }
+// size 0.05: the derived floor is 0.3 m across for the whole glint, but a
+// single spark dot under about 20 px on a phone is a pixel nobody can read.
+const SPARK = { speed: [2, 4.5], life: [0.08, 0.2], size: 0.05, blend: 'add', drag: 1, gravity: -6 }
 
 /** A death is a soft puff of fur that browns as it thins — never gore. */
 const DEATH_PUFF = {
@@ -32,27 +44,31 @@ const DEATH_PUFF = {
   gravity: 1.2, drag: 2.5
 }
 
+// Hue-matched to the gem's own mesh tint (#5ec8ff in types/xp-gem.js), pushed
+// to full saturation for the same reason as the hit sparks.
 /** The lazy glint a gem gives off while it lies there — money on the floor. */
-const GEM_IDLE = { count: 1, speed: 0.25, life: 0.45, size: 0.05, blend: 'add', colour: ['#aee2ff', '#ffffff'] }
+const GEM_IDLE = { count: 1, speed: 0.25, life: 0.45, size: 0.05, blend: 'add', colour: ['#00abff', '#ffffff'] }
 
 /** Seconds between idle glints, shared by the whole field of gems. */
 const GEM_IDLE_EVERY = 0.35
 
 /** The tail a gem streams once it has latched on and is flying to you. */
-const GEM_TRAIL = { rate: 22, speed: 0.2, life: 0.3, size: 0.035, blend: 'add', colour: ['#5ec8ff', '#cfeeff'] }
+const GEM_TRAIL = { rate: 22, speed: 0.2, life: 0.3, size: 0.035, blend: 'add', colour: ['#00abff', '#ffffff'] }
 
 /** The pop when a gem lands in the kitten. */
-const GEM_TAKEN = { count: 6, direction: { x: 0, y: 1, z: 0 }, spread: 0.7, speed: [1, 2.2], life: 0.25, size: 0.04, blend: 'add', colour: ['#5ec8ff', '#ffffff'] }
+const GEM_TAKEN = { count: 6, direction: { x: 0, y: 1, z: 0 }, spread: 0.7, speed: [1, 2.2], life: 0.25, size: 0.04, blend: 'add', colour: ['#00abff', '#ffffff'] }
 
 /** A level-up is the loudest good news on screen: a gold fountain and a halo. */
 const LEVEL_FOUNTAIN = {
   count: 90, direction: { x: 0, y: 1, z: 0 }, spread: 0.9, speed: [3, 7],
   life: [0.5, 0.9], size: [0.05, 0.12], blend: 'add',
-  colour: ['#ffd76a', '#ffefb0', '#ffffff'], gravity: -7, drag: 0.6
+  colour: ['#ffb800', '#ffefb0', '#ffffff'], gravity: -7, drag: 0.6
 }
+// blend 'add': a halo is light around the kitten, not a solid ring — it must
+// glow on top of the grass, not sit tinted underneath it.
 const LEVEL_HALO = {
-  count: 18, speed: 1.4, life: 0.6, size: 0.2, grow: 1.4,
-  colour: '#ffe9b0', fadeTo: '#c98a2a', drag: 2
+  count: 18, speed: 1.4, life: 0.6, size: 0.2, grow: 1.4, blend: 'add',
+  colour: '#ffc700', fadeTo: '#c98a2a', drag: 2
 }
 
 /** Who the run is about — where a level-up burst belongs. */
