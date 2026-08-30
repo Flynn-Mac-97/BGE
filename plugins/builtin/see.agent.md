@@ -23,6 +23,12 @@ numbers are exact.
   answers a `dataUrl` as well, so a panel can show it without disk.
 - `see.capture '{...}'` — the rendered canvas, marks drawn on top, same files.
   Browser only; from a terminal the CLI writes the bytes it gets back.
+- `see.moment '{"steps":[0,6,30]}'` — one sheet: the real render AND its flat
+  type layer at the same instant, then whole fixed steps forward, every cell
+  labelled. The two lenses are pixel-aligned, so a thing in the render but
+  not in the types layer is a rendering artifact, and the reverse is an
+  invisible entity. Browser only; advances the world like simulate, `stop`
+  restores the level.
 
 Options, all optional:
 - `camera` — any view fields to override: `{"camera":{"x":0,"y":40,"z":0,"pitch":-1.4,"fov":50,"mode":"perspective"}}`. Top-down map shot: high y, pitch -1.57.

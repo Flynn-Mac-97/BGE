@@ -21,7 +21,7 @@
  */
 import { makeProjector } from '../../engine/camera-project.js'
 import { boundsOf, frameSubject, facingOffset, boxesTouch } from '../../engine/frame-facts.js'
-import { sketchPixels, sketchOnCanvas, writeFrameFiles } from '../../engine/frame-sketch.js'
+import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet } from '../../engine/frame-sketch.js'
 
 /** Marks past this are noise: tags start overlapping and reads degrade. */
 const MOST_MARKS = 40
@@ -238,6 +238,60 @@ export default {
         const { encodePng } = await import(/* @vite-ignore */ '../../tools/lib/texture.mjs')
         const png = encodePng(drawn.width, drawn.height, drawn.pixels)
         return { ...(await writeFrameFiles(name, png, drawn.description)), counts: drawn.description.counts }
+      }
+    },
+    {
+      id: 'see.moment',
+      label: 'One moment through several lenses, stepped forward, on one labelled sheet',
+      /**
+       * The same instant through each lens — the real frame, and the flat
+       * type layer that is its answer key — then whole fixed steps forward
+       * and both again. A lens disagreement locates a defect: in the pixels
+       * but not the scene is a rendering artifact, in the scene but not the
+       * pixels is an invisible entity. Advances the world; `stop` restores.
+       */
+      run: async (context, options = {}) => {
+        if (typeof document === 'undefined' || !context.renderer || !context.shell?.canvas) {
+          return { why: 'a moment sheet needs the browser renderer — headless, use script with simulate and see.sketch' }
+        }
+        const steps = options.steps || [0, 6, 30]
+        const lenses = options.lenses || ['render', 'types']
+        if (!context.loop.running && !context.world.simulated) {
+          context.world.simulated = true
+          for (const entity of [...context.world.entities]) context.world.hook(entity, 'start', context)
+        }
+        const cells = []
+        const moments = []
+        let advanced = 0
+        for (const step of [...steps].sort((a, b) => a - b)) {
+          if (step > advanced) { context.loop.step(step - advanced); advanced = step }
+          const description = describe(context, options)
+          moments.push({ afterSteps: step, counts: description.counts, marked: description.visible.filter(v => v.mark) })
+          for (const lens of lenses) {
+            const cell = document.createElement('canvas')
+            const drawn = lens === 'types' && sketchOnCanvas(description, options)
+            cell.width = drawn ? drawn.canvas.width : Math.round(context.viewport.width / 2)
+            cell.height = drawn ? drawn.canvas.height : Math.round(context.viewport.height / 2)
+            const pen = cell.getContext('2d')
+            if (drawn) pen.drawImage(drawn.canvas, 0, 0)
+            else {
+              context.renderer.sync(context.world)
+              context.renderer.draw()
+              pen.drawImage(context.shell.canvas, 0, 0, cell.width, cell.height)
+            }
+            cells.push({ label: `${lens} +${step} steps`, image: cell })
+          }
+        }
+        const sheet = composeSheet(cells, { columns: lenses.length })
+        const name = options.name || `${context.editor.levelName}-moment-${++frameNumber}`
+        return {
+          __files: [
+            { path: `agent-runs/see/${name}.png`, base64: sheet.toDataURL('image/png').split(',')[1] },
+            { path: `agent-runs/see/${name}.json`, base64: btoa(unescape(encodeURIComponent(JSON.stringify(moments)))) }
+          ],
+          dataUrl: sheet.toDataURL('image/png'),
+          steps, lenses, moments: moments.map(moment => ({ afterSteps: moment.afterSteps, visible: moment.counts.visible }))
+        }
       }
     },
     {

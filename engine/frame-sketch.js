@@ -42,7 +42,40 @@ export function sketchOnCanvas(description, options = {}) {
       pen.fillText(text, x, y)
     }
   }
-  return { description, dataUrl: canvas.toDataURL('image/png') }
+  return { description, dataUrl: canvas.toDataURL('image/png'), canvas }
+}
+
+/**
+ * Several views of one moment on one sheet, each cell labelled in large text
+ * with a gutter between cells — a vision model reads one composed image far
+ * more reliably than it relates several, and cells that touch recreate the
+ * overlap failures it is worst at. Cells are canvases or images, in order.
+ */
+export function composeSheet(cells, options = {}) {
+  const columns = options.columns || Math.min(cells.length, 2)
+  const rows = Math.ceil(cells.length / columns)
+  const cellW = Math.max(...cells.map(cell => cell.image.width))
+  const cellH = Math.max(...cells.map(cell => cell.image.height))
+  const gutter = Math.max(12, Math.round(cellW / 40))
+  const labelH = Math.max(24, Math.round(cellH / 10))
+
+  const sheet = document.createElement('canvas')
+  sheet.width = columns * cellW + (columns + 1) * gutter
+  sheet.height = rows * (cellH + labelH) + (rows + 1) * gutter
+  const pen = sheet.getContext('2d')
+  pen.fillStyle = '#101216'
+  pen.fillRect(0, 0, sheet.width, sheet.height)
+  pen.font = `bold ${Math.round(labelH * 0.6)}px system-ui, sans-serif`
+  pen.textBaseline = 'middle'
+
+  cells.forEach((cell, index) => {
+    const x = gutter + (index % columns) * (cellW + gutter)
+    const y = gutter + Math.floor(index / columns) * (cellH + labelH + gutter)
+    pen.fillStyle = '#ffffff'
+    pen.fillText(cell.label, x + 4, y + labelH / 2)
+    pen.drawImage(cell.image, x, y + labelH)
+  })
+  return sheet
 }
 
 /**
