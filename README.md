@@ -48,8 +48,8 @@ plugins/builtin/physics-3d.agent.md
 
 The **Plugins** branch discovers these files by itself. A guide is loaded only
 when its plugin is enabled and the task names or edits that plugin — unless the
-guide declares `match:` paths of its own, as `Plugin Master` does to ride along
-with every plugin task. Being a plugin, it can carry commands and tests too.
+guide declares `match:` paths of its own, as `Plugin Master` does so it is included
+in every plugin task. Being a plugin, it can carry commands and tests too.
 
 Engine style defaults can be replaced for one project. An engine rule names an
 override key; a project rule with the same key wins only for matching project

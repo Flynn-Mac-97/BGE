@@ -7,7 +7,7 @@
  * in the browser it answers with the terminal command instead.
  *
  * The shelf is READ OFF DISK, not declared. It used to be a hand-kept array of
- * two demo scripts while eight real tools sat beside them, so an agent that
+ * two demo scripts while tools/ held eight real tools, so an agent that
  * checked first was told the shelf was empty and rewrote a generator that
  * already existed. A hand-kept list goes stale; a directory read cannot.
  *

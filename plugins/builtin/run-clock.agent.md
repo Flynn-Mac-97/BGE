@@ -9,7 +9,7 @@
 - context.runClock.limit(seconds)` ends it by itself. Reason: `survived`.
 - context.runClock.report('kills', () => count)` adds a number to the result.
 - `summary()` is `{ seconds, clock: '12:34', reason, over, ...reports }`, and
-  rides on `run:ended`. Also `run:started`.
+  is sent with `run:ended`. Also `run:started`.
 - Ending **holds** the world (`loop.hold('run-over')`) rather than stopping it,
   so a result screen still draws.
 - The words on a result screen belong to the game. This plugin writes none.

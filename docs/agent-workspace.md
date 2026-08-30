@@ -21,8 +21,8 @@ long as it is true.
 An instruction node that **ranks the options for a job** is the most valuable
 shape. `agents/art.md` is the worked example: a character is a Blender model, a
 few solids are `mesh.parts`, a box is a blockout. It exists because a lane
-built a character from 18 boxes while the Blender skill sat unused behind
-triggers its task never matched.
+built a character from 18 boxes; the Blender skill was available but never
+loaded, because its triggers did not match the task words.
 
 So when a run teaches something:
 
@@ -66,7 +66,7 @@ every agent.
 
 `Plugin Master` is a builtin plugin. Its sidecar guide declares
 `match: plugins/** project/plugins/**`, so the rules for creating and editing a
-plugin ride along with any plugin task — and, being a plugin, it can grow
+plugin are included in any plugin task — and, being a plugin, it can grow
 commands and tests like any other.
 
 ## Project overrides

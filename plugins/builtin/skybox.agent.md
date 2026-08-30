@@ -5,7 +5,7 @@
 - The other three keys of that block are World Look's — fog and the global light —
   and are listed below so one block can be written in one go. One more plugin reads
   it: `world.post` is Post Processing's list of passes.
-- `world` sits beside `entities` in the level file. Every key in it is optional, and
+- `world` is a top-level key of the level file, next to `entities`. Every key in it is optional, and
   a key no plugin claims is read by nobody and reported by nobody.
 
 ## The level's `world` block, in full
@@ -40,7 +40,7 @@ already had.
 
 ## The sky image
 
-- Mapped over a sphere of radius 100 m that rides with the eye, drawn first with
+- Mapped over a sphere of radius 100 m centred on the camera, drawn first with
   depth testing off, so it can never occlude anything and never fogs.
 - **It must be a full sky**: the image's top edge is the zenith, its vertical middle
   the horizon, its bottom edge the nadir. Hand it a zenith-to-horizon image and the
