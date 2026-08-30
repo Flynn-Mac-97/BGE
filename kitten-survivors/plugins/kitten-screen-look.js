@@ -342,21 +342,12 @@ function fillMeter(g, screen, x, y, size, part, colour, radius, edge, back) {
  * A mark: a ring on the floor under an actor, its name above the head and a
  * health bar under the name. Given in screen coordinates, already projected.
  */
+// The name and the health bar only. The ring under the actor is scene geometry
+// — `mesh.ring` in the renderer — so it survives a frame taken without this
+// layer, and drawing a second one here would double it.
 function drawMark(g, item, screen) {
   const width = Math.max(28, item.width || 40)
   const colour = item.color || GEM
-
-  if (item.foot) {
-    g.beginPath()
-    g.ellipse(item.foot[0], item.foot[1], width / 2, width / 4.4, 0, 0, Math.PI * 2)
-    g.globalAlpha = 0.22
-    g.fillStyle = colour
-    g.fill()
-    g.globalAlpha = 1
-    g.lineWidth = 4
-    g.strokeStyle = colour
-    g.stroke()
-  }
 
   const barWidth = Math.max(58, width)
   const [x, y] = [item.at[0] - barWidth / 2, item.at[1]]

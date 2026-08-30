@@ -31,8 +31,8 @@ const GAP = 10
 const RESULT_TILE = 56
 const RESULT_ROW = 10
 
-/** Metres above and below an actor's origin its mark is drawn at, and the ring across. */
-const HEAD = 0.62, FEET = 0.24, RING = 1.1
+/** Metres above an actor's origin its nameplate is drawn at. */
+const HEAD = 0.62
 
 /** Keys that start a run from the title card. Any of them: it is "press anything". */
 const START_KEYS = ['Space', 'Enter', 'NumpadEnter', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Digit1']
@@ -128,13 +128,12 @@ export default {
         if (!name) continue
         const head = projector.place(entity.x, entity.y + HEAD, entity.z || 0)
         if (!head.inFront) continue
-        const feet = projector.place(entity.x, entity.y - FEET, entity.z || 0)
         const most = Number(entity.properties?.maxHealth) || Number(entity.properties?.health) || 1
+        // The ring under the actor is scene geometry — `mesh.ring` in the
+        // renderer — so it survives a frame taken without the interface layer.
         out.push({
           mark: { name, health: (Number(entity.properties?.health) || 0) / most },
           at: [head.x * box.width / 100, head.y * box.height / 100],
-          foot: [feet.x * box.width / 100, feet.y * box.height / 100],
-          width: projector.sizeAt(feet.depth, RING, RING).w * box.width / 100,
           color: entity === kitten() ? GEM : GOLD
         })
       }
