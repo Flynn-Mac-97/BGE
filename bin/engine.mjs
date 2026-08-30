@@ -422,6 +422,20 @@ if (op.startsWith('agent.')) {
       process.exit(0)
     }
 
+    /**
+     * Rewrite the generated agent files — AGENTS.md, CLAUDE.md and the skill
+     * copies of every enabled plugin guide.
+     *
+     * The dev server writes them at start-up, so an edit to a guide made while
+     * it runs leaves `check` failing with no command to run.
+     */
+    if (op === 'agent.skills') {
+      const registration = await import('../engine/agent-registration.mjs')
+      const written = await registration.writeGeneratedAgentFiles(CHECKOUT, path.basename(PROJECT))
+      out(written ?? { ok: true })
+      process.exit(0)
+    }
+
     if (op === 'agent.prepare') {
       const id = args[0]
       if (typeof id !== 'string') die(1, 'usage: agent.prepare <id> [JSON task request]')

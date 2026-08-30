@@ -284,8 +284,8 @@ export async function generatedFileProblems(root, projectDirectory) {
     problems.push({
       file: file.path,
       why: onDisk === null
-        ? `${file.path} is generated from ${file.source} and is not on disk — start the dev server, or run writeGeneratedAgentFiles, to write it`
-        : `${file.path} does not match ${file.source} it is generated from. Every agent reads the stale copy. Start the dev server, or run writeGeneratedAgentFiles, to write it`
+        ? `${file.path} is generated from ${file.source} and is not on disk. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
+        : `${file.path} does not match ${file.source} it is generated from. Every agent reads the stale copy. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
     })
   }
   const wanted = new Set(files.map(file => file.path))
@@ -293,7 +293,7 @@ export async function generatedFileProblems(root, projectDirectory) {
     if (wanted.has(skill.path)) continue
     problems.push({
       file: skill.path,
-      why: `${skill.path} is a generated skill no enabled guide in ${projectDirectory} claims. It registers a plugin that is off or gone; start the dev server, or run writeGeneratedAgentFiles, to remove it`
+      why: `${skill.path} is a generated skill no enabled guide in ${projectDirectory} claims. It registers a plugin that is off or gone. Run "node bin/engine.mjs agent.skills" to remove it`
     })
   }
   return problems

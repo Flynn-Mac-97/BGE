@@ -310,7 +310,20 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
 
     // Undefined when nothing is drawing, which is the honest answer rather than
     // a stub that pretends to render.
-    get renderer() { return editor.context?.renderer }
+    get renderer() { return editor.context?.renderer },
+
+    /**
+     * What the last frame cost: draw calls, triangles, and whatever else the
+     * renderer counts.
+     *
+     * An op rather than a field on `snapshot`, because measuring a rendering
+     * change otherwise means driving `window.engine` through the browser.
+     */
+    renderStats() {
+      const renderer = editor.context?.renderer
+      if (!renderer) return { error: 'nothing is drawing — no renderer in this world' }
+      return renderer.stats
+    }
   }
 
   return api
