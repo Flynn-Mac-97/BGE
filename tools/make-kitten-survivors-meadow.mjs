@@ -68,7 +68,7 @@ const SHINGLE = 'meadow/roof-shingle.png'
 const HAY = 'meadow/hay.png'
 
 /** The four flat colours, for the small things a texture would be wasted on. */
-const TUFT_LIGHT = '#5ea84a'
+const TUFT_LIGHT = '#c6e07e'
 const FLOWER_GOLD = '#d8c250'
 const FLOWER_CREAM = '#d9d4bd'
 const FLOWER_MAUVE = '#a86f9c'
@@ -144,9 +144,17 @@ function prop(family, { x, z, base = 0, size, yaw = null, texture = null, tint =
   return entity
 }
 
-/** A flat piece of ground colour: a patch of moss, a dry patch, a wheel rut. */
+/**
+ * A flat piece of ground colour: a patch of moss, a dry patch, a wheel rut.
+ *
+ * It casts nothing. A patch is a six centimetre box lying on the floor, and
+ * under a key at sixty degrees it threw a hard black rectangle of its own
+ * outline across the grass beside it.
+ */
 function ground(family, { x, z, width, depth, texture, thickness = 0.06, yaw = null, tint = null }) {
-  return prop(family, { x, z, base: 0, size: [width, thickness, depth], yaw, texture, tint, tiling: 1 })
+  const entity = prop(family, { x, z, base: 0, size: [width, thickness, depth], yaw, texture, tint, tiling: 1 })
+  entity.mesh.shadow = false
+  return entity
 }
 
 /**
@@ -359,7 +367,7 @@ for (let index = 0; index < 320; index++) {
   const spot = findSpot({ reach: FIELD - 1.5, apart: 1.5, placed: tuftPlaces })
   if (!spot) continue
   const height = between(0.16, FIELD_CEILING)
-  const dark = random() < 0.62
+  const dark = random() < 0.38
   prop('tuft', {
     x: spot[0], z: spot[1],
     size: [between(0.4, 0.8), height, between(0.16, 0.34)],
@@ -438,7 +446,7 @@ for (let index = 0; index < 70; index++) {
   prop('twig', {
     x: spot[0], z: spot[1],
     size: [between(0.35, 0.9), between(0.05, 0.09), between(0.06, 0.12)],
-    yaw: between(0, 360), texture: BARK, tiling: 2
+    yaw: between(0, 360), texture: TIMBER, tiling: 2
   })
 }
 
@@ -752,7 +760,7 @@ for (let index = 0; index < 7; index++) {
 // over a corner it clipped the far half and those shadows simply vanished.
 entities.push({
   id: 'key-light', type: 'light', at: [0, 40, 0],
-  properties: { kind: 'directional', color: '#fff6e6', intensity: 2.85, direction: [-0.47, -0.87, -0.17], range: 96, shadow: true }
+  properties: { kind: 'directional', color: '#fff6e6', intensity: 2.85, direction: [-0.47, -0.87, -0.17], range: 44, shadow: true }
 })
 entities.push({
   id: 'barn-glow', type: 'light', at: [BARN_X - 3.4, 4.2, BARN_Z + 7],

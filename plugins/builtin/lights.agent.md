@@ -27,7 +27,8 @@ Every property, with its default:
 | `fade` | `0` | seconds to fade over, after which the entity destroys itself |
 | `static` | `true` | only affects what `lights.bake` lists |
 
-- **One shadow. `SHADOW_CAP` is 1**, and it is a constant rather than a setting. A directional or spot shadow is a second render of the map every frame; a point light's is six. Map is 1024², so a directional light's texel is `range / 1024` metres — at `range: 96` that is 9 cm.
+- **One shadow. `SHADOW_CAP` is 1**, and it is a constant rather than a setting. A directional or spot shadow is a second render of the map every frame; a point light's is six. Map is 1024², so a directional light's texel is `range / 1024` metres — at `range: 96` that is 9 cm. A prop smaller than a few texels casts nothing at all.
+- **`mesh: { shadow: false }` on a placement or a type casts nothing and still receives.** Anything flat and lying on the ground needs it: a mown patch, a rut, a scorch mark is a thin box, and a thin box under a low sun throws a hard offset shadow of its own outline across the surface it is meant to be part of.
 - **Aim a shadow-casting key from the SIDE.** Aimed away down the view axis it throws every shadow directly behind the thing that cast it: full cost, nothing visible.
 - `world.sun` in the level's `world` block is a separate directional light that **cannot cast a shadow**. Use it as fill and make the light entity the key.
 - Also reads the level's top-level `lightmaps` block, and writes `mesh.lightmap` onto the entities it names. Nothing here bakes — `run lights.bake '{"surfaces":true}'` emits the manifest for an external bake.

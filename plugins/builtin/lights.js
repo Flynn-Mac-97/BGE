@@ -699,9 +699,20 @@ function markShadowSurfaces(context, scene) {
     // cast a shadow across the whole map for nothing.
     const entity = object.userData.entity ? context.world.byId(object.userData.entity) : null
     const excluded = object.userData.skybox === true || object.userData.gizmo === true || entity?.type === 'light'
-    object.castShadow = !excluded
+    // `mesh.shadow: false` casts nothing and still receives. A flat decal lying
+    // on the ground — a mown patch, a rut, a scorch mark — is a thin box, and a
+    // thin box under a low sun throws a hard offset shadow of its own outline
+    // across the surface it is meant to be part of.
+    object.castShadow = !excluded && castsShadow(context, entity) !== false
     object.receiveShadow = !excluded
   }
+}
+
+/** What the entity, then its type, says about casting. Undefined means yes. */
+function castsShadow(context, entity) {
+  if (!entity) return undefined
+  if (entity.mesh && 'shadow' in entity.mesh) return entity.mesh.shadow
+  return context.world.types?.[entity.type]?.mesh?.shadow
 }
 
 // ------------------------------------------------------------------ lightmaps

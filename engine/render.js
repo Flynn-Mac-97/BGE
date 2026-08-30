@@ -1542,8 +1542,8 @@ export function makeRenderer(canvas, view, viewport) {
       batch.object.matrixAutoUpdate = false
       batch.object.userData.batch = key
       // The merged copy is what is drawn, so it is what has to cast and receive.
-      // Whoever set these on the members — the lights plugin walks the scene —
-      // decided it for every one of them, so the first member speaks for all.
+      // Casting is part of the batch key, so every member agrees and the first
+      // one speaks for all.
       batch.object.castShadow = members[0].castShadow
       batch.object.receiveShadow = members[0].receiveShadow
       scene.add(batch.object)
@@ -1576,7 +1576,11 @@ export function makeRenderer(canvas, view, viewport) {
     if (wanted && !record.batch) {
       const cellX = Math.floor(entity.x / MERGE_CELL)
       const cellZ = Math.floor((entity.z || 0) / MERGE_CELL)
-      joinBatch(entity, record, `${described.material}|${cellX},${cellZ}`, described.material)
+      // Casting is part of the key, not just material and cell. One merged mesh
+      // has one castShadow flag, so a batch holding both a caster and a
+      // non-caster has to pick one and is wrong for half its members.
+      const casts = meshes.get(entity.id)?.castShadow === false ? 'flat' : 'casts'
+      joinBatch(entity, record, `${described.material}|${casts}|${cellX},${cellZ}`, described.material)
     } else if (!wanted && record.batch) {
       leaveBatch(entity.id)
     }
