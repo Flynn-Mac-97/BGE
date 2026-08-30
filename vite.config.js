@@ -499,7 +499,10 @@ function serverRegistry() {
  * them against the same rule that writes them. It also reads the source per
  * write, so an edit while the server runs reaches the generated files.
  */
-const writeAgentDoc = () => writeGeneratedAgentFiles(ROOT, PROJECT_DIRECTORY)
+// Returns nothing on purpose: Vite treats whatever `configureServer` resolves
+// to as a hook to call after its middlewares, and the writer answers the list
+// of paths it wrote.
+const writeAgentDoc = async () => { await writeGeneratedAgentFiles(ROOT, PROJECT_DIRECTORY) }
 
 export default defineConfig({
   plugins: [
