@@ -7,3 +7,4 @@
 - `bounds` is four numbers: x0, y0, x1, y1 flat, x0, z0, x1, z1 in three dimensions.
 - Follow, move, and shake through `context.camera`. A shake turns the aim in first person and knocks the eye in third.
 - Check state with `camera.state` — it reports the eye, the focus, and why it is not following anything.
+- `view.follows` carries the followed entity's id, or null. It is the only kernel-visible answer to "which body is the player's"; the renderer reads it to place the ground ring.

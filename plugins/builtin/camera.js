@@ -143,12 +143,7 @@ export default {
       /** Resolves when the level's camera block has been read. See readRule below. */
       ruleRead: Promise.resolve(),
 
-      follow(entityOrId) {
-        cam.target = typeof entityOrId === 'string'
-          ? (context.world.byId(entityOrId) || context.world.find(entityOrId))
-          : entityOrId
-        return cam.target
-      },
+      follow: aimAt,
       moveTo(x, y) {
         context.view.x = x
         context.view.y = y
@@ -195,6 +190,21 @@ export default {
     }
     context.camera = cam
 
+    /**
+     * Point the camera at a body, and say on the view which body that is.
+     *
+     * `view.follows` is the kernel-visible answer to "which entity is the
+     * player's". engine/render.js reads it to decide who gets a ground ring;
+     * nothing else about the camera is written where the kernel can see it.
+     */
+    function aimAt(entityOrId) {
+      cam.target = typeof entityOrId === 'string'
+        ? (context.world.byId(entityOrId) || context.world.find(entityOrId))
+        : entityOrId
+      context.view.follows = cam.target?.id ?? null
+      return cam.target
+    }
+
     /** What the rule says, applied to the view. Play starts here, and so does a late read. */
     function applyRule() {
       const v = context.view
@@ -221,7 +231,7 @@ export default {
      * settled promise because commands learned to await it.
      */
     context.bus.on('level:loaded', (name, camera) => {
-      cam.target = null
+      aimAt(null)
       forget(cam)
       cam.rule = camera || {}
       cam.ruleRead = Promise.resolve()
@@ -247,7 +257,7 @@ export default {
       // editor tiring to use.
       if (cam.editorView) Object.assign(context.view, cam.editorView)
       cam.editorView = null
-      cam.target = null
+      aimAt(null)
       forget(cam)
     })
   },
@@ -256,11 +266,14 @@ export default {
     phase: 'fixed',
     run(world, seconds, context) {
       const cam = context.camera
+      const view = context.view
       // Fixed systems only run while playing or simulating, so there is no
       // "am I in edit mode" check here.
-      if (cam.target && !world.entities.includes(cam.target)) cam.target = null
+      if (cam.target && !world.entities.includes(cam.target)) {
+        cam.target = null
+        view.follows = null
+      }
 
-      const view = context.view
       // You are inside your own body, so your own body must not be drawn to you.
       // The eye sits at chest height and a hand's width off the centre line, which
       // puts it inside the torso — the view fills with the inside of your own
