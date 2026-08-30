@@ -87,19 +87,13 @@ test('check passes clean with nothing running, and a warning never fails it', ()
   assert.ok(reply.problems.every(p => p.warning), 'anything left is a warning')
 })
 
-test('check fails on kitten-survivors, naming the ground placement its own invariant breaks', () => {
-  // The fixture this proves against: kitten-survivors/levels/meadow.json places
-  // `ground` six metres below the y = 0 its own doc comment requires. Left
-  // broken on purpose — other lanes test against it too.
-  const r = run(['check', '--project', 'kitten-survivors'])
-  const reply = JSON.parse(r.stdout)
-  assert.equal(r.code, 1, 'a broken invariant fails the check')
-  assert.equal(reply.ok, false)
-  const broken = reply.problems.find(p => !p.warning && /invariant/.test(p.why))
-  assert.ok(broken, 'the failure list names an invariant break')
-  assert.match(broken.why, /placement "floor"/)
-  assert.match(broken.why, /type "ground"/)
-  assert.match(broken.why, /top face of the slab sits at y = 0/)
+test('the meadow floor satisfies the invariant its type declares', () => {
+  // A real level against a real declaration, so re-breaking the placement turns
+  // this red. The machinery itself is proven below, on fixtures — this only
+  // asks whether the shipped level keeps the rule.
+  const reply = JSON.parse(run(['check', '--project', 'kitten-survivors']).stdout)
+  const broken = reply.problems.filter(problem => /invariant/.test(problem.why))
+  assert.deepEqual(broken, [], 'the meadow breaks an invariant it declares')
 })
 
 test('invariantProblems: a placement that satisfies its type is silent', () => {
