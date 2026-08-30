@@ -219,7 +219,7 @@ test('a plugin that failed to import is named everywhere a command turns up miss
   const wholesome = await inspectOver(healthy, bus)
   assert.deepEqual(healthy.failures(), [])
   assert.equal(wholesome.snapshot().pluginsFailed, undefined, 'a healthy snapshot gains nothing')
-  assert.throws(() => wholesome.run('nope.nothing'),
+  await assert.rejects(() => wholesome.run('nope.nothing'),
     /^Error: no command "nope\.nothing"\. Try engine\.commands\(\)$/,
     'an ordinary typo keeps the short answer')
 
@@ -243,7 +243,7 @@ test('a plugin that failed to import is named everywhere a command turns up miss
   assert.deepEqual(engine.snapshot({ plugins: true }).plugins, [{
     file: 'plugins/builtin/see.js', loaded: false, builtin: true, error: "SyntaxError: Unexpected token '}'"
   }])
-  assert.throws(() => engine.run('see.capture'),
+  await assert.rejects(() => engine.run('see.capture'),
     /plugins\/builtin\/see\.js failed to import: SyntaxError: Unexpected token/,
     'the reply names the file and the reason')
 })

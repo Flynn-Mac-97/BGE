@@ -201,11 +201,14 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       ]
     },
 
-    run(id, args) {
+    // Async, because a command handler may be. Both callers — the CLI and the
+    // bridge — await the answer, so an async command reports what it measured
+    // instead of a pending promise.
+    async run(id, args) {
       const command = loader.contrib.commands.find(c => c.id === id)
         || loader.contrib.menus.find(m => m.id === id)
       if (!command) throw new Error(missingCommand(id, loader.failures()))
-      const out = command.run(editor.context, args)
+      const out = await command.run(editor.context, args)
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
       if (command.toolbar !== false && loader.contrib.menus.includes(command)) editor.context.redraw()

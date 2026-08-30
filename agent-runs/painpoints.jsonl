@@ -241,3 +241,4 @@
 {"id":"p175","resolved":true,"at":"2026-08-30T18:01:50.698Z","note":"the headless and live CLI paths now exit 1 when the answer reports a failure, so agent.release refuses a lane whose tests failed"}
 {"id":"p176","resolved":true,"at":"2026-08-30T18:01:50.810Z","note":"the worktree-exists error now names agent.merge and the git commands that free the id"}
 {"id":"p177","resolved":true,"at":"2026-08-30T18:01:50.922Z","note":"the packet is written beside the project in use and its path is returned as run.packet"}
+{"id":"p129","resolved":true,"at":"2026-08-30T18:08:36.728Z","note":"engine.run awaits the command handler, so an async command answers its measurement instead of a pending promise"}
