@@ -19,6 +19,7 @@
  * clock.
  */
 import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
+import { convexHull } from '../../engine/frame-facts.js'
 import { describe } from './see/describe.js'
 import { resolveView, view } from './see/views.js'
 import { occlusion, isolate, find, diff, camera } from './see/queries.js'
@@ -39,6 +40,39 @@ function concealOverlays(context) {
     }
   }
   return hidden
+}
+
+/** Give back what concealOverlays borrowed. Every hide is paired with a show. */
+function revealOverlays(hidden) {
+  for (const child of hidden) child.visible = true
+}
+
+/**
+ * The camera fields an image command may borrow.
+ *
+ * A look must hand the editor back the camera it took. Copied before the move
+ * and restored in a `finally`, because the paths that do not finish — an empty
+ * studio, a lost context, a model that never arrives — are exactly the ones
+ * that would otherwise leave someone staring down a borrowed lens.
+ */
+const keepView = view => ({
+  x: view.x, y: view.y, z: view.z, yaw: view.yaw, pitch: view.pitch,
+  fov: view.fov, mode: view.mode, zoom: view.zoom
+})
+
+/**
+ * Write the mark number to id map onto the description itself.
+ *
+ * The sidecar is what leaves the machine: a vision reader is handed the PNG
+ * and the JSON, never the command's reply. So every binding the reply carries,
+ * the file carries too. Mark numbers sit on each entry; this is the index that
+ * reads the other way, from "outline 12" back to an id.
+ */
+function bindMarks(description) {
+  description.marks = Object.fromEntries((description.visible || [])
+    .filter(entry => entry.mark)
+    .map(entry => [entry.mark, entry.id]))
+  return description.marks
 }
 
 /**
@@ -64,7 +98,12 @@ async function withSubject(context, options, run) {
   const instance = context.world.all(wanted)[0]
   if (instance) return run({ ...options, subject: instance.id })
 
-  const spawned = context.spawn(wanted, { at: [0, 2, 0] })
+  // The preview takes a name of its own rather than the world's id counter:
+  // that counter decides what every later spawn is called, and looking at a
+  // type must not rename the things a seeded run goes on to make.
+  const previewId = `see-preview-${wanted}`
+  const spawned = context.spawn(wanted,
+    { at: [0, 2, 0], ...(context.world.byId(previewId) ? {} : { id: previewId }) })
   try {
     const result = await run({ ...options, subject: spawned.id, alone: options.alone ?? true })
     if (result && typeof result === 'object') result.preview = { type: wanted, spawnedAndRemoved: true }
@@ -138,23 +177,41 @@ export default {
         if (options.error) return { error: options.error }
         return withSubject(context, options, async options => {
         const name = options.name || `${context.editor.levelName}-sketch-${++frameNumber}`
+        const description = describe(context, options)
+        if (description.error) return description
+        // An alone shot promises one thing in the frame, and none of it is not
+        // a picture of that thing. Refusing names the subject, where a blank
+        // PNG would be read as an answer about how the model looks.
+        if (options.alone && options.subject && !description.visible.length) {
+          return {
+            error: 'the studio drew nothing — the subject is outside this camera\'s frame',
+            subject: options.subject
+          }
+        }
+        const marks = bindMarks(description)
         // In the browser a 2D canvas encodes the PNG itself — no zlib, and
         // the caller gets a dataUrl it can show without touching disk.
         if (typeof document !== 'undefined') {
-          const drawn = sketchOnCanvas(describe(context, options), options)
+          const drawn = sketchOnCanvas(description, options)
           if (drawn.error) return drawn
           return {
             dataUrl: drawn.dataUrl,
             __files: browserFiles(name, drawn.dataUrl.split(',')[1], drawn.description),
-            marks: Object.fromEntries(drawn.description.visible.filter(v => v.mark).map(v => [v.mark, v.id])),
+            marks,
+            palette: description.palette,
             counts: drawn.description.counts
           }
         }
-        const drawn = sketchPixels(describe(context, options), options)
+        const drawn = sketchPixels(description, options)
         if (drawn.error) return drawn
         const { encodePng } = await import(/* @vite-ignore */ '../../tools/lib/texture.mjs')
         const png = encodePng(drawn.width, drawn.height, drawn.pixels)
-        return { ...(await writeFrameFiles(name, png, drawn.description)), counts: drawn.description.counts }
+        return {
+          ...(await writeFrameFiles(name, png, drawn.description)),
+          marks,
+          palette: description.palette,
+          counts: drawn.description.counts
+        }
         })
       }
     },
@@ -174,36 +231,74 @@ export default {
         }
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
+        // Every refusal is answered before a single mutation, so a command that
+        // will not draw has not moved anything by the time it says so.
+        if (context.loop.paused) {
+          return {
+            error: `the clock is held by ${JSON.stringify(context.loop.holds)}, so no step between cells can pass — the sheet would be one instant shown three times`,
+            holds: context.loop.holds,
+            hint: 'release the hold, or answer the waiting screen first — screen.read names it'
+          }
+        }
+        // A subject naming nothing is a refusal, and a refusal has to arrive
+        // before the world is stepped rather than after three cells of it.
+        const named = describe(context, options)
+        if (named.error) return named
         const steps = options.steps || [0, 6, 30]
         const lenses = options.lenses || ['render', 'types']
-        if (!context.loop.running && !context.world.simulated) {
-          context.world.simulated = true
-          for (const entity of [...context.world.entities]) context.world.hook(entity, 'start', context)
-        }
+
+        const view = context.view
+        const kept = keepView(view)
+        // The render lens draws through the LIVE camera while the type lens
+        // projects from the options, so a camera override has to reach both or
+        // the two halves of a cell are two different views and every honest
+        // disagreement is drowned in one manufactured one.
+        const borrowsCamera = !!(options.camera || options.subject)
+        let overlays = []
         const cells = []
         const moments = []
         let advanced = 0
-        for (const step of [...steps].sort((a, b) => a - b)) {
-          if (step > advanced) { context.loop.step(step - advanced); advanced = step }
-          const description = describe(context, options)
-          moments.push({ afterSteps: step, counts: description.counts, marked: description.visible.filter(v => v.mark) })
-          for (const lens of lenses) {
-            const cell = document.createElement('canvas')
-            const drawn = lens === 'types' && sketchOnCanvas(description, options)
-            cell.width = drawn ? drawn.canvas.width : Math.round(context.viewport.width / 2)
-            cell.height = drawn ? drawn.canvas.height : Math.round(context.viewport.height / 2)
-            const pen = cell.getContext('2d')
-            if (drawn) pen.drawImage(drawn.canvas, 0, 0)
-            else {
-              context.renderer.sync(context.world)
-              // Hidden per cell: a step between cells lets the overlay's own
-              // plugin turn its sprites back on.
-              const overlays = options.ui === false ? concealOverlays(context) : []
-              context.renderer.draw()
-              pen.drawImage(context.shell.canvas, 0, 0, cell.width, cell.height)
-              for (const child of overlays) child.visible = true
+        try {
+          if (!context.loop.running && !context.world.simulated) {
+            context.world.simulated = true
+            for (const entity of [...context.world.entities]) context.world.hook(entity, 'start', context)
+          }
+          for (const step of [...steps].sort((a, b) => a - b)) {
+            if (step > advanced) { context.loop.step(step - advanced); advanced = step }
+            const description = describe(context, options)
+            if (borrowsCamera) Object.assign(view, description.camera)
+            bindMarks(description)
+            moments.push({ afterSteps: step, counts: description.counts, palette: description.palette, marks: description.marks, marked: description.visible.filter(v => v.mark) })
+            for (const lens of lenses) {
+              const cell = document.createElement('canvas')
+              const drawn = lens === 'types' && sketchOnCanvas(description, options)
+              cell.width = drawn ? drawn.canvas.width : Math.round(context.viewport.width / 2)
+              cell.height = drawn ? drawn.canvas.height : Math.round(context.viewport.height / 2)
+              const pen = cell.getContext('2d')
+              if (drawn) pen.drawImage(drawn.canvas, 0, 0)
+              else {
+                context.renderer.sync(context.world)
+                // Hidden per cell: a step between cells lets the overlay's own
+                // plugin turn its sprites back on.
+                overlays = options.ui === false ? concealOverlays(context) : []
+                context.renderer.draw()
+                pen.drawImage(context.shell.canvas, 0, 0, cell.width, cell.height)
+                revealOverlays(overlays)
+                overlays = []
+              }
+              cells.push({ label: `${lens} +${step} steps`, image: cell })
             }
-            cells.push({ label: `${lens} +${step} steps`, image: cell })
+          }
+        } finally {
+          revealOverlays(overlays)
+          if (borrowsCamera) Object.assign(view, kept)
+          if (borrowsCamera || options.ui === false) {
+            // The editor's own picture is stale after a borrowed camera or a
+            // hidden overlay; a repaint that fails must not become the answer.
+            try {
+              context.renderer.sync(context.world)
+              context.renderer.draw()
+            } catch { /* the cells are already drawn */ }
           }
         }
         const sheet = composeSheet(cells, { columns: lenses.length })
@@ -229,22 +324,11 @@ export default {
         if (description.error) return description
 
         const view = context.view
-        const kept = { x: view.x, y: view.y, z: view.z, yaw: view.yaw, pitch: view.pitch, fov: view.fov, mode: view.mode, zoom: view.zoom }
+        const kept = keepView(view)
         const wants = { ...(options.camera || {}) }
         if (options.subject) Object.assign(wants, description.camera, options.camera || {})
         const moved = Object.keys(wants).length > 0
-        if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
-
-        // A declared model may still be downloading — a preview spawned a
-        // moment ago always is — and drawing now captures the placeholder box.
         const subjectEntity = options.subject && context.world.byId(options.subject)
-        const declaredModel = subjectEntity && (subjectEntity.mesh || subjectEntity._definition?.mesh)?.model
-        for (let waited = 0; waited < 40 && declaredModel
-          && context.renderer.modelState?.(declaredModel) !== 'ready'
-          && context.renderer.modelState?.(declaredModel) !== 'failed'; waited++) {
-          context.renderer.sync(context.world)
-          await new Promise(resolve => setTimeout(resolve, 50))
-        }
 
         // `alone` must be true of the pixels, not only of the description:
         // everything but the subject is hidden, and the scene's own grade —
@@ -254,11 +338,24 @@ export default {
         const concealed = []
         let studio = null
         let overlays = []
-        let copy, pen, crop = null
-        // Everything from here to the finally mutates live render state; the
-        // finally is what guarantees the editor gets its world back on every
-        // path — an empty studio, a lost context, a throw mid-draw.
+        let copy, pen, crop = null, silhouette = null
+        // The camera moves inside this try, not before it: everything from
+        // here on mutates live render state, and the finally is the ONE way
+        // out. An empty studio, a lost context, a model that never arrives and
+        // a throw mid-draw all hand the editor back the world it lent.
         try {
+        if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
+
+        // A declared model may still be downloading — a preview spawned a
+        // moment ago always is — and drawing now captures the placeholder box.
+        const declaredModel = subjectEntity && (subjectEntity.mesh || subjectEntity._definition?.mesh)?.model
+        for (let waited = 0; waited < 40 && declaredModel
+          && context.renderer.modelState?.(declaredModel) !== 'ready'
+          && context.renderer.modelState?.(declaredModel) !== 'failed'; waited++) {
+          context.renderer.sync(context.world)
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+
         if (options.alone && subjectEntity) {
           for (const other of context.world.entities) {
             if (other === subjectEntity || other.hidden) continue
@@ -315,16 +412,26 @@ export default {
           context.renderer.drawInto(target, raw)
           target.dispose()
 
+          // One scan answers both questions the readback holds: where the drawn
+          // pixels end, and what shape they make. Only a row's first and last
+          // drawn pixel can sit on the outline, so the spans are the whole
+          // input a hull needs.
           let left = canvas.width, right = 0, top = canvas.height, bottom = 0
+          const spans = new Map()
           for (let y = 0; y < canvas.height; y++) {
             const row = (canvas.height - 1 - y) * canvas.width
+            let first = -1, last = -1
             for (let x = 0; x < canvas.width; x++) {
               if (raw[(row + x) * 4 + 3] < 8) continue
-              if (x < left) left = x
-              if (x > right) right = x
-              if (y < top) top = y
-              if (y > bottom) bottom = y
+              if (first < 0) first = x
+              last = x
             }
+            if (first < 0) continue
+            spans.set(y, [first, last])
+            if (first < left) left = first
+            if (last > right) right = last
+            if (y < top) top = y
+            bottom = y
           }
           if (right <= left || bottom <= top) {
             return { error: 'the studio drew nothing — the subject rendered no pixels', subject: subjectEntity.id }
@@ -333,6 +440,20 @@ export default {
           crop = { x: Math.max(0, left - pad), y: Math.max(0, top - pad) }
           crop.w = Math.min(canvas.width - crop.x, right - left + pad * 2)
           crop.h = Math.min(canvas.height - crop.y, bottom - top + pad * 2)
+
+          // The crop reframes the picture, so describe's projected box hull now
+          // points at nothing. Traced from the alpha the draw actually laid
+          // down, in the delivered image's own percent coordinates, the hull is
+          // true of the file that ships rather than of the frame it came from.
+          const points = []
+          for (const [y, [first, last]] of spans) {
+            for (const x of [first, last + 1]) {
+              points.push([(x - crop.x) / crop.w * 100, (y - crop.y) / crop.h * 100])
+              points.push([(x - crop.x) / crop.w * 100, (y + 1 - crop.y) / crop.h * 100])
+            }
+          }
+          const traced = convexHull(points)
+          if (traced.length >= 3) silhouette = traced.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10])
 
           copy = document.createElement('canvas')
           copy.width = crop.w
@@ -393,7 +514,7 @@ export default {
 
         } finally {
           for (const other of concealed) other.hidden = false
-          for (const child of overlays) child.visible = true
+          revealOverlays(overlays)
           if (studio) {
             studio.scene.remove(studio.rig)
             studio.scene.background = studio.background
@@ -402,9 +523,13 @@ export default {
             context.renderer.passes?.set(studio.passes)
           }
           if (moved) Object.assign(view, kept)
-          if (moved || concealed.length || overlays.length) {
-            context.renderer.sync(context.world)
-            context.renderer.draw()
+          if (moved || studio || concealed.length || overlays.length) {
+            // The editor's own picture is stale after a borrowed camera or a
+            // dimmed scene; a repaint that fails must not become the answer.
+            try {
+              context.renderer.sync(context.world)
+              context.renderer.draw()
+            } catch { /* the frame is already taken */ }
           }
         }
 
@@ -412,11 +537,11 @@ export default {
         // a grid of pixels; if every one is fully transparent the readback
         // failed, and the honest answer says so instead of shipping marks
         // floating on a blank.
-        const sampled = pen.getImageData(0, 0, copy.width, copy.height).data
+        const pixels = pen.getImageData(0, 0, copy.width, copy.height).data
         let anything = false
-        const stride = Math.max(4, Math.floor(sampled.length / 4 / 400) * 4)
-        for (let at = 3; at < sampled.length; at += stride) {
-          if (sampled[at] > 0) { anything = true; break }
+        const stride = Math.max(4, Math.floor(pixels.length / 4 / 400) * 4)
+        for (let at = 3; at < pixels.length; at += stride) {
+          if (pixels[at] > 0) { anything = true; break }
         }
         if (!anything) {
           return {
@@ -425,27 +550,44 @@ export default {
           }
         }
 
-        // Exposure is arithmetic, not judgement: mean brightness of a 4x4
-        // grid of the frame, 0-100, so "too dark to read" is a number in the
-        // sidecar before anyone spends a vision read on it.
+        // Exposure is arithmetic, not judgement: mean brightness of a 4x4 grid
+        // of the frame, 0-100, so "too dark to read" is a number in the sidecar
+        // before anyone spends a vision read on it.
+        //
+        // Only pixels the draw put down are measured. A cropped studio frame is
+        // mostly transparent background, and averaging emptiness in reports a
+        // well-lit model as nearly black — the one reading this field exists to
+        // prevent. A cell with nothing drawn in it has no brightness and says
+        // `null`; `over` names which pixels answered, so the number's meaning
+        // is never a guess.
         const cells = []
+        let litSum = 0, litSeen = 0, looked = 0
         const cellW = Math.floor(copy.width / 4), cellH = Math.floor(copy.height / 4)
         for (let gy = 0; gy < 4; gy++) for (let gx = 0; gx < 4; gx++) {
           let sum = 0, seen = 0
           for (let y = gy * cellH; y < (gy + 1) * cellH; y += 8) {
             for (let x = gx * cellW; x < (gx + 1) * cellW; x += 8) {
               const at = (y * copy.width + x) * 4
-              sum += 0.2126 * sampled[at] + 0.7152 * sampled[at + 1] + 0.0722 * sampled[at + 2]
+              looked++
+              if (pixels[at + 3] < 8) continue
+              sum += 0.2126 * pixels[at] + 0.7152 * pixels[at + 1] + 0.0722 * pixels[at + 2]
               seen++
             }
           }
-          cells.push(Math.round(sum / Math.max(1, seen) / 2.55))
+          litSum += sum
+          litSeen += seen
+          cells.push(seen ? Math.round(sum / seen / 2.55) : null)
         }
+        const drawnCells = cells.filter(cell => cell !== null)
         description.light = {
-          mean: Math.round(cells.reduce((total, cell) => total + cell, 0) / cells.length),
-          darkestCell: Math.min(...cells),
-          brightestCell: Math.max(...cells),
-          grid: cells
+          mean: litSeen ? Math.round(litSum / litSeen / 2.55) : 0,
+          darkestCell: drawnCells.length ? Math.min(...drawnCells) : null,
+          brightestCell: drawnCells.length ? Math.max(...drawnCells) : null,
+          grid: cells,
+          over: litSeen === looked
+            ? 'every pixel of the frame'
+            : 'the pixels the draw put down — a transparent background is not darkness',
+          measuredFraction: Math.round(litSeen / Math.max(1, looked) * 100) / 100
         }
 
         // Marks are hulls: each marked entity outlined in its TYPE's colour,
@@ -486,8 +628,36 @@ export default {
           }
         }
 
+        // A studio frame is the one frame nothing may be drawn on.
+        //
+        // It exists to judge how a model looks, and an outline drawn over a
+        // frame measurably inflates a vision model's aesthetic score — the bias
+        // survives pairwise comparison and survives warning the reader about
+        // it, so a mark here would corrupt the only question the frame is ever
+        // asked. The legend goes with it: `palette` names OUTLINE colours and
+        // never a material, and a legend beside an unstroked picture invites a
+        // reader to call a legend entry the animal's own fur, which is what
+        // happened. Silence about either is the bug, so the reply says both.
+        if (crop) {
+          delete description.palette
+          for (const entry of description.visible) {
+            delete entry.mark
+            delete entry.hull
+            if (silhouette) entry.silhouette = silhouette
+          }
+          description.unmarked = 'Nothing is drawn on this frame. It is a judgement frame, and an outline drawn '
+            + 'on a frame inflates a vision model\'s score of it, so marking it would corrupt the question. '
+            + 'There is no palette either: `palette` names OUTLINE colours and never a thing\'s own material, '
+            + 'so no colour named anywhere binds to what you see here — read the colours off the pixels. '
+            + '`silhouette` is the subject\'s traced outline in this image\'s percent coordinates, measured, not drawn.'
+        }
+
         const name = options.name || `${context.editor.levelName}-${++frameNumber}`
         const base64 = copy.toDataURL('image/png').split(',')[1]
+        // The sidecar carries every binding the reply carries. A vision reader
+        // is handed the PNG and the JSON and never sees the reply, so a map
+        // kept only in the reply is a map kept from the one who needs it.
+        const marks = bindMarks(description)
         const sidecar = typeof Buffer !== 'undefined'
           ? Buffer.from(JSON.stringify(description)).toString('base64')
           : btoa(unescape(encodeURIComponent(JSON.stringify(description))))
@@ -496,8 +666,10 @@ export default {
             { path: `agent-runs/see/${name}.png`, base64 },
             { path: `agent-runs/see/${name}.json`, base64: sidecar }
           ],
-          marks: Object.fromEntries(description.visible.filter(v => v.mark).map(v => [v.mark, v.id])),
-          palette: description.palette,
+          marks,
+          ...(crop
+            ? { subject: subjectEntity.id, unmarked: description.unmarked }
+            : { palette: description.palette }),
           counts: description.counts
         }
         })

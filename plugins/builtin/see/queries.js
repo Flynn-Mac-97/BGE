@@ -121,6 +121,10 @@ export async function isolate(context, options = {}) {
     // Stepping an unsimulated world runs start hooks and moves entities off
     // their edited places — the dossier must not change the level it reads.
     velocityWhy = 'not measured: the loop is stopped and the world is unsimulated — play or simulate first'
+  } else if (context.loop.paused) {
+    // A step under a held clock moves nothing, and [0, 0, 0] would report a
+    // sprinting rat as standing still. The holder is the answer instead.
+    velocityWhy = `not measured: the clock is held by ${JSON.stringify(context.loop.holds)} — a step would move nothing and read as a standstill`
   } else {
     const before = { x: entity.x, y: entity.y, z: entity.z || 0 }
     context.loop.step(1)
@@ -224,6 +228,18 @@ export function find(context, options = {}) {
  */
 export function diff(context, options = {}) {
   const steps = Math.max(1, Math.round(options.steps ?? 30))
+  // A held clock measures as stillness, and "nothing changed" is the one
+  // answer this verb must never give by accident. Said before the world is
+  // touched: starting a level's hooks to then step nothing would leave the
+  // entities off their edited places for an answer that was never coming.
+  if (context.loop.paused) {
+    return {
+      error: `the clock is held by ${JSON.stringify(context.loop.holds)}, so no step can pass and everything would read as still`,
+      holds: context.loop.holds,
+      steps,
+      hint: 'release the hold, or answer the waiting screen first — screen.read names it'
+    }
+  }
   if (!context.loop.running && !context.world.simulated) {
     context.world.simulated = true
     for (const entity of [...context.world.entities]) context.world.hook(entity, 'start', context)
@@ -238,11 +254,12 @@ export function diff(context, options = {}) {
     counts: { before: before.counts, after: describe(context, options).counts },
     method: `describe, ${steps} fixed steps, describe again — changes by diffMoments`
   }
-  // A held clock measures as stillness. Nothing changed is only a finding
-  // when time actually passed; otherwise the holder is the finding.
+  // Nothing changed is only a finding when time actually passed. A hold taken
+  // mid-run, or hit stop swallowing a few steps, makes stillness a fact about
+  // the clock rather than about the game.
   if (advanced < steps / 60 - 0.001) {
     out.warning = context.loop.paused
-      ? `the clock is held by ${JSON.stringify(context.loop.holds)} — nothing can move; release it or pick the waiting screen first`
+      ? `the clock was taken mid-diff by ${JSON.stringify(context.loop.holds)} — only ${Math.round(advanced * 60)} of ${steps} steps passed`
       : `only ${Math.round(advanced * 60)} of ${steps} steps advanced the clock`
   }
   return out
