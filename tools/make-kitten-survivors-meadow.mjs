@@ -98,7 +98,7 @@ const OUT = path.join(ROOT, 'kitten-survivors/levels/meadow.json')
 
 // --------------------------------------------------------------- the numbers
 /** Half the play field, measured to the inside face of the wall. */
-const FIELD = 25
+const FIELD = 30
 /**
  * Half the ground slab.
  *
@@ -260,7 +260,12 @@ function nextId(family) {
  */
 function prop(family, { x, z, base = 0, size, yaw = null, texture = null, tint = null, tiling = null, solid = false, collider = null, material = null, steps = null, outline = null, opacity = null }) {
   const [width, height, depth] = size
+  // The box is rounded first and the centre is derived from the rounded height.
+  // Rounding the two apart lets a prop sink half a step under the floor, and at
+  // this camera the line where it cuts the ground is the first thing the eye
+  // finds.
   const mesh = { box: [round(width), round(height), round(depth)] }
+  const drawnHeight = mesh.box[1]
   if (texture) mesh.texture = texture
   if (tint) mesh.tint = tint
   if (tiling !== null) mesh.tiling = tiling
@@ -272,7 +277,7 @@ function prop(family, { x, z, base = 0, size, yaw = null, texture = null, tint =
   const entity = {
     id: nextId(family),
     type: 'meadow-prop',
-    at: [round(x), round(base + height / 2), round(z)],
+    at: [round(x), Math.ceil((base + drawnHeight / 2) * 1000) / 1000, round(z)],
     mesh
   }
   if (yaw !== null) entity.rotation = round(yaw)
@@ -864,7 +869,11 @@ function write(level) {
 }
 
 const text = write(level)
-fs.writeFileSync(OUT, text)
+// Written beside the level and moved into place only once the checks below
+// pass. A guard that fails after the write has already shipped the level it
+// rejects.
+const DRAFT = `${OUT}.draft`
+fs.writeFileSync(DRAFT, text)
 
 // --------------------------------------------------------------- proving it
 /**
@@ -873,7 +882,7 @@ fs.writeFileSync(OUT, text)
  * Read back rather than checked in memory, because a level file that is not
  * valid JSON fails as an empty viewport rather than as an error anybody sees.
  */
-const reread = JSON.parse(fs.readFileSync(OUT, 'utf8'))
+const reread = JSON.parse(fs.readFileSync(DRAFT, 'utf8'))
 
 const hex = value => [0, 2, 4].map(at => parseInt(value.slice(1 + at, 3 + at), 16) / 255)
 const luminance = ([red, green, blue]) => 0.2126 * red + 0.7152 * green + 0.0722 * blue
@@ -1010,5 +1019,9 @@ console.log('')
 if (problems.length) {
   for (const problem of problems.slice(0, 20)) console.error(`[make-kitten-survivors-meadow] ${problem}`)
   if (problems.length > 20) console.error(`[make-kitten-survivors-meadow] and ${problems.length - 20} more`)
+  console.error(`[make-kitten-survivors-meadow] the level was NOT written — ${OUT} still holds the last one that passed`)
+  fs.rmSync(DRAFT, { force: true })
   process.exitCode = 1
+} else {
+  fs.renameSync(DRAFT, OUT)
 }
