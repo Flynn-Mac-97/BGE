@@ -240,9 +240,10 @@ export default {
           }
           const THREE = await import('three')
           const scene = context.renderer.scene
-          studio = { scene, background: scene.background, fog: scene.fog, dimmed: [], passes: context.renderer.passes?.list || [] }
+          studio = { THREE, scene, background: scene.background, fog: scene.fog, dimmed: [], passes: context.renderer.passes?.list || [] }
           scene.fog = null
           scene.background = new THREE.Color('#8b8f96')
+          studio.key = [139, 143, 150]
           // Post effects are a grade too — a vignette shades the backdrop and
           // bloom lifts the colours — so a neutral draw runs with none.
           context.renderer.passes?.set([])
@@ -290,16 +291,30 @@ export default {
           const pixels = wholePen.getImageData(0, 0, whole.width, whole.height).data
           const back = [pixels[0], pixels[1], pixels[2]]
           let left = whole.width, right = 0, top = whole.height, bottom = 0
+          let sum = 0, seen = 0
           for (let y = 0; y < whole.height; y += 2) {
             for (let x = 0; x < whole.width; x += 2) {
               const at = (y * whole.width + x) * 4
               const away = Math.abs(pixels[at] - back[0]) + Math.abs(pixels[at + 1] - back[1]) + Math.abs(pixels[at + 2] - back[2])
               if (away < 30) continue
+              sum += 0.2126 * pixels[at] + 0.7152 * pixels[at + 1] + 0.0722 * pixels[at + 2]
+              seen++
               if (x < left) left = x
               if (x > right) right = x
               if (y < top) top = y
               if (y > bottom) bottom = y
             }
+          }
+          // A mid-grey backdrop loses a mid-toned subject — a reader keeps the
+          // silhouette only when the backdrop opposes the subject's own
+          // luminance. Measured, chosen, and drawn once more.
+          if (seen) {
+            const luminance = sum / seen / 255
+            const dark = luminance >= 0.55
+            studio.scene.background = new studio.THREE.Color(dark ? '#22252b' : '#dde3ea')
+            studio.key = dark ? [34, 37, 43] : [221, 227, 234]
+            context.renderer.draw()
+            wholePen.drawImage(canvas, 0, 0)
           }
           if (right > left && bottom > top) {
             const pad = Math.max(16, Math.round((right - left) * 0.1))
@@ -318,6 +333,17 @@ export default {
           copy.width = crop.w
           copy.height = crop.h
           copy.getContext('2d').drawImage(whole, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
+          // The backdrop was only scaffolding: keyed to transparent, so a
+          // reader gets pixels that ARE the subject and nothing that is not.
+          const keyed = pen.getImageData(0, 0, copy.width, copy.height)
+          const bits = keyed.data
+          for (let at = 0; at < bits.length; at += 4) {
+            const away = Math.abs(bits[at] - studio.key[0])
+              + Math.abs(bits[at + 1] - studio.key[1])
+              + Math.abs(bits[at + 2] - studio.key[2])
+            if (away < 24) bits[at + 3] = 0
+          }
+          pen.putImageData(keyed, 0, 0)
         }
 
         for (const other of concealed) other.hidden = false
