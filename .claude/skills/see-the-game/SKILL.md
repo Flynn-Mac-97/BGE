@@ -27,6 +27,23 @@ Never ask a vision model what a query answers. Vision models miscount
 overlapping things and misjudge positions and distances; the query numbers
 are exact, and every reply's `method` field names how it was computed.
 
+These questions are never answered from pixels. Each one has a verb, and
+the verb is exact where a look is at or near chance:
+
+| never ask a picture | ask this |
+|---|---|
+| how many of X are there | `see.describe`, `see.find` |
+| which is in front, what is blocking it | `see.occlusion` |
+| how far apart, how big, how fast | `see.isolate`, `describe` with `between` |
+| where on screen, which region, which third | `see.describe` — read `at`, never estimate it |
+| is the frame too dark | the sidecar's `light` block |
+| what does the HUD say | `hud.read`, `screen.read` |
+
+Never phrase a question to a vision model as a negative — "which of these
+is NOT a rat", "is anything missing". Models answer negation at chance and
+say yes to almost any "is there an X" question. Ask the positive form and
+compare it against the sidecar; absence is a query, not a look.
+
 ## Troubleshooting — route the symptom
 
 - Screen looks wrong (blank, giant colour blocks, one flat colour):
@@ -52,8 +69,18 @@ are exact, and every reply's `method` field names how it was computed.
   takes the project DIRECTORY NAME (`kitten-survivors`), never `.`.
 - `script '[...]'` is headless-only. Over the bridge, run one verb per call —
   the browser world keeps its state between calls.
-- Add `"brief": true` to describe in a busy scene: only marked entities are
-  listed, with every count kept. A full meadow lists 700 props without it.
+- Add `"brief": true` in a busy scene: only marked entities are listed, with
+  every count kept. A full meadow lists 700 props without it. It works on
+  `capture` and `sketch` too, and it is the difference between a 16KB sidecar
+  and a 9KB one on the meadow at 0:30.
+- `simulate` answers compactly, like `snapshot`. Ask for the entity list with
+  `{"entities": true}` when the list is the point.
+- Simulating does not move the camera. The view stays where the editor left
+  it, which in a headless run is the editor's own camera looking at an empty
+  field — so a moment simulated but not aimed shows scenery and no creatures.
+  Aim first: `see.view '{"aim":"you","back":3}'` frames the followed entity
+  and every later query answers from there. The meadow's play camera is saved
+  as the view `meadow-play`.
 
 ## Inspect one model, in one call
 
@@ -81,9 +108,9 @@ workflow by hand.
   `rows`/`columns` set the sample grid (default 5x5).
 - `see.isolate '{"subject":"rat-3"}'` — world and screen boxes, cut,
   region, visible fraction, blockers, velocity, and distance/facing to the
-  followed entity. Velocity costs one fixed step; a stopped, unsimulated
-  world answers `velocity: null` with `velocityWhy` instead of moving the
-  level.
+  followed entity. Velocity costs one fixed step; a stopped and unsimulated
+  world, or a held clock, answers `velocity: null` with `velocityWhy` — a
+  step under a hold would move nothing and read as a standstill.
 - `see.find '{"type":"rat","region":"top-left"}'` — all entities matching
   every predicate: `type`, `idPrefix`, `region`, `sizeOver/Under`,
   `depthOver/Under`, `cutUnder`, `occludedOver/Under`, `within: [metres,
@@ -91,7 +118,8 @@ workflow by hand.
   names throw.
 - `see.diff '{"steps":30}'` — `appeared`, `gone`, `moved`, `enteredFrame`,
   `leftFrame`, counts before and after. Advances the world like simulate;
-  `stop` restores the level.
+  `stop` restores the level. A held clock is refused before anything is
+  stepped, naming the holder: nothing can move, and stillness would be a lie.
 - `see.camera` — view, eye, `insideOf`, `nearerThanHalfAMetre` (perspective
   only — orthographic depth is always 0, and the reply says the test was
   skipped), `followed`.
@@ -101,17 +129,26 @@ workflow by hand.
 - `see.sketch '{...}'` — flat-colour frame from computed facts: marked
   entities fill their screen hull in their type's colour, the rest are
   rectangles. Headless it writes `agent-runs/see/<name>.png` + `.json`; in
-  the browser it also answers a `dataUrl`.
+  the browser it also answers a `dataUrl`. An `alone` sketch whose subject is
+  outside the frame is refused, never answered with a blank. A sketch says
+  where things are and how the frame is arranged; it cannot say whether a
+  shape reads as a rat — that needs `capture` with `subject`.
 - `see.capture '{...}'` — the rendered canvas, marks drawn on top, same
   files. Browser only. A tab that is not drawing is refused with an error
   and a `hidden` flag, never returned as a blank frame. The sidecar's
-  `light` block holds mean and 4x4-cell brightness, 0–100 — never ask
-  vision if a frame is too dark.
+  `light` block holds mean and 4x4-cell brightness, 0–100, measured over the
+  pixels the draw put down; `over` names which pixels answered and
+  `measuredFraction` how many, and a cell with nothing drawn reads `null`.
+  Never ask vision if a frame is too dark.
 - `see.moment '{"steps":[0,6,30]}'` — one sheet: the real render and its
   flat type layer at the same instants, stepped forward, every cell
   labelled. In the pixels but not the scene is a rendering artifact; in the
   scene but not the pixels is an invisible entity. Browser only; advances
-  the world; `stop` restores.
+  the world; `stop` restores. A held clock is refused before any step.
+  `camera`, `view` and `subject` aim the LIVE camera for the sheet and put it
+  back, so both lenses show one moment. Use a sheet to decide which single
+  moment to capture, then ask your question of that one capture — a model
+  reading several pictures at once is markedly worse than one reading one.
 
 Image options: `camera` (view field overrides; top-down map shot: high y,
 pitch -1.57), `shot` (a named angle with `subject`: `three-quarter` default,
@@ -123,20 +160,39 @@ so the queries answer from that view too; `'{"aim":"you","back":3}'` aims it
 at an entity or type, framed the way subject shots frame, pulled `back` times
 out), `subject` (frame one entity; add `"alone": true` to hide the
 rest — the studio: neutral light, no post, cropped to the drawn pixels, TRANSPARENT
-background by default; pass `background` with a colour when a test needs a
-known backdrop), `between` (two ids — distance, touching, relative screen position,
+background by default, and UNMARKED, with `silhouette` giving the subject's
+traced outline in the crop's own coordinates; pass `background` with a colour
+when a test needs a known backdrop), `between` (two ids — distance, touching, relative screen position,
 facing), `ui: false` (hide player-facing overlays — damage numbers and
 anything marked `userData.overlay` — when the question is the world, not the
 HUD), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`.
 
 Marks are HULLS: each marked entity is outlined in its TYPE's colour, drawn
 on its own pixels — one colour per type, so a busy frame is a handful of
-colours. The reply and sidecar carry `palette` (type → hex) and each marked
-entry's `hull` (its screen outline as [x, y] percent points). In a capture
-the hull traces the entity's drawn silhouette from the ID buffer; in a
-sketch or bare describe it is the projected box. The subject is white and
-wider. Ground an answer in colour + the sidecar's positions, never in
-floating text.
+colours. The reply and sidecar both carry `palette` (type → hex), `marks`
+(number → id) and each marked entry's `hull` (its screen outline as [x, y]
+percent points). In a capture the hull traces the entity's drawn silhouette
+from the ID buffer; in a sketch or bare describe it is the projected box.
+The subject is white and wider — except in an `alone` studio frame, which is
+unmarked on purpose. `palette` names OUTLINE colours and never a thing's own
+material colour: a rat outlined in `#e06c72` is not a pink rat.
+
+Which entities get marked: marks are dealt out by type, not by size. Every
+type on screen takes its first mark before any type takes a second, rarest
+first, so `palette` names every kind in frame. After that a type's turn comes
+round in proportion to how much of it the camera holds — a sea of props is
+sampled once or twice and the creatures take the rest. In a subject shot the
+subject is always mark 1. Anything wider or taller than half the frame is a
+backdrop and is never marked.
+
+**Marks help you find a thing, and they make a frame score better than it
+is.** An outline drawn on a picture measurably inflates a vision model's
+judgement of it, and saying so in the prompt does not undo it. So a frame is
+either for identification or for judgement, never both: keep the marks when
+the question is which thing is which, and ask for a clean frame when the
+question is whether the art is any good. An `alone` studio frame is already
+unmarked and ships no `palette`, because judging the model is the only thing
+it is for.
 
 ## A moment in time
 
@@ -152,14 +208,47 @@ not advance, read `snapshot`; `paused` names who holds the clock.
 
 ## Reading a frame with a vision model
 
-- Send the PNG and its `.json` sidecar together; the sidecar is ground
-  truth, pixels answer only what it cannot say.
-- Refer to entities by hull colour and type — `palette` maps colour to type,
-  `marks` maps mark numbers to ids, and each marked entry's `at` names where
-  it sits. Never bind by floating text: the game draws its own numbers.
+- Send the PNG and its `.json` sidecar together. The sidecar is ground truth
+  for the fields it lists and silent on everything else. Where the sidecar
+  and the picture disagree about something the sidecar measures, the sidecar
+  wins; where they disagree about anything else, say so rather than resolving
+  it. The sidecar carries measurements and never a verdict — a model will
+  adopt a judgement it is handed instead of forming one.
+- Refer to entities by hull colour and mark number together — `palette` maps
+  colour to type, `marks` maps mark numbers to ids, and each marked entry's
+  `at` names where it sits. This is a house convention that works, not a law
+  of vision models: cross-check the colour against the number and the number
+  against `at`. Never bind by floating text; the game draws its own numbers.
 - One question per read, multiple-choice where possible. "Does the white
   outlined thing read as a rat or a box, A or B" beats "describe the scene".
-- A subject under ~5% of the frame: capture it with `subject`.
+  Ask for the choice and one short sentence of reason — and treat the reason
+  as a hint, never a fact. A model's verdict is far better than its account
+  of where the problem is, and any "where" claim has to be checked against
+  `see.describe` before it is acted on.
+- Comparing two frames is a forced choice, never a score out of ten. Ask
+  which is better, then ask again with the two swapped; a flip means no
+  difference. If a scale is needed at all, use words — excellent, good, fair,
+  poor, bad.
+- A subject under ~5% of the frame: capture it with `subject`. Below that
+  size, answers fall away sharply, and cropping to the subject wins back most
+  of what was lost.
+
+### When a small or cheap model is doing the looking
+
+It will not degrade gently. On this exact task — judging one rendered game
+frame — the small tier of a model family scores near chance where the large
+tier is reliable, and its failure is a stuck answer rather than a wrong one.
+A question whose answer is stuck returns no information at all.
+
+- Spend the image on ONE subject, framed alone. A crowded frame is where the
+  cheap tier collapses.
+- Give it a forced binary choice. Never open description, never "find
+  anything wrong" — it will say everything is fine, every time.
+- Do not rely on it reading marks. Put the identifying fact in the question
+  and in the crop, not in the overlay.
+- Ask twice with the options swapped, and treat disagreement as no answer.
+- Never route counting, depth or distance to it. For a small model the query
+  path is not the cheaper path, it is the only correct one.
 
 ## Limits
 
