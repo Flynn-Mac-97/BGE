@@ -7,6 +7,8 @@
  * holds them; saving without a camera keeps the view being looked through
  * right now.
  */
+import { boundsOf, frameSubject } from '../../../engine/frame-facts.js'
+
 const FILE = 'views.json'
 
 async function readViews(context) {
@@ -26,6 +28,34 @@ export async function resolveView(context, options = {}) {
 
 export async function view(context, options = {}) {
   const views = await readViews(context)
+
+  // Aim the live camera at an entity or a type's first live instance: the
+  // same framing subject shots use, pulled `back` times further out (default
+  // 3) so the surroundings stay in frame. With `save`, the camera is also
+  // kept under that name.
+  if (typeof options.aim === 'string') {
+    const entity = context.world.byId(options.aim)
+      || (context.world.types.has(options.aim) && context.world.all(options.aim)[0])
+    if (!entity) {
+      return { error: `no entity or live instance of type "${options.aim}" to aim at` }
+    }
+    const camera = frameSubject(entity, boundsOf(entity), options.shot)
+    camera.mode = 'perspective'
+    const back = options.back ?? 3
+    camera.x = entity.x + (camera.x - entity.x) * back
+    camera.y = entity.y + (camera.y - entity.y) * back
+    camera.z = (entity.z || 0) + (camera.z - (entity.z || 0)) * back
+    for (const [key, value] of Object.entries(camera)) {
+      if (value !== undefined) context.view[key] = value
+    }
+    const reply = { aimed: entity.id, camera }
+    if (typeof options.save === 'string') {
+      views[options.save] = camera
+      await context.files.write(FILE, JSON.stringify(views, null, 2) + '\n')
+      reply.saved = options.save
+    }
+    return reply
+  }
 
   if (typeof options.save === 'string') {
     const current = context.view
@@ -54,5 +84,5 @@ export async function view(context, options = {}) {
     return { dropped: options.drop, views: Object.keys(views) }
   }
 
-  return { views, use: 'any see command takes {"view":"<name>"}; save with {"save":"<name>"} or {"save":"<name>","camera":{...}}' }
+  return { views, use: 'any see command takes {"view":"<name>"}; {"save":"<name>"} keeps a camera, {"go":"<name>"} aims the live camera at a saved view, {"aim":"<id or type>"} aims it at an entity' }
 }

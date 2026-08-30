@@ -9,6 +9,21 @@
  */
 import { typeColour, DIGITS } from './frame-facts.js'
 
+/**
+ * The description's palette wins over the hash colour: it is the legend the
+ * sidecar publishes, nudged so no marked type wears its backdrop's colour.
+ */
+function colourOf(description, type) {
+  const hex = description.palette?.[type]
+  if (!hex) return typeColour(type)
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16), 255]
+}
+
+/** Paint order: backdrops (wider or taller than the frame) first, then by depth, far to near. */
+function paintDepth(entry) {
+  return entry.size[0] > 100 || entry.size[1] > 100 ? Infinity : entry.depth
+}
+
 /** The browser sketch: the same facts drawn on a 2D canvas, which encodes its own PNG. */
 export function sketchOnCanvas(description, options = {}) {
   if (description.error) return description
@@ -18,14 +33,26 @@ export function sketchOnCanvas(description, options = {}) {
   const pen = canvas.getContext('2d')
   pen.fillStyle = '#202830'
   pen.fillRect(0, 0, canvas.width, canvas.height)
-  for (const entry of [...description.visible].sort((a, b) => b.depth - a.depth)) {
-    const [r, g, b] = typeColour(entry.type)
+  // A marked entry is drawn as its hull — the shape its box actually makes on
+  // screen — in its type's colour; the rest stay rectangles, background only.
+  // An entry wider than the frame is a backdrop, and its centre depth stands
+  // for all of it — sorted by that depth, a ground plane paints over half the
+  // scene. Backdrops paint first, whatever their depth.
+  for (const entry of [...description.visible].sort((a, b) => paintDepth(b) - paintDepth(a))) {
+    const [r, g, b] = colourOf(description, entry.type)
     pen.fillStyle = `rgb(${r},${g},${b})`
-    const w = Math.max(1, entry.size[0] / 100 * canvas.width)
-    const h = Math.max(1, entry.size[1] / 100 * canvas.height)
-    pen.fillRect(entry.at[0] / 100 * canvas.width - w / 2, entry.at[1] / 100 * canvas.height - h / 2, w, h)
+    if (entry.hull) {
+      pen.beginPath()
+      for (const [x, y] of entry.hull) pen.lineTo(x / 100 * canvas.width, y / 100 * canvas.height)
+      pen.closePath()
+      pen.fill()
+    } else {
+      const w = Math.max(1, entry.size[0] / 100 * canvas.width)
+      const h = Math.max(1, entry.size[1] / 100 * canvas.height)
+      pen.fillRect(entry.at[0] / 100 * canvas.width - w / 2, entry.at[1] / 100 * canvas.height - h / 2, w, h)
+    }
   }
-  if (options.marks !== false) {
+  if (options.marks === 'tags') {
     const tag = Math.max(10, Math.round(canvas.height / 32))
     pen.font = `bold ${tag}px system-ui, sans-serif`
     pen.textAlign = 'center'
@@ -33,7 +60,7 @@ export function sketchOnCanvas(description, options = {}) {
     for (const entry of description.visible) {
       if (!entry.mark) continue
       const x = entry.at[0] / 100 * canvas.width
-      const y = Math.max(tag, entry.at[1] / 100 * canvas.height - tag)
+      const y = entry.at[1] / 100 * canvas.height
       const text = String(entry.mark)
       const w = pen.measureText(text).width + tag * 0.6
       pen.fillStyle = 'rgba(0, 0, 0, 0.85)'
@@ -121,9 +148,29 @@ export function sketchPixels(description, options = {}) {
     pixels.set(colour, (y * width + x) * 4)
   }
 
-  // Painter's order: far first, so near covers far the way the renderer would.
-  for (const entry of [...description.visible].sort((a, b) => b.depth - a.depth)) {
-    const colour = typeColour(entry.type)
+  // Painter's order: backdrops first, then far to near, so near covers far
+  // the way the renderer would. Marked entries fill their hull — the box's
+  // real screen shape — by scanline; convexity makes each row one span.
+  for (const entry of [...description.visible].sort((a, b) => paintDepth(b) - paintDepth(a))) {
+    const colour = colourOf(description, entry.type)
+    if (entry.hull) {
+      const points = entry.hull.map(([x, y]) => [x / 100 * width, y / 100 * height])
+      const top = Math.max(0, Math.floor(Math.min(...points.map(p => p[1]))))
+      const bottom = Math.min(height - 1, Math.ceil(Math.max(...points.map(p => p[1]))))
+      for (let y = top; y <= bottom; y++) {
+        let from = Infinity, to = -Infinity
+        for (let at = 0; at < points.length; at++) {
+          const [ax, ay] = points[at]
+          const [bx, by] = points[(at + 1) % points.length]
+          if ((ay <= y) === (by <= y)) continue
+          const x = ax + (y - ay) / (by - ay) * (bx - ax)
+          if (x < from) from = x
+          if (x > to) to = x
+        }
+        for (let x = Math.round(from); x <= Math.round(to); x++) paint(x, y, colour)
+      }
+      continue
+    }
     const w = Math.max(1, Math.round(entry.size[0] / 100 * width))
     const h = Math.max(1, Math.round(entry.size[1] / 100 * height))
     const left = Math.round(entry.at[0] / 100 * width - w / 2)
@@ -131,7 +178,7 @@ export function sketchPixels(description, options = {}) {
     for (let y = top; y < top + h; y++) for (let x = left; x < left + w; x++) paint(x, y, colour)
   }
 
-  if (options.marks !== false) {
+  if (options.marks === 'tags') {
     for (const entry of description.visible) {
       if (!entry.mark) continue
       const text = String(entry.mark)

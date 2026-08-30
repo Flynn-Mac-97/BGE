@@ -98,9 +98,10 @@ workflow by hand.
 
 ## Image commands
 
-- `see.sketch '{...}'` — flat-colour frame from computed facts, marks
-  stamped. Headless it writes `agent-runs/see/<name>.png` + `.json`; in the
-  browser it also answers a `dataUrl`.
+- `see.sketch '{...}'` — flat-colour frame from computed facts: marked
+  entities fill their screen hull in their type's colour, the rest are
+  rectangles. Headless it writes `agent-runs/see/<name>.png` + `.json`; in
+  the browser it also answers a `dataUrl`.
 - `see.capture '{...}'` — the rendered canvas, marks drawn on top, same
   files. Browser only. A tab that is not drawing is refused with an error
   and a `hidden` flag, never returned as a blank frame. The sidecar's
@@ -118,11 +119,22 @@ pitch -1.57), `shot` (a named angle with `subject`: `three-quarter` default,
 subject's facing), `view` (a saved camera by name — `see.view '{"save":"arena-south"}'`
 keeps the current camera, saved in `<project>/views.json`, committed;
 `see.view` alone lists; `'{"go":"arena-south"}'` aims the LIVE camera,
-so the queries answer from that view too), `subject` (frame one entity; add `"alone": true` to hide the
+so the queries answer from that view too; `'{"aim":"you","back":3}'` aims it
+at an entity or type, framed the way subject shots frame, pulled `back` times
+out), `subject` (frame one entity; add `"alone": true` to hide the
 rest — the studio: neutral light, no post, cropped to the drawn pixels, TRANSPARENT
 background by default; pass `background` with a colour when a test needs a
 known backdrop), `between` (two ids — distance, touching, relative screen position,
-facing), `marks: false`, `name`.
+facing), `ui: false` (hide player-facing overlays — damage numbers and
+anything marked `userData.overlay` — when the question is the world, not the
+HUD), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`.
+
+Marks are HULLS: each marked entity is outlined in its TYPE's colour, drawn
+on its own pixels — one colour per type, so a busy frame is a handful of
+colours. The reply and sidecar carry `palette` (type → hex) and each marked
+entry's `hull` (its screen outline as [x, y] percent points). The subject is
+white and wider. Ground an answer in colour + the sidecar's positions, never
+in floating text.
 
 ## A moment in time
 
@@ -140,9 +152,11 @@ not advance, read `snapshot`; `paused` names who holds the clock.
 
 - Send the PNG and its `.json` sidecar together; the sidecar is ground
   truth, pixels answer only what it cannot say.
-- Refer to entities by mark number; `marks` in the reply maps them to ids.
-- One question per read, multiple-choice where possible. "Does mark 3 read
-  as a rat or a box, A or B" beats "describe the scene".
+- Refer to entities by hull colour and type — `palette` maps colour to type,
+  `marks` maps mark numbers to ids, and each marked entry's `at` names where
+  it sits. Never bind by floating text: the game draws its own numbers.
+- One question per read, multiple-choice where possible. "Does the white
+  outlined thing read as a rat or a box, A or B" beats "describe the scene".
 - A subject under ~5% of the frame: capture it with `subject`.
 
 ## Limits

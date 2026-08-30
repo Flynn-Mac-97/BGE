@@ -4,7 +4,7 @@
  * every image starts here, and nothing here reads a renderer or a clock.
  */
 import { makeProjector } from '../../../engine/camera-project.js'
-import { boundsOf, frameSubject, facingOffset, boxesTouch } from '../../../engine/frame-facts.js'
+import { boundsOf, frameSubject, facingOffset, boxesTouch, screenHull, typeHue, hueHex } from '../../../engine/frame-facts.js'
 
 /** Marks past this are noise: tags start overlapping and reads degrade. */
 const MOST_MARKS = 40
@@ -71,6 +71,38 @@ export function describe(context, options = {}) {
     if (marked.some(other =>
       Math.abs(other.at[0] - entry.at[0]) < 4 && Math.abs(other.at[1] - entry.at[1]) < 5)) continue
     entry.mark = marked.push(entry)
+  }
+
+  // A tag floating above a thing is a guess about what it tags; a hull IS the
+  // thing's screen shape. Every marked entry carries one, and `palette` maps
+  // each marked type to the one colour every See drawing strokes it with —
+  // one colour per TYPE, so a busy frame is a handful of colours, not a
+  // hundred. Hues come from the type's name hash, so a type keeps its colour
+  // between frames — but two names can hash together (kitten and ground do),
+  // and a hull the colour of its backdrop marks nothing. A marked type whose
+  // hue lands within 25 degrees of any other visible type's is walked around
+  // the wheel until it stands clear; marked types are visited sorted, so the
+  // outcome is deterministic.
+  for (const entry of marked) {
+    const hull = screenHull(entry._world, projector)
+    if (hull) entry.hull = hull
+  }
+  const apart = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b)) >= 25
+  const hues = new Map()
+  for (const entry of visible) {
+    if (!hues.has(entry.type)) hues.set(entry.type, typeHue(entry.type))
+  }
+  const palette = {}
+  for (const type of [...new Set(marked.map(entry => entry.type))].sort()) {
+    const own = hues.get(type)
+    let hue = own.hue
+    for (let spins = 0; spins < 12; spins++) {
+      const clear = [...hues].every(([other, at]) => other === type || apart(at.hue, hue))
+      if (clear) break
+      hue = (hue + 37) % 360
+    }
+    hues.set(type, { hue, bright: own.bright })
+    palette[type] = hueHex(hue, own.bright)
   }
 
   const coverage = {}
@@ -171,6 +203,8 @@ export function describe(context, options = {}) {
     },
     /** Percent of the screen each type's boxes cover, before overlap. */
     coverage,
+    /** One colour per marked type — the colour each See drawing uses for it. */
+    palette,
     /** Marked pairs whose world boxes interpenetrate — computed, not seen. */
     overlaps,
     /** [nearer, farther] marked pairs whose screen boxes cross — who hides whom. */

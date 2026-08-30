@@ -183,3 +183,7 @@
 {"id":"p134","resolved":true,"at":"2026-08-30T08:30:04.386Z","note":"the shell carries the agent door: a hidden first link read_page surfaces naming agent.context and See, and the status bar says it visibly for screenshots"}
 {"id":"p135","at":"2026-08-30T09:35:35.412Z","kind":"engine","what":"Queries answer from the live camera, but nothing but the mouse could aim it — an agent asking occlusion of an offscreen subject had no way to point the camera at it"}
 {"id":"p135","resolved":true,"at":"2026-08-30T09:35:47.105Z","note":"see.view {\"go\":\"name\"} aims the live camera at a saved view; queries answer from it"}
+{"id":"p136","at":"2026-08-30T10:00:47.840Z","kind":"engine","what":"Capture marks were numbered tags floating above entities — indistinguishable from the game's own damage numbers, and a reader cannot bind a floating number to the body below it"}
+{"id":"p137","at":"2026-08-30T10:00:47.978Z","kind":"engine","what":"typeColour hashes two type names to the same hue — kitten and ground collide — so a marked thing can wear its backdrop's colour and vanish"}
+{"id":"p136","resolved":true,"at":"2026-08-30T10:00:58.978Z","note":"Marks are hulls: each marked entity outlined in its type's colour on its own pixels, palette legend in the sidecar; marks:'tags' keeps the stamps; ui:false hides overlay sprites"}
+{"id":"p137","resolved":true,"at":"2026-08-30T10:00:59.706Z","note":"describe nudges a marked type's hue 37 degrees at a time until it stands 25 degrees clear of every visible type; drawings read the palette"}

@@ -267,6 +267,8 @@ function makePainter(THREE, scene) {
     // smoke can hide is a number that arrives when it is no longer news.
     made.renderOrder = 10
     made.frustumCulled = false
+    // HUD in the scene, not world — see.capture {"ui": false} hides these.
+    made.userData.overlay = true
     scene.add(made)
     pool[index] = made
     return made

@@ -11,11 +11,12 @@
  *   see.sketch    a flat-colour frame drawn from those facts. Works everywhere.
  *   see.capture   the real rendered frame. Browser only.
  *
- * Every image carries numbered marks and a JSON sidecar mapping mark to
- * entity id — a vision model grounds reliably against marks, and everything
- * computable is in the sidecar, never asked of vision. A `__files` reply is
- * written to disk by the CLI. Frames are named by level name and a frame
- * number, never by a clock.
+ * Every image outlines each marked entity's screen hull in its type's
+ * colour, and the JSON sidecar carries the legend — palette (type to hex),
+ * marks (number to id), hull points. Everything computable is in the
+ * sidecar, never asked of vision. A `__files` reply is written to disk by
+ * the CLI. Frames are named by level name and a frame number, never by a
+ * clock.
  */
 import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
 import { describe } from './see/describe.js'
@@ -23,6 +24,22 @@ import { resolveView, view } from './see/views.js'
 import { occlusion, isolate, find, diff, camera } from './see/queries.js'
 
 let frameNumber = 0
+
+/**
+ * Hide player-facing overlay objects for one draw. Anything a plugin marks
+ * `userData.overlay = true` — damage numbers and their kin — is HUD in the
+ * scene, not world, and `ui: false` leaves it out of the frame.
+ */
+function concealOverlays(context) {
+  const hidden = []
+  for (const child of context.renderer?.scene?.children || []) {
+    if (child.userData?.overlay && child.visible) {
+      child.visible = false
+      hidden.push(child)
+    }
+  }
+  return hidden
+}
 
 /**
  * A subject may be an entity id, or just a TYPE name. A live instance wins;
@@ -85,7 +102,7 @@ export default {
     },
     {
       id: 'see.view',
-      label: 'Save, list, or drop a named camera — a view worth returning to is a word',
+      label: 'Save, list, drop, or aim the camera — a view worth returning to is a word',
       run: (context, options) => view(context, options || {})
     },
     {
@@ -115,7 +132,7 @@ export default {
     },
     {
       id: 'see.sketch',
-      label: 'A flat-colour frame with numbered marks, drawn without a renderer',
+      label: 'A flat-colour frame of screen hulls, drawn without a renderer',
       run: async (context, options = {}) => {
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
@@ -179,8 +196,12 @@ export default {
             if (drawn) pen.drawImage(drawn.canvas, 0, 0)
             else {
               context.renderer.sync(context.world)
+              // Hidden per cell: a step between cells lets the overlay's own
+              // plugin turn its sprites back on.
+              const overlays = options.ui === false ? concealOverlays(context) : []
               context.renderer.draw()
               pen.drawImage(context.shell.canvas, 0, 0, cell.width, cell.height)
+              for (const child of overlays) child.visible = true
             }
             cells.push({ label: `${lens} +${step} steps`, image: cell })
           }
@@ -196,7 +217,7 @@ export default {
     },
     {
       id: 'see.capture',
-      label: 'The real rendered frame, with numbered marks and a JSON sidecar',
+      label: 'The real rendered frame, hulls outlined, with a JSON sidecar',
       run: async (context, options = {}) => {
         if (typeof document === 'undefined' || !context.renderer || !context.shell?.canvas) {
           return { why: 'a capture needs the browser renderer — use see.sketch headless, or open the editor' }
@@ -262,6 +283,7 @@ export default {
         // Always drawn fresh, never copied as-is: a hidden or throttled tab
         // stops painting, and its stale canvas reads back as nothing.
         context.renderer.sync(context.world)
+        const overlays = options.ui === false ? concealOverlays(context) : []
         // The sky is a sphere riding the camera and effects are scene
         // children, not entities — in the studio, everything that is not the
         // subject or the rig goes dark for the one draw.
@@ -349,6 +371,7 @@ export default {
         }
 
         for (const other of concealed) other.hidden = false
+        for (const child of overlays) child.visible = true
         if (studio) {
           studio.scene.remove(studio.rig)
           studio.scene.background = studio.background
@@ -357,7 +380,7 @@ export default {
           context.renderer.passes?.set(studio.passes)
         }
         if (moved) Object.assign(view, kept)
-        if (moved || concealed.length) {
+        if (moved || concealed.length || overlays.length) {
           context.renderer.sync(context.world)
           context.renderer.draw()
         }
@@ -402,22 +425,41 @@ export default {
           grid: cells
         }
 
+        // Marks are hulls: each marked entity outlined in its TYPE's colour,
+        // right on its own pixels — a numbered tag floats above the thing it
+        // tags, where game text (damage numbers) also lives, and a reader
+        // cannot tell tag from HUD or bind a floating number to the body
+        // below it. `palette` in the reply maps colour to type; the subject
+        // is white and wider. `marks: "tags"` keeps the numbered stamps.
         if (options.marks !== false && !crop) {
-          const tag = Math.max(14, Math.round(copy.height / 45))
-          pen.font = `bold ${tag}px system-ui, sans-serif`
-          pen.textAlign = 'center'
-          pen.textBaseline = 'middle'
-          for (const entry of description.visible) {
-            if (!entry.mark) continue
-            const x = entry.at[0] / 100 * copy.width
-            // Above the entity's top edge, in clear space, off the geometry.
-            const y = Math.max(tag, (entry.at[1] - entry.size[1] / 2) / 100 * copy.height - tag * 0.8)
-            const text = String(entry.mark)
-            const w = pen.measureText(text).width + tag * 0.6
-            pen.fillStyle = 'rgba(0, 0, 0, 0.82)'
-            pen.fillRect(x - w / 2, y - tag * 0.62, w, tag * 1.24)
-            pen.fillStyle = '#ffffff'
-            pen.fillText(text, x, y)
+          if (options.marks === 'tags') {
+            const tag = Math.max(14, Math.round(copy.height / 45))
+            pen.font = `bold ${tag}px system-ui, sans-serif`
+            pen.textAlign = 'center'
+            pen.textBaseline = 'middle'
+            for (const entry of description.visible) {
+              if (!entry.mark) continue
+              const x = entry.at[0] / 100 * copy.width
+              const y = Math.max(tag, (entry.at[1] - entry.size[1] / 2) / 100 * copy.height - tag * 0.8)
+              const text = String(entry.mark)
+              const w = pen.measureText(text).width + tag * 0.6
+              pen.fillStyle = 'rgba(0, 0, 0, 0.82)'
+              pen.fillRect(x - w / 2, y - tag * 0.62, w, tag * 1.24)
+              pen.fillStyle = '#ffffff'
+              pen.fillText(text, x, y)
+            }
+          } else {
+            const line = Math.max(2, copy.height / 320)
+            for (const entry of [...description.visible].reverse()) {
+              if (!entry.mark || !entry.hull) continue
+              const subject = entry.id === options.subject
+              pen.beginPath()
+              for (const [x, y] of entry.hull) pen.lineTo(x / 100 * copy.width, y / 100 * copy.height)
+              pen.closePath()
+              pen.strokeStyle = subject ? '#ffffff' : description.palette?.[entry.type] || '#ffffff'
+              pen.lineWidth = subject ? line * 2 : line
+              pen.stroke()
+            }
           }
         }
 
@@ -432,6 +474,7 @@ export default {
             { path: `agent-runs/see/${name}.json`, base64: sidecar }
           ],
           marks: Object.fromEntries(description.visible.filter(v => v.mark).map(v => [v.mark, v.id])),
+          palette: description.palette,
           counts: description.counts
         }
         })

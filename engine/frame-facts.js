@@ -29,13 +29,22 @@ export function boundsOf(entity) {
 }
 
 /** A stable colour per type name, so two sketches of one world agree. */
-export function typeColour(name) {
+/** The type's hash-derived hue and brightness — the raw material of its colour. */
+export function typeHue(name) {
   let hash = 0
   for (const character of String(name)) hash = (hash * 31 + character.charCodeAt(0)) >>> 0
-  const hue = hash % 360
-  const bright = 0.45 + ((hash >>> 9) % 40) / 100
+  return { hue: hash % 360, bright: 0.45 + ((hash >>> 9) % 40) / 100 }
+}
+
+export function typeColour(name) {
+  const { hue, bright } = typeHue(name)
   const [r, g, b] = hueToRgb(hue, 0.65, bright)
   return [r, g, b, 255]
+}
+
+/** A hue and brightness as a hex string, for legends and stroke styles. */
+export function hueHex(hue, bright) {
+  return '#' + hueToRgb(hue, 0.65, bright).map(v => v.toString(16).padStart(2, '0')).join('')
 }
 
 function hueToRgb(hue, saturation, lightness) {
@@ -101,6 +110,42 @@ export function boxesTouch(a, b) {
   return Math.abs(a.x - b.x) < (a.w + b.w) / 2
     && Math.abs(a.y - b.y) < (a.h + b.h) / 2
     && Math.abs(a.z - b.z) < ((a.l || 0) + (b.l || 0)) / 2
+}
+
+/**
+ * The convex hull of screen points, in draw order — Andrew's monotone chain.
+ * Fewer than three points come back as given.
+ */
+export function convexHull(points) {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  if (sorted.length < 3) return sorted
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+  const lower = []
+  for (const point of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop()
+    lower.push(point)
+  }
+  const upper = []
+  for (const point of [...sorted].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop()
+    upper.push(point)
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1))
+}
+
+/**
+ * Where an entity's world box lands on screen: the hull of its eight
+ * projected corners, [x, y] percent pairs. A corner behind a perspective eye
+ * cannot project; fewer than three usable corners answers null, and the
+ * caller falls back to the screen rectangle.
+ */
+export function screenHull(box, projector) {
+  const corners = []
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+    const point = projector.place(box.x + sx * box.w / 2, box.y + sy * box.h / 2, (box.z || 0) + sz * (box.l || 0) / 2)
+    if (point.inFront) corners.push([Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10])
+  }
+  return corners.length >= 3 ? convexHull(corners) : null
 }
 
 /** 3x5 digit stamps for marks in a sketch, where there is no font. */
