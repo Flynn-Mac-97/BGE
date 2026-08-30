@@ -4,7 +4,8 @@ import path from 'node:path'
 // The index builder and the determinism lint live in the engine, not in this
 // config, so a world running headless in node builds the same index from the
 // same code. Two implementations of "what is in this project" would drift.
-import { buildIndex as buildProjectIndex, problemsIn, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
+import { buildIndex as buildProjectIndex, problemsIn, fatal, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
+import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
 
 const ROOT = process.cwd()
 
@@ -167,7 +168,10 @@ function api() {
           // imports, unreadable levels, and anything that breaks determinism.
           if (url.pathname === '/api/check') {
             const problems = problemsIn(await buildIndex())
-            return send(res, 200, { ok: problems.length === 0, problems })
+            // `ok` follows the fatal ones. A warning is worth reading and never
+            // worth failing on, and both callers of `problemsIn` agree on that
+            // through the same function.
+            return send(res, 200, { ok: fatal(problems).length === 0, problems })
           }
 
           if (url.pathname === '/api/tree') {
@@ -488,63 +492,15 @@ function serverRegistry() {
 }
 
 /**
- * AGENTS.md is how a CLI that has never seen this project learns to drive it.
- * Written at server start so it can never drift from a stale checkout, and
- * never overwritten by hand-edits being lost — it is generated, say so in it.
+ * AGENTS.md, CLAUDE.md and the generated skills, written at server start.
+ *
+ * The rule for what they contain is in engine/agent-registration.mjs, and this
+ * calls it rather than repeating it, so `node bin/engine.mjs check` reports
+ * them against the same rule that writes them. The copy that used to be here
+ * held the bootstrap text in a constant read once at startup, so editing the
+ * source while the server ran wrote the old text back.
  */
-async function writeAgentDoc() {
-  await fs.writeFile(path.join(ROOT, 'AGENTS.md'), AGENT_DOC, 'utf8')
-
-  // Claude Code reads CLAUDE.md. Point at the same file rather than duplicating
-  // it, and never clobber one the user already wrote.
-  const claude = path.join(ROOT, 'CLAUDE.md')
-  try { await fs.access(claude) } catch {
-    await fs.writeFile(claude, 'See [AGENTS.md](AGENTS.md) — it is generated and always current.\n', 'utf8')
-  }
-
-  await writeGuideSkills()
-}
-
-/**
- * An enabled plugin's guide can register as a HARNESS skill — an entry in the
- * skill listing every agent reads before its first tool call. Documentation
- * loses to that listing every time: five fresh agents in a row chose the
- * browser skill by name and never opened a file. A guide opts in with `skill:`
- * and `description:` frontmatter; the body written here is the guide itself.
- * Toggling the plugin off removes the skill at the next server start, because
- * this directory is cleared and rebuilt from enabled guides alone.
- */
-async function writeGuideSkills() {
-  const generated = path.join(ROOT, '.claude/skills')
-  const plugins = await agentPlugins()
-  const mine = new Set()
-  for (const node of plugins) {
-    if (!node.enabled) continue
-    const guide = await fs.readFile(path.join(ROOT, node.scope === 'engine' ? node.file : path.join(PROJECT_DIRECTORY, node.file)), 'utf8').catch(() => '')
-    const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
-    const skillName = declared?.match(/^skill:\s*(.+)$/m)?.[1]?.trim()
-    const description = declared?.match(/^description:\s*(.+)$/m)?.[1]?.trim()
-    if (!skillName || !description) continue
-    mine.add(skillName)
-    const body = guide.replace(/^---\s*\n[\s\S]*?\n---\s*/, '')
-    await fs.mkdir(path.join(generated, skillName), { recursive: true })
-    await fs.writeFile(path.join(generated, skillName, 'SKILL.md'),
-      `---\nname: ${skillName}\ndescription: ${description}\n---\n<!-- generated from ${node.file} at server start; edits are lost -->\n\n${body}`, 'utf8')
-  }
-  // Skills this generator wrote before but did not write now belong to guides
-  // that were disabled or dropped — remove them, or a dead plugin stays
-  // registered. Only generated skills are touched; a hand-written one has no
-  // generated marker and is left alone.
-  let names = []
-  try { names = await fs.readdir(generated) } catch { return }
-  for (const name of names) {
-    if (mine.has(name)) continue
-    const text = await fs.readFile(path.join(generated, name, 'SKILL.md'), 'utf8').catch(() => '')
-    if (text.includes('<!-- generated from ')) await fs.rm(path.join(generated, name), { recursive: true, force: true })
-  }
-}
-
-const AGENT_DOC = await fs.readFile(path.join(ROOT, 'agents/bootstrap.md'), 'utf8')
+const writeAgentDoc = () => writeGeneratedAgentFiles(ROOT, PROJECT_DIRECTORY)
 
 export default defineConfig({
   plugins: [

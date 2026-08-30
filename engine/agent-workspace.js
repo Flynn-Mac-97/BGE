@@ -142,6 +142,25 @@ const asProjectPattern = (file, projectDirectory) =>
     ? cleanPath(file).replace(new RegExp(`^${projectDirectory}/`), 'project/')
     : cleanPath(file)
 
+const selectableKind = node => ['instruction', 'skill'].includes(node.kind)
+
+/**
+ * Why one rule set is missing, short enough to send on every packet.
+ *
+ * A packet that lists only what it holds looks complete. The reason tells an
+ * agent what to change to get the rest.
+ */
+function withheldReason(node, replaced) {
+  if (replaced) return `replaced by the project's own ${node.override} rule`
+  if (!node.enabled) return 'switched off in agents/settings.json'
+  const byFile = (node.match || []).length > 0
+  const byWord = (node.triggers || []).length > 0
+  if (byFile && byWord) return 'no file matched, no trigger word in the task'
+  if (byFile) return 'no file matched its patterns'
+  if (byWord) return 'no trigger word in the task'
+  return 'selected only by name'
+}
+
 export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectDirectory = 'project') {
   const request = normaliseAgentRequest(requestValue)
   const workspace = await loadAgentGraph(read, pluginNodes)
@@ -154,7 +173,7 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const wanted = new Set(request.nodes)
   const task = request.task.toLowerCase()
   for (const node of workspace.nodes) {
-    if (!['instruction', 'skill'].includes(node.kind)) continue
+    if (!selectableKind(node)) continue
     if (node.always) wanted.add(node.id)
     if ((node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))) wanted.add(node.id)
     if ((node.triggers || []).some(trigger => task.includes(String(trigger).toLowerCase()))) wanted.add(node.id)
@@ -163,22 +182,66 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const unknown = [...wanted].filter(id => !workspace.nodes.some(node => node.id === id))
   if (unknown.length) throw new Error(`unknown agent node: ${unknown.join(', ')}`)
 
-  const selected = workspace.nodes.filter(node => wanted.has(node.id) && ['instruction', 'skill'].includes(node.kind) && node.enabled)
+  const selected = workspace.nodes.filter(node => wanted.has(node.id) && selectableKind(node) && node.enabled)
   const projectOverrides = new Set(selected
     .filter(node => node.scope === 'project' && node.override)
     .map(node => node.override))
-  const resolved = selected.filter(node =>
-    !(node.scope === 'engine' && node.override && projectOverrides.has(node.override)))
+  // An `always` rule is never replaced, only added to. A project override is
+  // scoped to its own files but eviction is scoped to the whole packet, so one
+  // project file in the list would drop the rule for the engine files beside
+  // it. The overrides also defer back — `project/agents/overrides/` says "this
+  // game follows the engine comment style" — so evicting one sent no rule at
+  // all. The project's rule comes after, and later text wins on a conflict.
+  const replaced = new Set(selected
+    .filter(node => node.scope === 'engine' && node.override && !node.always && projectOverrides.has(node.override))
+    .map(node => node.id))
+  const resolved = selected.filter(node => !replaced.has(node.id))
   const entries = await Promise.all(resolved.map(async node => ({ ...node, text: await read(node.scope, node.file) })))
+
+  const sent = new Set(resolved.map(node => node.id))
+  const missing = workspace.nodes.filter(node => selectableKind(node) && !sent.has(node.id))
+  // Plugin guides are counted, not listed: there are dozens, one reason covers
+  // them all, and spelling each one out costs more than the rules themselves.
+  const guideIds = new Set(pluginNodes.map(node => node.id))
+  const withheld = missing.filter(node => !guideIds.has(node.id))
+    .map(node => ({ id: node.id, title: node.title || node.id, reason: withheldReason(node, replaced.has(node.id)) }))
+  // A count, not the ids: seventy ids cost more than the rules they sit beside,
+  // and the notice already says where a guide is found.
+  const withheldPluginGuides = missing.filter(node => guideIds.has(node.id)).length
+  // Rules the file list would have brought in. A request naming no files loses
+  // every one of them, and that is what an agent has to be told.
+  const skippedByFile = missing.filter(node =>
+    !guideIds.has(node.id) && node.enabled && !replaced.has(node.id) && (node.match || []).length).length
+
   // A check that names the default project would test somebody else's game. The
   // manifest writes `<project>` and the packet says which one, so the command a
   // lane is handed is the command that proves the lane's own work.
   const tests = [...new Set(entries.flatMap(node => node.tests || []))]
     .map(test => test.replaceAll('<project>', projectDirectory))
+  // Both notices go in the text, not only in a field: most agents read the text
+  // and never parse the JSON.
+  const noFilesNotice = request.files.length || !skippedByFile ? null
+    : '# You named no files\n\n'
+      + `This packet is short. ${skippedByFile} rule sets are chosen by the files you touch, and none of them are here.`
+      + ' Ask again as soon as you know the files:\n\n'
+      + '```sh\nnode bin/engine.mjs agent.context \'{"task":"...","files":["path/to/file.js"]}\'\n```'
+  const withheldNotice = withheld.length || withheldPluginGuides
+    ? [
+      '# Not included',
+      'These rule sets exist and are not above. Ask for one by id with `\'{"task":"...","nodes":["<id>"]}\'`.',
+      withheld.length ? withheld.map(node => `- \`${node.id}\` — ${node.title} — ${node.reason}`).join('\n') : null,
+      withheldPluginGuides
+        ? `${withheldPluginGuides} plugin guides are also missing. A guide arrives when your task uses that`
+          + " plugin's words; each guide is the `*.agent.md` file beside its plugin."
+        : null
+    ].filter(Boolean).join('\n\n')
+    : null
   const parts = [
     request.task ? `# Task\n\n${request.task}` : null,
+    noFilesNotice,
     ...entries.map(node => `# ${node.title || node.id}\n\n${withoutFirstHeading(node.text)}`),
-    tests.length ? `# Required checks\n\n${tests.map(test => `- ${test}`).join('\n')}` : null
+    tests.length ? `# Required checks\n\n${tests.map(test => `- ${test}`).join('\n')}` : null,
+    withheldNotice
   ].filter(Boolean)
   const text = parts.join('\n\n') + '\n'
 
@@ -191,6 +254,9 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
     lanes: entries.map(node => ({ id: node.id, title: node.title, file: node.file, tests: node.tests || [] })),
     tests,
     overrides: [...projectOverrides],
+    withheld,
+    withheldPluginGuides,
+    skippedByFile,
     characters: text.length,
     text
   }

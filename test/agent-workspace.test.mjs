@@ -6,9 +6,18 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import { matchesAgentPattern, readAgentWorkspace, resolveAgentContext } from '../engine/agent-workspace.js'
-import { prepareAgent, readAgentRegistry, releaseAgent, mergeAgent } from '../engine/agent-workspace-node.mjs'
+import { contextFromDisk, prepareAgent, readAgentRegistry, releaseAgent, mergeAgent } from '../engine/agent-workspace-node.mjs'
+import { onDisk } from '../engine/start-world-node.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+/** Every node this checkout really offers, manifests and plugin guides alike. */
+async function everyRealNode() {
+  const project = path.join(ROOT, 'project')
+  const read = (scope, file) => fs.promises.readFile(path.join(scope === 'engine' ? ROOT : project, file), 'utf8')
+  const workspace = await readAgentWorkspace(read, await onDisk(project).agentPlugins())
+  return workspace.nodes.filter(node => ['instruction', 'skill'].includes(node.kind))
+}
 
 function memoryReader({ disabled = ['blender'] } = {}) {
   const files = new Map([
@@ -80,6 +89,33 @@ test('a project style rule replaces its named engine default', async () => {
   assert.deepEqual(result.overrides, ['style'])
 })
 
+test('a project rule adds to an always rule and never evicts it', async () => {
+  // An override is scoped to its own files; eviction was scoped to the whole
+  // packet, so one project file dropped the universal rule for the engine files
+  // beside it. The project overrides on disk also defer back to the engine
+  // rule, so evicting it sent no rule at all.
+  const files = new Map([
+    ['engine:agents/manifest.json', JSON.stringify({ version: 2, nodes: [
+      { id: 'root', kind: 'group' },
+      { id: 'style', kind: 'instruction', parent: 'root', file: 'agents/style.md', override: 'style', always: true }
+    ] })],
+    ['project:agents/manifest.json', JSON.stringify({ version: 2, nodes: [
+      { id: 'project-style', kind: 'instruction', parent: 'root', file: 'agents/overrides/style.md', override: 'style', match: ['project/**/*.js'] }
+    ] })],
+    ['project:agents/settings.json', JSON.stringify({ disabled: [] })],
+    ['engine:agents/style.md', 'engine style'],
+    ['project:agents/overrides/style.md', 'project style']
+  ])
+  const read = async (scope, file) => files.get(`${scope}:${file}`)
+  for (const list of [['project/types/player.js'], ['engine/world.js', 'project/types/player.js']]) {
+    const result = await resolveAgentContext(read, { files: list })
+    assert.match(result.text, /engine style/, `the always rule is missing for ${list.join(' + ')}`)
+  }
+  // The project's own rule still arrives for its own files, after the engine's.
+  const both = await resolveAgentContext(read, { files: ['project/types/player.js'] })
+  assert.ok(both.text.indexOf('engine style') < both.text.indexOf('project style'))
+})
+
 test('enabled plugin guides load only when the task names the plugin', async () => {
   const base = memoryReader()
   const read = async (scope, file) => file === 'plugins/builtin/physics.agent.md'
@@ -93,6 +129,56 @@ test('enabled plugin guides load only when the task names the plugin', async () 
   assert.doesNotMatch(idle.text, /collision/)
   const matched = await resolveAgentContext(read, { task: 'fix physics' }, [plugin])
   assert.match(matched.text, /collision/)
+})
+
+// The first call an agent makes is the one where it does not yet know its
+// files, so any rule selected by file match is absent from it. Style rules
+// govern every write, so they cannot be selected that way.
+test('a packet built from a task alone still carries the style rules', async () => {
+  const packet = await contextFromDisk(ROOT, { task: 'finish the See plugin' })
+  const ids = packet.nodes.map(node => node.id)
+  assert.ok(ids.includes('code-style'), `code-style is missing from ${ids.join(', ')}`)
+  assert.ok(ids.includes('comment-style'), `comment-style is missing from ${ids.join(', ')}`)
+  assert.match(packet.text, /Explain why, not what the code already says/)
+  assert.match(packet.text, /Use full names/)
+})
+
+test('a packet says what it withheld and that no files were named', async () => {
+  const packet = await contextFromDisk(ROOT, { task: 'finish the See plugin' })
+  const sent = new Set(packet.nodes.map(node => node.id))
+  for (const node of packet.withheld) {
+    assert.ok(node.id && node.title && node.reason, `withheld entry is incomplete: ${JSON.stringify(node)}`)
+    assert.ok(!sent.has(node.id), `${node.id} is both sent and withheld`)
+  }
+  assert.ok(packet.withheld.some(node => node.id === 'engine'), 'the engine rules were dropped without saying so')
+  assert.match(packet.text, /# Not included/)
+  assert.match(packet.text, /`engine` — Engine — no file matched its patterns/)
+
+  assert.ok(packet.skippedByFile > 0)
+  assert.match(packet.text, new RegExp(`# You named no files[\\s\\S]*${packet.skippedByFile} rule sets`))
+
+  const withFiles = await contextFromDisk(ROOT, { task: 'finish the See plugin', files: ['engine/world.js'] })
+  assert.doesNotMatch(withFiles.text, /# You named no files/)
+  assert.ok(withFiles.nodes.some(node => node.id === 'engine'))
+})
+
+// Guards the shape of the bug, not one node id: a rule that applies to every
+// JavaScript or Markdown file cannot be reached by file match on the first
+// call, so it must be marked `always`.
+test('no rule covering all JavaScript or all Markdown waits on a file match', async () => {
+  // Every probe sits in a directory: `**/*.js` matches nothing at the root, so a
+  // root file would let a pattern that covers the whole tree slip through.
+  const everywhere = ['engine/world.js', 'plugins/builtin/see.js', 'project/types/player.js', 'a/b/c/deep.js']
+  const everyDocument = ['agents/core.md', 'docs/kernel.md', 'project/notes.md', 'a/b/c/deep.md']
+  const covers = (patterns, probes) =>
+    probes.every(file => patterns.some(pattern => matchesAgentPattern(file, pattern)))
+
+  for (const node of await everyRealNode()) {
+    const patterns = node.match || []
+    if (!covers(patterns, everywhere) && !covers(patterns, everyDocument)) continue
+    assert.equal(node.always, true,
+      `node "${node.id}" matches every file of a kind, so it must set "always": true rather than wait for a file list`)
+  }
 })
 
 test('bad parents are shown in the tree status', async () => {
