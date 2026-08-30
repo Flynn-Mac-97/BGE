@@ -11,6 +11,9 @@
  */
 const RING = 200
 
+/** Half a fixed step. Below this, a simulation ran the time it was asked for. */
+const STEP_TOLERANCE = 1 / 120
+
 /**
  * The world's log, and everything that has to be listening before there is a
  * world to read.
@@ -258,8 +261,18 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         world.simulated = true
         for (const e of [...world.entities]) world.hook(e, 'start', editor.context)
       }
+      const before = loop.time
       loop.step(Math.round(seconds * 60))
-      return api.snapshot(options)
+      const snapshot = api.snapshot(options)
+      // A hold runs the steps without advancing the world, so a caller that
+      // reads only the reply cannot tell a simulated minute from a held one.
+      const advanced = loop.time - before
+      if (advanced < seconds - STEP_TOLERANCE) {
+        snapshot.asked = seconds
+        snapshot.advanced = Math.round(advanced * 1000) / 1000
+        snapshot.heldBy = loop.holds
+      }
+      return snapshot
     },
     spawn: (type, placement) => entityView(editor.context.spawn(type, placement)),
     destroy: id => editor.context.destroy(world.byId(id)),
