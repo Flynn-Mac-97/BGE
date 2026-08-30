@@ -288,8 +288,10 @@ function makeT(context, checks, unsubscribes) {
      * game does. Takes the path, or the `files` list a see command answers.
      */
     frame(path, caption) {
+      // A checkout path, a `files` list from a see command, or a data URL from
+      // a browser sketch — whatever form the frame arrived in, keep it.
       const file = Array.isArray(path) ? path.find(entry => entry.endsWith('.png')) : path
-      if (typeof file === 'string') checks.push({ ok: true, message: caption || file, note: true, frame: file })
+      if (typeof file === 'string') checks.push({ ok: true, message: caption || 'frame', note: true, frame: file })
     }
   }
 

@@ -278,7 +278,8 @@ export function makeUI(state, redraw) {
      */
     picture(src, o = {}) {
       const element = h('figure', 'u-picture')
-      append(element, [h('img', null, { src: `/${src}${o.stamp ? `?run=${o.stamp}` : ''}`, alt: o.label || '' })])
+      const url = src.startsWith('data:') ? src : `/${src}${o.stamp ? `?run=${o.stamp}` : ''}`
+      append(element, [h('img', null, { src: url, alt: o.label || '' })])
       if (o.label) append(element, [h('figcaption', 'u-tsub', { text: o.label })])
       return element
     },

@@ -6,7 +6,7 @@ down; stop at the first row that answers your question.
 | question | use | costs |
 |---|---|---|
 | counts, positions, sizes, coverage, is X on screen, do two things interpenetrate, how far apart are they | `see.describe` | nothing — computed, works everywhere |
-| layout and composition, roughly | `see.sketch` | one small PNG; headless, no browser |
+| layout and composition, roughly | `see.sketch` | one small PNG; works everywhere |
 | does it actually look right — art, light, readability | `see.capture` | a real frame; browser only |
 
 Never ask a vision model what `describe` already answers. Vision models
@@ -19,7 +19,8 @@ numbers are exact.
   (percent, x right, y down), sizes, depth, mark numbers, off-screen counts,
   per-type coverage.
 - `see.sketch '{...}'` — flat-colour frame from those facts, marks stamped.
-  Headless only. Writes `agent-runs/see/<name>.png` + `.json`.
+  Headless it writes `agent-runs/see/<name>.png` + `.json`; in the browser it
+  answers a `dataUrl` as well, so a panel can show it without disk.
 - `see.capture '{...}'` — the rendered canvas, marks drawn on top, same files.
   Browser only; from a terminal the CLI writes the bytes it gets back.
 
