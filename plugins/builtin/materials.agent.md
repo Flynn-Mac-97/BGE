@@ -32,4 +32,40 @@ Three things that are not obvious and cost real time:
 
 Textures are named as bare paths and resolve under the project's `assets/`: `meadow/grass.png` → `<project>/assets/meadow/grass.png`. A missing one falls back to a flat colour **and reports itself**.
 
+## Not materials: the keyline and the contact shadow
+
+Two keys on `mesh` are read by `engine/render.js`, not by any material, because
+each draws a second piece of geometry and a material builder returns one
+material. Both work on a `box`, on `parts` and on a `model` — a GLB keeps its
+file's own materials and can still be given a keyline.
+
+| key | is | default |
+|---|---|---|
+| `keyline` | a dark line round the silhouette, **in screen pixels**, the same width at every distance | 2.2 for anything that has moved, 0 for the rest |
+| `keylineColour` | its colour | `#1d1418` |
+| `shadow` | a soft ellipse on the ground: `true`, `false`, or a radius in metres | on for anything that has moved |
+| `shadowStrength` | how dark it presses, 0 to 1 | 0.44 |
+
+An entity that has never moved since it appeared gets neither, so scenery is
+left alone; declaring either key overrides that. The answer sticks, so an enemy
+that stops to bite keeps both — and a prop dragged in the editor keeps them
+until the page reloads. Change the defaults on `context.renderer.readability`,
+which also holds `groundY` (0) and `shadowRange` (1.6 m, the lift over which a
+shadow spreads and fades).
+
+`outline` on a `toon` material is a different thing and both can be used at
+once: it shades the surface where it turns away from the eye, in metres of
+geometry, so it thins with distance. Use `keyline` for readability at play
+distance and `outline` for a rim on a near surface.
+
+Three limits worth knowing:
+
+- A model's keyline is traced from the file in its REST POSE, so a limb `pose`
+  swings moves inside its own outline. It is a pixel or two on a leg at play
+  distance, and it buys one draw call per character instead of one per limb.
+- A mesh wound inside out — an inverted hull modelled into the GLB — is left out
+  of the keyline. Once a type has `keyline`, that baked hull is dead weight.
+- A contact shadow lands on `groundY`, not on whatever surface is under it, so a
+  thing above a raised prop drops its shadow on the floor beside it.
+
 A game registers its own with `context.materials.register(name, ({ mesh, texture, tint, view, parameters }) => material)` and never touches a file under `engine/`. `materials.list` · `run materials.list`.
