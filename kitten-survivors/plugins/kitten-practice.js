@@ -119,7 +119,20 @@ export default {
        *   run kitten.arc '[150, 30, ["yarn ball", "sharp-teeth", "full-belly"]]'
        */
       run: (context, args) => {
+        // The object form too, because every other command takes one. An
+        // unknown key is refused rather than defaulted.
+        if (args && typeof args === 'object' && !Array.isArray(args)) {
+          const unknown = Object.keys(args).filter(key => !['seconds', 'every', 'draft'].includes(key))
+          if (unknown.length) {
+            throw new Error(`kitten.arc takes seconds, every and draft — not ${unknown.join(', ')}`)
+          }
+          return playRun(context, Number(args.seconds) || 120,
+            Math.max(1, Number(args.every) || 15), args.draft || null)
+        }
         const [seconds, every, drafted] = Array.isArray(args) ? args : [args, 15, null]
+        if (seconds !== undefined && !Number.isFinite(Number(seconds))) {
+          throw new Error(`kitten.arc wants a number of seconds — got ${JSON.stringify(seconds)}`)
+        }
         return playRun(context, Number(seconds) || 120, Math.max(1, Number(every) || 15), drafted)
       }
     }

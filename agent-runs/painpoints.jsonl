@@ -303,3 +303,6 @@
 {"id":"p216","resolved":true,"at":"2026-08-30T20:23:18.672Z","note":"agent.skills rewrites the generated files from the CLI, and the stale-file errors name that command instead of a function"}
 {"id":"p218","resolved":true,"at":"2026-08-30T20:23:18.815Z","note":"renderStats answers draw calls and triangles from the CLI, so measuring a rendering change needs no browser automation"}
 {"id":"p219","resolved":true,"at":"2026-08-30T20:24:50.791Z","note":"servers.stop refuses a bare sweep while more than one server runs, names the ports, and takes 'all' when a sweep is meant"}
+{"id":"p223","resolved":true,"at":"2026-08-30T20:29:29.309Z","note":"kitten.arc takes the object form and refuses an unknown key instead of playing the default"}
+{"id":"p221","resolved":true,"at":"2026-08-30T20:29:29.419Z","note":"the bridge names its own server's port in the no-editor error"}
+{"id":"p220","resolved":true,"at":"2026-08-30T20:29:29.532Z","note":"a reply carrying an error field exits non-zero, so a script cannot run its next step against the file the last one failed to write"}

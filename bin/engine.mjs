@@ -253,6 +253,9 @@ function reportedFailure(value) {
   if (!value || typeof value !== 'object') return false
   if (Array.isArray(value)) return value.some(reportedFailure)
   if (value.ok === false) return true
+  // A command that answers `{ error: "..." }` did not do what it was asked. Left
+  // at exit 0, the next step in a script runs on whatever the last one wrote.
+  if (typeof value.error === 'string' && value.error) return true
   return Array.isArray(value.tests) && value.tests.some(reportedFailure)
 }
 

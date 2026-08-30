@@ -353,7 +353,9 @@ function bridge() {
               resolve({
                 ok: false,
                 code: 'no-client',
-                error: 'no editor attached. Open http://localhost:5180 and leave the tab open.'
+                // This server's own port. A fixed one sends a lane driving its
+                // own server to somebody else's tab.
+                error: `no editor attached. Open http://localhost:${server.config.server.port} and leave the tab open.`
               })
             }
           }, timeout)
