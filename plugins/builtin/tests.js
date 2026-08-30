@@ -90,6 +90,12 @@ export default {
           },
           onPick: id => runAll(context, id)
         }),
+        // Frames the tests left behind, for the reader whose eyes are better
+        // than the assertions. Stamped by run time so a rerun's picture wins
+        // over the browser cache.
+        ...ids.flatMap(id => (results.get(id)?.checks || [])
+          .filter(check => check.frame)
+          .map(check => ui.picture(check.frame, { label: check.message, stamp: `${id}-${results.get(id).ms}` }))),
         ui.text(running ? 'running…' : ran ? `${pass}/${ran} passing` : 'not run yet', { dim: true })
       ])
     }
@@ -143,7 +149,9 @@ async function runAll(context, only) {
     context.redraw()
   }
 
-  save(context)
+  // Awaited, or a headless process exits before the write lands and the saved
+  // results silently hold the run before this one.
+  await save(context)
   return summary(out)
 }
 
@@ -271,7 +279,18 @@ function makeT(context, checks, unsubscribes) {
     is: (got, want, message) => push(same(got, want), message, got, want),
     near: (got, want, tol, message) => push(Math.abs(got - want) <= tol, message, round(got), `${want} ±${tol}`),
     ok: (cond, message) => push(!!cond, message, !!cond, true),
-    note: message => checks.push({ ok: true, message, note: true })
+    note: message => checks.push({ ok: true, message, note: true }),
+
+    /**
+     * Keep a picture as part of the result — a frame the test made, by
+     * checkout path. The panel shows it, because a human's eyes catch what an
+     * assertion cannot, and a frame from a seeded run only changes when the
+     * game does. Takes the path, or the `files` list a see command answers.
+     */
+    frame(path, caption) {
+      const file = Array.isArray(path) ? path.find(entry => entry.endsWith('.png')) : path
+      if (typeof file === 'string') checks.push({ ok: true, message: caption || file, note: true, frame: file })
+    }
   }
 
   return test

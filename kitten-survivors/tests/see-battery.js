@@ -32,13 +32,19 @@ export default {
     test.ok(during.between.touching === false || during.between.distance < 1,
       'between answers for a named pair')
 
-    // The frames a human checks, written to agent-runs/see/. A browser run
-    // cannot write them and says so; run this suite headless for the frames.
+    // The frames a human checks, written to agent-runs/see/ and shown in the
+    // Tests panel. A browser run cannot write them and says so; run the suite
+    // headless once and the panel shows that run's frames.
     const sketch = await test.run('see.sketch', { camera: PLAY_CAMERA, name: 'test-battery-30s' })
-    if (sketch.files) test.is(sketch.files.length, 2, 'the 0:30 frame and its sidecar are on disk')
-    else test.note('no frames from a browser run — see.sketch needs node, use tests.run headless')
+    if (sketch.files) {
+      test.is(sketch.files.length, 2, 'the 0:30 frame and its sidecar are on disk')
+      test.frame(sketch.files, 'the field at 0:30, play camera')
+    } else test.note('no frames from a browser run — see.sketch needs node, use tests.run headless')
 
     const portrait = await test.run('see.sketch', { subject: 'you', name: 'test-battery-kitten' })
-    if (portrait.files) test.ok(portrait.marks['1'] === 'you', 'the subject is mark 1 in its own portrait')
+    if (portrait.files) {
+      test.ok(portrait.marks['1'] === 'you', 'the subject is mark 1 in its own portrait')
+      test.frame(portrait.files, 'the kitten, framed as the subject')
+    }
   }
 }

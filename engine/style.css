@@ -245,6 +245,9 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline:2p
 .u-tlabel { font:9.5px var(--mono); color:var(--ink-3); max-width:100%; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap; }
 .u-tsub { font:9px var(--mono); color:var(--ink-5); }
+.u-picture { margin:6px 10px; display:inline-flex; flex-direction:column; gap:3px; }
+.u-picture img { max-width:340px; max-height:200px; object-fit:contain;
+  image-rendering:pixelated; background:var(--sunk); border:1px solid var(--rule); }
 .u-preview { height:80px; margin:6px 10px; background:var(--void); display:flex;
   align-items:center; justify-content:center; overflow:hidden; }
 /* Pixel art is small on purpose. Fill the box so a 16x16 sprite is legible

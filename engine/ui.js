@@ -271,6 +271,18 @@ export function makeUI(state, redraw) {
       return element
     },
 
+    /**
+     * An image by checkout path, not by asset name — for output a run left
+     * behind (a test's frames under agent-runs/), which no asset URL reaches.
+     * `stamp` busts the browser cache when the same path holds a new picture.
+     */
+    picture(src, o = {}) {
+      const element = h('figure', 'u-picture')
+      append(element, [h('img', null, { src: `/${src}${o.stamp ? `?run=${o.stamp}` : ''}`, alt: o.label || '' })])
+      if (o.label) append(element, [h('figcaption', 'u-tsub', { text: o.label })])
+      return element
+    },
+
     // escape hatch of last resort — its use is a bug report about this file
     raw: node => node
   }
