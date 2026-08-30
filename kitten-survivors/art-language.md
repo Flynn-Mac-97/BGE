@@ -145,9 +145,12 @@ Three things about it that are decisions rather than numbers:
 **Dusk is a colour decision, not a sun-angle one.** A real evening sun sits a few
 degrees off the horizon and throws shadows twenty metres long, and twenty metres
 of shadow across a field full of enemies is twenty metres the player cannot read.
-The key sits at about 34 degrees — short shadows — and every bit of the evening
+The key sits at about 60 degrees — short shadows — and every bit of the evening
 comes from its colour, from the cool violet ambient it is set against, and from
-the sky behind it.
+the sky behind it. It started at 34, and at 34 the hedge and trees just past the
+east fence raked their shadows metres into the play field; anything outside the
+fence is taller than anything inside it, so the fence line sets the floor on how
+steep the key must be.
 
 **The key comes from the right, not from behind the camera.** Aimed away down the
 view axis it lit every face the player sees and threw every shadow directly
