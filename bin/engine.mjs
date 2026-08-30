@@ -53,6 +53,8 @@ drive     select <id...>       set <id> <key> <value>
           spawn <type> ['{"at":[1,2,0]}']     destroy <id>
           run <command-id> [arg]              commands
 run       play    stop    simulate <seconds>    seed <n>
+          script '[["simulate",30],["run","see.describe"]]'
+                               several ops, one world — headless only
 debug     errors    log [n]    watch    eval '<js>'
 friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
                engine friction only — a game defect goes in your report, not here
@@ -202,6 +204,7 @@ const pretty = flags.pretty || (process.stdout.isTTY && !flags.raw)
  * paths instead of carrying the bytes.
  */
 function materialise(value) {
+  if (Array.isArray(value)) return value.map(materialise)
   if (!Array.isArray(value?.__files)) return value
   const root = fileURLToPath(new URL('..', import.meta.url))
   const written = []
@@ -515,6 +518,30 @@ if (flags.headless) {
   if (typeof flags.level === 'string') {
     try { await editor.loadLevel(flags.level) }
     catch (e) { die(1, `no level "${flags.level}" — ${e.message}`) }
+  }
+
+  /**
+   * `script` runs several ops in THIS one world, in order. One op per process
+   * was the rule, and it made "simulate 30, then look" impossible without a
+   * bespoke harness — every measurement task wrote one. A step is a JSON list,
+   * op first: script '[["simulate",30],["run","see.describe",{...}]]'.
+   * A step that throws stops the script and reports which step and why.
+   */
+  if (op === 'script') {
+    const steps = args[0]
+    if (!Array.isArray(steps) || !steps.every(step => Array.isArray(step) && typeof step[0] === 'string')) {
+      die(1, `script takes one JSON array of steps, op first in each:\n  script '[["simulate",30],["run","see.describe"]]'`)
+    }
+    const results = []
+    for (const [stepOp, ...stepArgs] of steps) {
+      const stepVerb = engine[stepOp]
+      if (typeof stepVerb !== 'function') die(1, `step ${results.length + 1}: no op "${stepOp}"`)
+      try { results.push(await stepVerb.apply(engine, stepArgs)) }
+      catch (e) { die(1, `step ${results.length + 1} (${stepOp}): ${String(e?.message || e)}`, e?.stack) }
+    }
+    console.log = original
+    out(results.map(result => result === undefined ? { ok: true } : result))
+    process.exit(0)
   }
 
   const verb = engine[op]
