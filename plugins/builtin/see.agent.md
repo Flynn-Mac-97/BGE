@@ -73,8 +73,8 @@ node bin/engine.mjs destroy rat-0                        # remove what you spawn
   `visibleFraction` divides visible pixels by the PROJECTED BOX, so a shaped
   model reads below 1 with nothing blocking it — compare against its own
   uncrowded baseline, not against 1. Particles, decals and damage numbers are
-  not entities, so the ID buffer cannot name them as blockers yet. — `visibleFraction` 0–1 and `blockedBy`.
-  ID buffer when a renderer answers; rays from the eye otherwise. Optional
+  not entities, so the ID buffer cannot name them as blockers yet. ID buffer
+  when a renderer answers; rays from the eye otherwise. Optional
   `rows`/`columns` set the sample grid (default 5x5).
 - `see.isolate '{"subject":"rat-3"}'` — world and screen boxes, cut,
   region, visible fraction, blockers, velocity, and distance/facing to the
