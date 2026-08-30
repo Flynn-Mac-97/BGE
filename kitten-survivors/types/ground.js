@@ -17,7 +17,7 @@
  * tinted patches the level lays over it, never from its shading.
  */
 export default {
-  about: 'the meadow floor, one slab per placement. Its top face is the y = 0 plane every other position in the level is measured from',
+  about: 'the meadow floor, one slab per placement. Its top face is the y = 0 plane the level is measured from',
   appearance: 'A single flat slab of grass under everything else, with no outline. The quietest surface on screen, and deliberately so.',
   looksWrongWhen: 'entities float above it or sink into it — the slab is not placed at y = -height/2',
 
