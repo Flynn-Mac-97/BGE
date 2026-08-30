@@ -16,10 +16,21 @@
  *   will be full of enemies and a surface with a smooth gradient on it is a
  *   surface the eye keeps checking. Four bands and it is read once and dismissed.
  *
- * The keyline is PALE, not black, and thin. It has to separate a prop from a
- * pale floor without spending the frame's edge budget: `detail-stays-cheap`
- * caps edgeDensity at 0.045, and a black outline round every prop in a sparse
- * field is a large share of that on its own.
+ * The keyline is PALE, not black, and THIN. `detail-stays-cheap` caps
+ * edgeDensity at 0.045 for the whole frame, and every outlined prop spends some
+ * of it. This one is baked geometry, so its width shrinks with distance and at
+ * play zoom it is under a pixel — it separates a prop from the floor in a close
+ * frame and buys nothing at nine metres. At 0.14 across two thousand props the
+ * frame measured 0.046; at 0.08 it measures under 0.04 and no prop reads
+ * differently. Creatures carry a screen-space keyline of constant width, which
+ * is what an outline has to be to survive this camera; this is not that, and it
+ * is not worth widening until it is.
+ *
+ * VALUE. Every placement inside the fence sits between 0.46 and 0.70 luminance,
+ * checked by tools/make-kitten-survivors-meadow.mjs against the texture and tint
+ * it actually names. The horde holds 0.14 to 0.33 and the cat holds 0.92, so a
+ * prop that drifts dark hides a crow and one that drifts bright competes with
+ * the cat.
  *
  * NO COLLIDER. Scenery does not stop anything by default — an entity is only in
  * the 3D physics world when its `collider.box` has three numbers, so leaving it
@@ -40,7 +51,7 @@ export default {
     box: [1, 1, 1],
     material: 'toon',
     steps: 4,
-    outline: 0.14,
+    outline: 0.08,
     outlineColour: '#fffaf0'
   }
 
