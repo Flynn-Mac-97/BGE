@@ -270,12 +270,28 @@ export default {
         }
         context.renderer.draw()
 
+        // An alone frame crops to the subject plus a margin: the point of the
+        // image is the model, and every empty pixel costs the reader tokens.
         const canvas = context.shell.canvas
+        let crop = null
+        const entry = studio && description.visible.find(seen => seen.id === subjectEntity.id)
+        if (entry) {
+          const margin = 0.35
+          const w = Math.min(canvas.width, entry.size[0] / 100 * canvas.width * (1 + margin * 2))
+          const h = Math.min(canvas.height, entry.size[1] / 100 * canvas.height * (1 + margin * 2))
+          crop = {
+            w: Math.max(64, Math.round(w)),
+            h: Math.max(64, Math.round(h))
+          }
+          crop.x = Math.max(0, Math.min(canvas.width - crop.w, Math.round(entry.at[0] / 100 * canvas.width - crop.w / 2)))
+          crop.y = Math.max(0, Math.min(canvas.height - crop.h, Math.round(entry.at[1] / 100 * canvas.height - crop.h / 2)))
+        }
         const copy = document.createElement('canvas')
-        copy.width = canvas.width
-        copy.height = canvas.height
+        copy.width = crop ? crop.w : canvas.width
+        copy.height = crop ? crop.h : canvas.height
         const pen = copy.getContext('2d')
-        pen.drawImage(canvas, 0, 0)
+        if (crop) pen.drawImage(canvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
+        else pen.drawImage(canvas, 0, 0)
 
         for (const other of concealed) other.hidden = false
         if (studio) {
@@ -330,7 +346,7 @@ export default {
           grid: cells
         }
 
-        if (options.marks !== false) {
+        if (options.marks !== false && !crop) {
           const tag = Math.max(14, Math.round(copy.height / 45))
           pen.font = `bold ${tag}px system-ui, sans-serif`
           pen.textAlign = 'center'
