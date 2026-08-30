@@ -1,0 +1,514 @@
+[
+  {
+    "file": "overcooked-2.jpg",
+    "source": "https://store.steampowered.com/app/728880/",
+    "answers": "how does a top-down scene stay readable when a dozen things move at once",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#93eef0",
+          "share": 0.132
+        },
+        {
+          "hex": "#c26939",
+          "share": 0.092
+        },
+        {
+          "hex": "#934c31",
+          "share": 0.047
+        },
+        {
+          "hex": "#b5fbf9",
+          "share": 0.044
+        },
+        {
+          "hex": "#76e4e4",
+          "share": 0.042
+        },
+        {
+          "hex": "#f8bc90",
+          "share": 0.041
+        }
+      ],
+      "value": {
+        "p05": 0.316,
+        "median": 0.667,
+        "p95": 0.927,
+        "spread": 0.611
+      },
+      "saturation": {
+        "median": 0.495,
+        "p95": 0.865
+      },
+      "warmShare": 0.635,
+      "bands": 30,
+      "edgeDensity": 0.036,
+      "haze": {
+        "far": {
+          "saturation": 0.623,
+          "value": 0.599
+        },
+        "near": {
+          "saturation": 0.465,
+          "value": 0.698
+        },
+        "chromaDrop": -0.158,
+        "valueLift": -0.099
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "overcooked-2-b.jpg",
+    "source": "https://store.steampowered.com/app/728880/",
+    "answers": "how bright can a top-down floor be without competing with the actors",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#f26c19",
+          "share": 0.128
+        },
+        {
+          "hex": "#f99137",
+          "share": 0.078
+        },
+        {
+          "hex": "#446246",
+          "share": 0.047
+        },
+        {
+          "hex": "#6f844b",
+          "share": 0.04
+        },
+        {
+          "hex": "#fa8f1d",
+          "share": 0.036
+        },
+        {
+          "hex": "#f47337",
+          "share": 0.032
+        }
+      ],
+      "value": {
+        "p05": 0.209,
+        "median": 0.515,
+        "p95": 0.881,
+        "spread": 0.672
+      },
+      "saturation": {
+        "median": 0.71,
+        "p95": 0.973
+      },
+      "warmShare": 0.842,
+      "bands": 32,
+      "edgeDensity": 0.026,
+      "haze": {
+        "far": {
+          "saturation": 0.755,
+          "value": 0.515
+        },
+        "near": {
+          "saturation": 0.442,
+          "value": 0.477
+        },
+        "chromaDrop": -0.313,
+        "valueLift": 0.038
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "goose-game.jpg",
+    "source": "https://store.steampowered.com/app/837470/",
+    "answers": "how little texture detail a scene needs to still read as a place",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#6f9b78",
+          "share": 0.292
+        },
+        {
+          "hex": "#9e876f",
+          "share": 0.126
+        },
+        {
+          "hex": "#a09f95",
+          "share": 0.118
+        },
+        {
+          "hex": "#927b63",
+          "share": 0.072
+        },
+        {
+          "hex": "#4e5a62",
+          "share": 0.069
+        },
+        {
+          "hex": "#aba89d",
+          "share": 0.053
+        }
+      ],
+      "value": {
+        "p05": 0.304,
+        "median": 0.55,
+        "p95": 0.661,
+        "spread": 0.357
+      },
+      "saturation": {
+        "median": 0.29,
+        "p95": 0.444
+      },
+      "warmShare": 0.372,
+      "bands": 28,
+      "edgeDensity": 0.012,
+      "haze": {
+        "far": {
+          "saturation": 0.296,
+          "value": 0.502
+        },
+        "near": {
+          "saturation": 0.291,
+          "value": 0.565
+        },
+        "chromaDrop": -0.005,
+        "valueLift": -0.063
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "slime-rancher.jpg",
+    "source": "https://store.steampowered.com/app/433340/",
+    "answers": "how saturated can friendly creatures be against a natural ground",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#6f6041",
+          "share": 0.183
+        },
+        {
+          "hex": "#906844",
+          "share": 0.068
+        },
+        {
+          "hex": "#6c4b39",
+          "share": 0.065
+        },
+        {
+          "hex": "#89edf2",
+          "share": 0.053
+        },
+        {
+          "hex": "#ea6d33",
+          "share": 0.046
+        },
+        {
+          "hex": "#974521",
+          "share": 0.046
+        }
+      ],
+      "value": {
+        "p05": 0.215,
+        "median": 0.439,
+        "p95": 0.909,
+        "spread": 0.694
+      },
+      "saturation": {
+        "median": 0.504,
+        "p95": 0.816
+      },
+      "warmShare": 0.81,
+      "bands": 30,
+      "edgeDensity": 0.027,
+      "haze": {
+        "far": {
+          "saturation": 0.46,
+          "value": 0.509
+        },
+        "near": {
+          "saturation": 0.679,
+          "value": 0.437
+        },
+        "chromaDrop": 0.219,
+        "valueLift": 0.072
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "moving-out.jpg",
+    "source": "https://store.steampowered.com/app/996770/",
+    "answers": "how does comic chunky geometry read at small size",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#b3c875",
+          "share": 0.127
+        },
+        {
+          "hex": "#6f4542",
+          "share": 0.103
+        },
+        {
+          "hex": "#ec9f70",
+          "share": 0.048
+        },
+        {
+          "hex": "#69696d",
+          "share": 0.048
+        },
+        {
+          "hex": "#6c2047",
+          "share": 0.046
+        },
+        {
+          "hex": "#a3ba6c",
+          "share": 0.045
+        }
+      ],
+      "value": {
+        "p05": 0.13,
+        "median": 0.451,
+        "p95": 0.763,
+        "spread": 0.633
+      },
+      "saturation": {
+        "median": 0.43,
+        "p95": 0.74
+      },
+      "warmShare": 0.739,
+      "bands": 31,
+      "edgeDensity": 0.039,
+      "haze": {
+        "far": {
+          "saturation": 0.431,
+          "value": 0.434
+        },
+        "near": {
+          "saturation": 0.432,
+          "value": 0.623
+        },
+        "chromaDrop": 0.001,
+        "valueLift": -0.189
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "a-short-hike.jpg",
+    "source": "https://store.steampowered.com/app/1055540/",
+    "answers": "how few colours a whole outdoor scene can be made of",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#bbb93d",
+          "share": 0.153
+        },
+        {
+          "hex": "#bd8b35",
+          "share": 0.087
+        },
+        {
+          "hex": "#9a8b3a",
+          "share": 0.087
+        },
+        {
+          "hex": "#b4968c",
+          "share": 0.08
+        },
+        {
+          "hex": "#c36e34",
+          "share": 0.077
+        },
+        {
+          "hex": "#676c36",
+          "share": 0.07
+        }
+      ],
+      "value": {
+        "p05": 0.328,
+        "median": 0.546,
+        "p95": 0.762,
+        "spread": 0.434
+      },
+      "saturation": {
+        "median": 0.631,
+        "p95": 0.773
+      },
+      "warmShare": 0.971,
+      "bands": 28,
+      "edgeDensity": 0,
+      "haze": {
+        "far": {
+          "saturation": 0.495,
+          "value": 0.536
+        },
+        "near": {
+          "saturation": 0.665,
+          "value": 0.573
+        },
+        "chromaDrop": 0.17,
+        "valueLift": -0.037
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "pikuniku.jpg",
+    "source": "https://store.steampowered.com/app/572890/",
+    "answers": "how far can flat bold shapes be pushed and stay a world",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1728,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#acd9f3",
+          "share": 0.784
+        },
+        {
+          "hex": "#57a341",
+          "share": 0.109
+        },
+        {
+          "hex": "#44b65b",
+          "share": 0.023
+        },
+        {
+          "hex": "#8b3d3f",
+          "share": 0.015
+        },
+        {
+          "hex": "#7a7b7a",
+          "share": 0.01
+        },
+        {
+          "hex": "#a7daf2",
+          "share": 0.007
+        }
+      ],
+      "value": {
+        "p05": 0.547,
+        "median": 0.821,
+        "p95": 0.821,
+        "spread": 0.274
+      },
+      "saturation": {
+        "median": 0.292,
+        "p95": 0.607
+      },
+      "warmShare": 0.041,
+      "bands": 32,
+      "edgeDensity": 0.01,
+      "haze": {
+        "far": {
+          "saturation": 0.292,
+          "value": 0.821
+        },
+        "near": {
+          "saturation": 0.292,
+          "value": 0.821
+        },
+        "chromaDrop": 0,
+        "valueLift": 0
+      }
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "donut-county.jpg",
+    "source": "https://store.steampowered.com/app/702670/",
+    "answers": "how does a flat top-down world separate objects from ground",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#c9be5b",
+          "share": 0.266
+        },
+        {
+          "hex": "#4e5b3f",
+          "share": 0.102
+        },
+        {
+          "hex": "#5fa4c3",
+          "share": 0.098
+        },
+        {
+          "hex": "#424a33",
+          "share": 0.068
+        },
+        {
+          "hex": "#979fa2",
+          "share": 0.066
+        },
+        {
+          "hex": "#bbbfbb",
+          "share": 0.059
+        }
+      ],
+      "value": {
+        "p05": 0.279,
+        "median": 0.64,
+        "p95": 0.882,
+        "spread": 0.603
+      },
+      "saturation": {
+        "median": 0.371,
+        "p95": 0.567
+      },
+      "warmShare": 0.807,
+      "bands": 32,
+      "edgeDensity": 0.024,
+      "haze": {
+        "far": {
+          "saturation": 0.309,
+          "value": 0.405
+        },
+        "near": {
+          "saturation": 0.513,
+          "value": 0.629
+        },
+        "chromaDrop": 0.204,
+        "valueLift": -0.224
+      }
+    },
+    "measuredBy": "browser canvas"
+  }
+]

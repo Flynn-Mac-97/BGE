@@ -1,0 +1,262 @@
+[
+  {
+    "file": "cult-of-the-lamb.jpg",
+    "source": "https://store.steampowered.com/app/1313140/",
+    "answers": "how a crowd of hits stays separable from the crowd being hit",
+    "facts": {
+      "pixels": 207360,
+      "size": [
+        1920,
+        1080
+      ],
+      "palette": [
+        {
+          "hex": "#08040a",
+          "share": 0.674
+        },
+        {
+          "hex": "#42443a",
+          "share": 0.067
+        },
+        {
+          "hex": "#3b1318",
+          "share": 0.047
+        },
+        {
+          "hex": "#686747",
+          "share": 0.042
+        },
+        {
+          "hex": "#96925a",
+          "share": 0.021
+        },
+        {
+          "hex": "#61483d",
+          "share": 0.016
+        }
+      ],
+      "value": {
+        "p05": 0.001,
+        "median": 0.029,
+        "p95": 0.535,
+        "spread": 0.534
+      },
+      "saturation": {
+        "median": 0.73,
+        "p95": 1
+      },
+      "warmShare": 0.4,
+      "bands": 32,
+      "edgeDensity": 0.057
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "holocure.jpg",
+    "source": "https://store.steampowered.com/app/2420510/",
+    "answers": "how much of the screen can be effect before the player is lost",
+    "facts": {
+      "pixels": 230400,
+      "size": [
+        1280,
+        720
+      ],
+      "palette": [
+        {
+          "hex": "#898d9d",
+          "share": 0.201
+        },
+        {
+          "hex": "#edeeef",
+          "share": 0.188
+        },
+        {
+          "hex": "#6f7588",
+          "share": 0.13
+        },
+        {
+          "hex": "#999eb4",
+          "share": 0.114
+        },
+        {
+          "hex": "#656978",
+          "share": 0.088
+        },
+        {
+          "hex": "#c0c6df",
+          "share": 0.048
+        }
+      ],
+      "value": {
+        "p05": 0.31,
+        "median": 0.574,
+        "p95": 0.949,
+        "spread": 0.639
+      },
+      "saturation": {
+        "median": 0.129,
+        "p95": 0.459
+      },
+      "warmShare": 0.057,
+      "bands": 32,
+      "edgeDensity": 0.009
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "20-minutes-till-dawn.jpg",
+    "source": "https://store.steampowered.com/app/1966900/",
+    "answers": "how bright is a projectile against its own arena",
+    "facts": {
+      "pixels": 207647,
+      "size": [
+        1725,
+        963
+      ],
+      "palette": [
+        {
+          "hex": "#252130",
+          "share": 0.598
+        },
+        {
+          "hex": "#283547",
+          "share": 0.204
+        },
+        {
+          "hex": "#f2d7c1",
+          "share": 0.048
+        },
+        {
+          "hex": "#5d6c62",
+          "share": 0.026
+        },
+        {
+          "hex": "#363e45",
+          "share": 0.023
+        },
+        {
+          "hex": "#232027",
+          "share": 0.02
+        }
+      ],
+      "value": {
+        "p05": 0.134,
+        "median": 0.137,
+        "p95": 0.849,
+        "spread": 0.715
+      },
+      "saturation": {
+        "median": 0.312,
+        "p95": 0.444
+      },
+      "warmShare": 0.096,
+      "bands": 27,
+      "edgeDensity": 0.035
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "vampire-survivors.jpg",
+    "source": "https://store.steampowered.com/app/1794680/",
+    "answers": "what the genre does when a hundred things are on screen",
+    "facts": {
+      "pixels": 204800,
+      "size": [
+        1280,
+        800
+      ],
+      "palette": [
+        {
+          "hex": "#6e4933",
+          "share": 0.327
+        },
+        {
+          "hex": "#8c6346",
+          "share": 0.113
+        },
+        {
+          "hex": "#684026",
+          "share": 0.108
+        },
+        {
+          "hex": "#100a08",
+          "share": 0.093
+        },
+        {
+          "hex": "#3d221c",
+          "share": 0.076
+        },
+        {
+          "hex": "#755b3c",
+          "share": 0.067
+        }
+      ],
+      "value": {
+        "p05": 0.028,
+        "median": 0.31,
+        "p95": 0.464,
+        "spread": 0.436
+      },
+      "saturation": {
+        "median": 0.533,
+        "p95": 0.901
+      },
+      "warmShare": 0.932,
+      "bands": 32,
+      "edgeDensity": 0.19
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "brawl-stars-combat.png",
+    "source": "https://apps.apple.com/us/app/id1229016807",
+    "answers": "how a bright cartoon mobile game draws combat a child can follow",
+    "facts": {
+      "pixels": 205715,
+      "size": [
+        1600,
+        900
+      ],
+      "palette": [
+        {
+          "hex": "#6b31f8",
+          "share": 0.162
+        },
+        {
+          "hex": "#0e1a3f",
+          "share": 0.099
+        },
+        {
+          "hex": "#9e5a72",
+          "share": 0.086
+        },
+        {
+          "hex": "#fdfcfc",
+          "share": 0.062
+        },
+        {
+          "hex": "#020810",
+          "share": 0.058
+        },
+        {
+          "hex": "#351b9b",
+          "share": 0.052
+        }
+      ],
+      "value": {
+        "p05": 0.062,
+        "median": 0.3,
+        "p95": 1,
+        "spread": 0.938
+      },
+      "saturation": {
+        "median": 0.8,
+        "p95": 1
+      },
+      "warmShare": 0.232,
+      "bands": 32,
+      "edgeDensity": 0.05
+    },
+    "measuredBy": "browser canvas"
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "hit-is-the-brightest-thing",
+    "says": "A frame with a hit in it contains something near white.",
+    "why": "Those three measure 0.949, 0.849 and 1.000. A hit is read as a flash, and a flash that is not the brightest thing on screen is not a flash. This is the one thing allowed to outshine the cat.",
+    "check": "measured",
+    "field": "value.p95",
+    "wants": {
+      "min": 0.85
+    },
+    "enforcedBy": null,
+    "from": [
+      "holocure.jpg",
+      "20-minutes-till-dawn.jpg",
+      "brawl-stars-combat.png"
+    ]
+  },
+  {
+    "id": "effects-own-full-saturation",
+    "says": "Effects take the full chroma nothing else is allowed.",
+    "why": "Those measure 1.000, 0.901 and 1.000. The world sits low in saturation on purpose, so full chroma is a channel nothing else uses and an effect is separable by colour alone.",
+    "check": "measured",
+    "field": "saturation.p95",
+    "wants": {
+      "min": 0.88
+    },
+    "enforcedBy": null,
+    "from": [
+      "cult-of-the-lamb.jpg",
+      "vampire-survivors.jpg",
+      "brawl-stars-combat.png"
+    ]
+  },
+  {
+    "id": "effects-never-become-fog",
+    "says": "Effects stay sparse. The screen never becomes noise.",
+    "why": "Those four run 0.009 to 0.057. Vampire Survivors measures 0.190 and is the failure this bound exists to stop: past that the frame is noise and the player cannot find their own character. It is in the shelf as the negative case and is deliberately not cited here.",
+    "check": "measured",
+    "field": "edgeDensity",
+    "wants": {
+      "max": 0.09
+    },
+    "enforcedBy": null,
+    "from": [
+      "holocure.jpg",
+      "20-minutes-till-dawn.jpg",
+      "brawl-stars-combat.png",
+      "cult-of-the-lamb.jpg"
+    ]
+  },
+  {
+    "id": "no-effect-below-a-third-of-a-metre",
+    "says": "No effect is smaller than 0.3 m across.",
+    "why": "The cat is 0.8 m and about 5% of the frame, so 1% of the frame is roughly 0.16 m. On a phone about 1080 px on its short edge, a 0.3 m effect is near 20 px. Below that it is a coloured pixel nobody can identify, and it costs the same to draw.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "effect-reads-in-three-frames",
+    "says": "An effect is recognisable in the three frames it exists for.",
+    "why": "An effect lives under half a second. Anything whose shape only resolves over a longer animation is decoration the player never sees.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": [
+      "brawl-stars-combat.png",
+      "holocure.jpg"
+    ]
+  }
+]

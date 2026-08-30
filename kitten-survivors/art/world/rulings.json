@@ -1,0 +1,268 @@
+[
+  {
+    "id": "bright-day",
+    "says": "The frame is a bright day. Something in it is nearly white.",
+    "why": "Every one of the eight references clears 0.66 and most sit near 0.9. A dusk frame gives a phone screen nothing to hold, and a child reads a dark picture as a picture of nothing.",
+    "check": "measured",
+    "field": "value.p95",
+    "wants": {
+      "min": 0.66
+    },
+    "from": [
+      "overcooked-2.jpg",
+      "overcooked-2-b.jpg",
+      "goose-game.jpg",
+      "slime-rancher.jpg",
+      "moving-out.jpg",
+      "a-short-hike.jpg",
+      "pikuniku.jpg",
+      "donut-county.jpg"
+    ]
+  },
+  {
+    "id": "real-tonal-range",
+    "says": "The picture uses a real tonal range, never one flat band.",
+    "why": "The narrowest reference is 0.274 and the widest 0.694. Below that the whole screen is one value and nothing separates from anything.",
+    "check": "measured",
+    "field": "value.spread",
+    "wants": {
+      "min": 0.27
+    },
+    "from": [
+      "overcooked-2.jpg",
+      "overcooked-2-b.jpg",
+      "goose-game.jpg",
+      "slime-rancher.jpg",
+      "moving-out.jpg",
+      "a-short-hike.jpg",
+      "pikuniku.jpg",
+      "donut-county.jpg"
+    ]
+  },
+  {
+    "id": "ground-not-gloomy",
+    "says": "The middle of the picture sits at mid tone or above.",
+    "why": "The darkest reference medians 0.439. A ground darker than its actors inverts the game: the player hunts the floor instead of reading the crowd.",
+    "check": "measured",
+    "field": "value.median",
+    "wants": {
+      "min": 0.43
+    },
+    "from": [
+      "overcooked-2.jpg",
+      "overcooked-2-b.jpg",
+      "goose-game.jpg",
+      "slime-rancher.jpg",
+      "moving-out.jpg",
+      "a-short-hike.jpg",
+      "pikuniku.jpg",
+      "donut-county.jpg"
+    ]
+  },
+  {
+    "id": "warm-daylight",
+    "says": "The light is warm.",
+    "why": "Seven of eight references are warm, from 0.37 to 0.97. Pikuniku is the deliberate cool exception and is not cited here. Warm light is what makes a scene read as friendly rather than as night.",
+    "check": "measured",
+    "field": "warmShare",
+    "wants": {
+      "min": 0.35
+    },
+    "from": [
+      "overcooked-2.jpg",
+      "overcooked-2-b.jpg",
+      "goose-game.jpg",
+      "slime-rancher.jpg",
+      "moving-out.jpg",
+      "a-short-hike.jpg",
+      "donut-county.jpg"
+    ]
+  },
+  {
+    "id": "detail-stays-cheap",
+    "says": "Surfaces stay plain. Detail is spent on silhouette, never on texture.",
+    "why": "Every reference sits under 0.04 and A Short Hike measures 0.000 — a whole outdoor scene with no surface detail at all. At phone size texture is noise. This is a guard: nobody may answer a brightness failure by adding grain.",
+    "check": "measured",
+    "field": "edgeDensity",
+    "wants": {
+      "max": 0.045
+    },
+    "from": [
+      "a-short-hike.jpg",
+      "pikuniku.jpg",
+      "goose-game.jpg",
+      "donut-county.jpg"
+    ]
+  },
+  {
+    "id": "keyline",
+    "says": "Every object carries a pale keyline, so it separates from whatever is behind it.",
+    "why": "The game is read as a crowd on a five centimetre screen. An outline is the only thing that guarantees figure from ground when a hundred warm shapes overlap a warm floor. The toon material already takes an outline width, so this costs one number per material.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "from": [
+      "pikuniku.jpg",
+      "donut-county.jpg",
+      "goose-game.jpg"
+    ]
+  },
+  {
+    "id": "cat-is-found-instantly",
+    "says": "A player finds the cat in under a second, with a hundred enemies on screen.",
+    "why": "This is the whole game. If it fails, nothing else in this document matters.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "from": [
+      "overcooked-2.jpg",
+      "moving-out.jpg"
+    ]
+  },
+  {
+    "id": "shapes-are-funny",
+    "says": "Silhouettes are comic: rounded, top-heavy, exaggerated. Nothing is anatomically serious.",
+    "why": "The game is for children and the tone is a joke about being swarmed by rats. A correctly proportioned animal reads as a different, more serious game.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "from": [
+      "pikuniku.jpg",
+      "goose-game.jpg",
+      "slime-rancher.jpg"
+    ]
+  },
+  {
+    "id": "no-fine-print",
+    "says": "Nothing a player must see is smaller than the cat head at phone size.",
+    "why": "Portrait phone, arm length. Anything below that size is decoration and must not carry information.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "from": [
+      "donut-county.jpg",
+      "a-short-hike.jpg"
+    ]
+  },
+  {
+    "id": "silhouette-ceiling",
+    "says": "Inside the fence, nothing the arena draws is taller than 0.5 m.",
+    "why": "The camera looks down at about 60 degrees, so a thing of height h hides roughly 2h of ground behind it. Half a metre hides one metre, which is less than one enemy. A 1.4 m fence post hides nearly three metres — three enemies the player never saw coming, in a game whose whole skill is reading the crowd. Every metre of height belongs outside the fence.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": "tools/make-kitten-survivors-meadow.mjs, which fails its own build on a tall prop inside the fence",
+    "from": []
+  },
+  {
+    "id": "landmarks-are-flat",
+    "says": "Landmarks are drawn in the floor and have no height at all.",
+    "why": "Follows from the silhouette ceiling. A player must know where they are while looking at a hundred enemies, and the usual answer — a tower, a statue, a great rock — is the one thing this camera cannot afford. A mown clearing, a ring of set stones and a cart track read from anywhere and hide nothing.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "arena-has-no-colliders",
+    "says": "Nothing in the play field collides. The only solids are the ground, the boundary banks and the gates.",
+    "why": "Every solid thing inside an arena is somewhere the crowd can pin the player. It also means pathing never has to avoid scenery.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "cat-is-the-ruler",
+    "says": "The cat is 0.8 m long and 0.45 m tall, and every other size is read against it. One unit is one metre and the top of the ground is y = 0.",
+    "why": "A shared ruler is what stops four people building at four scales. `at` is the centre of a box, so a thing of height h standing on the ground is placed at y = h / 2.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "everything-is-boxes",
+    "says": "The renderer draws box, quad and GLB, and turns an entity about Y only. Anything that must tip or roll is a model, not a placement.",
+    "why": "There is no cylinder, cone or sphere and no pitch or roll in the level format. So a tree is a trunk box and three canopy boxes, a slope is a stair of boxes, and an irregular edge is made by overlapping rectangles until no single outline shows.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": "the level format itself — anything else fails to load",
+    "from": []
+  },
+  {
+    "id": "never-tint-a-type",
+    "says": "Never put a tint on a type.",
+    "why": "A placement mesh merges into the type key by key, so a tint on the type is not a fallback — it multiplies into every textured placement that did not override it, and repaints the whole level.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "key-comes-from-the-side",
+    "says": "The key light comes from the side, never down the view axis.",
+    "why": "A key aimed away down the view axis lights every face the camera sees and throws every shadow directly behind the thing that cast it: a full extra shadow pass for nothing visible. From the side each shadow lies across the ground beside its prop, which is the only cue that a tuft stands up and an earth patch lies flat, and it puts the cat shadow beside the cat so the cat reads as being ON the field rather than drawn over it.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "short-shadows",
+    "says": "The key sits at about 60 degrees above the horizon or steeper.",
+    "why": "A sun a few degrees off the horizon throws shadows twenty metres long, and twenty metres of shadow across a field full of enemies is twenty metres the player cannot read. Everything outside the fence is taller than anything inside it, so the fence line sets the floor on how steep the key must be.",
+    "check": "derived",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
+  },
+  {
+    "id": "key-is-nearly-white",
+    "says": "The key light is nearly white. Warmth comes from the sky, not the lamp.",
+    "why": "A strongly coloured key at high intensity pushes every surface hue apart instead of holding the picture together, and returns straw as orange and earth as red.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": [
+      "a-short-hike.jpg",
+      "overcooked-2.jpg"
+    ]
+  },
+  {
+    "id": "arena-sits-under-the-actors",
+    "says": "The arena stays below the actors in saturation, so the most saturated thing on screen is always something the player must react to.",
+    "why": "Bright is not the same as loud. The world direction raises the value of the ground; this keeps its chroma down so raising the light does not turn the floor into a competitor. One frame cannot measure it without knowing which pixels are ground, so it is judged.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": [
+      "overcooked-2.jpg",
+      "slime-rancher.jpg",
+      "donut-county.jpg"
+    ]
+  },
+  {
+    "id": "ground-reads-as-one-surface",
+    "says": "The ground reads as one surface. Tonal range comes from light and standing objects, never from painted floor patches.",
+    "why": "value.spread can be cleared two ways. Every reference clears it from light and from objects standing up; a patchwork of clashing floor tints clears the same number and reads as sheets of paper thrown on a lawn. The measured ruling cannot tell the two apart, so this one is the half that can only be looked at.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": [
+      "a-short-hike.jpg",
+      "goose-game.jpg",
+      "overcooked-2.jpg"
+    ]
+  }
+]

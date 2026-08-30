@@ -1,0 +1,10 @@
+{
+  "subject": "effects",
+  "reads": "A weapon firing, a rat dying and a gem landing must each be legible in a frame holding a hundred enemies. Effects are the whole feedback loop: a hit nobody sees is a game with no combat.",
+  "camera": "Same top-down 60 degree view as the world. An effect is 0.2 to 1 m across and lives under half a second, so it is a few dozen pixels on a phone for a few frames.",
+  "questions": [
+    "How does an effect stay separable from the actors it is drawn over?",
+    "How bright must a hit be to read against a bright ground?",
+    "How long can an effect last before a hundred of them become fog?"
+  ]
+}

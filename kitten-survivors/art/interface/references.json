@@ -1,0 +1,210 @@
+[
+  {
+    "file": "archero.jpg",
+    "source": "https://apps.apple.com/us/app/id1453651052",
+    "answers": "how a portrait mobile action game lays a HUD over play",
+    "facts": {
+      "pixels": 202500,
+      "size": [
+        675,
+        1200
+      ],
+      "palette": [
+        {
+          "hex": "#09154a",
+          "share": 0.104
+        },
+        {
+          "hex": "#ebf1ee",
+          "share": 0.075
+        },
+        {
+          "hex": "#1270f0",
+          "share": 0.065
+        },
+        {
+          "hex": "#122261",
+          "share": 0.063
+        },
+        {
+          "hex": "#c3e5f0",
+          "share": 0.058
+        },
+        {
+          "hex": "#1c3473",
+          "share": 0.05
+        }
+      ],
+      "value": {
+        "p05": 0.083,
+        "median": 0.426,
+        "p95": 0.932,
+        "spread": 0.849
+      },
+      "saturation": {
+        "median": 0.603,
+        "p95": 0.926
+      },
+      "warmShare": 0.141,
+      "bands": 32,
+      "edgeDensity": 0.03
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "crossy-road.png",
+    "source": "https://apps.apple.com/us/app/id924373886",
+    "answers": "how little HUD a mobile game can get away with",
+    "facts": {
+      "pixels": 202500,
+      "size": [
+        675,
+        1200
+      ],
+      "palette": [
+        {
+          "hex": "#33934c",
+          "share": 0.202
+        },
+        {
+          "hex": "#664936",
+          "share": 0.17
+        },
+        {
+          "hex": "#21693d",
+          "share": 0.144
+        },
+        {
+          "hex": "#725a3f",
+          "share": 0.074
+        },
+        {
+          "hex": "#184a35",
+          "share": 0.065
+        },
+        {
+          "hex": "#483725",
+          "share": 0.05
+        }
+      ],
+      "value": {
+        "p05": 0.177,
+        "median": 0.346,
+        "p95": 0.662,
+        "spread": 0.485
+      },
+      "saturation": {
+        "median": 0.626,
+        "p95": 0.735
+      },
+      "warmShare": 0.4,
+      "bands": 32,
+      "edgeDensity": 0.028
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "angry-birds-2.png",
+    "source": "https://apps.apple.com/us/app/id880047117",
+    "answers": "how big a button a child hits without looking",
+    "facts": {
+      "pixels": 205715,
+      "size": [
+        1600,
+        900
+      ],
+      "palette": [
+        {
+          "hex": "#31cdfd",
+          "share": 0.087
+        },
+        {
+          "hex": "#f0f4e9",
+          "share": 0.054
+        },
+        {
+          "hex": "#8e9236",
+          "share": 0.047
+        },
+        {
+          "hex": "#709462",
+          "share": 0.04
+        },
+        {
+          "hex": "#6e8c3f",
+          "share": 0.037
+        },
+        {
+          "hex": "#6e7735",
+          "share": 0.035
+        }
+      ],
+      "value": {
+        "p05": 0.177,
+        "median": 0.545,
+        "p95": 0.92,
+        "spread": 0.743
+      },
+      "saturation": {
+        "median": 0.513,
+        "p95": 0.888
+      },
+      "warmShare": 0.398,
+      "bands": 32,
+      "edgeDensity": 0.028
+    },
+    "measuredBy": "browser canvas"
+  },
+  {
+    "file": "subway-surfers.jpg",
+    "source": "https://apps.apple.com/us/app/id512939461",
+    "answers": "how a HUD stays legible over a bright moving world",
+    "facts": {
+      "pixels": 221600,
+      "size": [
+        554,
+        1200
+      ],
+      "palette": [
+        {
+          "hex": "#04b8f6",
+          "share": 0.115
+        },
+        {
+          "hex": "#c1f4f9",
+          "share": 0.053
+        },
+        {
+          "hex": "#6cedff",
+          "share": 0.047
+        },
+        {
+          "hex": "#edf2ef",
+          "share": 0.044
+        },
+        {
+          "hex": "#94f6fd",
+          "share": 0.041
+        },
+        {
+          "hex": "#6c0e17",
+          "share": 0.035
+        }
+      ],
+      "value": {
+        "p05": 0.125,
+        "median": 0.578,
+        "p95": 0.94,
+        "spread": 0.815
+      },
+      "saturation": {
+        "median": 0.539,
+        "p95": 1
+      },
+      "warmShare": 0.476,
+      "bands": 32,
+      "edgeDensity": 0.057
+    },
+    "measuredBy": "browser canvas"
+  }
+]

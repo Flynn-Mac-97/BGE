@@ -8,7 +8,7 @@
  * THE TOP OF THIS SLAB IS y = 0 WHEN IT IS PLACED AT y = -HEIGHT/2, and the
  * meadow places it exactly there. Every other number in the level is measured
  * from that plane, so a prop of height h sits at y = h/2 and nobody has to carry
- * an offset around. See kitten-survivors/art-language.md.
+ * an offset around. See kitten-survivors/art/world/bible.md.
  *
  * Toon rather than lambert, four bands, and no outline. Under one directional
  * key light a flat plane of toon shading is one flat value, which is the point:

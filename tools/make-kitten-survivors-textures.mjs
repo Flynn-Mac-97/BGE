@@ -71,10 +71,14 @@ function grass(image, random) {
   const patchwork = fractalNoise(random, 4, 4, 3)
   const drift = fractalNoise(random, 2, 2, 2)
 
-  const deep = colour('#2f6b30')
-  const base = colour('#3c8138')
-  const bright = colour('#4d9540')
-  const dry = colour('#7d8f3e')
+  // Yellow-greens, all under 90 degrees of hue. The first set sat at 111 to 117,
+  // which is the blue side of green: lit by a warm key it still measured
+  // warmShare 0.05 against the eight references' 0.37 to 0.97, because a
+  // blue-green field cannot read as sunlit whatever the lamp does.
+  const deep = colour('#557a2e')
+  const base = colour('#6b9437')
+  const bright = colour('#8ab04a')
+  const dry = colour('#c2b862')
 
   paint(image, (x, y, u, v) => {
     const level = quantise(patchwork(u, v) * 0.75 + drift(u, v) * 0.25, 4)
@@ -106,9 +110,9 @@ function grass(image, random) {
 /** Cut grass: the same field, lighter, with the mower's stripes still in it. */
 function grassMown(image, random) {
   const patchwork = fractalNoise(random, 4, 4, 3)
-  const base = colour('#4f9a41')
-  const bright = colour('#63ac4c')
-  const deep = colour('#3f8437')
+  const base = colour('#86ae48')
+  const bright = colour('#9dc158')
+  const deep = colour('#6f9a3e')
 
   paint(image, (x, y, u, v) => {
     const level = quantise(patchwork(u, v), 3)
@@ -130,9 +134,9 @@ function grassMown(image, random) {
 /** Late-summer straw: where the field has gone over, and the warm note in it. */
 function grassDry(image, random) {
   const patchwork = fractalNoise(random, 5, 5, 3)
-  const straw = colour('#9a9a4a')
-  const pale = colour('#a8b862')
-  const shade = colour('#6e7838')
+  const straw = colour('#c8c46a')
+  const pale = colour('#d6dc90')
+  const shade = colour('#93a052')
   const green = colour('#5d8038')
 
   paint(image, (x, y, u, v) => {

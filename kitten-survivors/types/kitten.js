@@ -35,14 +35,18 @@ const HEIGHT = 0.45
 const LENGTH = 0.8
 
 /**
- * A ginger tabby. The colours are painted into the model's materials, and the
- * markings that matter are the ones on TOP, because the camera looks down: the
- * stripes across the back, a face a shade lighter than the body, dark ear
- * backs, and a pale tip on the tail held high. From nine metres back they are
- * most of what you see of the kitten, and without them it is one brown lump.
- * This constant only paints the stand-in box while the file loads.
+ * A ginger tabby. The colours are painted into the model's materials by
+ * `tools/blender/make-kitten-survivors-kitten.py`, which builds the model and
+ * is the file to edit to change it.
+ *
+ * The markings that matter are the ones on TOP, because the camera looks down:
+ * five dark bars across the back and down the flank, a ringed tail held
+ * upright, dark ear backs, a face a shade lighter than the body, and cream
+ * paws. From nine metres back they are most of what you see of the kitten, and
+ * without them it is one brown lump. This constant only paints the stand-in box
+ * while the file loads.
  */
-const FUR = '#e8a55c'
+const FUR = '#e0a05a'
 
 /** How long the body takes to come round to a new heading, in seconds. */
 const TURN_EASE = 0.05

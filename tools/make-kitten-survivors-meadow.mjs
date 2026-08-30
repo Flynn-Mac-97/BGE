@@ -22,9 +22,9 @@
  * byte for byte and a re-run is a reviewable diff rather than four hundred
  * changed lines.
  *
- * The art language this builds to is written down in
- * kitten-survivors/art-language.md. The two rules that shape almost every number
- * below:
+ * The direction this builds to is kitten-survivors/art/world/bible.md, generated
+ * by the Art Direction plugin. `art.check` tests a frame of this meadow against
+ * it. The two rules that shape almost every number below:
  *
  *   The top of the ground is y = 0, and a prop of height h is placed at y = h/2.
  *   Inside the fence nothing the arena draws is taller than 0.5 m.
@@ -157,12 +157,21 @@ function ground(family, { x, z, width, depth, texture, thickness = 0.06, yaw = n
  * the pale end of this list is `grass-mown` and `grass-dry` rather than a tint,
  * and why every entry is written with the answer beside it.
  *
- * Every one of them is held close to the field's own #3d7e37. The first version
- * of this was untinted straw and untinted earth, and from above it read as
- * sheets of yellow and red paper thrown on a lawn: a rotated rectangle is only
- * ever hidden by being nearly the colour of what it lies on. Colour that a
- * player has to look at belongs to enemies and pickups; the ground gets the
- * quiet half of the palette and nothing more.
+ * EVERY PATCH IS HELD CLOSE TO THE FIELD. A rotated rectangle on a floor is only
+ * ever hidden by being nearly the colour of what it lies on; spread the tints out
+ * and the field reads as sheets of paper thrown on a lawn.
+ *
+ * That is worth stating against a number, because the number does not say it.
+ * `art/world/bible.md` asks for value.spread of at least 0.27, and a frame can
+ * clear it two ways: from light and standing objects, which is how all eight
+ * references do it, or from a patchwork of clashing floor colour, which passes
+ * the same check and looks broken. Take the range from the light. The ruling
+ * `ground-reads-as-one-surface` is the judged half of this and exists because
+ * this generator once did the other thing.
+ *
+ * A tint MULTIPLIES its texture, so it can only ever darken or warm one — a
+ * patch lighter than the field has to come from a lighter texture, which is why
+ * the pale end is `grass-mown` and `grass-dry` rather than a tint.
  */
 const GROUND_PATCHES = [
   { texture: GRASS, tint: '#eaf0d8', weight: 6 },   // the field, a touch warmer
@@ -673,14 +682,16 @@ for (let index = 0; index < 7; index++) {
 /**
  * One key, one fill, one ambient, and three small warm sources.
  *
- * DUSK HERE IS A COLOUR DECISION, NOT A SUN-ANGLE ONE. A real evening sun sits a
- * few degrees off the horizon and throws shadows twenty metres long, and twenty
- * metres of shadow across a field full of enemies is twenty metres the player
- * cannot read. So the key sits at about sixty degrees — short shadows — and
- * every bit of the evening comes from its colour, from the cool violet ambient
- * it is set against, and from the sky behind it. It began at thirty-four
- * degrees, and at thirty-four the hedge and trees just past the east fence
- * raked their shadows metres into the play field.
+ * BRIGHT WARM DAY. `art/world/bible.md` sets four measured bounds this block has
+ * to clear: value.p95 at least 0.66, value.median at least 0.43, value.spread at
+ * least 0.27 and warmShare at least 0.35. Eight references agree on all four and
+ * none of them is dark. Run `art.check` after changing anything here.
+ *
+ * The key sits at about sixty degrees, which is a derived ruling and not a look:
+ * a sun a few degrees off the horizon throws shadows twenty metres long, and
+ * twenty metres of shadow across a field full of enemies is twenty metres the
+ * player cannot read. At thirty-four degrees the hedge and trees past the east
+ * fence raked their shadows metres into the play field.
  *
  * The key is a light ENTITY rather than `world.sun`, because only a light entity
  * can cast a shadow, and the shadow is what tells the player which things are
@@ -706,7 +717,7 @@ for (let index = 0; index < 7; index++) {
 // over a corner it clipped the far half and those shadows simply vanished.
 entities.push({
   id: 'key-light', type: 'light', at: [0, 40, 0],
-  properties: { kind: 'directional', color: '#ffe0bc', intensity: 1.35, direction: [-0.47, -0.87, -0.17], range: 96, shadow: true }
+  properties: { kind: 'directional', color: '#fff6e6', intensity: 2.85, direction: [-0.47, -0.87, -0.17], range: 96, shadow: true }
 })
 entities.push({
   id: 'barn-glow', type: 'light', at: [BARN_X - 3.4, 4.2, BARN_Z + 7],
@@ -729,10 +740,10 @@ entities.push({ id: 'you', type: 'kitten', at: [0, 0.225, 0] })
 // ------------------------------------------------------------------- the level
 const level = {
   about: [
-    'A meadow at dusk, and the arena of Kitten Survivors.',
+    'A meadow on a bright day, and the arena of Kitten Survivors.',
     'GENERATED — run `node tools/make-kitten-survivors-meadow.mjs` to rebuild it; edits made here are lost on the next run.',
     'The top of the ground is y = 0. Inside the fence at 46 nothing the arena draws is taller than 0.5 m, so nothing hides the crowd.',
-    'The art language every other lane matches is kitten-survivors/art-language.md.',
+    'The direction every other lane matches is kitten-survivors/art/world/bible.md.',
     'Enemies are not placed here: a survivor\'s crowd arrives on a clock, not out of a level file.'
   ].join(' '),
   seed: 1,
@@ -759,11 +770,20 @@ const level = {
     zoom: 32
   },
   world: {
-    sky: '#2a2450',
-    skyTexture: 'meadow/sky-dusk.png',
-    fog: [0.011, '#4a3d68'],
-    ambient: { intensity: 0.55, color: '#8b93cc' },
-    sun: { direction: [0.55, -0.45, 0.7], intensity: 0.28, color: '#9fb0dd' },
+    // Flat sky, no panorama. A painted dusk panorama was the darkest thing in
+    // frame and a phone sees the top third of it; one bright colour costs
+    // nothing and never competes with the field.
+    sky: '#8ecae6',
+    // Thin and pale. At 0.011 and violet the fog washed the far field out to
+    // half its value by 76 m, on a field 90 m across. This keeps the depth cue
+    // and stops the edges going dark.
+    fog: [0.0006, '#cfe4bd'],
+    // Ambient is the shadow floor, so it sets the dark end of the picture. At
+    // 0.85 the field measured value.spread 0.191 against a required 0.27: lit
+    // and shaded grass came out the same value and the frame had no range at
+    // all. Low ambient against a strong key is where the range comes from.
+    ambient: { intensity: 0.48, color: '#c3d9ea' },
+    sun: { direction: [0.55, -0.45, 0.7], intensity: 0.3, color: '#bcd4ea' },
     // Bloom is set to touch only what is genuinely bright — the fire, the barn
     // window, the glow-worms. At threshold 0.78 it caught the lit grass as well
     // and the whole field came back orange, which is the failure mode of every
@@ -771,9 +791,13 @@ const level = {
     // like the picture is broken.
     post: [
       { smaa: true },
-      { bloom: { strength: 0.14, threshold: 0.95, radius: 0.4 } },
-      { grade: { contrast: 1.04, saturation: 1.06, tint: '#fff2e2' } },
-      { vignette: 0.22 }
+      // Threshold above the lit grass. The field is bright now, so 0.95 caught
+      // the ground itself and the whole frame came back milky.
+      { bloom: { strength: 0.1, threshold: 0.995, radius: 0.4 } },
+      // NO TINT. A warm white tint multiplies every pixel toward the tint and
+      // took the field's saturation from 0.66 to 0.33 — the wash read as fog and
+      // was not fog. Grade contrast only.
+      { grade: { contrast: 1.1, saturation: 0.98 } }
     ]
   },
   entities
