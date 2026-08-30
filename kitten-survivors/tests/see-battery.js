@@ -207,16 +207,20 @@ export default {
     // A preview spawns a type that has no live instance, frames it and destroys
     // it. The world must not keep the body, and the id counter must not have
     // been spent — a look cannot rename what the run spawns next.
-    const nextName = context.spawn('rat', { at: [40, 0, 40] }).id
-    context.destroy(context.world.byId(nextName))
+    // The counter only ever climbs, so the measure is how far: one spawn moves
+    // it one, and a preview between two spawns must not move it at all.
+    const numberOf = id => Number(id.split('-').pop())
+    const firstName = test.spawn('rat', { at: [40, 0, 40] }).id
+    test.destroy(firstName)
     const preview = await leavesNothing('previewing a type with no live instance',
       'see.sketch', { subject: 'boar', name: 'test-battery-preview' })
     test.ok(preview.preview?.spawnedAndRemoved || preview.why,
       'the preview reply says the type was spawned and removed')
-    test.is(context.count('boar'), 0, 'the previewed body is gone')
-    test.is(context.spawn('rat', { at: [40, 0, 40] }).id, nextName,
-      'the preview left the id counter alone — the next spawn keeps its name')
-    context.destroy(context.world.byId(nextName))
+    test.is(test.count('boar'), 0, 'the previewed body is gone')
+    const secondName = test.spawn('rat', { at: [40, 0, 40] }).id
+    test.destroy(secondName)
+    test.is(numberOf(secondName) - numberOf(firstName), 1,
+      `the preview left the id counter alone — ${firstName} then ${secondName}`)
 
     // A held clock cannot be stepped, and a verb that steps must say so rather
     // than report a frozen world as a still one.

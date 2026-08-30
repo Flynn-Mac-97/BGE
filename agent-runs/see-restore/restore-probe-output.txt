@@ -1,0 +1,92 @@
+
+capture / not drawing
+  headless there is no renderer at all, which is the same refusal a hidden tab gets after its readback comes back empty
+  call    ["run","see.capture",{}]
+  reply   {"why":"a capture needs the browser renderer — use see.sketch headless, or open the editor"}
+  diff    empty
+
+capture / unknown subject
+  a name that is neither an entity id nor a type
+  call    ["run","see.capture",{"subject":"not-a-thing"}]
+  reply   {"why":"a capture needs the browser renderer — use see.sketch headless, or open the editor"}
+  diff    empty
+
+capture / empty studio
+  alone on a subject the camera is not pointing at
+  call    ["run","see.capture",{"subject":"you","alone":true,"camera":{"x":9999,"y":9999,"z":9999}}]
+  reply   {"why":"a capture needs the browser renderer — use see.sketch headless, or open the editor"}
+  diff    empty
+
+capture / preview of a type
+  a type with no live instance is spawned, framed and destroyed
+  call    ["run","see.capture",{"subject":"boar"}]
+  reply   {"why":"a capture needs the browser renderer — use see.sketch headless, or open the editor"}
+  diff    empty
+
+capture / no such saved view
+  a view name that was never saved
+  call    ["run","see.capture",{"view":"no-such-view"}]
+  reply   {"why":"a capture needs the browser renderer — use see.sketch headless, or open the editor"}
+  diff    empty
+
+sketch / unknown subject
+  the same refusal, on the path that reaches the preview code headless
+  call    ["run","see.sketch",{"subject":"not-a-thing"}]
+  reply   {"error":"no entity or type \"not-a-thing\"","types":["boar","crow","ground","hound","kitten","meadow-prop","rat","wasp","xp-gem","light"],"hint":"name a live entity id, or a type — a type is previewed without needing...
+  diff    empty
+
+sketch / preview of a type
+  the real spawn-and-destroy, run headless: the entity must be gone and the id counter untouched
+  call    ["run","see.sketch",{"subject":"boar","name":"restore-probe-boar"}]
+  reply   {"files":["agent-runs/see/restore-probe-boar.png","agent-runs/see/restore-probe-boar.json"],"marks":{"1":"see-preview-boar"},"palette":{"boar":"#cfafee"},"counts":{"visible":1,"offscreen":0,"offscreenByType":{}},"prev...
+  diff    empty
+
+sketch / empty studio
+  alone on a subject outside the frame
+  call    ["run","see.sketch",{"subject":"you","alone":true,"camera":{"x":9999,"y":9999,"z":9999}}]
+  reply   {"error":"the studio drew nothing — the subject is outside this camera's frame","subject":"you"}
+  diff    empty
+
+sketch / no such saved view
+  a view name that was never saved
+  call    ["run","see.sketch",{"view":"no-such-view"}]
+  reply   {"error":"no saved view \"no-such-view\". Saved: kitten-side, kitten-swarm, meadow-play — save one with see.view"}
+  diff    empty
+
+moment / no renderer
+  headless refusal, before any step is taken
+  call    ["run","see.moment",{"steps":[0,6,30]}]
+  reply   {"why":"a moment sheet needs the browser renderer — headless, use script with simulate and see.sketch"}
+  diff    empty
+
+moment / held clock
+  asked to step while something holds time
+  call    ["run","see.moment",{"steps":[0,6,30]}]
+  reply   {"why":"a moment sheet needs the browser renderer — headless, use script with simulate and see.sketch"}
+  diff    empty
+
+diff / held clock
+  asked to step while something holds time
+  call    ["run","see.diff",{"steps":30}]
+  reply   {"error":"the clock is held by [\"run-over\"], so no step can pass and everything would read as still","holds":["run-over"],"steps":30,"hint":"release the hold, or answer the waiting screen first — screen.read names it"}
+  diff    empty
+
+diff / held clock, world never simulated
+  the same refusal on an unplayed level, where starting the hooks would move every entity off its edited place
+  call    ["run","see.diff",{"steps":30}]
+  reply   {"error":"the clock is held by [\"run-over\"], so no step can pass and everything would read as still","holds":["run-over"],"steps":30,"hint":"release the hold, or answer the waiting screen first — screen.read names it"}
+  diff    empty
+
+isolate / held clock
+  the velocity step cannot pass, so the dossier must not step at all
+  call    ["run","see.isolate",{"subject":"you"}]
+  reply   {"id":"you","type":"kitten","world":{"x":0,"y":-5.77,"z":0,"w":0.5,"h":0.45,"l":0.8},"screen":null,"onScreen":false,"velocity":null,"velocityWhy":"not measured: the clock is held by [\"run-over\"] — a step would move ...
+  diff    empty
+
+view / aim at nothing
+  the live camera must not move for a name that does not exist
+  call    ["run","see.view",{"aim":"not-a-thing"}]
+  reply   {"error":"no entity or live instance of type \"not-a-thing\" to aim at"}
+  diff    empty
+
+15/15 error paths left the world exactly as they found it.
