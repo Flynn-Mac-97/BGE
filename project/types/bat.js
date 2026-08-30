@@ -1,4 +1,8 @@
 export default {
+  about: 'a patrolling enemy. Flies a fixed distance either side of where it was placed, bobbing as it goes',
+  appearance: 'A small bat sprite about a metre across, drifting side to side and rising and falling as it moves.',
+  looksWrongWhen: 'it sits still, or drifts further from its placement each pass — `home` was not recorded at start.',
+
   sprite: { image: 'bat.png', width: 0.9, height: 0.9 },
   collider: { box: [0.7, 0.5] },
   properties: { speed: 2, range: 3 },

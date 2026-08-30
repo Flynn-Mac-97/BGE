@@ -9,7 +9,7 @@ import { makeProjector } from '../../../engine/camera-project.js'
 import { boundsOf, facingOffset } from '../../../engine/frame-facts.js'
 import { occlusionGrid, insideOf, matches, diffMoments } from '../../../engine/scene-query.js'
 import { FIXED_STEP } from '../../../engine/loop.js'
-import { describe } from './describe.js'
+import { describe, aboutTypes } from './describe.js'
 
 /**
  * The ID buffer is another lane's module and may not exist yet, and a static
@@ -138,10 +138,23 @@ export async function isolate(context, options = {}) {
   const target = context.camera?.target
   const followed = target && target.id !== entity.id && context.world.entities.includes(target) ? target : null
 
+  // One subject, so the whole authored block rides along: what it is, how a
+  // correct one reads, how a broken one reads, and why this one is placed here.
+  // `appearance` is safe in a dossier and never in an image sidecar, because
+  // nothing here is handed to a vision model beside a picture.
+  const definition = entity._definition || {}
+  const authored = {
+    ...(definition.about ? { about: definition.about } : {}),
+    ...(definition.appearance ? { appearance: definition.appearance } : {}),
+    ...(definition.looksWrongWhen ? { looksWrongWhen: definition.looksWrongWhen } : {}),
+    ...(entity.note ? { note: entity.note } : {})
+  }
+
   return {
     id: entity.id,
     type: entity.type,
     ...(entity.hidden ? { hidden: true } : {}),
+    ...(Object.keys(authored).length ? { description: authored } : {}),
     world: { x: round(entity.x), y: round(entity.y), z: round(entity.z || 0), ...bounds },
     screen,
     onScreen: !!entry,
@@ -216,6 +229,9 @@ export function find(context, options = {}) {
   return {
     count: found.length,
     found,
+    // What each type found IS, once per type. A list of a hundred ids says
+    // nothing about what was found until this says what they are.
+    ...aboutTypes(context, found.map(entry => entry.type)),
     method: `one describe, scene-query matches over every entity${wantsOcclusion ? ', occlusion by rays' : ''}`
   }
 }

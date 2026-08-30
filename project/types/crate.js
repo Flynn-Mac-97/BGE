@@ -1,4 +1,8 @@
 export default {
+  about: 'the wooden crate. Too tall to see or shoot over standing, low enough to crouch-jump onto',
+  appearance: 'A wooden cube, roughly chest-to-head height on a standing player. Cover you must commit to leaving, and a position you must commit to taking.',
+  looksWrongWhen: 'a placement has given it its own size — the height is a game rule, not a per-placement choice',
+
   // The 1.6 wooden crate, and the 1.6 metres are not a coincidence worth losing.
   //
   // A crate is exactly tall enough that a standing player cannot see or shoot

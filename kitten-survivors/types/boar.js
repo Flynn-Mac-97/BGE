@@ -18,6 +18,10 @@ const HEIGHT = 0.65
 const LENGTH = 1.3
 
 export default {
+  about: 'the charging enemy, and the only one whose attack the player can read coming and dodge',
+  appearance: 'A broad, heavy, rust-red quadruped. It stops, winds up, then crosses ground fast in a straight line — the pause before the run is the tell.',
+  looksWrongWhen: 'it is a plain tinted box — models/boar.glb has not loaded',
+
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   mesh: { model: 'models/boar.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#8a4226' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },

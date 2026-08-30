@@ -76,10 +76,15 @@ test('the determinism lint names each banned source with a line', () => {
   assert.equal(problems.length, 3, 'the comment line is not a problem')
 })
 
-test('check passes clean with nothing running', () => {
+test('check passes clean with nothing running, and a warning never fails it', () => {
   const r = run(['check'])
+  const reply = JSON.parse(r.stdout)
   assert.equal(r.code, 0)
-  assert.deepEqual(JSON.parse(r.stdout).problems, [])
+  assert.equal(reply.ok, true)
+  assert.deepEqual(reply.problems.filter(p => !p.warning), [], 'nothing fatal')
+  // Undescribed types are reported and must never fail the run: a check that
+  // failed the build the day it shipped is a check somebody switches off.
+  assert.ok(reply.problems.every(p => p.warning), 'anything left is a warning')
 })
 
 test('pain records, lists and resolves against an isolated file', () => {

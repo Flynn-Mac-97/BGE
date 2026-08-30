@@ -1,20 +1,20 @@
 /**
- * Rat — the shambler, and the floor of the whole game.
- *
- * Slow, weak, and never not there. A rat is what the player learns the rules
- * on: it walks straight at you, it dies to one hit for the first minute, and by
- * the tenth there are two hundred of them. Everything else in the horde is
- * defined against it.
- *
- * Low and long, in the dullest brown on the meadow, so it reads as ground
- * clutter rather than as a threat — which is exactly what it is until there are
- * enough of them.
+ * Rat — the floor of the whole game. Every other enemy is tuned against it, so
+ * a change to these numbers is a change to what every other enemy means.
  */
 const WIDTH = 0.42
 const HEIGHT = 0.32
 const LENGTH = 0.62
 
 export default {
+  // What a rat IS, for anyone — person or agent — who has to recognise one.
+  // `about` is repeated once per marked type in every See sidecar, which is why
+  // it is held to 100 characters. None of these may restate a number from
+  // `properties` below: the copy is the part that goes stale.
+  about: 'the weakest and commonest enemy, and the one every other enemy is measured against',
+  appearance: 'A low, long, dull-brown quadruped a third of the kitten tall. Reads as ground clutter rather than as a threat.',
+  looksWrongWhen: 'it is a plain tinted box — models/rat.glb has not loaded',
+
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   mesh: { model: 'models/rat.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#6d5844' },
 

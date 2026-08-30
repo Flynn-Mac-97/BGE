@@ -19,6 +19,10 @@ const STANDING_HEIGHT = 1.83
 let saidNoWeapons = false
 
 export default {
+  about: 'one CT-side body. terrorist.js with the other team, pistol and colour; a driver attaches on top',
+  appearance: 'A human figure a little under two metres, tinted blue. Until the GLB loads it draws as a plain box.',
+  looksWrongWhen: 'it floats above the floor or sinks into it — the model stands on its origin and needs `anchor: feet`.',
+
   mesh: {
     model: 'counter-strike/models/counter-terrorist.glb',
     // The GLB stands on the floor with its origin between its feet, which is

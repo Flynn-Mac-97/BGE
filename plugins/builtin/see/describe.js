@@ -127,8 +127,9 @@ export function describe(context, options = {}) {
   for (const entry of visible) {
     if (!hues.has(entry.type)) hues.set(entry.type, typeHue(entry.type))
   }
+  const markedTypes = [...new Set(marked.map(entry => entry.type))].sort()
   const palette = {}
-  for (const type of [...new Set(marked.map(entry => entry.type))].sort()) {
+  for (const type of markedTypes) {
     const own = hues.get(type)
     const distanceTo = hue => Math.min(...[...hues]
       .filter(([other]) => other !== type)
@@ -246,6 +247,12 @@ export function describe(context, options = {}) {
     coverage,
     /** One colour per marked type — the colour each See drawing uses for it. */
     palette,
+    /**
+     * What the author wrote each marked type IS. Authored, not measured. One
+     * entry per TYPE, so ten times the rats costs nothing extra. `about: false`
+     * drops the block whole.
+     */
+    ...(options.about === false ? {} : aboutTypes(context, markedTypes)),
     /** Marked pairs whose world boxes interpenetrate — computed, not seen. */
     overlaps,
     /** [nearer, farther] marked pairs whose screen boxes cross — who hides whom. */
@@ -254,6 +261,31 @@ export function describe(context, options = {}) {
     regions,
     ...(between ? { between } : {})
   }
+}
+
+/**
+ * What the author wrote each of these types IS, and which of them nobody has
+ * written yet.
+ *
+ * One entry per TYPE, never per entity: identity does not vary within a type,
+ * so repeating it on forty marked bodies would buy nothing and cost the frame.
+ * `undescribed` is emitted because a legend naming four of five marked types
+ * reads as "the fifth has nothing worth saying", which is the same false
+ * confidence the legend exists to kill. It is left out when empty.
+ *
+ * `appearance` and `looksWrongWhen` are never here. A vision model adopts a
+ * judgement it is handed, so telling a reader what a correct rat looks like
+ * answers the one question the picture was taken to ask.
+ */
+export function aboutTypes(context, typeNames) {
+  const about = {}
+  const undescribed = []
+  for (const type of [...new Set(typeNames)].sort()) {
+    const written = context.world.types.get(type)?.about
+    if (written) about[type] = written
+    else undescribed.push(type)
+  }
+  return { about, ...(undescribed.length ? { undescribed } : {}) }
 }
 
 const round = n => Math.round(n * 100) / 100

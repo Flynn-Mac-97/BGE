@@ -1,4 +1,8 @@
 export default {
+  about: 'one textured solid box. The whole map is built from these; each placement sets size and material',
+  appearance: 'A rectangular solid carrying a map texture. Most of what fills a frame in this map is brushes, at every size from a step to an outer wall.',
+  looksWrongWhen: 'it is a large flat block of one untextured colour — its material did not load, and a wall becomes an unidentifiable slab',
+
   // A brush is one textured solid box, and it is what the whole of de_dust2 is
   // made of — floors, walls, steps, lintels, awnings, the lot.
   //

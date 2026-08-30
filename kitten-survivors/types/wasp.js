@@ -15,6 +15,10 @@ const HEIGHT = 0.22
 const LENGTH = 0.44
 
 export default {
+  about: 'the fastest enemy. It cannot be outrun, so it is answered with firepower rather than movement',
+  appearance: 'The smallest enemy and the only warm yellow one, flying higher than a crow. It weaves on the way in rather than approaching in a straight line.',
+  looksWrongWhen: 'it is a plain tinted box — models/wasp.glb has not loaded',
+
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#e6b032' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },

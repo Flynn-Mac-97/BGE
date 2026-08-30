@@ -107,7 +107,11 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     const out = {
       id: e.id, type: e.type,
       at: [r(e.x), r(e.y), r(e.z)],
-      ...(e.rotation ? { rotation: r(e.rotation) } : {})
+      ...(e.rotation ? { rotation: r(e.rotation) } : {}),
+      // Why this one is placed here. In a bulk list it is the only description
+      // that appears, and only on the placements that wrote one — what the type
+      // IS is said once per type, not once per entity.
+      ...(e.note ? { note: e.note } : {})
     }
     if (bulk) {
       // In bulk, properties IS the override list — naming the keys twice is waste.
@@ -116,6 +120,14 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       // repeated on every entity that attached it.
       if (e.behaviours.length) out.behaviours = e.behaviours.map(b => b.name)
     } else {
+      // What the author wrote this type IS, read through the definition rather
+      // than copied onto the entity, so editing the type file reaches every
+      // live entity with nothing to re-sync. Identity comes before the numbers
+      // because a reader has to know what the thing is to read them.
+      const definition = e._definition || {}
+      if (definition.about) out.about = definition.about
+      if (definition.appearance) out.appearance = definition.appearance
+      if (definition.looksWrongWhen) out.looksWrongWhen = definition.looksWrongWhen
       out.properties = e.properties
       if (e.overrides.length) out.overrides = e.overrides
       if (e.behaviours.length) {

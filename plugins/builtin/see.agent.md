@@ -61,13 +61,18 @@ compare it against the sidecar; absence is a query, not a look.
   `visibleFraction` and `blockedBy` name the hider. Zero blockers? Run
   `see.isolate` on it: `hidden`, `onScreen: false`, or an off-frame world
   position is the answer.
-- Something is on screen and you do not know what it is: See cannot answer
-  this yet. The ID buffer knows which entity drew each pixel, but the only
-  verb reading it, `see.occlusion`, takes `of: "<id>"` — you must know the
-  answer to ask the question. Until a verb exists: run `see.describe` and
-  match the shape against the marked entries' `at` and `size`, and treat the
-  result as a guess. Particles, decals, HUD overlays and a material that
-  failed to load are not entities, so the ID buffer cannot name them at all.
+- Something is on screen and you do not know what it is: take `see.capture`,
+  read the mark number off the outline, look the mark up in the sidecar's
+  `marks` to get the id, then `run description '{"of":"<id>"}'`. That answers
+  what the author says it is, what a correct one looks like, and — the case
+  that costs the most time — what a BROKEN one looks like. A big featureless
+  block of flat colour is usually a `looksWrongWhen`, not a thing you have
+  failed to recognise. The sidecar's `about` names every marked type;
+  `undescribed` names the marked types nobody has written yet, so silence is
+  never mistaken for "nothing to know". `appearance` is deliberately absent
+  from the sidecar: a vision model handed a description of a thing will report
+  seeing it, so ask the picture the positive question first and compare it
+  against `description` yourself.
 - Did it move, spawn, or die correctly: `see.diff '{"steps":30}'`.
 - Inspect one thing: `see.isolate '{"subject":"<id>"}'` — the full dossier
   in one call.

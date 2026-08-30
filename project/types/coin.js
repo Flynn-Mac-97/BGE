@@ -1,4 +1,8 @@
 export default {
+  about: 'a pickup. Spins in place, adds to the score and vanishes when the player touches it',
+  appearance: 'A small gold coin, half a metre across, turning steadily. The smallest thing on screen.',
+  looksWrongWhen: 'it does not turn, or the player passes through it and it stays — the circle collider is too small.',
+
   sprite: { image: 'coin.png', width: 0.5, height: 0.5 },
   sounds: { pickup: 'coin.wav' },
   collider: { circle: 0.22 },

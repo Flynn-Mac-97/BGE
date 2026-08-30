@@ -640,6 +640,10 @@ export default {
         // happened. Silence about either is the bug, so the reply says both.
         if (crop) {
           delete description.palette
+          // The description goes for the same reason the palette does: a reader
+          // handed "a low, long, dull-brown quadruped" reports seeing one.
+          delete description.about
+          delete description.undescribed
           for (const entry of description.visible) {
             delete entry.mark
             delete entry.hull
@@ -649,7 +653,8 @@ export default {
             + 'on a frame inflates a vision model\'s score of it, so marking it would corrupt the question. '
             + 'There is no palette either: `palette` names OUTLINE colours and never a thing\'s own material, '
             + 'so no colour named anywhere binds to what you see here — read the colours off the pixels. '
-            + '`silhouette` is the subject\'s traced outline in this image\'s percent coordinates, measured, not drawn.'
+            + '`silhouette` is the subject\'s traced outline in this image\'s percent coordinates, measured, not drawn. '
+            + 'There is no description either — nothing here tells you what anything is, so read the picture.'
         }
 
         const name = options.name || `${context.editor.levelName}-${++frameNumber}`

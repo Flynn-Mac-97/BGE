@@ -115,6 +115,14 @@ const slug = s => String(s || '').trim().toLowerCase()
 // ------------------------------------------------------------------ templates
 const TEMPLATES = {
   type: name => `export default {
+  // What is a ${name}, and what does it do? Under 100 characters — this one is
+  // repeated once per marked type in every See sidecar.
+  about: '',
+  // How does a CORRECT ${name} read on screen? Under 200 characters.
+  appearance: '',
+  // How does a BROKEN one read, and what is broken? Under 200 characters.
+  looksWrongWhen: '',
+
   // How it draws. A bare name means assets/. Delete this to get a flat colour.
   // sprite: { image: '${name}.png', width: 1, height: 1 },
 

@@ -14,7 +14,7 @@
 let nextId = 1
 
 /** Placement keys the entity models directly; everything else is preserved verbatim. */
-const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprite', 'mesh', 'collider', 'behaviours'])
+const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprite', 'mesh', 'collider', 'behaviours', 'note'])
 
 /**
  * Names a behaviour may not take.
@@ -25,7 +25,7 @@ const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprit
  */
 const RESERVED = new Set([
   'id', 'type', 'x', 'y', 'z', 'rotation', 'scale', 'sprite', 'mesh', 'collider',
-  'properties', 'overrides', 'behaviours', 'hidden', 'play',
+  'properties', 'overrides', 'behaviours', 'hidden', 'play', 'note',
   'velocityX', 'velocityY', 'velocityZ', 'grounded', 'animation', 'frame', 'flip', 'animationDone'
 ])
 
@@ -115,6 +115,13 @@ export function makeWorld(bus) {
       overrides: Object.keys(placement.properties || {}),
 
       hidden: false,
+
+      // Why THIS one is placed here. It adds to what the type says a thing is;
+      // it never restates it, because the type is described once and read from
+      // one place. Modelled rather than preserved verbatim so `set` can write
+      // it and the inspector can edit it.
+      note: placement.note ?? null,
+
       _definition: type,
 
       // What this entity composes, in the order the hooks run. Each record
@@ -413,6 +420,7 @@ export function makeWorld(bus) {
           const out = { type: e.type, at: [round(e.x), round(e.y), round(e.z)] }
           if (e.rotation) out.rotation = round(e.rotation)
           if (e.scale !== 1) out.scale = round(e.scale)
+          if (e.note) out.note = e.note
           if (e.collider && e.collider !== e._definition.collider) out.collider = e.collider
           // Same rule for the sprite: if this placement carries its own, it has
           // to come back out, or changing one crate's art is lost on save.

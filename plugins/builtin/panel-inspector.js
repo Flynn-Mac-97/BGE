@@ -153,10 +153,10 @@ function entity(ui, context, e) {
           note: e.overrides.includes(k) ? 'set here' : null,
           onChange: nv => setProp(k, nv)
         })))
-    ]),
-    ui.section('Defined in', [
-      ui.raw(link(`types/${e.type}.js`, () => context.open(`types/${e.type}.js`)))
     ])
+    // The link to the type file is in the What it is panel above, beside the
+    // sentences the file holds. One link, in the place a reader is already
+    // looking when they want the code.
   ].filter(Boolean))
 }
 
@@ -317,15 +317,6 @@ function fileView(ui, context, f) {
       chips(f.usedBy, 'nothing references this')
     ])
   ].filter(Boolean))
-}
-
-function link(text, onClick) {
-  const a = document.createElement('button')
-  a.textContent = text
-  a.className = 'u-btn'
-  a.style.margin = '2px 10px'
-  a.onclick = onClick
-  return a
 }
 
 const round = n => Math.round((n ?? 0) * 1000) / 1000

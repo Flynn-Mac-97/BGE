@@ -10,6 +10,10 @@
  * fell under gravity would fight the magnet all the way in.
  */
 export default {
+  about: 'what a dead enemy drops, and the whole economy of the game. Every level the player gains came from collecting these',
+  appearance: 'A small bright cyan cube that never stops turning. It carries no physics body, so it never falls — the Pickups plugin draws it towards the player instead.',
+  looksWrongWhen: 'it has stopped turning, or it is falling — a still gem reads as scenery, and a falling one is fighting the magnet',
+
   mesh: {
     box: [0.22, 0.22, 0.22],
     tint: '#5ec8ff'

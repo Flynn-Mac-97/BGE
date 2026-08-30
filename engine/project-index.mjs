@@ -201,6 +201,12 @@ export async function buildIndex(projectDirectory) {
         // line the author would have to go and fix.
         entry.usesBy = Object.fromEntries(references.map(r => [r.reference, r.where]))
         entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
+        // What the author says this type is, how a correct one reads on screen,
+        // and how a broken one reads. Carried here so reading the index answers
+        // "what is a brush" with no call and no guess from the name.
+        if (loaded.about) entry.about = String(loaded.about)
+        if (loaded.appearance) entry.appearance = String(loaded.appearance)
+        if (loaded.looksWrongWhen) entry.looksWrongWhen = String(loaded.looksWrongWhen)
         if (loaded.animation) entry.animation = Object.keys(loaded.animation)
         // What this type composes. Listed here so "what does a crate do" is one
         // index lookup rather than opening the type and then every behaviour.
@@ -315,7 +321,11 @@ export async function buildIndex(projectDirectory) {
   // times larger for nothing an agent does.
   const agent = {
     types: Object.fromEntries(Object.entries(index.types).map(([name, t]) => [name, {
-      file: t.file, properties: t.properties, hooks: t.hooks,
+      file: t.file,
+      ...(t.about ? { about: t.about } : {}),
+      ...(t.appearance ? { appearance: t.appearance } : {}),
+      ...(t.looksWrongWhen ? { looksWrongWhen: t.looksWrongWhen } : {}),
+      properties: t.properties, hooks: t.hooks,
       ...(t.uses?.length ? { uses: t.uses } : {}),
       ...(t.behaviours?.length ? { behaviours: t.behaviours } : {}),
       ...(t.error ? { error: t.error } : {})
@@ -595,10 +605,52 @@ function syntaxErrorLine(file) {
 }
 
 /**
+ * How long each authored description may be.
+ *
+ * `about` is repeated once per marked type in every See sidecar, so its cost is
+ * multiplied by how many types a frame holds. The other two never enter a
+ * sidecar and are held to one sentence a reader takes in at a glance.
+ */
+const CAPS = { about: 100, appearance: 200, looksWrongWhen: 200 }
+
+/**
+ * What nobody has written, and what somebody wrote too much of.
+ *
+ * Both are warnings. A check that failed the build the day it shipped, against
+ * every type at once, is a check somebody switches off.
+ */
+function describedProblems(index) {
+  const out = []
+  for (const [name, type] of Object.entries(index.types)) {
+    if (type.error) continue
+    for (const [field, cap] of Object.entries(CAPS)) {
+      const written = type[field]
+      if (!written || written.length <= cap) continue
+      out.push({
+        file: type.file,
+        warning: true,
+        why: field === 'about'
+          ? `type "${name}" has an about of ${written.length} characters — it is repeated once per marked type in every See sidecar, so keep it under ${cap}`
+          : `type "${name}" has an ${field} of ${written.length} characters — it should read as one sentence, so keep it under ${cap}`
+      })
+    }
+    if (!type.about) {
+      out.push({
+        file: type.file,
+        warning: true,
+        why: `type "${name}" has no about — an agent reading a level cannot say what it is`
+      })
+    }
+  }
+  return out
+}
+
+/**
  * Everything wrong with the project right now.
  *
  * The same list `/api/check` returns, built here so it is available with no
- * server running. An empty list is the only clean answer.
+ * server running. No entry without `warning` is the only clean answer; an entry
+ * marked `warning` is reported and never fails a check — see `fatal`.
  */
 export function problemsIn(index) {
   const missing = missingAssets(index)
@@ -621,9 +673,18 @@ export function problemsIn(index) {
     ...missing,
     ...Object.entries(index.tests).filter(([, t]) => t.error)
       .map(([name, t]) => ({ file: t.file, why: `test "${name}" failed to load — ${t.error}` })),
+    ...describedProblems(index),
     ...index.warnings
   ]
 }
+
+/**
+ * The problems that fail a check.
+ *
+ * Every caller that turns the list into a pass or a fail goes through this one
+ * function, so a warning cannot be fatal in one place and advisory in another.
+ */
+export const fatal = problems => problems.filter(problem => !problem.warning)
 
 // ------------------------------------------------------------------ servers
 /**

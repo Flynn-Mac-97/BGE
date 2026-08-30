@@ -1,4 +1,8 @@
 export default {
+  about: 'a build-time marker: where a player starts and which way they face. Not part of the played game',
+  appearance: 'A red post the size of a standing player. Editor Markers hides it the moment play starts.',
+  looksWrongWhen: 'red posts are visible during a round — Editor Markers is off, so a marker is drawn in play.',
+
   // Where a player starts, and nothing else. No collider, because a marker that
   // pushed players around would be the single most annoying entity in the map.
   //

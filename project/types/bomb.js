@@ -1,4 +1,8 @@
 export default {
+  about: 'the planted C4. Exists only after a plant completes — a carried bomb is a field, not an entity',
+  appearance: 'A small dark-red brick on the ground inside a bomb site. Until the c4 model loads it draws as its collider box.',
+  looksWrongWhen: 'there is more than one, or one exists before a plant completed',
+
   // The planted C4. It exists only once it is in the ground — nobody places one
   // in a level and nothing carries one around as an entity, because a carried
   // bomb is a field on the carrier (`entity.hasBomb`) and not a thing in the

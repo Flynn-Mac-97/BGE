@@ -1,10 +1,17 @@
 ---
 name: see-the-game
-description: Look at or inspect anything in the running game — models, effects, screens, what is visible or hidden. Use this INSTEAD of browser screenshots; it answers in exact facts and marked frames for a fraction of the cost.
+description: What the running game actually shows a player, and what each thing on screen is — answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, or instead of reading type files to work out what an object is.
 ---
 <!-- generated from plugins/builtin/see.agent.md at server start; edits are lost -->
 
 # See
+
+The gap this closes: your model of the game and what a player sees can
+disagree, and the code does not say so. An unexpected shape on screen has no
+name. Working out what an object is means opening its files. See answers from
+the engine's own data — what is on screen, where, what it is, what is hidden,
+whether it looks right — so a visual question costs a query, not a screenshot
+and a guess.
 
 Query first, pixels last. Route every question to the cheapest exact
 authority — scene graph, then geometry, then renderer queries, then
@@ -54,9 +61,18 @@ compare it against the sidecar; absence is a query, not a look.
   `visibleFraction` and `blockedBy` name the hider. Zero blockers? Run
   `see.isolate` on it: `hidden`, `onScreen: false`, or an off-frame world
   position is the answer.
-- What is drawn at a spot / what is this pixel: the renderer's ID buffer,
-  through `see.occlusion` — `method: "id-buffer"` means real rendered
-  pixels answered. Never a vision read.
+- Something is on screen and you do not know what it is: take `see.capture`,
+  read the mark number off the outline, look the mark up in the sidecar's
+  `marks` to get the id, then `run description '{"of":"<id>"}'`. That answers
+  what the author says it is, what a correct one looks like, and — the case
+  that costs the most time — what a BROKEN one looks like. A big featureless
+  block of flat colour is usually a `looksWrongWhen`, not a thing you have
+  failed to recognise. The sidecar's `about` names every marked type;
+  `undescribed` names the marked types nobody has written yet, so silence is
+  never mistaken for "nothing to know". `appearance` is deliberately absent
+  from the sidecar: a vision model handed a description of a thing will report
+  seeing it, so ask the picture the positive question first and compare it
+  against `description` yourself.
 - Did it move, spawn, or die correctly: `see.diff '{"steps":30}'`.
 - Inspect one thing: `see.isolate '{"subject":"<id>"}'` — the full dossier
   in one call.

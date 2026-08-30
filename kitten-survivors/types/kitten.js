@@ -61,6 +61,10 @@ const STRIDE_SWING = 0.55   // radians at a full run
 const STRIDE_EASE = 0.06    // in and out over about a fifth of a second
 
 export default {
+  about: 'the player. Steered directly on the ground plane; the weapons fire themselves, so movement is the whole of the input',
+  appearance: 'A small pale cat. The camera follows it, so it sits at the centre of the frame, and it stops dead the moment the player lets go rather than sliding.',
+  looksWrongWhen: 'it is not near the centre of the frame — the camera follows it, so a kitten off centre means the camera lost its target',
+
   mesh: {
     // The model is authored feet-on-origin, the only origin an artist can put
     // back in the same place twice, so `anchor` drops it by half the hull.

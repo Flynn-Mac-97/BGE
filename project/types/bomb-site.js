@@ -1,4 +1,8 @@
 export default {
+  about: 'the volume the bomb may be planted in. A trigger: felt, never walked into, and placed generously',
+  appearance: 'A large yellow box twelve metres square over one end of the map. Editor Markers hides it in play.',
+  looksWrongWhen: 'a yellow box shows during a round, or a plant fails while the player stands inside the site.',
+
   // The volume the bomb may be planted in. A trigger, so it is felt and never
   // walked into, and it is meant to be placed generously: a plant that fails
   // because the player stood thirty centimetres outside an invisible box is the

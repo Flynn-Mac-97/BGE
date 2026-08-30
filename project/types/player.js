@@ -1,4 +1,8 @@
 export default {
+  about: 'the character the person at the keyboard drives. Walks, jumps, takes coins, resets on a hazard',
+  appearance: 'A small animated figure about a metre tall, facing the way it moves. Idle, walk and jump each look different.',
+  looksWrongWhen: 'it slides with its legs still, or faces away from its movement — `animation` and `flip` are set every frame.',
+
   // A sheet plus the size of one cell. Frames are numbered left to right.
   sprite: { sheet: 'player.png', size: [16, 16], width: 0.9, height: 0.9 },
 

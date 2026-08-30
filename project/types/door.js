@@ -1,4 +1,8 @@
 export default {
+  about: 'a door leaf. None open — doorways are holes and the leaves stand flat, so a door is solid scenery',
+  appearance: 'A flat door leaf against a wall, blue for the three double doorways and metal for the ones set into building fronts. It never moves.',
+  looksWrongWhen: 'it is a large flat blue slab with no leaf detail — door-blue.png has not loaded, and a door becomes an unidentifiable coloured block',
+
   // The blue double doors at long, mid and B, and the metal doors on the
   // buildings. In 1.6's de_dust2 not one of them opens: the doorways are simply
   // holes in the wall, and the leaves stand permanently swung back flat against

@@ -49,7 +49,8 @@ const HELP = `engine — read and drive the running editor
 state     snapshot [--entities --log --plugins --commands --timers]
           entity <id>          index          tree
           check                exits 1 if anything is broken, nondeterministic,
-                               or a plugin file that will not load
+                               or a plugin file that will not load. A problem
+                               marked "warning" is reported and exits 0
 drive     select <id...>       set <id> <key> <value>
           spawn <type> ['{"at":[1,2,0]}']     destroy <id>
           run <command-id> [arg]              commands
@@ -461,7 +462,7 @@ if (op === 'tree') {
 // `check` exits non-zero when something is wrong, so it works in a shell chain:
 //   node bin/engine.mjs check && node bin/engine.mjs --headless run tests.run
 if (op === 'check') {
-  const { buildIndex, problemsIn, pluginImportFailures, pluginProblems } = await readProject()
+  const { buildIndex, problemsIn, fatal, pluginImportFailures, pluginProblems } = await readProject()
   // A plugin that will not import is listed first because it is the loudest
   // thing wrong and the quietest to find: the loader carries on without it, so
   // the only symptom anywhere else is a command that has stopped existing.
@@ -475,8 +476,11 @@ if (op === 'check') {
   // of the project being reported, and the other way round.
   const failed = await pluginImportFailures(CHECKOUT, PROJECT)
   const problems = [...pluginProblems(failed), ...problemsIn(await buildIndex(PROJECT))]
-  out({ ok: problems.length === 0, problems })
-  process.exit(problems.length === 0 ? 0 : 1)
+  // Warnings are reported and never fail the run. A warning that broke the
+  // chain would be turned off, and then it reports nothing at all.
+  const failures = fatal(problems)
+  out({ ok: failures.length === 0, problems })
+  process.exit(failures.length === 0 ? 0 : 1)
 }
 
 /**
