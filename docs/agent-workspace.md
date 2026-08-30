@@ -32,6 +32,11 @@ So when a run teaches something:
 - A tool with a setup cost → a `skill`, `optional`, so it costs nothing until wanted.
 - Something about one plugin → its `.agent.md` sidecar.
 
+Write only the rule, in imperative form. Never write the mistake or run that
+taught it into the instruction — that history goes in git and the pain ledger,
+and every retold mistake is paid for on each packet and primes the failure it
+describes.
+
 Check what a real task pulls before trusting it:
 `node bin/engine.mjs agent.context '{"task":"...","files":["..."]}'`. A `triggers`
 list is only as good as the words people actually write.
