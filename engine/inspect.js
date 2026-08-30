@@ -11,15 +11,27 @@
  */
 const RING = 200
 
-export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
-  const log = []
+/**
+ * The world's log, and everything that has to be listening before there is a
+ * world to read.
+ *
+ * It is made apart from the read surface because the read surface is built
+ * last — after the plugins have been found, imported and booted. A world that
+ * breaks while it is starting is exactly the world whose errors an agent most
+ * needs, and it was the one case where `snapshot().errors` came back empty.
+ * Make this first, hand it to `makeInspect` at the end, and everything that
+ * went wrong on the way is already in it.
+ */
+export function makeLog(bus) {
+  const lines = []
 
   const push = (level, source, message, extra) => {
-    log.push({ t: Math.round(performance.now()), level, source, message, ...extra })
-    if (log.length > RING) log.shift()
+    lines.push({ t: Math.round(performance.now()), level, source, message, ...extra })
+    if (lines.length > RING) lines.shift()
   }
 
-  bus.on('plugin:error', ({ name, error }) => push('error', `plugin:${name}`, error))
+  bus.on('plugin:error', failure =>
+    push('error', failure.file ? 'plugin' : `plugin:${failure.name}`, reasonFor(failure)))
   bus.on('files:written', ({ path }) => push('info', 'files', `wrote ${path}`))
 
   // "I wrote the file — did it take?" has to be answerable from the log, or an
@@ -51,6 +63,19 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
   } else if (typeof process !== 'undefined' && typeof process.on === 'function') {
     process.on('uncaughtException', error => uncaught(error))
     process.on('unhandledRejection', reason => rejected(reason))
+  }
+
+  return { lines, push }
+}
+
+export function makeInspect({ world, loader, loop, files, bus, editor, view, log }) {
+  // A log made here started after the plugins did, so it heard none of what
+  // they raised. Read that back out of the loader. A log passed in was already
+  // listening and has it all, in the order it happened.
+  const listenedFromTheStart = log != null
+  log ??= makeLog(bus)
+  if (!listenedFromTheStart) {
+    for (const failure of loader.failures()) log.push('error', 'plugin', reasonFor(failure))
   }
 
   /**
@@ -86,6 +111,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
     /** Compact by default. Pass { entities:true, log:true, plugins:true } for detail. */
     snapshot(options = {}) {
       const types = [...world.types.keys()]
+      const broken = loader.failures()
       const out = {
         mode: loop.running ? 'play' : 'edit',
         level: editor.levelName,
@@ -105,13 +131,22 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
         },
         selection: [...editor.selection],
         byType: types.reduce((a, t) => (a[t] = world.all(t).length, a), {}),
-        errors: log.filter(l => l.level === 'error').slice(-5),
+        errors: log.lines.filter(l => l.level === 'error').slice(-5),
+        // Its own key, not a line in the error ring, because the ring keeps the
+        // last five and a broken plugin must not be pushed out of the summary
+        // by five later complaints. Absent when everything loaded, so the
+        // healthy snapshot is the size it always was.
+        ...(broken.length ? { pluginsFailed: broken.map(reasonFor) } : {}),
         unsaved: files.pending > 0
       }
       if (options.entities) out.entities = world.entities.map(e => entityView(e, true))
       if (options.plugins) out.plugins = [...loader.plugins.entries()]
-        .map(([name, p]) => ({ name, enabled: p.enabled, error: p.error }))
-      if (options.log) out.log = log.slice(-40)
+        .map(([name, p]) => (p.file
+          // A file that never imported has no name to show. Say what it is
+          // instead of printing a path where a name belongs.
+          ? { file: p.file, loaded: false, builtin: p.builtin, error: p.error }
+          : { name, enabled: p.enabled, error: p.error }))
+      if (options.log) out.log = log.lines.slice(-40)
       if (options.timers) out.timers = loop.timers
       if (options.commands) out.commands = loader.contrib.commands.map(c => c.id)
       return out
@@ -134,7 +169,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
     run(id, args) {
       const command = loader.contrib.commands.find(c => c.id === id)
         || loader.contrib.menus.find(m => m.id === id)
-      if (!command) throw new Error(`no command "${id}". Try engine.commands()`)
+      if (!command) throw new Error(missingCommand(id, loader.failures()))
       const out = command.run(editor.context, args)
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
@@ -208,9 +243,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
       return { seed: loop.random.seed, time: loop.time }
     },
 
-    log: (n = 40) => log.slice(-n),
-    errors: () => log.filter(l => l.level === 'error'),
-    clearLog: () => { log.length = 0 },
+    log: (n = 40) => log.lines.slice(-n),
+    errors: () => log.lines.filter(l => l.level === 'error'),
+    clearLog: () => { log.lines.length = 0 },
 
     // direct handles for anything the summary does not cover
     world, loader, loop, files, bus, editor, view,
@@ -224,3 +259,26 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view }) {
 }
 
 const r = n => Math.round(n * 1000) / 1000
+
+/** One plugin failure in a sentence, for a log line or a snapshot. */
+const reasonFor = failure => failure.file
+  ? `${failure.file} failed to import — ${failure.error}. Every command it contributes is missing.`
+  : `plugin "${failure.name}" failed to load — ${failure.error}. Every command it contributes is missing.`
+
+/**
+ * Why a command is not here.
+ *
+ * A plugin whose file throws on import contributes nothing, so all of its verbs
+ * read as missing and the only symptom is the name of one of them. Hunting a
+ * command that is not missing but broken costs an afternoon, so the reply names
+ * every plugin that failed and what it failed with. Nothing failed, nothing
+ * extra is said — the ordinary typo keeps the short answer it deserves.
+ */
+const missingCommand = (id, failures) => {
+  if (!failures.length) return `no command "${id}". Try engine.commands()`
+  const why = failures.map(f => f.file
+    ? `Plugin file ${f.file} failed to import: ${f.error}.`
+    : `Plugin "${f.name}" failed to load: ${f.error}.`).join(' ')
+  return `no command "${id}". ${why} Every command those plugins contribute is missing, ` +
+    `which may be this one. Try engine.commands()`
+}

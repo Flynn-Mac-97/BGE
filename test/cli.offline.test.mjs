@@ -119,3 +119,85 @@ test('a headless world starts with nothing running', () => {
   assert.equal(r.code, 0, 'the world started')
   assert.equal(JSON.parse(r.stdout).mode, 'edit')
 })
+
+/** A read surface over a loader and nothing else. Enough to ask what it says. */
+async function inspectOver(loader, bus, log) {
+  const { makeInspect } = await import('../engine/inspect.js')
+  return makeInspect({
+    world: { types: new Map(), entities: [], behaviours: new Map(), all: () => [] },
+    loader,
+    loop: { running: false, paused: false, time: 0, random: { seed: 1 } },
+    files: { pending: 0 },
+    bus,
+    editor: { levelName: '—', selection: new Set() },
+    view: { x: 0, y: 0, zoom: 1, mode: 'ortho' },
+    log
+  })
+}
+
+/**
+ * A plugin file that throws on import takes every command it owns with it, and
+ * the only symptom is the name of one of them. The loader and the read surface
+ * have to say which file broke and why, or the search starts in the wrong place
+ * — hunting a command that was never missing, only broken.
+ */
+test('a plugin that failed to import is named everywhere a command turns up missing', async () => {
+  const { makeLoader } = await import('../engine/loader.js')
+  const { makeBus } = await import('../engine/bus.js')
+
+  const bus = makeBus()
+  const healthy = makeLoader(bus)
+  healthy.boot({})
+  const wholesome = await inspectOver(healthy, bus)
+  assert.deepEqual(healthy.failures(), [])
+  assert.equal(wholesome.snapshot().pluginsFailed, undefined, 'a healthy snapshot gains nothing')
+  assert.throws(() => wholesome.run('nope.nothing'),
+    /^Error: no command "nope\.nothing"\. Try engine\.commands\(\)$/,
+    'an ordinary typo keeps the short answer')
+
+  const broken = makeLoader(makeBus())
+  broken.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), true)
+  broken.boot({})
+  const engine = await inspectOver(broken, makeBus())
+
+  assert.deepEqual(broken.failures(), [{
+    name: null,
+    file: 'plugins/builtin/see.js',
+    error: "SyntaxError: Unexpected token '}'",
+    builtin: true,
+    failedToImport: true
+  }])
+
+  const snapshot = engine.snapshot()
+  assert.match(snapshot.pluginsFailed[0], /plugins\/builtin\/see\.js failed to import/)
+  assert.match(snapshot.errors.at(-1).message, /Every command it contributes is missing/,
+    'the default snapshot carries it without being asked')
+  assert.deepEqual(engine.snapshot({ plugins: true }).plugins, [{
+    file: 'plugins/builtin/see.js', loaded: false, builtin: true, error: "SyntaxError: Unexpected token '}'"
+  }])
+  assert.throws(() => engine.run('see.capture'),
+    /plugins\/builtin\/see\.js failed to import: SyntaxError: Unexpected token/,
+    'the reply names the file and the reason')
+})
+
+/**
+ * A log made before the plugins load hears the failure as it happens; one made
+ * after has to be told. Both have to end with the same single line, or the
+ * wiring that fixes the ordering would double every boot-time error.
+ */
+test('a log that was listening from the start records a failed plugin exactly once', async () => {
+  const { makeLoader } = await import('../engine/loader.js')
+  const { makeBus } = await import('../engine/bus.js')
+  const { makeLog } = await import('../engine/inspect.js')
+
+  const bus = makeBus()
+  const log = makeLog(bus)
+  const loader = makeLoader(bus)
+  loader.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), true)
+  loader.boot({})
+
+  const engine = await inspectOver(loader, bus, log)
+  const failures = engine.snapshot().errors.filter(l => /failed to import/.test(l.message))
+  assert.equal(failures.length, 1, 'heard once, not seeded a second time')
+  assert.match(failures[0].message, /plugins\/builtin\/see\.js failed to import — SyntaxError/)
+})
