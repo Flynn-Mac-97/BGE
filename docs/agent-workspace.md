@@ -12,6 +12,35 @@ including the Game lane — how to build a game is engine knowledge, not one
 game's. `<project>/agents/manifest.json` adds only what that game overrides, and
 may be missing entirely. Parent ids join both manifests into one visible tree.
 
+## Where a workflow insight goes
+
+What a run teaches belongs in the tree, not in the next brief. A brief reaches
+one agent once; a node reaches every agent that touches a matching file, for as
+long as it is true.
+
+An instruction node that **ranks the options for a job** is the most valuable
+shape. `agents/art.md` is the worked example: it says that a character is a
+Blender model, that a few solids are `mesh.parts`, that a box is a blockout, and
+that going straight to the last row is how a game ends up made of boxes. It came
+from a lane that built a cat out of eighteen boxes because nothing told it there
+was a better route — and the Blender skill existed the whole time, gated behind
+triggers the task never said.
+
+So when a run teaches something:
+
+- A rule that is always true → `agents/core.md`, the one node with `always`.
+- A route with choices and costs → an instruction node with `match:` on the files
+  it applies to, and `triggers:` on the words a task uses to describe the job.
+- A tool with a setup cost → a `skill`, `optional`, so it costs nothing until wanted.
+- Something about one plugin → its `.agent.md` sidecar.
+
+Check what a real task pulls before trusting it:
+`node bin/engine.mjs agent.context '{"task":"...","files":["..."]}'`. A `triggers`
+list is only as good as the words people actually write.
+
+None of it is fixed. A node that describes a route we have since beaten is worse
+than no node, so the file says to change it in the same task that beats it.
+
 ## Which project
 
 The project directory is a start-up parameter, so a `match:` pattern writes
