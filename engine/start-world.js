@@ -260,6 +260,14 @@ export async function startWorld({
       console.warn('[save] skipped — the world has been simulated, so it no longer holds start positions. Stop play mode (or engine.stop()) to reload the level first.')
       return { skipped: 'simulated' }
     }
+    // A run is not an edit. Between pressing play and the first step the world
+    // still holds start positions, so `simulated` is false and a save would go
+    // through — rewriting the whole file, including a generated level, in the
+    // editor's own formatting.
+    if (loop.running) {
+      console.warn('[save] skipped — the world is playing. Stop play mode first; a run is not an edit.')
+      return { skipped: 'playing' }
+    }
     // The editor's viewport is not the game's camera rule. In first person the
     // level says where the player looks from; overwriting that with wherever the
     // editor happened to be pointing would break the level by looking at it.
