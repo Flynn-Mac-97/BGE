@@ -16,5 +16,14 @@
     "yaw": 2.541592653589793,
     "pitch": -0.35,
     "fov": 50
+  },
+  "meadow-play": {
+    "x": 0,
+    "y": 12.1,
+    "z": 13.4,
+    "pitch": -1.05,
+    "yaw": 0,
+    "fov": 50,
+    "mode": "perspective"
   }
 }
