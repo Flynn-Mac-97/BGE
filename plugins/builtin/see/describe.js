@@ -6,7 +6,11 @@
 import { makeProjector } from '../../../engine/camera-project.js'
 import { boundsOf, frameSubject, facingOffset, boxesTouch, screenHull, typeHue, hueHex } from '../../../engine/frame-facts.js'
 
-/** Marks past this are noise: tags start overlapping and reads degrade. */
+/**
+ * Marks past this are noise: outlines crowd each other, and a `brief` reply —
+ * a mark, a hull and a screen box each — grows past what an agent can read in
+ * one go. Forty keeps a busy meadow's brief under eight kilobytes.
+ */
 const MOST_MARKS = 40
 
 export function describe(context, options = {}) {
@@ -22,9 +26,12 @@ export function describe(context, options = {}) {
 
   const visible = []
   const offscreenByType = {}
+  /** How many of each type the level holds, on screen or off — its commonness. */
+  const population = {}
   for (const entity of context.world.entities) {
     if (entity.hidden && !options.includeHidden) continue
     if (subject && options.alone && entity.id !== subject.id) continue
+    population[entity.type] = (population[entity.type] || 0) + 1
     const point = projector.place(entity.x, entity.y, entity.z || 0)
     const bounds = boundsOf(entity)
     // A tilted camera sees a mix of an entity's height and its footprint: at
@@ -48,26 +55,55 @@ export function describe(context, options = {}) {
     })
   }
 
-  // Marks go to the largest on screen first — the ones a vision read is about.
-  // In a subject shot the question is about the subject, so nearer wins over
-  // larger and the horizon does not spend the tags. A thing wider than half
-  // the frame is a backdrop, not a subject: it gets no mark. Two tags closer
-  // than a tag's own width just cover each other, so a mark also needs clear
-  // screen distance from every mark already given.
-  visible.sort(subject
-    ? (a, b) => a.depth - b.depth
-    : (a, b) => b.size[0] * b.size[1] - a.size[0] * a.size[1])
+  // A mark is how an answer binds to a body, so marks must fall where a
+  // question would fall. Largest-on-screen spent every one of them on the
+  // backdrop: a meadow's hills sit near the lens and draw wider than any rat
+  // that matters. Marks are dealt out by TYPE instead, on two rules.
+  //
+  // Every type on screen takes its first mark before any type takes a second,
+  // rarest type first, so the palette legend covers the whole frame within one
+  // round and no visible kind goes unnamed.
+  //
+  // After that a type's turn comes round every `population / on screen` marks
+  // — how many of it the level holds for each one the camera is showing. A
+  // type the camera holds all of is what the frame is about; a type it holds a
+  // twenty-fifth of is a sea of scenery being sampled, and one outline says as
+  // much about it as thirty would. Within a type the nearest goes first: near
+  // is what a question is about, and what a reader can make an outline out of.
+
+  // Nearest first is also the order a reader reads the list in, and the order
+  // an image strokes the hulls in, so the near ones land on top.
+  visible.sort(byDepthThenId)
   const subjectEntry = subject && visible.find(entry => entry.id === subject.id)
   const subjectDepth = subjectEntry?.depth
+
+  // A thing wider or taller than half the frame is a backdrop, not a subject,
+  // and in a subject shot the horizon is context rather than content. Neither
+  // can hold a mark, so neither takes a turn either — a type's turn must not
+  // be spent on a body that was never going to be marked.
+  const candidates = visible.filter(entry => entry !== subjectEntry
+    && entry.size[0] <= 50 && entry.size[1] <= 50
+    && !(subjectDepth && entry.depth > subjectDepth * 8))
+
+  const held = {}
+  for (const entry of candidates) held[entry.type] = (held[entry.type] || 0) + 1
+  const turn = new Map()
+  const counted = {}
+  for (const entry of candidates) {
+    const nth = counted[entry.type] = (counted[entry.type] || 0) + 1
+    turn.set(entry, 1 + (nth - 1) * population[entry.type] / held[entry.type])
+  }
+  candidates.sort((a, b) => turn.get(a) - turn.get(b)
+    || population[a.type] - population[b.type] || byDepthThenId(a, b))
+
   const marked = []
   // The subject of a subject shot is always mark 1 — the question is about it.
   if (subjectEntry) { subjectEntry.mark = marked.push(subjectEntry) }
-  for (const entry of visible) {
-    if (entry === subjectEntry) continue
-    if (entry.size[0] > 50 || entry.size[1] > 50) continue
-    // In a subject shot the horizon is context, not content — no tags out there.
-    if (subjectDepth && entry.depth > subjectDepth * 8) continue
+  for (const entry of candidates) {
     if (marked.length >= MOST_MARKS) break
+    // Two marks landing on the same few percent of screen draw over each
+    // other's outline, so a mark also needs clear screen distance from every
+    // mark already given.
     if (marked.some(other =>
       Math.abs(other.at[0] - entry.at[0]) < 4 && Math.abs(other.at[1] - entry.at[1]) < 5)) continue
     entry.mark = marked.push(entry)
@@ -221,3 +257,6 @@ export function describe(context, options = {}) {
 }
 
 const round = n => Math.round(n * 100) / 100
+
+/** Nearest first, and the id settles a tie, so one world answers one order. */
+const byDepthThenId = (a, b) => a.depth - b.depth || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
