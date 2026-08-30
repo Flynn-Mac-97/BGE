@@ -17,6 +17,9 @@
   choice screen holds the world, and a held step moves no clock at all, so a
   plain `simulate(60)` stops dead at the first card and every reading after it
   is the same reading.
+- The arc gives up rather than spins: `MOST_STILL_SLICES` slices that move no
+  clock end the run and `heldBy` names what is holding it. Ask for a run past
+  the end of one and that is the answer you get.
 - The arc's kitten is a stand-in for a player and deliberately a plain one: it
   runs from whatever is within nine metres, across the crowd rather than
   straight back, and turns toward the middle at the edge. It measures the
