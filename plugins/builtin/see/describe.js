@@ -225,20 +225,28 @@ export function describe(context, options = {}) {
 
   // Every other field is a projection, so a fault in world space cannot be seen
   // in them, and `depth` — distance from the lens — reads as height to anyone
-  // looking for one. A span per TYPE costs ten lines rather than one per
-  // entity, and a gap between two spans is what a structural fault looks like.
+  // looking for one. A gap between two spans is what a structural fault looks
+  // like, so this covers the level rather than the frame: whether a thing rests
+  // on the floor does not depend on the floor being aimed at. Per TYPE, so it
+  // costs ten lines on a scene where per entity would cost nine hundred.
   const verticalSpan = {}
-  for (const entry of visible) {
-    const world = entry._world
-    const bottom = world.y - world.h / 2
-    const top = world.y + world.h / 2
-    const span = verticalSpan[entry.type]
-    if (!span) verticalSpan[entry.type] = [round(bottom), round(top)]
+  for (const entity of context.world.entities) {
+    if (entity.hidden && !options.includeHidden) continue
+    const bounds = boundsOf(entity)
+    const span = verticalSpan[entity.type]
+    const bottom = round(entity.y - bounds.h / 2)
+    const top = round(entity.y + bounds.h / 2)
+    if (!span) verticalSpan[entity.type] = [bottom, top]
     else {
-      span[0] = Math.min(span[0], round(bottom))
-      span[1] = Math.max(span[1], round(top))
+      span[0] = Math.min(span[0], bottom)
+      span[1] = Math.max(span[1], top)
     }
   }
+
+  // Publishing the spans is not the same as answering. Handed six ranges, a
+  // cheap model picks the one it read last rather than the one that is metres
+  // out, so the comparison is done here and the band is named.
+  const heightGaps = emptyBands(verticalSpan)
 
   for (const entry of visible) delete entry._world
 
@@ -263,11 +271,17 @@ export function describe(context, options = {}) {
     /** Percent of the screen each type's boxes cover, before overlap. */
     coverage,
     /**
-     * Bottom and top face of each visible type in WORLD units, y up. The only
-     * field here that is not a projection, and the one that answers whether a
-     * thing rests on, floats above or sinks into another.
+     * Bottom and top face of every type in the level, in WORLD units, y up.
+     * The only field here that is not a projection, and the one that answers
+     * whether a thing rests on, floats above or sinks into another.
      */
     verticalSpan,
+    /**
+     * Heights no type occupies, tallest first. A level built to one surface has
+     * none worth naming; a band metres tall means one set of things was placed
+     * against a different surface from the rest.
+     */
+    ...(heightGaps.length ? { heightGaps } : {}),
     /** One colour per marked type — the colour each See drawing uses for it. */
     palette,
     /**
@@ -312,6 +326,33 @@ export function aboutTypes(context, typeNames) {
 }
 
 const round = n => Math.round(n * 100) / 100
+
+/**
+ * Heights nothing occupies, tallest band first.
+ *
+ * Everything in a level is built against a surface, so the types stack into one
+ * continuous run of heights. A band a metre or more tall means two surfaces
+ * were used, and the types above the band were placed against the wrong one.
+ *
+ * One world unit is the floor because a level has small honest gaps — a bird
+ * over a field, a lamp on a post — and naming those would bury the one that
+ * matters. Three at most, for the same reason.
+ */
+function emptyBands(verticalSpan) {
+  const spans = Object.entries(verticalSpan)
+    .map(([type, [bottom, top]]) => ({ type, bottom, top }))
+    .sort((first, second) => first.bottom - second.bottom)
+  const bands = []
+  for (let index = 1; index < spans.length; index++) {
+    // Against the highest top so far, not the one span below: a tall type
+    // reaching up through the band means there is no empty band.
+    const ceiling = Math.max(...spans.slice(0, index).map(span => span.top))
+    const metres = round(spans[index].bottom - ceiling)
+    if (metres < 1) continue
+    bands.push({ from: ceiling, to: spans[index].bottom, metres, above: spans[index].type })
+  }
+  return bands.sort((first, second) => second.metres - first.metres).slice(0, 3)
+}
 
 /** Nearest first, and the id settles a tie, so one world answers one order. */
 const byDepthThenId = (a, b) => a.depth - b.depth || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)

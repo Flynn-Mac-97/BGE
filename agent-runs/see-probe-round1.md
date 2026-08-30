@@ -23,10 +23,16 @@ See faster or truer than the plain route, not does an agent know it exists.
 
 **P1 — what is floating in the scene?**
 
+> This key was wrong, and the correction is in `see-probe-round2.md`. It was
+> measured on a world restored by a hot reload, where the entities a run spawns
+> sat at y = 0 along with the scenery. In a world that has actually played, the
+> kitten and the rats rest on the floor and only the authored scenery floats.
+> Round 1's P1 is scored below against the key as written, which both arms
+> failed on any reading.
+
 Everything except the floor. `floor` is a `ground` slab placed at y = -6.5
 with a 1-high box, so its top face is at y = -6.0. Every other entity is
-authored at y = 0: the kitten, 116 rats, 23 gems and 743 props. The whole
-meadow floats six metres above the surface it is supposed to rest on.
+authored at y = 0: the kitten, 116 rats, 23 gems and 743 props.
 `kitten-survivors/types/ground.js` states the rule the placement breaks — a
 slab is placed at y = -height/2, which is -0.5 here.
 
