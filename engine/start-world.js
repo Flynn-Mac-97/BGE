@@ -15,7 +15,7 @@
  * the same engine with nothing drawing it. The moment it becomes a second
  * implementation, the two start to disagree and neither can be trusted.
  */
-import { carryWorldThroughReload } from './reload-notice.js'
+import { carryWorldThroughReload, takeReloadNote } from './reload-notice.js'
 import { makeBus } from './bus.js'
 import { makeWorld } from './world.js'
 import { makeLoop } from './loop.js'
@@ -385,7 +385,11 @@ export async function startWorld({
   }
   if (start) await loadLevel(start)
 
-  const engine = makeInspect({ world, loader, loop, files, bus, editor, view })
+  // `reload` is a fact the kernel learns while booting and the reading surface
+  // reports: the page was reloaded and the world was rebuilt. It is a function
+  // because it answers once and then answers nothing, which is what keeps a
+  // warning worth reading.
+  const engine = makeInspect({ world, loader, loop, files, bus, editor, view, reload: takeReloadNote })
   context.engine = engine
 
   // Editing engine or plugin source is a full page reload, and a page reload

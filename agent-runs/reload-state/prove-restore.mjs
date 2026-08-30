@@ -15,7 +15,18 @@
  * that are supposed to be there.
  */
 import { startWorldInNode } from '../../engine/start-world-node.mjs'
-import { captureWorld, carryWorldThroughReload } from '../../engine/reload-notice.js'
+import { captureWorld, carryWorldThroughReload, takeReloadNote } from '../../engine/reload-notice.js'
+
+/**
+ * What `engine/inspect.js` will do with the note once the patch in the report is
+ * applied: ask for it, and fold it into the reply as one field when there is
+ * one. Written out here so the exact expression is the thing being proven, and
+ * not a paraphrase of it.
+ */
+const asInspectWill = reply => {
+  const notice = takeReloadNote()
+  return notice ? { ...reply, [notice.key]: notice.sentence } : reply
+}
 
 const project = process.argv[2] || 'kitten-survivors'
 const SECONDS = 5
@@ -106,13 +117,13 @@ const fresh = b.engine.snapshot({ entities: true })
 line(`before restore   ${fresh.counts.entities} entities, clock ${fresh.time}s, simulated ${b.world.simulated}`)
 
 const notice = await carryWorldThroughReload({ ...parts(b), store })
-// The first snapshot carries the notice, which is the point of it. The diff is
-// taken from the second, so what is compared is two worlds and not a world
-// against a world plus an announcement.
-b.engine.snapshot()
 const after = b.engine.snapshot({ entities: true })
 line(`after restore    ${after.counts.entities} entities, clock ${after.time}s, simulated ${b.world.simulated}`)
+line(`held still as    ${JSON.stringify(after.paused ?? null)}`)
 line(`session emptied  ${store.getItem('engine:reload-capture') === null}`)
+// A held world cannot be run on, which is the whole point of holding it — and
+// this proof needs to run it on in order to show what would have been wrong.
+b.loop.release('restored-world')
 
 // -------------------------------------------------------------------- diffs
 heading('diff 1 — snapshot before the reload against snapshot after the restore')
@@ -140,28 +151,30 @@ line(`simulated flag       ${b.world.simulated}`)
 heading('the notice, exactly as it is written')
 line(`key        ${notice.key}`)
 line(`sentence   ${notice.sentence}`)
-line(`reload     ${JSON.stringify(notice.reload ?? notice.detail, null, 2)}`)
+line(`detail     ${JSON.stringify(notice.detail, null, 2)}`)
 
-heading('delivery — the first snapshot carries it, the second does not')
+heading('delivery — said once, to whoever asks first, and never again')
 const c = await startWorldInNode({ project })
 const secondStore = fakeSession()
 secondStore.setItem('engine:reload-capture', captureText)
 await carryWorldThroughReload({ ...parts(c), store: secondStore })
-const first = c.engine.snapshot()
-const second = c.engine.snapshot()
-line(`snapshot 1 carries   ${Object.keys(first).filter(k => k === 'worldWasRestored' || k === 'worldWasReset' || k === 'reload').join(', ') || 'nothing'}`)
-line(`snapshot 2 carries   ${Object.keys(second).filter(k => k === 'worldWasRestored' || k === 'worldWasReset' || k === 'reload').join(', ') || 'nothing'}`)
+const carried = key => Object.keys(key).filter(k => k === 'worldWasRestored' || k === 'worldWasReset').join(', ') || 'nothing'
+const first = asInspectWill(c.engine.snapshot())
+const second = asInspectWill(c.engine.snapshot())
+line(`snapshot 1 carries   ${carried(first)}`)
+line(`snapshot 2 carries   ${carried(second)}`)
+line(`a command reply      ${carried(asInspectWill(c.engine.run('bridge.status')))}`)
+line(`in snapshot().errors ${first.errors.some(e => e.message.startsWith('[reload]'))}`)
 line(`engine.reloadNotice() still answers: ${!!c.engine.reloadNotice()}`)
 
-heading('delivery — the same notice riding on a command reply instead')
+heading('delivery — the same note taken by a command reply first instead')
 const d = await startWorldInNode({ project })
 const thirdStore = fakeSession()
 thirdStore.setItem('engine:reload-capture', captureText)
 await carryWorldThroughReload({ ...parts(d), store: thirdStore })
-const reply = d.engine.run('bridge.status')
-line(`run("bridge.status") -> ${JSON.stringify(reply)}`)
-const plain = d.engine.run('bridge.status')
-line(`the next one         -> ${JSON.stringify(plain)}`)
+const reply = asInspectWill(d.engine.run('bridge.status'))
+line(`run("bridge.status") -> ${JSON.stringify(reply).slice(0, 220)}...`)
+line(`the next one         -> ${JSON.stringify(asInspectWill(d.engine.run('bridge.status')))}`)
 
 // ------------------------------------------------------ the clock and the stream
 heading('the clock and the random stream, which are the moment as much as the entities are')
@@ -221,9 +234,10 @@ for (const [label, stored] of [
 
 // ------------------------------------------------------------------ verdict
 heading('verdict')
-// The clock cannot be set, and the log honestly records that a reload happened.
-// Everything else differing would be a world that did not come back.
-const expected = new Set(['time', 'errors'])
+// The log honestly records that a reload happened, and `paused` honestly
+// records that the restored world is a moment to look at rather than a run to
+// continue. Everything else differing would be a world that did not come back.
+const expected = new Set(['errors', 'paused'])
 const unexpected = snapshotDifferences.filter(text => !expected.has(text.split(/[:.[]/)[0]))
 line(`snapshot differences        ${snapshotDifferences.length} (${snapshotDifferences.length ? snapshotDifferences.map(t => t.split(':')[0]).join(', ') : 'none'})`)
 line(`unexpected ones             ${unexpected.length ? unexpected.join(' | ') : 'none'}`)

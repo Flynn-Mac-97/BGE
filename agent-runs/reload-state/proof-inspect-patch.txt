@@ -1,0 +1,12 @@
+applied  makeInspect takes the note
+applied  snapshot carries it
+applied  a command reply carries it
+
+snapshot 1        carries the notice
+snapshot 2        carries nothing
+run("a.plain")    carries the notice
+run("a.plain")    carries nothing
+run("a.number")   answered 7 — shape untouched, the note still waits
+snapshot next     carries the notice
+with nothing to say, snapshot has no reload field: true
+and simulate's snapshot is the same object shape:  true

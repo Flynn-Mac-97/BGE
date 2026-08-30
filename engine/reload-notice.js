@@ -20,7 +20,16 @@
  *                         back carries a plain sentence naming the file that
  *                         triggered it, when, and exactly what did and did not
  *                         come back. It is said once and then stops, so it
- *                         cannot haunt every later reply.
+ *                         cannot haunt every later reply. `takeReloadNote` is
+ *                         how the reading surface asks; this file pushes
+ *                         nothing and wraps nothing.
+ *
+ * When a restore cannot be faithful the world is held still rather than handed
+ * over as though it were. Entities a plugin spawned come back standing in the
+ * right places, but the crowd or pool that drove them was rebuilt empty — so the
+ * world looks exactly right and would run wrong, which is the failure the whole
+ * of this is about. Time is held under a name that every later `snapshot()`
+ * shows, so the lie cannot be told twice.
  *
  * The clock and the random stream come back with everything else. Both are
  * restored in the form the loop keeps them — a step count and a draw count, not
@@ -62,14 +71,21 @@ const STORAGE_LIMIT = 3_000_000
 /** How deep a captured value may nest before it is treated as something other than data. */
 const DATA_DEPTH = 8
 
-/** How long after a project plugin changed a page unload is attributed to that file. */
-const BLAME_WINDOW = 2000
-
 /** Marks a value that is not plain data and so was left behind. */
 const DROPPED = Symbol('dropped')
 
 /** A captured reference to another entity, put back by id once the world is whole again. */
 const ENTITY_REFERENCE = '#entity'
+
+/**
+ * The name time is held under when a restored world is safe to look at and not
+ * safe to run.
+ *
+ * Short because it has to be typed to let go of it, and a name because
+ * `snapshot().paused` lists holds by name — so every reading of the world, not
+ * just the first one, says that this world is a moment rather than a run.
+ */
+const LOOK_ONLY = 'restored-world'
 
 /**
  * Fields the capture handles itself, so the sweep for game-written fields skips
@@ -394,9 +410,20 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
   // The vague half of this used to be the whole of it, and a vague loss is one
   // nobody acts on. The entities a plugin made are countable, so count them and
   // say what the consequence is.
+  //
+  // The consequence is the whole point. Those entities are back and standing in
+  // the right places, so the world LOOKS exactly like the one that was lost —
+  // and it will not run like it, because whatever list drove them was rebuilt
+  // empty. A world that looks right and moves wrong is the failure this file
+  // exists to end, so it is not merely reported: the loop is held, by name, and
+  // nothing moves until somebody says it may.
   const madeInTheRun = capture.entities.filter(held => !fromLevel.has(held.id)).length
   if (madeInTheRun) {
-    notRestored.push(`the lists plugins keep of what they spawned — ${madeInTheRun} of the ${capture.entities.length} entities were made during the run, and a crowd, a pool or a wave counter holding them was rebuilt empty, so those entities are in the world but nothing is driving them. A plugin puts its list back by listening for "world:restored"`)
+    loop.hold(LOOK_ONLY)
+    notRestored.push(
+      `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${capture.entities.length} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. `
+      + `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. `
+      + `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`)
   } else {
     notRestored.push('anything a plugin holds outside the world, which was rebuilt from boot')
   }
@@ -406,6 +433,7 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
     entities: world.entities.length,
     simulated: world.simulated,
     playing: loop.running,
+    lookOnly: loop.holds.includes(LOOK_ONLY),
     notRestored
   }
 }
@@ -460,14 +488,20 @@ export function describeReload(capture, outcome) {
       level: outcome.restored.level,
       entities: outcome.restored.entities,
       simulated: outcome.restored.simulated,
-      playing: outcome.restored.playing
+      playing: outcome.restored.playing,
+      lookOnly: !!outcome.restored.lookOnly
     }
     detail.notRestored = outcome.restored.notRestored
     const was = `level "${outcome.restored.level}", ${outcome.restored.entities} ${outcome.restored.entities === 1 ? 'entity' : 'entities'}`
         + `${outcome.restored.simulated ? ', simulated' : ''}${outcome.restored.playing ? ', playing' : ''}`
     return {
       key: 'worldWasRestored',
-      sentence: `${trigger}${when}; the world was put back as it was — ${was}. `
+      // Two different claims, because they are two different worlds to be
+      // handed. One can be run on and the other cannot, and saying "restored"
+      // for both would make the word worthless.
+      sentence: (outcome.restored.lookOnly
+        ? `${trigger}${when}; the world was put back to LOOK at, not to run on — ${was}, and time is held still. `
+        : `${trigger}${when}; the world was put back as it was — ${was}. `)
         + `A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. `
         + `NOT restored: ${outcome.restored.notRestored.join('; ')}. `
         + `engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.`,
@@ -501,63 +535,36 @@ export function describeReload(capture, outcome) {
 // ------------------------------------------------------------------ delivery
 
 /**
- * The notice waiting to be handed over, and the surface it was bolted onto.
+ * The notice waiting to be handed over.
  *
  * Module state, and that is exactly its scope: a page has one world, and a node
  * process never sets this because nothing there has a session to restore from.
+ *
+ * It is offered rather than pushed. `engine.snapshot()` and `engine.run()` ask
+ * for it through `takeReloadNote`, which answers once and then answers nothing —
+ * so an agent running one command after the reload is certain to be told, and
+ * the twentieth is not told again.
  */
 let pending = null
 let lastNotice = null
-let unwrap = null
 
-const takeNotice = () => {
+/**
+ * The notice, once. The reading surface calls this; nothing else should.
+ *
+ * Say it once and stop, because a warning repeated on every reply is a warning
+ * an agent learns to skip past, and the one that mattered is then the one that
+ * got skipped.
+ */
+export function takeReloadNote() {
   if (!pending) return null
   const notice = pending
   pending = null
-  // Unhooked the moment it is delivered, so a session that has heard the news
-  // pays nothing at all for it afterwards.
-  unwrap?.()
-  unwrap = null
   return notice
 }
 
-const withNotice = (result, notice) => {
-  if (isPlainObject(result)) return { ...result, [notice.key]: notice.sentence, reload: notice.detail }
-  return {
-    [notice.key]: `${notice.sentence} This reply also carries the command's own result under "result".`,
-    reload: notice.detail,
-    result
-  }
-}
-
-/**
- * Bolt the notice onto the two things an agent reaches for first.
- *
- * `snapshot()` is what "what is the world" means, and `run()` is every command
- * there is — including `simulate`, which answers with a snapshot and so carries
- * it too. Whichever comes first delivers it and the wrappers come straight off.
- */
-function deliverThrough(engine, notice) {
-  pending = notice
-  lastNotice = notice
-  const originals = new Map()
-
-  for (const name of ['snapshot', 'run']) {
-    const original = engine[name]
-    if (typeof original !== 'function') continue
-    originals.set(name, original)
-    engine[name] = function (...args) {
-      const result = original.apply(this, args)
-      // Taken after the call, so a command that throws leaves the notice
-      // waiting for whoever asks next rather than swallowing it.
-      const carried = takeNotice()
-      if (!carried) return result
-      if (result && typeof result.then === 'function') return result.then(value => withNotice(value, carried))
-      return withNotice(result, carried)
-    }
-  }
-
-  unwrap = () => { for (const [name, original] of originals) engine[name] = original }
+/** The same notice, as many times as asked, for an agent that missed the once. */
+export function lastReloadNotice() {
+  return lastNotice
 }
 
 // ------------------------------------------------------------------ the tab
@@ -590,6 +597,10 @@ function sessionStore() {
 function shortenPath(file) {
   if (!file || file === '*') return null
   const path = String(file).split('\\').join('/')
+  // Already relative to the checkout, so it is already the answer. Trimming it
+  // further would throw away the project directory, which is the half that says
+  // which game a plugin belongs to.
+  if (!path.startsWith('/') && !/^[a-zA-Z]:/.test(path)) return path
   for (const directory of ['/plugins/', '/engine/', '/bin/', '/test/']) {
     const cut = path.lastIndexOf(directory)
     if (cut >= 0) return path.slice(cut + 1)
@@ -610,7 +621,6 @@ function shortenPath(file) {
 function armCapture(parts, store) {
   if (typeof window === 'undefined' || !store) return
   let saved = false
-  let lastPluginChange = null
 
   const save = cause => {
     if (saved) return
@@ -644,21 +654,21 @@ function armCapture(parts, store) {
       file: shortenPath(payload?.triggeredBy || payload?.path),
       at: new Date().toISOString()
     }))
-    // A project plugin is reloaded by the editor rather than by Vite, so the
-    // only record of which file it was is the change that came in just before.
-    hot.on('engine:changed', change => {
-      if (change?.file?.startsWith('plugins/')) lastPluginChange = { file: change.file, at: Date.now() }
-    })
   }
 
-  window.addEventListener('pagehide', () => {
-    const blamed = lastPluginChange && Date.now() - lastPluginChange.at < BLAME_WINDOW
-    save({
-      kind: 'page unload',
-      file: blamed ? `${parts.editor.projectDirectory}/${lastPluginChange.file}` : null,
-      at: new Date().toISOString()
-    })
-  })
+  // The reload the editor asks for itself, named by whoever asked for it. Live
+  // File Updates says this before it calls `location.reload()`, so the cause is
+  // carried rather than inferred.
+  parts.bus?.on?.('reload:before', ({ file, why } = {}) => save({
+    kind: why || 'the editor reloaded the page',
+    file: shortenPath(file),
+    at: new Date().toISOString()
+  }))
+
+  // Everything else that takes the page: a person pressing reload, a dev server
+  // restarting, a tab being closed. There is no file to name and guessing one
+  // would be worse than saying nothing, because a wrong name is acted on.
+  window.addEventListener('pagehide', () => save({ kind: 'page unload', file: null, at: new Date().toISOString() }))
 }
 
 /** Is the world the page just booted already the world that was captured? */
@@ -683,9 +693,9 @@ export async function carryWorldThroughReload(parts) {
   const { engine } = parts
   const store = parts.store ?? sessionStore()
 
-  // Always answerable, so an agent that missed the one-shot notice has somewhere
+  // Always answerable, so an agent that missed the one-shot note has somewhere
   // to look rather than a guess.
-  if (engine) engine.reloadNotice = () => lastNotice
+  if (engine) engine.reloadNotice = lastReloadNotice
 
   armCapture(parts, store)
   if (!store) return null
@@ -706,14 +716,14 @@ export async function carryWorldThroughReload(parts) {
     const notice = describeReload(capture || {}, {
       why: capture ? 'the moment was written by a different version of the engine' : 'the moment could not be read back'
     })
-    announce(engine, notice)
+    announce(notice)
     return notice
   }
   if (capture.project && capture.project !== parts.editor.projectDirectory) {
     const notice = describeReload(capture, {
       why: `the moment belonged to project "${capture.project}" and this page serves "${parts.editor.projectDirectory}"`
     })
-    announce(engine, notice)
+    announce(notice)
     return notice
   }
 
@@ -737,16 +747,20 @@ export async function carryWorldThroughReload(parts) {
     }
   }
 
-  announce(engine, notice)
+  announce(notice)
   return notice
 }
 
 /**
- * Say it twice on purpose: once into the log, which keeps it as history that
- * `snapshot().errors` shows, and once onto the next reply, which is the only
- * place an agent is certain to be looking.
+ * Say it twice on purpose.
+ *
+ * Once into the log, which keeps it as history that `snapshot().errors` shows
+ * for as long as it is recent; and once as the pending note, which the next
+ * `snapshot()` or `run()` takes and nothing takes again. History answers "what
+ * happened here"; the note answers "read this before you act".
  */
-function announce(engine, notice) {
+function announce(notice) {
+  pending = notice
+  lastNotice = notice
   console.error(`[reload] ${notice.sentence}`)
-  if (engine) deliverThrough(engine, notice)
 }

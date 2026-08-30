@@ -17,8 +17,10 @@
  *   levels   reloaded if it is the one open and you have no unsaved changes
  *   tests    picked up on the next run, no reload
  *   assets   textures re-fetched
- *   plugins  a full page reload, announced — a plugin owns DOM and listeners,
- *            and unloading one safely is a different job from this one
+ *   plugins  a full page reload, announced on the bus as `reload:before` with
+ *            the file that caused it — a plugin owns DOM and listeners, and
+ *            unloading one safely is a different job from this one. Whoever is
+ *            keeping the world across reloads writes it down on that event
  *
  * One exception, and it is Vite's rather than ours: *deleting* a project file
  * reloads the page. Vite does not consult plugins on unlink, so it reaches for
@@ -91,6 +93,17 @@ async function apply({ event, file, kind, name }, context) {
   // Plugins and anything else: the safe answer is a reload, but say why.
   if (file.startsWith('plugins/')) {
     console.log(`%c[hot] ${file} changed — reloading (plugins cannot swap in place)`, 'color:#888')
+    // Announced on the bus before the page goes, because after it there is
+    // nobody left to say it. This is the one reload the editor asks for itself,
+    // so Vite never mentions it, and a listener that had to guess the cause from
+    // whichever file changed most recently would guess wrong in the ordinary
+    // case: a refactor touches several files at once. The reason travels with
+    // the reload instead. Synchronous listeners only — the page goes on the very
+    // next line.
+    context.bus.emit('reload:before', {
+      file: `${context.editor.projectDirectory}/${file}`,
+      why: 'a plugin cannot swap in place'
+    })
     location.reload()
     return null
   }
