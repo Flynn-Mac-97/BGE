@@ -32,7 +32,7 @@ project/
 
 The root `AGENTS.md` is a short bootstrap that points at `ENGINE-BASE.md` —
 the base instructions: speech, code and comment style, and where everything
-lives, with links out. Engine rules live in `agents/`. Game rules live in
+is, with links out. Engine rules are in `agents/`. Game rules are in
 `project/agents/`. Their manifests join into one tree.
 
 Open **AGENTS** to inspect the tree, add a branch, edit its file, or switch an
@@ -317,7 +317,7 @@ The game tests need neither. They run in a private world in the CLI process, so
 several can run at once without seeing each other.
 
 A test is a file, the same way a type is a file. The throwaway scripts written
-to check a change are exactly the ones worth keeping, so they live in the
+to check a change are exactly the ones worth keeping, so they are kept in the
 project rather than in a shell history.
 
 ```js
@@ -341,7 +341,7 @@ node bin/engine.mjs --headless run tests.run coin-pickup  # one
 ```
 
 They also run from the Tests panel in the bottom dock, which keeps a pass/fail
-strip per test — `FP` means it failed once and passes now. Results live in
+strip per test — `FP` means it failed once and passes now. Results are written to
 `project/.engine/tests.json`, beside the generated index and out of the tree
 you browse, because they are output rather than source.
 
@@ -550,8 +550,7 @@ same selection.
 
 Types and tests are read from the generated index and imported by URL rather
 than through `import.meta.glob`, because a glob is fixed when the page loads —
-a file written after that would not exist until a reload, which is exactly the
-moment you want to run it.
+a file written after that would not exist until a reload.
 
 Every swap is logged, so "did my write take?" is one call:
 
@@ -587,7 +586,7 @@ resetting only some of them is the subtle version of the same bug.
 `engine.seed(n)` re-seeds and restarts the clock. Varying the seed is how you
 check behaviour holds generally rather than by luck.
 
-The clock, the schedule and the random stream live in one kernel module because
+The clock, the schedule and the random stream are in one kernel module because
 they are the same concern: whether a run repeats.
 
 ## Editing

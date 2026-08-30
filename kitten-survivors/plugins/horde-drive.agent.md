@@ -7,7 +7,7 @@
 - `SEPARATION` is the number the look of the game hangs on. Above about 1.3 the
   horde orbits instead of closing; below about 0.7 it stacks into one column and
   three hundred rats read as one. Reach for it first if the crowd feels wrong.
-- Family motion lives here because it is a rule, not a shape: a rat scurries in
+- Family motion is defined here because it is a rule, not a shape: a rat scurries in
   stop-start bursts, a hound lopes and pounces a half-second lunge from 4.6 m, crows
   and wasps bob at different rates, a boar stalks, braces for 0.45 s and then
   charges a locked straight line for 1.4 s. Each family moves its own way.

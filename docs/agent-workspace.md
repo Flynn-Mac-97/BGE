@@ -49,8 +49,8 @@ the better route.
 
 The project directory is a start-up parameter, so a `match:` pattern writes
 `project/**` and the resolver rewrites a claimed file's real directory to
-`project/` before matching. Without that, a game opened as `kitten-survivors`
-matched no project rule and the packet still looked complete.
+`project/` before matching. Without the rewrite, a game in any other directory
+matches no project rule and the packet still returns successfully.
 
 A `tests:` entry writes `<project>`, replaced with the directory in use, so a
 lane is handed the check that proves its own game rather than the default one.

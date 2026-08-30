@@ -14,9 +14,9 @@
    CLI / window.engine         ─┘
 ```
 
-Where you let go of a drag is the whole gesture. A type dropped on empty space
-places one; a behaviour dropped on an entity attaches to it. Nothing to arm,
-no mode to leave.
+The drop position decides what a drag means. A type dropped on empty space
+places one; a behaviour dropped on an entity attaches to it. There are no tool
+modes.
 
 No save button anywhere. Every edit lands on disk immediately, which is what
 lets the status bar say "saved" unconditionally.

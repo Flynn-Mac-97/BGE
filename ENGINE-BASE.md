@@ -30,7 +30,7 @@ file, and nothing is saved anywhere else.
 - Comment style: `agents/comment-style.md`
 - Plugin rules: Plugin Master — `plugins/builtin/plugin-master.agent.md`
 
-## Where everything lives
+## Where everything is
 
 - `README.md` — how to use the engine
 - `ARCHITECTURE.md` — how it works and why it is shaped this way

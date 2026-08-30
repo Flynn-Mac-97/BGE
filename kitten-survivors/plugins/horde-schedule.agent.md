@@ -11,7 +11,7 @@
 - The rate's one job is to outpace the weapons, so the crowd is shaped by the
   alive cap and not by the kill rate. Measured with the real four weapons taking
   a card at every level (`agent-runs/horde/measure-density.mjs`): the crowd now
-  rides 100% of its cap for a whole twenty-minute run — 115 at 1:00, 335 at
+  holds 100% of its cap for a whole twenty-minute run — 115 at 1:00, 335 at
   5:00, 600 at 10:00 — at a worst step of 1.6 ms. At the old 2.2 + 1.5/min it
   sagged to 60% of cap while the drip fell behind the kill rate.
 - `MOST_ALIVE` is a hard ceiling of 600, and it is a deliberately conservative cap

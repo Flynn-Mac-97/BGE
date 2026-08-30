@@ -3,7 +3,7 @@
 - Weapons that fire themselves on a cooldown. Nothing here reads input.
 - `context.autoWeapons.define(name, { stats, fire(context, owner, weapon), ready, start, stop, upgraded, warmUp })`.
 - `give(owner, name, overrides)` arms someone; `take(owner, name)` disarms; `fireNow(owner, name)` skips the cooldown.
-- Every number lives in `weapon.stats`: `level damage cooldown count area speed duration pierce knockback`. A weapon may add its own; nothing here is a fixed list.
+- Every number is in `weapon.stats`: `level damage cooldown count area speed duration pierce knockback`. A weapon may add its own; nothing here is a fixed list.
 - **Upgrades are the point.** `upgrade(owner, name, { damage: '+4', cooldown: '*0.9', count: 2 })` — a plain number sets, `+`/`-`/`*` adjust. `levelUp(owner, name, changes)` adds one level too. Announced as `weapon:upgraded`.
 - `weapon.state` is the weapon's own scratch bag between shots (an orbit angle, the last target). Stats are public; state is not.
 - Cooldown never goes below 1/30s however far it is upgraded.

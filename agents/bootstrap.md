@@ -2,7 +2,7 @@
 # Driving this engine
 
 Files on disk are true. Read `ENGINE-BASE.md` first — the base instructions:
-speech, code and comment style, and where everything lives. Then read the
+speech, code and comment style, and where everything is. Then read the
 small instruction packet for your task:
 
 ```sh

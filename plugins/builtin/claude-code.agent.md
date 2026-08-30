@@ -4,7 +4,7 @@ match: CLAUDE.md .claude/**
 
 # Claude Code
 
-What this project needs to drive `claude`, so no vendor name sits in engine
+What this project needs to drive `claude`, so no vendor name is in engine
 code. Checked against **v2.1.220**, 2026-08-29. Run `claude --help` before
 trusting an old line.
 
