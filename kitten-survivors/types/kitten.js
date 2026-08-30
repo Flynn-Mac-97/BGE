@@ -83,10 +83,11 @@ const STANDING_Y = HEIGHT / 2
  * is in the ground plane rather than in height, because this camera is close
  * to plan and a purely vertical tail foreshortens to nothing.
  *
- * It is the only BRIGHT family. The play frame runs a median of 0.72 luminance
- * and the five enemy families are held under 0.38, so the top surfaces of the
- * cat — back, head and the whole upper tail — are 0.92 white and it is the one
- * thing on screen above the ground. Ginger is kept for the ears, the legs, the
+ * It is the only BRIGHT family. The five enemy families sit between 0.29 and
+ * 0.45, so the top surfaces of the cat — back, head and the whole upper tail —
+ * are 0.92 white and it is the one thing on screen above the ground. The cat is
+ * also the largest body on the field and the only thing wearing a violet
+ * keyline. Ginger is kept for the ears, the legs, the
  * flanks and the base of the tail, which this camera sees edge-on.
  *
  * There are no tabby bars. Five bands across the back is surface pattern,

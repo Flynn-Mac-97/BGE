@@ -81,7 +81,7 @@
   {
     "id": "detail-stays-cheap",
     "says": "Surfaces stay plain. Detail is spent on silhouette, never on texture.",
-    "why": "Every reference sits under 0.04 and A Short Hike measures 0.000 — a whole outdoor scene with no surface detail at all. At phone size texture is noise. This is a guard: nobody may answer a brightness failure by adding grain.",
+    "why": "Every reference sits under 0.04 and A Short Hike measures 0.000 \u2014 a whole outdoor scene with no surface detail at all. At phone size texture is noise. This is a guard: nobody may answer a brightness failure by adding grain.",
     "check": "measured",
     "field": "edgeDensity",
     "wants": {
@@ -96,8 +96,8 @@
   },
   {
     "id": "keyline",
-    "says": "Every object carries a pale keyline, so it separates from whatever is behind it.",
-    "why": "The game is read as a crowd on a five centimetre screen. An outline is the only thing that guarantees figure from ground when a hundred warm shapes overlap a warm floor. The toon material already takes an outline width, so this costs one number per material.",
+    "says": "Everything that moves carries a near-black keyline of constant screen width, so it separates from whatever is behind it. Scenery carries none.",
+    "why": "The game is read as a crowd on a five centimetre screen, and an outline is the only thing that guarantees figure from ground when a hundred shapes overlap a warm floor. It is drawn in the vertex shader at a fixed number of pixels, so it does not thin with distance the way a modelled hull does. Scenery is excluded because an outline on 982 props is not a line, it is texture, and it would spend the whole edge budget.",
     "check": "judged",
     "field": null,
     "wants": null,
@@ -105,7 +105,18 @@
       "pikuniku.jpg",
       "donut-county.jpg",
       "goose-game.jpg"
-    ]
+    ],
+    "enforcedBy": "engine/render.js, mesh.keyline; renderStats reports how many were drawn"
+  },
+  {
+    "id": "value-alone-does-not-separate",
+    "says": "An actor and a prop may share a value band. Four other things must not be shared: the actor carries a near-black keyline and the prop carries none, the hues are from different families, the actor is taller than the 0.5 m prop ceiling, and the actor moves.",
+    "why": "The horde sits at 0.29 to 0.45 and decoration at 0.34 to 0.46, so they overlap. Forcing them apart would push five families into a 0.06 wide gap and take the wasp below the value it started at. The failure this guards against was navy birds on dark green props with no outline and matching value; the outline, the hue split and the height ceiling each remove it on their own. Horde hues are 9, 21, 34, 218 and 259; decoration is olive at 75 to 85.",
+    "check": "judged",
+    "field": null,
+    "wants": null,
+    "enforcedBy": null,
+    "from": []
   },
   {
     "id": "cat-is-found-instantly",
@@ -147,7 +158,7 @@
   {
     "id": "silhouette-ceiling",
     "says": "Inside the fence, nothing the arena draws is taller than 0.5 m.",
-    "why": "The camera looks down at about 60 degrees, so a thing of height h hides roughly 2h of ground behind it. Half a metre hides one metre, which is less than one enemy. A 1.4 m fence post hides nearly three metres — three enemies the player never saw coming, in a game whose whole skill is reading the crowd. Every metre of height belongs outside the fence.",
+    "why": "The camera looks down at about 60 degrees, so a thing of height h hides roughly 2h of ground behind it. Half a metre hides one metre, which is less than one enemy. A 1.4 m fence post hides nearly three metres \u2014 three enemies the player never saw coming, in a game whose whole skill is reading the crowd. Every metre of height belongs outside the fence.",
     "check": "derived",
     "field": null,
     "wants": null,
@@ -157,7 +168,7 @@
   {
     "id": "landmarks-are-flat",
     "says": "Landmarks are drawn in the floor and have no height at all.",
-    "why": "Follows from the silhouette ceiling. A player must know where they are while looking at a hundred enemies, and the usual answer — a tower, a statue, a great rock — is the one thing this camera cannot afford. A mown clearing, a ring of set stones and a cart track read from anywhere and hide nothing.",
+    "why": "Follows from the silhouette ceiling. A player must know where they are while looking at a hundred enemies, and the usual answer \u2014 a tower, a statue, a great rock \u2014 is the one thing this camera cannot afford. A mown clearing, a ring of set stones and a cart track read from anywhere and hide nothing.",
     "check": "derived",
     "field": null,
     "wants": null,
@@ -191,13 +202,13 @@
     "check": "derived",
     "field": null,
     "wants": null,
-    "enforcedBy": "the level format itself — anything else fails to load",
+    "enforcedBy": "the level format itself \u2014 anything else fails to load",
     "from": []
   },
   {
     "id": "never-tint-a-type",
     "says": "Never put a tint on a type.",
-    "why": "A placement mesh merges into the type key by key, so a tint on the type is not a fallback — it multiplies into every textured placement that did not override it, and repaints the whole level.",
+    "why": "A placement mesh merges into the type key by key, so a tint on the type is not a fallback \u2014 it multiplies into every textured placement that did not override it, and repaints the whole level.",
     "check": "derived",
     "field": null,
     "wants": null,

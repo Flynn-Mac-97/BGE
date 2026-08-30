@@ -148,13 +148,18 @@ A sun a few degrees off the horizon throws shadows twenty metres long, and twent
 
 No measurement decides these. Check them with `art.compare` and a forced choice between two frames, never with a score.
 
-### Every object carries a pale keyline, so it separates from whatever is behind it.
+### Everything that moves carries a near-black keyline of constant screen width, so it separates from whatever is behind it. Scenery carries none.
 
-The game is read as a crowd on a five centimetre screen. An outline is the only thing that guarantees figure from ground when a hundred warm shapes overlap a warm floor. The toon material already takes an outline width, so this costs one number per material.
+The game is read as a crowd on a five centimetre screen, and an outline is the only thing that guarantees figure from ground when a hundred shapes overlap a warm floor. It is drawn in the vertex shader at a fixed number of pixels, so it does not thin with distance the way a modelled hull does. Scenery is excluded because an outline on 982 props is not a line, it is texture, and it would spend the whole edge budget.
 
 **Judged, not measured.** No number decides this one. Run `art.compare` and read the two frames side by side.
 
 **From:** `pikuniku.jpg`, `donut-county.jpg`, `goose-game.jpg`
+### An actor and a prop may share a value band. Four other things must not be shared: the actor carries a near-black keyline and the prop carries none, the hues are from different families, the actor is taller than the 0.5 m prop ceiling, and the actor moves.
+
+The horde sits at 0.29 to 0.45 and decoration at 0.34 to 0.46, so they overlap. Forcing them apart would push five families into a 0.06 wide gap and take the wasp below the value it started at. The failure this guards against was navy birds on dark green props with no outline and matching value; the outline, the hue split and the height ceiling each remove it on their own. Horde hues are 9, 21, 34, 218 and 259; decoration is olive at 75 to 85.
+
+**Judged, not measured.** No number decides this one. Run `art.compare` and read the two frames side by side.
 ### A player finds the cat in under a second, with a hundred enemies on screen.
 
 This is the whole game. If it fails, nothing else in this document matters.
