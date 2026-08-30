@@ -242,8 +242,9 @@ export default {
           const scene = context.renderer.scene
           studio = { THREE, scene, background: scene.background, fog: scene.fog, dimmed: [], passes: context.renderer.passes?.list || [] }
           scene.fog = null
-          scene.background = new THREE.Color('#8b8f96')
-          studio.key = [139, 143, 150]
+          // No backdrop at all: the studio pass renders into an RGBA target,
+          // and empty stays empty — true alpha from the engine, nothing to key.
+          scene.background = null
           // Post effects are a grade too — a vignette shades the backdrop and
           // bloom lifts the colours — so a neutral draw runs with none.
           context.renderer.passes?.set([])
@@ -274,76 +275,77 @@ export default {
         }
         context.renderer.draw()
 
-        // An alone frame crops to the subject plus a margin: the point of the
-        // image is the model, and every empty pixel costs the reader tokens.
-        // The crop is found in the PIXELS, not the declared box — a model's
-        // real silhouette (a tail, an attachment) can exceed its box, and a
-        // preview must never cut geometry off.
+        // An alone frame is rendered by the engine straight into an RGBA
+        // target with NO background — real per-pixel alpha from the draw, so
+        // there is nothing to key and no fringe to leave. Cropped to the
+        // pixels that carry coverage: no declared box can cut geometry off,
+        // and every delivered pixel IS the subject.
         const canvas = context.shell.canvas
-        const whole = document.createElement('canvas')
-        whole.width = canvas.width
-        whole.height = canvas.height
-        const wholePen = whole.getContext('2d')
-        wholePen.drawImage(canvas, 0, 0)
-
-        let crop = null
+        let copy, pen, crop = null
         if (studio) {
-          const pixels = wholePen.getImageData(0, 0, whole.width, whole.height).data
-          const back = [pixels[0], pixels[1], pixels[2]]
-          let left = whole.width, right = 0, top = whole.height, bottom = 0
-          let sum = 0, seen = 0
-          for (let y = 0; y < whole.height; y += 2) {
-            for (let x = 0; x < whole.width; x += 2) {
-              const at = (y * whole.width + x) * 4
-              const away = Math.abs(pixels[at] - back[0]) + Math.abs(pixels[at + 1] - back[1]) + Math.abs(pixels[at + 2] - back[2])
-              if (away < 30) continue
-              sum += 0.2126 * pixels[at] + 0.7152 * pixels[at + 1] + 0.0722 * pixels[at + 2]
-              seen++
+          const target = new studio.THREE.WebGLRenderTarget(canvas.width, canvas.height)
+          const raw = new Uint8Array(canvas.width * canvas.height * 4)
+          context.renderer.drawInto(target, raw)
+          target.dispose()
+
+          let left = canvas.width, right = 0, top = canvas.height, bottom = 0
+          for (let y = 0; y < canvas.height; y++) {
+            const row = (canvas.height - 1 - y) * canvas.width
+            for (let x = 0; x < canvas.width; x++) {
+              if (raw[(row + x) * 4 + 3] < 8) continue
               if (x < left) left = x
               if (x > right) right = x
               if (y < top) top = y
               if (y > bottom) bottom = y
             }
           }
-          // A mid-grey backdrop loses a mid-toned subject — a reader keeps the
-          // silhouette only when the backdrop opposes the subject's own
-          // luminance. Measured, chosen, and drawn once more.
-          if (seen) {
-            const luminance = sum / seen / 255
-            const dark = luminance >= 0.55
-            studio.scene.background = new studio.THREE.Color(dark ? '#22252b' : '#dde3ea')
-            studio.key = dark ? [34, 37, 43] : [221, 227, 234]
-            context.renderer.draw()
-            wholePen.drawImage(canvas, 0, 0)
+          if (right <= left || bottom <= top) {
+            return { error: 'the studio drew nothing — the subject rendered no pixels', subject: subjectEntity.id }
           }
-          if (right > left && bottom > top) {
-            const pad = Math.max(16, Math.round((right - left) * 0.1))
-            crop = {
-              x: Math.max(0, left - pad),
-              y: Math.max(0, top - pad)
-            }
-            crop.w = Math.min(whole.width - crop.x, right - left + pad * 2)
-            crop.h = Math.min(whole.height - crop.y, bottom - top + pad * 2)
-          }
-        }
+          const pad = Math.max(12, Math.round((right - left) * 0.08))
+          crop = { x: Math.max(0, left - pad), y: Math.max(0, top - pad) }
+          crop.w = Math.min(canvas.width - crop.x, right - left + pad * 2)
+          crop.h = Math.min(canvas.height - crop.y, bottom - top + pad * 2)
 
-        const copy = crop ? document.createElement('canvas') : whole
-        const pen = crop ? copy.getContext('2d') : wholePen
-        if (crop) {
+          copy = document.createElement('canvas')
           copy.width = crop.w
           copy.height = crop.h
-          copy.getContext('2d').drawImage(whole, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
-          // The backdrop was only scaffolding: keyed to transparent, so a
-          // reader gets pixels that ARE the subject and nothing that is not.
-          const keyed = pen.getImageData(0, 0, copy.width, copy.height)
-          const bits = keyed.data
-          for (let at = 0; at < bits.length; at += 4) {
-            const away = Math.abs(bits[at] - studio.key[0])
-              + Math.abs(bits[at + 1] - studio.key[1])
-              + Math.abs(bits[at + 2] - studio.key[2])
-            if (away < 24) bits[at + 3] = 0
+          pen = copy.getContext('2d')
+          const image = pen.createImageData(crop.w, crop.h)
+          for (let y = 0; y < crop.h; y++) {
+            const from = ((canvas.height - 1 - (crop.y + y)) * canvas.width + crop.x) * 4
+            image.data.set(raw.subarray(from, from + crop.w * 4), y * crop.w * 4)
           }
-          pen.putImageData(keyed, 0, 0)
+          // The target reads back linear; the screen the colours were authored
+          // against is sRGB. Encoded here, or every preview ships too dark.
+          const bits = image.data
+          for (let at = 0; at < bits.length; at += 4) {
+            for (let channel = 0; channel < 3; channel++) {
+              const linear = bits[at + channel] / 255
+              bits[at + channel] = Math.round(255 * (linear <= 0.0031308
+                ? linear * 12.92
+                : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055))
+            }
+          }
+          // Transparent unless the caller asks for a colour — a test may need
+          // a known backdrop to assert against, or a mid-tone to judge under.
+          if (options.background && options.background !== 'alpha') {
+            const flat = document.createElement('canvas')
+            flat.width = crop.w
+            flat.height = crop.h
+            flat.getContext('2d').putImageData(image, 0, 0)
+            pen.fillStyle = options.background
+            pen.fillRect(0, 0, crop.w, crop.h)
+            pen.drawImage(flat, 0, 0)
+          } else {
+            pen.putImageData(image, 0, 0)
+          }
+        } else {
+          copy = document.createElement('canvas')
+          copy.width = canvas.width
+          copy.height = canvas.height
+          pen = copy.getContext('2d')
+          pen.drawImage(canvas, 0, 0)
         }
 
         for (const other of concealed) other.hidden = false
