@@ -532,6 +532,15 @@ export default {
           copy.height = canvas.height
           pen = copy.getContext('2d')
           pen.drawImage(canvas, 0, 0)
+          // The HUD and every game screen draw on their own 2D canvases over
+          // the GL one, so a frame taken from GL alone shows a game with no
+          // interface. They are stretched to the GL canvas because a layer is
+          // sized in CSS pixels and the GL canvas in device pixels.
+          if (options.ui !== false) {
+            for (const layer of document.querySelectorAll('canvas.hud-layer, canvas.screen-layer')) {
+              if (layer.width && layer.height) pen.drawImage(layer, 0, 0, copy.width, copy.height)
+            }
+          }
         }
 
         // Where the renderer can say, a marked hull is upgraded from box
