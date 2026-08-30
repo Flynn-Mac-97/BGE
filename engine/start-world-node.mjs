@@ -25,6 +25,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 
 import { makeFiles } from './files.js'
+import { importPlugin } from './plugin-import.js'
 import { startWorld } from './start-world.js'
 import { buildIndex, walk } from './project-index.mjs'
 
@@ -138,7 +139,7 @@ export function onDisk(projectDirectory) {
  * the directory means a plugin written a second ago is found on the next start,
  * which is the same promise the index makes about types.
  */
-async function findPlugins(root, projectDirectory) {
+async function findPlugins(root, projectDirectory, loader) {
   const places = [
     { directory: path.join(root, 'plugins/builtin'), builtin: true },
     { directory: path.join(projectDirectory, 'plugins'), builtin: false }
@@ -151,13 +152,15 @@ async function findPlugins(root, projectDirectory) {
     for (const name of names.sort()) {
       if (!name.endsWith('.js')) continue
       const file = path.join(directory, name)
-      try {
-        const definition = (await import(pathToFileURL(file).href)).default
-        if (!definition) continue
-        found.push({ definition, builtin })
-      } catch (e) {
-        console.error(`[loader] ${file} failed to import`, e)
-      }
+      const definition = await importPlugin({
+        // Named the way a person types it, so the report reads as a path they
+        // can open rather than as wherever this process happens to be.
+        file: path.relative(root, file).replaceAll('\\', '/'),
+        load: () => import(pathToFileURL(file).href),
+        loader,
+        builtin
+      })
+      if (definition) found.push({ definition, builtin })
     }
   }
   return found
@@ -195,7 +198,7 @@ export async function startWorldInNode({ root = ROOT, project = 'project', viewp
 
   return startWorld({
     openFiles: bus => makeFiles(bus, onDisk(projectDirectory)),
-    loadPlugins: () => findPlugins(checkout, projectDirectory),
+    loadPlugins: loader => findPlugins(checkout, projectDirectory, loader),
     importProjectFile: importProjectFileFrom(projectDirectory),
     // The name, not the absolute path: a plugin builds `<project>/plugins` from
     // it, and the browser half only ever knows the name.

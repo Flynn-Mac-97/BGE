@@ -19,7 +19,7 @@ import { makeBus } from './bus.js'
 import { makeWorld } from './world.js'
 import { makeLoop } from './loop.js'
 import { makeLoader } from './loader.js'
-import { makeInspect } from './inspect.js'
+import { makeInspect, makeLog } from './inspect.js'
 
 /**
  * How big the viewport is, when nothing has measured one.
@@ -74,6 +74,11 @@ export async function startWorld({
   view = { ...DEFAULT_VIEW }
 } = {}) {
   const bus = makeBus()
+  // The log is made before anything can fail, not with the read surface at the
+  // end. A world that breaks while it is being built is exactly the world an
+  // agent most needs `snapshot().errors` to describe, and that was the one
+  // case where the field came back empty.
+  const log = makeLog(bus)
   const world = makeWorld(bus)
   const loader = makeLoader(bus)
   const files = openFiles(bus)
@@ -343,7 +348,7 @@ export async function startWorld({
   })
 
   // ---------------------------------------------------------------- run
-  const found = await loadPlugins()
+  const found = await loadPlugins(loader)
   // Where a plugin was found travels beside it rather than being guessed from
   // its name later. Sorting works on definitions, so the flag is carried in a
   // side map instead of being copied onto the definition itself.
@@ -384,7 +389,7 @@ export async function startWorld({
   }
   if (start) await loadLevel(start)
 
-  const engine = makeInspect({ world, loader, loop, files, bus, editor, view })
+  const engine = makeInspect({ world, loader, loop, files, bus, editor, view, log })
   context.engine = engine
 
   return { context, engine, world, loop, loader, bus, files, editor, view, viewport }
