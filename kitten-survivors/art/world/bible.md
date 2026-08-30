@@ -56,6 +56,8 @@ Each of these is a decision nobody has made yet. Averaging them would produce a 
 | `saturation.median` | 0.29 | 0.71 | 0.42 |
 | `saturation.p95` | 0.444 | 0.973 | 0.529 |
 | `warmShare` | 0.041 | 0.971 | 0.93 |
+| `haze.chromaDrop` | -0.313 | 0.219 | 0.532 |
+| `haze.valueLift` | -0.224 | 0.072 | 0.296 |
 
 ## The rulings
 
@@ -116,9 +118,9 @@ Follows from the silhouette ceiling. A player must know where they are while loo
 Every solid thing inside an arena is somewhere the crowd can pin the player. It also means pathing never has to avoid scenery.
 
 **Derived.** It follows from the fact above, not from a picture. Nothing enforces it automatically.
-### The cat is 0.8 m long and 0.45 m tall, and every other size is read against it. One unit is one metre and the top of the ground is y = 0.
+### The cat is 1.6 m long and 0.9 m tall, and every other size is read against it. One unit is one metre and the top of the ground is y = 0. No common prop passes 0.5 m, so the cat stands at least 1.6 times the tallest thing it walks past.
 
-A shared ruler is what stops four people building at four scales. `at` is the centre of a box, so a thing of height h standing on the ground is placed at y = h / 2.
+A shared ruler is what stops four people building at four scales. `at` is the centre of a box, so a thing of height h standing on the ground is placed at y = h / 2. The cat's height carries a second job: a player has to find their own body in a crowd, and the reference makes the played character the tallest thing in its neighbourhood.
 
 **Derived.** It follows from the fact above, not from a picture. Nothing enforces it automatically.
 ### The renderer draws box, quad and GLB, and turns an entity about Y only. Anything that must tip or roll is a model, not a placement.

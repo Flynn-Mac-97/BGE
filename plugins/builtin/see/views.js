@@ -39,6 +39,9 @@ export async function view(context, options = {}) {
     if (!entity) {
       return { error: `no entity or live instance of type "${options.aim}" to aim at` }
     }
+    // What the camera was, so the reply can name the way back. Aiming writes
+    // the live camera and the game's own rule does not always take it again.
+    const was = { x: context.view.x, y: context.view.y, z: context.view.z, zoom: context.view.zoom, mode: context.view.mode, yaw: context.view.yaw, pitch: context.view.pitch, fov: context.view.fov }
     const camera = frameSubject(entity, boundsOf(entity), options.shot)
     camera.mode = 'perspective'
     const back = options.back ?? 3
@@ -48,7 +51,15 @@ export async function view(context, options = {}) {
     for (const [key, value] of Object.entries(camera)) {
       if (value !== undefined) context.view[key] = value
     }
-    const reply = { aimed: entity.id, camera }
+    const named = Object.keys(views)
+    const reply = {
+      aimed: entity.id,
+      camera,
+      was,
+      restore: named.length
+        ? `the live camera is now aimed and stays aimed — put it back with see.view '{"go":"${named[0]}"}'`
+        : 'the live camera is now aimed and stays aimed — save a view first if you need it back'
+    }
     if (typeof options.save === 'string') {
       views[options.save] = camera
       await context.files.write(FILE, JSON.stringify(views, null, 2) + '\n')

@@ -176,8 +176,8 @@
   },
   {
     "id": "cat-is-the-ruler",
-    "says": "The cat is 0.8 m long and 0.45 m tall, and every other size is read against it. One unit is one metre and the top of the ground is y = 0.",
-    "why": "A shared ruler is what stops four people building at four scales. `at` is the centre of a box, so a thing of height h standing on the ground is placed at y = h / 2.",
+    "says": "The cat is 1.6 m long and 0.9 m tall, and every other size is read against it. One unit is one metre and the top of the ground is y = 0. No common prop passes 0.5 m, so the cat stands at least 1.6 times the tallest thing it walks past.",
+    "why": "A shared ruler is what stops four people building at four scales. `at` is the centre of a box, so a thing of height h standing on the ground is placed at y = h / 2. The cat's height carries a second job: a player has to find their own body in a crowd, and the reference makes the played character the tallest thing in its neighbourhood.",
     "check": "derived",
     "field": null,
     "wants": null,

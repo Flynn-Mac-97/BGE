@@ -367,6 +367,19 @@ function meshOf(entity) {
 }
 
 /**
+ * How much bigger than its declared box a thing is actually drawn.
+ *
+ * Two scales multiply: the placement's `scale`, and a model's own `mesh.scale`.
+ * Every answer about a thing's size has to use the same product the draw uses,
+ * or a query reports one size and the screen shows another.
+ */
+function totalScale(entity) {
+  const declared = meshOf(entity)
+  const model = declared?.model ? number(declared.scale, 1, `${entity.type}.mesh.scale`) : 1
+  return (entity.scale ?? 1) * model
+}
+
+/**
  * Which way a body is turned, in radians about Y.
  *
  * There are two names for this and they are not a duplicate — they are the two
@@ -417,7 +430,7 @@ function anchorOffset(entity) {
   }
   if (anchor !== 'feet') return 0
   const height = declared.box?.[1] ?? entity.collider?.box?.[1] ?? 0
-  return -(height / 2) * (entity.scale ?? 1)
+  return -(height / 2) * totalScale(entity)
 }
 
 /**
@@ -604,7 +617,7 @@ function meshShape(entity) {
  * exactly the answer it always got.
  */
 function drawSize(entity) {
-  const s = entity.scale ?? 1
+  const s = totalScale(entity)
   const shape = meshShape(entity)
   if (shape) return { w: shape.w * s, h: shape.h * s, d: shape.d * s }
   const diameter = entity.collider?.circle ? entity.collider.circle * 2 : null
@@ -2400,7 +2413,7 @@ export function makeRenderer(canvas, view, viewport) {
           // Solid geometry carries its own size, so scale multiplies rather
           // than sets. Rotation is about Y, not Z: on a wall, `rotation` means
           // which way it faces, and tipping it over is never what was meant.
-          const s = (entity.scale ?? 1) * (declared.model ? number(declared.scale, 1, `${entity.type}.mesh.scale`) : 1)
+          const s = totalScale(entity)
           object.scale.set(s, s, s)
           object.rotation.set(0, facingRadians(entity), 0)
           // The editor dims a hovered entity to preview it.
