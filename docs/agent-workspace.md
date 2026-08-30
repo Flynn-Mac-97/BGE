@@ -144,9 +144,16 @@ lanes fight over exactly the files that are not in it.
 
 **What still bites:**
 
-- Two editor tabs both answer the bridge and the first reply wins, so a
-  state-dependent CLI call can read the other tab's world. One tab, or
-  `--headless`.
+- Two editor tabs on the SAME server both answer the bridge and the first
+  reply wins, so a state-dependent CLI call can read the other tab's world.
+  One tab per server, or `--headless`. Across servers this cannot happen any
+  more: every reply names the checkout it serves and the CLI refuses a
+  mismatch, which is also what lets a lane drive its own dev server with
+  `--port`.
+- Browser automation tabs are one shared pool across every lane. A lane that
+  browses must open its own tab, verify the PORT in the address bar before
+  every click, and close the tab when done — one lane's keypress landed in
+  another lane's editor after a tab was navigated out from under it.
 - Worktrees resolve `three` and `vite` only because `.agent-worktrees/` sits
   inside the main checkout and node walks up. Moving them needs `npm install`.
 - Give each lane real file paths, never a bare glob — a claim starting with a

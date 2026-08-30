@@ -167,6 +167,12 @@ async function call(op, args, ms = timeout) {
     die(2, `cannot reach the dev server at ${host}. Is \`npm run dev\` running?`, String(e))
   }
   const body = await res.json().catch(() => ({ error: `bad response ${res.status}` }))
+  // The server names the checkout it serves; refuse to drive somebody else's.
+  // This is what makes it safe for a lane to drive its own dev server — the
+  // reply proves whose workspace is on the other end before any op lands.
+  if (body.serves && path.resolve(body.serves) !== path.resolve(REPO)) {
+    die(2, `the server at ${host} serves\n  ${path.resolve(body.serves)}\nbut this command runs from\n  ${path.resolve(REPO)}\nDrive this workspace's own server with --port, or run --headless.`)
+  }
   if (body.code === 'no-client') die(2, body.error)
   if (!body.ok) die(1, body.error || 'unknown error', body.stack)
   return body.result
@@ -428,13 +434,18 @@ if (op === 'check') {
 /**
  * A lane talks to its own world, never the shared editor.
  *
- * The live editor serves the main workspace, so an op that drives it writes
+ * The DEFAULT editor serves the main workspace, so an op that drives it writes
  * straight past the worktree that was created to keep the lane apart. Three
  * lanes each ran `spawn` without `--headless`, reached the one dev server, and
  * left a `_probe_<pid>` entity in the shared level — and `check` failed in a
  * workspace none of them were working in. Claim Guard cannot catch this: it
  * knows which run owns a file, and the write arrives from the server's process,
  * which is nobody.
+ *
+ * A lane MAY run a dev server of its own and drive that — it names the port,
+ * and `call()` refuses any server whose reply says it serves a different
+ * checkout. The guard here only stops the silent default, where "the" editor
+ * is somebody else's.
  *
  * Being inside `.agent-worktrees/` is the whole test. It needs no environment
  * variable to be passed down, which is what makes it hold for a lane that spawns
@@ -443,10 +454,12 @@ if (op === 'check') {
 // Every op that reads the project off disk — pain, agent, index, tree, check —
 // has already run and exited above. What is left here drives a world.
 const LANE = /[\\/]\.agent-worktrees[\\/]([^\\/]+)/.exec(REPO)
-if (LANE && !flags.headless) {
-  die(1, `"${op}" drives the live editor, which serves the main workspace — not lane "${LANE[1]}".\n` +
-    `Run it in this lane's own world instead:\n` +
-    `  node bin/engine.mjs --headless ${process.argv.slice(2).join(' ')}`)
+if (LANE && !flags.headless && !flags.port) {
+  die(1, `"${op}" would drive the default editor, which serves the main workspace — not lane "${LANE[1]}".\n` +
+    `Run it headless, or name this lane's own dev server:\n` +
+    `  node bin/engine.mjs --headless ${process.argv.slice(2).join(' ')}\n` +
+    `  node bin/engine.mjs --port <this lane's port> ${process.argv.slice(2).join(' ')}\n` +
+    `Either way the server's reply is checked against this workspace before any op lands.`)
 }
 
 /**
