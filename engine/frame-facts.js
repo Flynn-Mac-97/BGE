@@ -135,17 +135,21 @@ export function convexHull(points) {
 
 /**
  * Where an entity's world box lands on screen: the hull of its eight
- * projected corners, [x, y] percent pairs. A corner behind a perspective eye
- * cannot project; fewer than three usable corners answers null, and the
- * caller falls back to the screen rectangle.
+ * projected corners, [x, y] percent pairs. Every corner must sit clearly in
+ * front of a perspective eye: a corner behind it would silently vanish and
+ * the hull would collapse to the far face, and a corner grazing the eye
+ * plane projects thousands of percent off screen and the hull floods the
+ * frame. One unsafe corner answers null, and the caller falls back to the
+ * screen rectangle.
  */
 export function screenHull(box, projector) {
   const corners = []
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
     const point = projector.place(box.x + sx * box.w / 2, box.y + sy * box.h / 2, (box.z || 0) + sz * (box.l || 0) / 2)
-    if (point.inFront) corners.push([Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10])
+    if (!point.inFront || (projector.mode !== 'ortho' && point.depth < 0.2)) return null
+    corners.push([Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10])
   }
-  return corners.length >= 3 ? convexHull(corners) : null
+  return convexHull(corners)
 }
 
 /** 3x5 digit stamps for marks in a sketch, where there is no font. */

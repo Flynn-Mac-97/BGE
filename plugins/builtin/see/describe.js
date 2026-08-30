@@ -87,7 +87,6 @@ export function describe(context, options = {}) {
     const hull = screenHull(entry._world, projector)
     if (hull) entry.hull = hull
   }
-  const apart = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b)) >= 25
   const hues = new Map()
   for (const entry of visible) {
     if (!hues.has(entry.type)) hues.set(entry.type, typeHue(entry.type))
@@ -95,14 +94,20 @@ export function describe(context, options = {}) {
   const palette = {}
   for (const type of [...new Set(marked.map(entry => entry.type))].sort()) {
     const own = hues.get(type)
-    let hue = own.hue
-    for (let spins = 0; spins < 12; spins++) {
-      const clear = [...hues].every(([other, at]) => other === type || apart(at.hue, hue))
-      if (clear) break
-      hue = (hue + 37) % 360
+    const distanceTo = hue => Math.min(...[...hues]
+      .filter(([other]) => other !== type)
+      .map(([, at]) => Math.min(Math.abs(at.hue - hue), 360 - Math.abs(at.hue - hue))), Infinity)
+    // Only a probed hue is ever assigned; when no probe stands clear, the
+    // best of them wins — never an unchecked thirteenth value.
+    let best = own.hue
+    let bestDistance = distanceTo(own.hue)
+    for (let spins = 1; spins < 12 && bestDistance < 25; spins++) {
+      const hue = (own.hue + spins * 37) % 360
+      const distance = distanceTo(hue)
+      if (distance > bestDistance) { best = hue; bestDistance = distance }
     }
-    hues.set(type, { hue, bright: own.bright })
-    palette[type] = hueHex(hue, own.bright)
+    hues.set(type, { hue: best, bright: own.bright })
+    palette[type] = hueHex(best, own.bright)
   }
 
   const coverage = {}

@@ -157,6 +157,7 @@ export function sketchPixels(description, options = {}) {
       const points = entry.hull.map(([x, y]) => [x / 100 * width, y / 100 * height])
       const top = Math.max(0, Math.floor(Math.min(...points.map(p => p[1]))))
       const bottom = Math.min(height - 1, Math.ceil(Math.max(...points.map(p => p[1]))))
+      let painted = false
       for (let y = top; y <= bottom; y++) {
         let from = Infinity, to = -Infinity
         for (let at = 0; at < points.length; at++) {
@@ -167,7 +168,15 @@ export function sketchPixels(description, options = {}) {
           if (x < from) from = x
           if (x > to) to = x
         }
+        if (from > to) continue
+        painted = true
         for (let x = Math.round(from); x <= Math.round(to); x++) paint(x, y, colour)
+      }
+      // A hull thinner than one buffer row crosses no integer scanline and
+      // would vanish; a marked thing always gets at least one pixel.
+      if (!painted) {
+        paint(Math.round(points.reduce((sum, p) => sum + p[0], 0) / points.length),
+          Math.round(points.reduce((sum, p) => sum + p[1], 0) / points.length), colour)
       }
       continue
     }

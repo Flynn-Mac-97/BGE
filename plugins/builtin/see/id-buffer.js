@@ -153,8 +153,13 @@ export async function silhouettes(context, ids) {
     const hulls = {}
     for (const [id, spans] of edges) {
       const points = []
+      // Both edges of the span's pixels on both edges of the row, so the
+      // hull encloses the pixels instead of stopping at their top-left —
+      // and a one-row silhouette still makes a real polygon.
       for (const [y, [left, right]] of spans) {
-        points.push([left / width * 100, y / height * 100], [(right + 1) / width * 100, y / height * 100])
+        points.push(
+          [left / width * 100, y / height * 100], [(right + 1) / width * 100, y / height * 100],
+          [left / width * 100, (y + 1) / height * 100], [(right + 1) / width * 100, (y + 1) / height * 100])
       }
       hulls[id] = convexHull(points).map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10])
     }

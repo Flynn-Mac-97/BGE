@@ -253,6 +253,12 @@ export default {
         // below, whole.
         const concealed = []
         let studio = null
+        let overlays = []
+        let copy, pen, crop = null
+        // Everything from here to the finally mutates live render state; the
+        // finally is what guarantees the editor gets its world back on every
+        // path — an empty studio, a lost context, a throw mid-draw.
+        try {
         if (options.alone && subjectEntity) {
           for (const other of context.world.entities) {
             if (other === subjectEntity || other.hidden) continue
@@ -283,7 +289,7 @@ export default {
         // Always drawn fresh, never copied as-is: a hidden or throttled tab
         // stops painting, and its stale canvas reads back as nothing.
         context.renderer.sync(context.world)
-        const overlays = options.ui === false ? concealOverlays(context) : []
+        if (options.ui === false) overlays = concealOverlays(context)
         // The sky is a sphere riding the camera and effects are scene
         // children, not entities — in the studio, everything that is not the
         // subject or the rig goes dark for the one draw.
@@ -303,7 +309,6 @@ export default {
         // pixels that carry coverage: no declared box can cut geometry off,
         // and every delivered pixel IS the subject.
         const canvas = context.shell.canvas
-        let copy, pen, crop = null
         if (studio) {
           const target = new studio.THREE.WebGLRenderTarget(canvas.width, canvas.height)
           const raw = new Uint8Array(canvas.width * canvas.height * 4)
@@ -386,19 +391,21 @@ export default {
           }
         }
 
-        for (const other of concealed) other.hidden = false
-        for (const child of overlays) child.visible = true
-        if (studio) {
-          studio.scene.remove(studio.rig)
-          studio.scene.background = studio.background
-          studio.scene.fog = studio.fog
-          for (const child of studio.dimmed) child.visible = true
-          context.renderer.passes?.set(studio.passes)
-        }
-        if (moved) Object.assign(view, kept)
-        if (moved || concealed.length || overlays.length) {
-          context.renderer.sync(context.world)
-          context.renderer.draw()
+        } finally {
+          for (const other of concealed) other.hidden = false
+          for (const child of overlays) child.visible = true
+          if (studio) {
+            studio.scene.remove(studio.rig)
+            studio.scene.background = studio.background
+            studio.scene.fog = studio.fog
+            for (const child of studio.dimmed) child.visible = true
+            context.renderer.passes?.set(studio.passes)
+          }
+          if (moved) Object.assign(view, kept)
+          if (moved || concealed.length || overlays.length) {
+            context.renderer.sync(context.world)
+            context.renderer.draw()
+          }
         }
 
         // A frame of nothing must never come back labelled as a frame. Sample
