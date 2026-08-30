@@ -48,13 +48,19 @@ const HELP = `engine — read and drive the running editor
 
 state     snapshot [--entities --log --plugins --commands --timers]
           entity <id>          index          tree
-          check                exits 1 if anything is broken or nondeterministic
+          check                exits 1 if anything is broken, nondeterministic,
+                               or a plugin file that will not load
 drive     select <id...>       set <id> <key> <value>
           spawn <type> ['{"at":[1,2,0]}']     destroy <id>
           run <command-id> [arg]              commands
 run       play    stop    simulate <seconds>    seed <n>
           script '[["simulate",30],["run","see.describe"]]'
                                several ops, one world — headless only
+servers   servers              every dev server this checkout started — port,
+                               process, checkout, project, uptime — and the
+                               editor tabs attached to each, hidden ones named
+          servers.stop [<port>]     stop that one, or all of them when no port
+                               is given. Safe when nothing is running
 debug     errors    log [n]    watch    eval '<js>'
 friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
                engine friction only — a game defect goes in your report, not here
@@ -87,6 +93,11 @@ Exit 0 ok, 1 error, 2 no editor attached (open ${HOST}).
 index, tree, check and pain read the project straight off disk, so they answer
 with nothing running. Everything else drives a live editor unless --headless
 says to start a world here instead.
+
+servers and servers.stop need no editor either. They read what each dev server
+wrote down and then prove every line by asking the port, because a server killed
+outright leaves its record behind and a record alone is not evidence. A port
+answering for somebody else's checkout is named and never stopped for you.
 
 Agent commands also need nothing running. Small prepared tasks use this
 workspace; parallel writers get a git worktree and require a clean baseline.
@@ -450,10 +461,49 @@ if (op === 'tree') {
 // `check` exits non-zero when something is wrong, so it works in a shell chain:
 //   node bin/engine.mjs check && node bin/engine.mjs --headless run tests.run
 if (op === 'check') {
-  const { buildIndex, problemsIn } = await readProject()
-  const problems = problemsIn(await buildIndex(PROJECT))
+  const { buildIndex, problemsIn, pluginImportFailures, pluginProblems } = await readProject()
+  // A plugin that will not import is listed first because it is the loudest
+  // thing wrong and the quietest to find: the loader carries on without it, so
+  // the only symptom anywhere else is a command that has stopped existing.
+  //
+  // The failures are found by importing the files off disk, because `check`
+  // answers with nothing running and a world it never booted has no loader to
+  // ask. A live loader keeps the same list in the same shape, so this one line
+  // is the only thing that would change to read it instead.
+  //
+  // Gathered separately from the index so a broken plugin cannot stop the rest
+  // of the project being reported, and the other way round.
+  const failed = await pluginImportFailures(CHECKOUT, PROJECT)
+  const problems = [...pluginProblems(failed), ...problemsIn(await buildIndex(PROJECT))]
   out({ ok: problems.length === 0, problems })
   process.exit(problems.length === 0 ? 0 : 1)
+}
+
+/**
+ * What is running, and how to stop it.
+ *
+ * These come before the lane guard below on purpose. A lane's whole reason for
+ * running this is to clean up after itself, and a command that refused to run
+ * in a worktree would leave the servers exactly where the problem started.
+ */
+if (op === 'servers' || op === 'servers.stop') {
+  const { listServers, stopServers } = await readProject()
+  const named = typeof args[0] === 'number' ? args[0] : flags.port ? Number(flags.port) : null
+  if (op === 'servers') {
+    // The default port is asked about whether or not a record mentions it. A
+    // server nobody wrote down, sitting where every command looks by default,
+    // is the one an agent cannot otherwise see.
+    out(await listServers(CHECKOUT, [Number(flags.port || PORT)]))
+    process.exit(0)
+  }
+  if (args[0] !== undefined && named === null && args[0] !== 'all') {
+    die(1, `servers.stop takes a port number, or nothing at all to stop them all — got ${JSON.stringify(args[0])}`)
+  }
+  const result = await stopServers(CHECKOUT, named)
+  out(result)
+  // Non-zero only when something was asked for and is still running, so a
+  // cleanup step in a shell chain fails exactly when cleanup did not happen.
+  process.exit(result.ok ? 0 : 1)
 }
 
 /**

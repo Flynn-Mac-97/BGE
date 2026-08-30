@@ -4,7 +4,7 @@ import path from 'node:path'
 // The index builder and the determinism lint live in the engine, not in this
 // config, so a world running headless in node builds the same index from the
 // same code. Two implementations of "what is in this project" would drift.
-import { buildIndex as buildProjectIndex, problemsIn, walk, KIND } from './engine/project-index.mjs'
+import { buildIndex as buildProjectIndex, problemsIn, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
 
 const ROOT = process.cwd()
 
@@ -368,6 +368,126 @@ function bridge() {
 }
 
 /**
+ * Write down that this server exists, and who is looking at it.
+ *
+ * Nothing used to track a dev server or the tabs attached to it, so cleanup was
+ * a hunt through Task Manager and the two failures it caused were invisible: a
+ * forgotten server on the expected port serves a different project, and a hidden
+ * tab answers a capture with a blank frame. `node bin/engine.mjs servers` reads
+ * what is written here, and `servers.stop` ends it.
+ *
+ * The record is best effort and is never believed on its own. A server killed
+ * with `taskkill /F` gets no chance to tidy up, so the reader proves every entry
+ * by asking the port instead of trusting the file.
+ */
+const TAB_BEACON = 'virtual:engine-tab-beacon'
+const TAB_BEACON_MODULE = '\0' + TAB_BEACON
+const TAB_BEACON_URL = '/@id/__x00__' + TAB_BEACON
+
+/**
+ * The page's half, injected into every document this server serves.
+ *
+ * Whether a tab is hidden is a fact only the page holds — the server sees a
+ * websocket and cannot tell a foreground editor from one buried behind twenty
+ * others. So the tab says so itself, at load and at every change, and the
+ * listing can name the cause of a blank frame instead of guessing at it.
+ */
+const TAB_BEACON_SOURCE = `
+const hot = import.meta.hot
+if (hot) {
+  const key = 'engine:tab-id'
+  let id = sessionStorage.getItem(key)
+  if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem(key, id) }
+  const announce = () => hot.send('engine:tab', {
+    id,
+    url: location.href,
+    title: document.title,
+    hidden: document.hidden
+  })
+  announce()
+  addEventListener('visibilitychange', announce)
+}
+`
+
+function serverRegistry() {
+  // Keyed by the raw socket, so a tab that closes takes its entry with it and
+  // a reload replaces rather than duplicates.
+  const tabs = new Map()
+  let record = null
+
+  const attached = () => [...tabs.values()]
+    .filter(tab => tab.socket.readyState === 1)
+    .map(({ socket, ...tab }) => tab)
+
+  return {
+    name: 'engine-server-registry',
+
+    resolveId: id => (id === TAB_BEACON ? TAB_BEACON_MODULE : null),
+    load: id => (id === TAB_BEACON_MODULE ? TAB_BEACON_SOURCE : null),
+    transformIndexHtml: () => [{
+      tag: 'script', attrs: { type: 'module', src: TAB_BEACON_URL }, injectTo: 'head'
+    }],
+
+    configureServer(server) {
+      server.ws.on('engine:tab', (said, client) => {
+        const socket = client.socket
+        const known = tabs.get(socket)
+        tabs.set(socket, {
+          socket,
+          id: String(said?.id || 'unnamed'),
+          url: String(said?.url || ''),
+          title: String(said?.title || ''),
+          project: PROJECT_DIRECTORY,
+          hidden: said?.hidden === true,
+          since: known?.since || new Date().toISOString(),
+          lastSaid: new Date().toISOString()
+        })
+        socket.once?.('close', () => tabs.delete(socket))
+      })
+
+      // What this server is, asked over the wire. A record on disk says what was
+      // true when it was written; this is the only thing that says what is true
+      // now, which is why the CLI never reports an entry alive without it.
+      server.middlewares.use((req, res, next) => {
+        if (req.url.split('?')[0] !== '/api/server') return next()
+        return send(res, 200, {
+          ...(record || { serves: ROOT, project: PROJECT_DIRECTORY }),
+          pid: process.pid,
+          tabs: attached()
+        })
+      })
+
+      server.httpServer?.once('listening', () => {
+        // The port that was asked for and the port that was got are different
+        // things whenever another server already holds it, and the record has to
+        // carry the one an agent can actually reach.
+        const port = server.httpServer.address()?.port
+        if (typeof port !== 'number') return
+        record = {
+          port,
+          pid: process.pid,
+          serves: ROOT,
+          project: PROJECT_DIRECTORY,
+          url: `http://localhost:${port}`,
+          startedAt: new Date().toISOString()
+        }
+        try { recordServer(ROOT, record) } catch (error) {
+          console.warn(`[engine] could not write the server registry: ${error?.message || error}`)
+        }
+      })
+
+      const forget = () => {
+        if (!record) return
+        try { forgetServer(ROOT, record.port, record.pid) } catch { /* leaving a corpse is survivable; the reader proves liveness */ }
+        record = null
+      }
+      server.httpServer?.on('close', forget)
+      process.on('exit', forget)
+    }
+  }
+}
+
+/**
  * AGENTS.md is how a CLI that has never seen this project learns to drive it.
  * Written at server start so it can never drift from a stale checkout, and
  * never overwritten by hand-edits being lost — it is generated, say so in it.
@@ -431,6 +551,7 @@ export default defineConfig({
     // bridge first: api() answers 404 for any unclaimed /api/ path, so anything
     // sharing that prefix has to register ahead of it.
     bridge(),
+    serverRegistry(),
     api(),
     { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() }
   ],
@@ -448,8 +569,10 @@ export default defineConfig({
    */
   define: { 'import.meta.env.ENGINE_PROJECT': JSON.stringify(PROJECT_DIRECTORY) },
   // ENGINE_NO_OPEN keeps a headless or CI run from launching a visible browser.
+  // ENGINE_PORT is the same variable `bin/engine.mjs` reads, so naming a port
+  // once puts the server and the commands that drive it on the same one.
   server: {
-    port: 5180,
+    port: Number(process.env.ENGINE_PORT) || 5180,
     open: !process.env.ENGINE_NO_OPEN,
     watch: { ignored: file => !watched(file) }
   }
