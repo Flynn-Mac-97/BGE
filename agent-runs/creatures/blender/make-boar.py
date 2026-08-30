@@ -18,10 +18,18 @@
 #
 # The tusks point along the charge, so the tell is in the shape either way.
 #
-# Deep rust red, mass 0.19 luminance, the second darkest family. It shares a
-# screen with the hound and both are large, so the two are told apart by hue
-# and by the gap under the hound before size comes into it. Every prop is held
-# above 0.44, so a boar crossing one never shares its value.
+# Saturated brick red, mass 0.30 luminance. It was 0.19 and read as a hole:
+# the keyline is a near-black line at constant screen width on everything that
+# moves, and a near-black line on a near-black body separates nothing.
+#
+# It is the lowest of the three warm families — wasp amber 0.45, rat 0.38,
+# boar 0.30 — and the reddest of them at hue 9, so the rat above it stays a
+# separate animal at a distance. It shares a screen with the hound and both are
+# large, so hue and the gap under the hound part those two before size does.
+#
+# The mantle over the head and shoulders is 47% of the model's area, so it sets
+# the mass as much as the hide does. It stays a clear step under the hide at the
+# same hue: a body that is one flat mid tone reads as a sticker.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -36,9 +44,9 @@ MODEL_PATH = globals().get(
 HIP_HEIGHT = 0.265
 
 COLOURS = {
-    "boarHide": "#7a2718",     # 0.218 luminance, deep rust red
-    "boarMantle": "#4a1510",   # 0.125, one dark shape over the head and shoulders
-    "boarSnout": "#c4625a",    # 0.464, the snout disc and the ear inners; a mark, not mass
+    "boarHide": "#b03a24",     # 0.320 luminance, hue 9, saturated brick red
+    "boarMantle": "#742a1e",   # 0.223, one dark shape over the head and shoulders, and 47% of the area
+    "boarSnout": "#cc6a60",    # 0.495, the snout disc and the ear inners; a mark, not mass
     "boarTusk": "#fff4dc",     # tusks and eye whites
     "dark": "#1a0d10",         # bristles, pupils, hooves
 }

@@ -11,9 +11,13 @@
  * and the wings stay inside that line so it never reads as a small crow. That
  * is the one thing no other family's outline says.
  *
- * Deep amber with two fat black bands, mass 0.26 luminance, and the most
- * saturated hue in the horde. The five enemy families are held under 0.38 and
- * every prop above 0.44, so an enemy crossing a prop never shares its value.
+ * Saturated amber with two fat black bands, mass 0.45 luminance — the
+ * brightest family, because the wasp is the smallest thing on the field and
+ * the one that must not be missed. The amber stops at 0.45: the lit ground
+ * reads 0.68 and the cat's ginger marks 0.61, and the wasp stays under both.
+ * The bands hold the dark end, and the near-black keyline reads on the amber.
+ *
+ * Still the most saturated hue in the horde.
  *
  * Two bands, not six — six is a pattern, and art/world/bible.md spends no
  * detail on pattern.
@@ -37,13 +41,13 @@ const BEAT_SWING = 0.22
 
 export default {
   about: 'the fastest enemy. It cannot be outrun, so it is answered with firepower rather than movement',
-  appearance: 'A deep amber needle five times as long as it is wide, black-banded, with a straight pale sting out the back, flying higher than a crow. It weaves rather than arriving in a straight line.',
+  appearance: 'A hot amber needle five times as long as it is wide, black-banded, with a straight pale sting out the back, flying higher than a crow. It weaves rather than arriving in a straight line.',
   looksWrongWhen: 'it is a plain tinted box — models/wasp.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   // The abdomen and sting overshoot the hull: the hull is what a weapon hits,
   // the length is the shape that is read.
-  mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#a85a06' },
+  mesh: { model: 'models/wasp.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#ad6a10' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

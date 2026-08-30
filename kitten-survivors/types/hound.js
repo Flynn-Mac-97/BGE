@@ -11,9 +11,11 @@
  * 1.08 m, more than twice the cat. Every other family is a solid mass on the
  * floor, so that gap is the one thing no other family's outline says.
  *
- * Cool slate blue at 0.33 mass luminance, and the only cool family. The five
- * enemy families are held under 0.38 and every prop above 0.44, so an enemy
- * crossing a prop never shares its value.
+ * Saturated slate blue, mass 0.35 luminance, coat 0.39, and the only blue
+ * family — the crow is the other cool one and it is violet. The horde carries
+ * mid value and the near-black keyline does the separating: a near-black line
+ * on a near-black body separates nothing. The muzzle, legs and paws stay
+ * near-black, so the gap under the belly is the strongest contrast on screen.
  *
  * It is drawn from `models/hound.glb`, which keeps four legs named
  * `legFrontLeft` through `legBackRight` with their origin at the hip, so
@@ -34,13 +36,13 @@ const STRIDE_SWING = 0.5
 
 export default {
   about: 'the enemy that soaks hits. Too slow to threaten alone; it blocks routes and makes corridors',
-  appearance: 'The tallest enemy, in cool slate blue, on four long thin legs with a clear gap of meadow under its belly, a scalloped mane behind the head and a dark muzzle. The only cool family.',
+  appearance: 'The tallest enemy, in saturated slate blue, on four long thin dark legs with a clear gap of meadow under its belly, a scalloped mane behind the head and a dark muzzle. The only blue family.',
   looksWrongWhen: 'it is a plain tinted box — models/hound.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   // The model stands 1.08 m and overshoots the hull: the hull is what a weapon
   // hits, the height is the shape that is read.
-  mesh: { model: 'models/hound.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#3e4d73' },
+  mesh: { model: 'models/hound.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#46679f' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

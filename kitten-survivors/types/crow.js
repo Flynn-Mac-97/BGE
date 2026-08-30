@@ -12,9 +12,14 @@
  * past the tail so the trailing edge is cut by a deep notch. That is the one
  * thing no other family's outline says.
  *
- * Blue-black at 0.14 luminance, the darkest family. The five enemy families are
- * held under 0.38 and every prop above 0.44, so an enemy crossing a prop never
- * shares its value. The orange beak is the only mark above that band on it.
+ * Saturated violet-indigo, mass 0.34 luminance. The horde carries mid value and
+ * the near-black keyline does the separating: a near-black line on a near-black
+ * body separates nothing. Violet, not blue, because the hound is the blue
+ * family. The orange beak is the one hot mark.
+ *
+ * The wing sits close to the body in value. The key light is almost overhead,
+ * so a wing turned by the flap takes only the ambient and drops to a tenth of
+ * its own colour; the flap gives the wing the step it needs.
  *
  * It is drawn from `models/crow.glb`, which keeps two wings named `wingLeft`
  * and `wingRight` with their origin at the shoulder. `applyPose` in
@@ -37,13 +42,13 @@ const BEAT_SWING = 0.5
 
 export default {
   about: 'the swarming enemy. Arrives in flocks from one bearing, so the threat is the flock, not a bird',
-  appearance: 'A blue-black chevron flying at chest height, wider than it is long, with a notch cut into its trailing edge and one hot orange beak. The darkest family on the meadow.',
+  appearance: 'A violet-indigo chevron flying at chest height, wider than it is long, with a notch cut into its trailing edge and one hot orange beak. The only violet family on the meadow.',
   looksWrongWhen: 'it is a plain tinted box — models/crow.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
   // The spread wings overshoot the hull: the hull is what a weapon hits, the
   // wings are the shape that is read.
-  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#262b4a' },
+  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#6746b3' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

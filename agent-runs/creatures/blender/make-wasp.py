@@ -14,10 +14,17 @@
 # the colour removed, so the wasp owns "a straight line with a spike" and
 # nothing else may be it.
 #
-# Deep amber with TWO fat black bands, mass 0.26 luminance. Hot yellow measures
-# 0.77, which is where the ground sits, so a wasp that value vanishes crossing
-# open meadow. Amber keeps the highest saturation in the horde without taking
-# the value that belongs to the floor.
+# Saturated amber with TWO fat black bands, mass 0.30 luminance. The amber
+# itself is 0.45, the brightest mass in the horde, because the wasp is the
+# smallest thing on the field and the one that must not be missed.
+#
+# It stops at 0.45 and not higher. Hot yellow measures 0.77 and the lit ground
+# measures 0.68, so a brighter wasp vanishes crossing open meadow; the cat's
+# ginger marks are 0.61 and the wasp must stay under them.
+#
+# The black bands hold the dark end. A body that is one flat mid tone reads as
+# a sticker, and the keyline — near-black, constant screen width — needs the
+# body to be lighter than it is.
 #
 # Two bands, not six — six is a texture, and art/world/bible.md spends no
 # detail on texture. Two bands each a fifth of the abdomen are geometry, and
@@ -36,7 +43,7 @@ MODEL_PATH = globals().get(
 ROOT = (0.030, 0.020, 0.150)
 
 COLOURS = {
-    "waspAmber": "#a85a06",   # 0.394 luminance, the most saturated hue in the horde
+    "waspAmber": "#ad6a10",   # 0.446 luminance, hue 34, the most saturated hue in the horde
     "waspBlack": "#1a1520",   # 0.089, two bands, the thorax, the eyes
     "waspWing": "#cfe0ee",    # pale and small; a mark, not mass
     "waspSting": "#ffeec2",   # the sting and the eye whites
