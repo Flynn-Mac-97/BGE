@@ -53,6 +53,23 @@ node bin/engine.mjs --headless --project <p> script \
 
 Deterministic, so the same seed gives the same frame every run.
 
+For a real-renderer frame of a played moment, drive the browser world the
+same way — never by waiting: a background tab runs about one step a second,
+so wall-clock sleep is not game time. `simulate` steps the clock exactly
+regardless of focus:
+
+```sh
+node bin/engine.mjs play
+node bin/engine.mjs simulate 8
+node bin/engine.mjs run choice.pick 1     # a held world is usually a screen asking
+node bin/engine.mjs simulate 22
+node bin/engine.mjs run see.capture '{"name":"at-30s"}'
+node bin/engine.mjs stop
+```
+
+If time will not advance, read `snapshot` — `paused` names who is holding
+the clock.
+
 ## Reading a frame with a vision model
 
 - Send the PNG and its `.json` sidecar together. The sidecar is ground truth;
