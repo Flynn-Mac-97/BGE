@@ -1,9 +1,10 @@
 /**
  * See query verbs: exact answers about the frame, computed before any pixel
  * is read. Every verb takes (context, options) and returns plain JSON with a
- * `method` field naming how the answer was computed. Occlusion prefers the
- * renderer's ID buffer when one can answer; everything else is geometry from
- * engine/scene-query.js over the same describe index every See command uses.
+ * `method` field naming how the answer was computed. Occlusion and identify
+ * prefer the renderer's ID buffer when one can answer; everything else is
+ * geometry from engine/scene-query.js over the same describe index every See
+ * command uses.
  */
 import { makeProjector } from '../../../engine/camera-project.js'
 import { boundsOf, facingOffset } from '../../../engine/frame-facts.js'
@@ -75,6 +76,123 @@ export async function occlusion(context, options = {}) {
     blockedBy: grid.blockedBy,
     method: 'rays'
   }
+}
+
+/**
+ * `at`, checked once: exactly two finite numbers, both within the visible
+ * frame. Returns a problem string, or null when it is fine — never throws,
+ * so a bad position is a named answer, not a crash.
+ */
+function invalidAt(at) {
+  if (!Array.isArray(at) || at.length !== 2) return 'an "at": [xPercent, yPercent]'
+  const [x, y] = at
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return '"at" as two finite numbers'
+  if (x < 0 || x > 100 || y < 0 || y > 100) return `"at" within the visible frame, 0-100 — got [${x}, ${y}]`
+  return null
+}
+
+/** What the author wrote about one entity, the same block isolate() carries. */
+function describeEntity(entity) {
+  const definition = entity._definition || {}
+  const authored = {
+    ...(definition.about ? { about: definition.about } : {}),
+    ...(definition.appearance ? { appearance: definition.appearance } : {}),
+    ...(definition.looksWrongWhen ? { looksWrongWhen: definition.looksWrongWhen } : {}),
+    ...(entity.note ? { note: entity.note } : {})
+  }
+  return {
+    id: entity.id,
+    type: entity.type,
+    ...(entity.hidden ? { hidden: true } : {}),
+    ...(Object.keys(authored).length ? { description: authored } : {})
+  }
+}
+
+/**
+ * Turn an id-buffer answer into the identify reply. `id` is null for
+ * background — a real answer, not an absence. An id the world no longer
+ * knows is named rather than dropped: the buffer is a snapshot, and the
+ * entity behind an id can be destroyed between the draw and this read.
+ */
+function resolveHit(context, id, at, method) {
+  if (id === null) return { at, id: null, type: null, hitBackground: true, method }
+  const entity = context.world.byId(id)
+  if (!entity) {
+    return {
+      at, id, type: null,
+      why: `"${id}" was drawn at this pixel but no longer exists in the world — a stale render, or the entity was destroyed since the frame was drawn`,
+      method
+    }
+  }
+  return { at, ...describeEntity(entity), method }
+}
+
+/**
+ * Geometry answer for one screen point: the nearest on-screen entity whose
+ * projected box covers it. A box is not a drawn silhouette, so a point near
+ * a corner can name an entity that drew nothing there — the caller is told
+ * this is the fallback, not the renderer, through `method`.
+ */
+function boxHit(context, at) {
+  const [xPercent, yPercent] = at
+  const description = describe(context, {})
+  let winner = null
+  for (const entry of description.visible || []) {
+    const withinX = Math.abs(entry.at[0] - xPercent) <= entry.size[0] / 2
+    const withinY = Math.abs(entry.at[1] - yPercent) <= entry.size[1] / 2
+    if (withinX && withinY && (!winner || entry.depth < winner.depth)) winner = entry
+  }
+  const method = 'boxes: nearest on-screen entity whose projected box covers the point (approximate — no drawn silhouette)'
+  if (!winner) return { at, id: null, type: null, hitBackground: true, method }
+  return { at, ...describeEntity(context.world.byId(winner.id)), method }
+}
+
+/**
+ * What is drawn at one screen position — the pixel-identity answer a player
+ * pointing at the screen needs. `at` is percent, 0-100, x rightward and y
+ * downward, matching every other screen field in this plugin, so the caller
+ * never converts against a canvas's backing-buffer size and never has to
+ * know the device pixel ratio.
+ *
+ * The ID buffer answers first when a renderer is attached and actually drew
+ * this frame; a hidden or backgrounded tab is refused rather than trusted,
+ * because its buffer reads as background everywhere and that is a fact
+ * about the tab, not the scene. Geometry answers otherwise, and `rendererWhy`
+ * says why the renderer did not — never silence, never a guess dressed as
+ * a renderer-true answer.
+ */
+export async function identify(context, options = {}) {
+  const problem = invalidAt(options.at)
+  if (problem) return { error: `identify needs ${problem}` }
+  const at = options.at
+
+  let rendererWhy
+  const buffer = await loadIdBuffer()
+  if (!buffer?.idMap) {
+    rendererWhy = 'the ID buffer module did not load'
+  } else {
+    try {
+      const map = await buffer.idMap(context)
+      if (map?.hidden) {
+        rendererWhy = 'this tab is hidden — its draw cannot be trusted, and a blank buffer from a hidden tab is not "nothing is there". Focus this tab, or ask one that is on screen.'
+      } else if (typeof map?.at === 'function') {
+        // Percent to pixel against the ID buffer's OWN width and height — the
+        // exact size mount() built the target at, in CSS pixels — never the
+        // visible canvas's backing-buffer size, which is that times the
+        // device pixel ratio. Clamped at the far edge: percent 100 floors to
+        // one pixel past the last column, and that column is still on screen.
+        const x = Math.min(map.width - 1, Math.max(0, Math.floor(at[0] / 100 * map.width)))
+        const y = Math.min(map.height - 1, Math.max(0, Math.floor(at[1] / 100 * map.height)))
+        return resolveHit(context, map.at(x, y), at, 'id-buffer: exact drawn pixel')
+      } else {
+        rendererWhy = map?.why || 'the renderer did not answer'
+      }
+    } catch (error) {
+      rendererWhy = `the ID buffer threw: ${error.message}`
+    }
+  }
+
+  return { ...boxHit(context, at), rendererWhy }
 }
 
 /** scene-query owns the region thresholds; probing its names keeps one source of truth. */

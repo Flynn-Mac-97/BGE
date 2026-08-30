@@ -78,13 +78,21 @@ const noRenderer = context =>
  * `at(x, y)` takes pixels from the top left, x rightward and y downward, the
  * same orientation every screen answer in this plugin uses. `coverage` counts
  * the pixels on which each entity is the frontmost thing.
+ *
+ * `hidden` says whether this tab was backgrounded at the moment of the draw.
+ * A hidden or throttled tab can stop drawing, and the buffer then decodes as
+ * background everywhere — a fact about the tab, not about the scene. A
+ * caller must check `hidden` before trusting an empty `at()` as "nothing is
+ * there".
  */
 export async function idMap(context) {
   const missing = noRenderer(context)
   if (missing) return missing
   const mounted = await mount(context)
   try {
-    return decode(mounted, mounted.fullPass())
+    const map = decode(mounted, mounted.fullPass())
+    map.hidden = typeof document !== 'undefined' && document.hidden === true
+    return map
   } finally {
     mounted.unmount()
   }
