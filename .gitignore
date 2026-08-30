@@ -12,3 +12,7 @@ tools/.dsh-agent.*
 
 # A dev server log is a live file, not a record of anything.
 agent-runs/dev-*.log
+
+# measure.mjs regenerates these; nineteen thousand lines of run output is
+# not evidence anyone reads.
+agent-runs/see-marks/*seed*.json
