@@ -43,6 +43,14 @@ Options, all optional:
 
 ## Limits
 
+- `coverage` sums each type's boxes before overlap, so a type layered over
+  itself can exceed 100. It compares between frames; it is not screen share.
+- `see.capture` from a terminal answers from whichever attached tab replies
+  first. Keep ONE editor tab open. A tab that is not drawing is refused with
+  an honest error and a `hidden` flag rather than returned as a blank frame.
+- The capture is the tab's canvas at the tab's size — a bigger window is a
+  bigger frame.
+
 - `describe` and `sketch` compute from entity bounds — no lighting, material,
   animation or texture truth. Those need `capture`.
 - HUD and screens are words already: `hud.read`, `screen.read`.

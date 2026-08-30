@@ -67,16 +67,24 @@ function hueToRgb(hue, saturation, lightness) {
   return [at(0), at(8), at(4)]
 }
 
-/** A camera to look at one entity: pulled back along -Z, tipped down a third. */
+/**
+ * A camera to look at one entity: a three-quarter front view, because a model
+ * is judged by its face and silhouette and a straight-behind view shows
+ * neither. The subject's own facing decides where "front" is.
+ */
 function frameSubject(entity, bounds) {
-  const distance = Math.max(2, Math.max(bounds.w, bounds.h) * 2.5)
+  const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * 2.5)
   const pitch = -0.35
+  const facing = Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
+  // The eye is placed past the nose and off to one side; its yaw looks back.
+  const azimuth = facing + Math.PI - 0.6
+  const flat = distance * Math.cos(-pitch)
   return {
     mode: 'third-person-still',
-    x: entity.x,
+    x: entity.x + Math.sin(azimuth) * flat,
     y: entity.y + distance * Math.sin(-pitch),
-    z: (entity.z || 0) + distance * Math.cos(-pitch),
-    yaw: 0, pitch, fov: 50
+    z: (entity.z || 0) + Math.cos(azimuth) * flat,
+    yaw: azimuth, pitch, fov: 50
   }
 }
 
@@ -104,8 +112,8 @@ function describe(context, options = {}) {
     const seenHeight = bounds.h * Math.cos(tilt) + bounds.l * Math.sin(tilt)
     const size = projector.sizeAt(point.depth, bounds.w, seenHeight)
     const onScreen = point.inFront
-      && point.x > -size.w && point.x < 100 + size.w
-      && point.y > -size.h && point.y < 100 + size.h
+      && point.x > -size.w / 2 && point.x < 100 + size.w / 2
+      && point.y > -size.h / 2 && point.y < 100 + size.h / 2
     if (!onScreen) {
       offscreenByType[entity.type] = (offscreenByType[entity.type] || 0) + 1
       continue
@@ -119,14 +127,24 @@ function describe(context, options = {}) {
   }
 
   // Marks go to the largest on screen first — the ones a vision read is about.
-  // A thing wider than half the frame is a backdrop, not a subject: it gets no
-  // mark, so tags stay on what a question would name.
-  visible.sort((a, b) => b.size[0] * b.size[1] - a.size[0] * a.size[1])
-  let nextMark = 0
+  // In a subject shot the question is about the subject, so nearer wins over
+  // larger and the horizon does not spend the tags. A thing wider than half
+  // the frame is a backdrop, not a subject: it gets no mark. Two tags closer
+  // than a tag's own width just cover each other, so a mark also needs clear
+  // screen distance from every mark already given.
+  visible.sort(subject
+    ? (a, b) => a.depth - b.depth
+    : (a, b) => b.size[0] * b.size[1] - a.size[0] * a.size[1])
+  const subjectDepth = subject && visible.find(entry => entry.id === subject.id)?.depth
+  const marked = []
   for (const entry of visible) {
     if (entry.size[0] > 50 || entry.size[1] > 50) continue
-    if (nextMark >= MOST_MARKS) break
-    entry.mark = ++nextMark
+    // In a subject shot the horizon is context, not content — no tags out there.
+    if (subjectDepth && entry.depth > subjectDepth * 8) continue
+    if (marked.length >= MOST_MARKS) break
+    if (marked.some(other =>
+      Math.abs(other.at[0] - entry.at[0]) < 4 && Math.abs(other.at[1] - entry.at[1]) < 5)) continue
+    entry.mark = marked.push(entry)
   }
 
   const coverage = {}
@@ -257,11 +275,11 @@ export default {
         const wants = { ...(options.camera || {}) }
         if (options.subject) Object.assign(wants, description.camera, options.camera || {})
         const moved = Object.keys(wants).length > 0
-        if (moved) {
-          Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
-          context.renderer.sync(context.world)
-          context.renderer.draw()
-        }
+        if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
+        // Always drawn fresh, never copied as-is: a hidden or throttled tab
+        // stops painting, and its stale canvas reads back as nothing.
+        context.renderer.sync(context.world)
+        context.renderer.draw()
 
         const canvas = context.shell.canvas
         const copy = document.createElement('canvas')
@@ -274,6 +292,23 @@ export default {
           Object.assign(view, kept)
           context.renderer.sync(context.world)
           context.renderer.draw()
+        }
+
+        // A frame of nothing must never come back labelled as a frame. Sample
+        // a grid of pixels; if every one is fully transparent the readback
+        // failed, and the honest answer says so instead of shipping marks
+        // floating on a blank.
+        const sampled = pen.getImageData(0, 0, copy.width, copy.height).data
+        let anything = false
+        const stride = Math.max(4, Math.floor(sampled.length / 4 / 400) * 4)
+        for (let at = 3; at < sampled.length; at += stride) {
+          if (sampled[at] > 0) { anything = true; break }
+        }
+        if (!anything) {
+          return {
+            error: 'the canvas read back empty — the answering tab is not drawing (hidden, throttled, or stale). Focus one editor tab and close the others.',
+            hidden: document.hidden === true
+          }
         }
 
         if (options.marks !== false) {
