@@ -6,8 +6,17 @@
  */
 const POINTS = ['panels', 'tools', 'commands', 'fields', 'importers', 'systems', 'menus']
 
+/** The definition a file that never imported did not export. It gives nothing. */
+const NOTHING = Object.freeze({ name: null, about: '' })
+
+/** An error as a reader wants it: the kind of failure, then what went wrong. */
+const describe = error =>
+  error?.name && error?.message ? `${error.name}: ${error.message}` : String(error?.message || error)
+
 export function makeLoader(bus) {
-  const plugins = new Map()          // name -> { definition, enabled, error, builtin }
+  // name -> { definition, enabled, error, builtin }, plus a file that never
+  // became a plugin, keyed by its path and carrying `file`.
+  const plugins = new Map()
   const contrib = Object.fromEntries(POINTS.map(p => [p, []]))
 
   function rebuild() {
@@ -63,10 +72,41 @@ export function makeLoader(bus) {
       const p = plugins.get(name)
       if (!p) return
       p.enabled = false
-      p.error = String(error?.message || error)
+      p.error = describe(error)
       console.error(`[plugin:${name}]`, error)
       bus.emit('plugin:error', { name, error: p.error })
       rebuild()
+    },
+
+    /**
+     * A file that threw on import, recorded as a plugin that is present and
+     * broken rather than one that was never there.
+     *
+     * It has no definition and so no name, so its path is the key and travels
+     * on as `file`. An empty definition stands in for the one it never
+     * exported, because every reader of this map asks a definition what it
+     * contributes and the honest answer is "nothing".
+     */
+    failedImport(file, error, builtin = false) {
+      const path = String(file).replaceAll('\\', '/')
+      const reason = describe(error)
+      plugins.set(path, { definition: NOTHING, enabled: false, error: reason, builtin, file: path })
+      bus.emit('plugin:error', { name: path, file: path, error: reason })
+    },
+
+    /**
+     * Every plugin the loader could not use, with the reason. A failed import
+     * has a `file` and no `name`; a plugin that threw in onLoad has a `name`
+     * and no `file`, because by then the path is behind it.
+     */
+    failures() {
+      return [...plugins.entries()].filter(([, p]) => p.error).map(([key, p]) => ({
+        name: p.file ? null : key,
+        file: p.file || null,
+        error: p.error,
+        builtin: p.builtin === true,
+        failedToImport: p.file != null
+      }))
     },
 
     /**

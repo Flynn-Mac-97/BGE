@@ -1,0 +1,35 @@
+applied 9 edits across 2 files, each matching exactly once
+healthy world, everything loaded: pluginsFailed undefined, errors 0, plugins 71
+test/cli.offline.test.mjs while wired: ℹ pass 10, ℹ fail 0
+test/agent-workspace.test.mjs while wired: ℹ pass 6, ℹ fail 0
+
+broke plugins/builtin/see.js with a stray brace
+
+================ the shipped headless runner, wired ================
+--- snapshot(), no options ---
+{
+  "pluginsFailed": [
+    "plugins/builtin/see.js failed to import — SyntaxError: Unexpected token '}'. Every command it contributes is missing."
+  ],
+  "errors": [
+    {
+      "t": 70,
+      "level": "error",
+      "source": "plugin",
+      "message": "plugins/builtin/see.js failed to import — SyntaxError: Unexpected token '}'. Every command it contributes is missing."
+    }
+  ]
+}
+--- snapshot({ plugins: true }).plugins, entries that did not load ---
+[
+  {
+    "file": "plugins/builtin/see.js",
+    "loaded": false,
+    "builtin": true,
+    "error": "SyntaxError: Unexpected token '}'"
+  }
+]
+--- engine.run("see.capture") ---
+no command "see.capture". Plugin file plugins/builtin/see.js failed to import: SyntaxError: Unexpected token '}'. Every command those plugins contribute is missing, which may be this one. Try engine.commands()
+
+restored 3 files — working tree for them: clean

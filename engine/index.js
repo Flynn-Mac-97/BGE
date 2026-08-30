@@ -11,6 +11,7 @@
  */
 import { PROJECT_DIRECTORY } from './asset-path.js'
 import { makeFiles, overHTTP } from './files.js'
+import { importPlugin, reportImportFailure } from './plugin-import.js'
 import { makeRenderer } from './render.js'
 import { makeShell } from './shell.js'
 import { startWorld } from './start-world.js'
@@ -47,18 +48,19 @@ const PROJECT_PLUGIN = /^plugins\/[^/]+\.js$/
  * project is already imported. That also makes this the twin of the headless
  * runner, which has always read the directory rather than globbing it: a plugin
  * written a second ago is found on the next load, either side of the split.
+ *
+ * Importing a file and saying what went wrong when it will not import is the
+ * one half both finders share, so it lives in `plugin-import.js` and this one
+ * only decides which files to offer it. The loader is the argument that makes
+ * that possible: a file that throws has no plugin name, so the loader is the
+ * only thing that can answer for it when a command turns up missing later.
  */
-async function findPlugins() {
+async function findPlugins(loader) {
   const found = []
 
   for (const [path, load] of Object.entries(import.meta.glob('/plugins/builtin/*.js'))) {
-    try {
-      const definition = (await load()).default
-      if (!definition) continue
-      found.push({ definition, builtin: true })
-    } catch (e) {
-      console.error(`[loader] ${path} failed to import`, e)
-    }
+    const definition = await importPlugin({ file: path.replace(/^\//, ''), load, loader, builtin: true })
+    if (definition) found.push({ definition, builtin: true })
   }
 
   let listing = []
@@ -68,17 +70,16 @@ async function findPlugins() {
     // A project whose file list cannot be read has no plugins as far as this is
     // concerned, and an editor quietly missing eight of them is the worst way to
     // find that out.
-    console.error(`[loader] could not list ${PROJECT_DIRECTORY}/ — no project plugins were loaded`, e)
+    reportImportFailure(loader, `${PROJECT_DIRECTORY}/plugins/`, e)
   }
 
   for (const file of listing.map(entry => entry.path).filter(f => PROJECT_PLUGIN.test(f)).sort()) {
-    try {
-      const definition = (await import(/* @vite-ignore */ `/${PROJECT_DIRECTORY}/${file}`)).default
-      if (!definition) continue
-      found.push({ definition, builtin: false })
-    } catch (e) {
-      console.error(`[loader] ${PROJECT_DIRECTORY}/${file} failed to import`, e)
-    }
+    const definition = await importPlugin({
+      file: `${PROJECT_DIRECTORY}/${file}`,
+      load: () => import(/* @vite-ignore */ `/${PROJECT_DIRECTORY}/${file}`),
+      loader
+    })
+    if (definition) found.push({ definition, builtin: false })
   }
 
   return found
