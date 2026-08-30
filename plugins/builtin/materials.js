@@ -15,13 +15,12 @@
  * win where they overlap. That is what makes `texture`, `tint` and `roughness`
  * all reachable without inventing a second place to write them.
  *
- * PREFER THE FLAT FORM. Both are read here, but the renderer picks a material by
- * `mesh.material` and keys its shared-material cache on the name, the texture,
- * the tint and the tiling — so an object written there resolves to a name it
- * does not have, and two meshes that differ only in a parameter (two toons with
- * different step counts) get one shared material rather than two. Widening
- * `materialLook` in engine/render.js to include the material's own parameters is
- * the fix; that file belongs to the renderer, not to this plugin.
+ * PREFER THE FLAT FORM. Both are read here, but the renderer's shared-material
+ * cache is keyed on the flat keys: `materialLook` in engine/render.js walks
+ * every key of the mesh that is not structural. A parameter written inside
+ * `material: { … }` is not one of those, so two toons that differ only in a step
+ * count written that way share one material and the second draws with the
+ * first's settings.
  *
  * A builder is handed exactly what render.js hands it:
  *
@@ -175,7 +174,7 @@ export const STANDARD_MATERIALS = {
     parameters: { texture: null, tint: null, shininess: 30, specular: '#111111', normal: null, opacity: 1 }
   },
   toon: {
-    about: 'banded light in an adjustable number of steps, with an optional rim outline',
+    about: 'banded light in an adjustable number of steps, with an optional rim shade. A line of constant screen width is mesh.keyline, not this',
     parameters: { texture: null, tint: null, steps: 3, outline: 0, outlineColour: '#000000', opacity: 1 }
   },
   matcap: {
@@ -609,13 +608,13 @@ function buildersFor(THREE, assetURL, materials) {
   }
 
   /**
-   * A rim outline, patched into the toon shader.
+   * A rim shade, patched into the toon shader.
    *
-   * The outline everybody means is an inverted hull — a second, slightly larger,
-   * back-faced copy of the mesh. A material builder cannot add a second mesh, so
-   * this is the honest alternative: darken where the surface turns away from the
-   * eye. On curved geometry it reads the same; on a flat wall seen head-on there
-   * is no silhouette to draw and it correctly draws nothing.
+   * It darkens where the surface turns away from the eye. That is a shade on
+   * the surface, measured in geometry, so it thins with distance and is under a
+   * pixel at play zoom. The line that stays the same width at every distance is
+   * `mesh.keyline`, which render.js draws as a second mesh — something a
+   * material builder cannot do, since it returns one material.
    */
   const outline = (material, width, outlineColour) => {
     material.onBeforeCompile = shader => {

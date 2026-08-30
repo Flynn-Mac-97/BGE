@@ -20,6 +20,14 @@
  * animation is assignment — a hook can say what a body IS holding without
  * tracking what it WAS holding.
  *
+ * Two things are drawn beside an entity rather than by it, because neither can
+ * be a material: a KEYLINE, a dark line of constant screen-space width round
+ * the silhouette, and a CONTACT SHADOW, one soft ellipse on the ground under
+ * everything that moves. A material builder returns one material and cannot add
+ * a second mesh, and a loaded model draws with its file's own materials and can
+ * be given none at all — so both are geometry this file builds. Defaults are in
+ * `readability`; `mesh.keyline` and `mesh.shadow` override them.
+ *
  * The draw order is two passes: the world, then the viewmodel against a cleared
  * depth buffer through a narrower camera of its own. That second pass is the
  * only correct answer to a first-person weapon clipping into a wall, and it is
@@ -789,6 +797,152 @@ function mergeMeshes(members) {
   return merged
 }
 
+// ------------------------------------------------------- keylines and shadows
+
+/**
+ * One averaged normal per distinct position.
+ *
+ * A hull grown along per-vertex normals splits open at every hard edge, because
+ * a box corner carries three normals and each face grows a different way.
+ * Averaging across coincident positions closes it. Face normals are left
+ * unnormalised, so a large triangle counts for more than a sliver.
+ */
+function hullNormals(position, index) {
+  const vertices = position.length / 3
+  const keyAt = new Array(vertices)
+  const sums = new Map()   // position, to a tenth of a millimetre -> its running sum
+
+  for (let v = 0; v < vertices; v++) {
+    const key = `${Math.round(position[v * 3] * 1e4)},${Math.round(position[v * 3 + 1] * 1e4)},${Math.round(position[v * 3 + 2] * 1e4)}`
+    keyAt[v] = key
+    if (!sums.has(key)) sums.set(key, [0, 0, 0])
+  }
+
+  const add = (vertex, x, y, z) => {
+    const sum = sums.get(keyAt[vertex])
+    sum[0] += x; sum[1] += y; sum[2] += z
+  }
+
+  for (let i = 0; i < index.length; i += 3) {
+    const a = index[i], b = index[i + 1], c = index[i + 2]
+    const ax = position[a * 3], ay = position[a * 3 + 1], az = position[a * 3 + 2]
+    const bx = position[b * 3] - ax, by = position[b * 3 + 1] - ay, bz = position[b * 3 + 2] - az
+    const cx = position[c * 3] - ax, cy = position[c * 3 + 1] - ay, cz = position[c * 3 + 2] - az
+    const x = by * cz - bz * cy
+    const y = bz * cx - bx * cz
+    const z = bx * cy - by * cx
+    add(a, x, y, z); add(b, x, y, z); add(c, x, y, z)
+  }
+
+  const normal = new Float32Array(position.length)
+  for (let v = 0; v < vertices; v++) {
+    const sum = sums.get(keyAt[v])
+    const length = Math.hypot(sum[0], sum[1], sum[2]) || 1
+    normal[v * 3] = sum[0] / length
+    normal[v * 3 + 1] = sum[1] / length
+    normal[v * 3 + 2] = sum[2] / length
+  }
+  return normal
+}
+
+/**
+ * Six times the volume a closed mesh encloses, which is negative when its
+ * faces are wound inward.
+ *
+ * The sum is the divergence theorem and does not depend on where the origin
+ * is, so a mesh anywhere in the model answers the same.
+ */
+function signedVolume(position, index) {
+  let total = 0
+  for (let i = 0; i < index.length; i += 3) {
+    const a = index[i] * 3, b = index[i + 1] * 3, c = index[i + 2] * 3
+    total += position[a] * (position[b + 1] * position[c + 2] - position[b + 2] * position[c + 1])
+      + position[a + 1] * (position[b + 2] * position[c] - position[b] * position[c + 2])
+      + position[a + 2] * (position[b] * position[c + 1] - position[b + 1] * position[c])
+  }
+  return total
+}
+
+/**
+ * One geometry covering everything an object draws, in the object's own space.
+ *
+ * A keyline is one draw call per entity, so a model of fourteen meshes has to
+ * become one buffer. Positions and normals only — a hull draws in one flat
+ * colour and has no use for UVs or a second UV set.
+ *
+ * A mesh wound inside out is dropped: it is already an outline, modelled into
+ * the file as an inverted hull, and its faces would read as the near surface
+ * and paint the keyline colour across the body.
+ */
+function hullGeometry(object) {
+  object.updateWorldMatrix(false, true)
+  const toLocal = new THREE.Matrix4().copy(object.matrixWorld).invert()
+  const relative = new THREE.Matrix4()
+  const point = new THREE.Vector3()
+  const positions = []
+  const indices = []
+
+  object.traverse(node => {
+    // A hull already hanging off this object is not part of its shape.
+    if (node.userData.keyline) return
+    const attribute = node.isMesh ? node.geometry?.attributes?.position : null
+    if (!attribute) return
+    relative.multiplyMatrices(toLocal, node.matrixWorld)
+
+    const own = []
+    for (let i = 0; i < attribute.count; i++) {
+      point.fromBufferAttribute(attribute, i).applyMatrix4(relative)
+      own.push(point.x, point.y, point.z)
+    }
+    const index = node.geometry.index
+    const ownIndices = []
+    if (index) for (let i = 0; i < index.count; i++) ownIndices.push(index.getX(i))
+    else for (let i = 0; i < attribute.count; i++) ownIndices.push(i)
+
+    if (signedVolume(own, ownIndices) < 0) return
+
+    const first = positions.length / 3
+    for (const value of own) positions.push(value)
+    for (const at of ownIndices) indices.push(first + at)
+  })
+
+  if (!indices.length) return null
+  const position = new Float32Array(positions)
+  const index = position.length / 3 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices)
+  const hull = new THREE.BufferGeometry()
+  hull.setAttribute('position', new THREE.BufferAttribute(position, 3))
+  hull.setAttribute('normal', new THREE.BufferAttribute(hullNormals(position, index), 3))
+  hull.setIndex(new THREE.BufferAttribute(index, 1))
+  hull.computeBoundingSphere()
+  return hull
+}
+
+/** Hulls by shape, so a hundred rats share one. Bounded by distinct shapes. */
+const hullCache = new Map()
+
+/**
+ * Grow the hull by a fixed number of PIXELS, not by a fixed number of metres.
+ *
+ * A modelled outline is geometry, so its width shrinks with distance and is
+ * under a pixel at the zoom this kind of game plays at. Offsetting in clip
+ * space and undoing the perspective divide by hand keeps the line the same
+ * width wherever the thing is standing, which is the whole point of it.
+ */
+const KEYLINE_GROWTH = `
+  vec2 towards = (projectionMatrix * vec4(normalize(normalMatrix * normal), 0.0)).xy * framePixels;
+  float reach = length(towards);
+  // A face turned exactly edge-on has no screen direction to grow along, so it
+  // grows by nothing rather than by NaN.
+  if (reach > 1e-5) gl_Position.xy += (towards / reach) * (2.0 * keylineWidth / framePixels) * gl_Position.w;
+`
+
+/** The soft ellipse a contact shadow is, and how hard it presses on the ground. */
+const CONTACT_SHADOW_FADE = `
+  float reach = length(vContact);
+  gl_FragColor.a = vContactStrength * (1.0 - smoothstep(0.15, 1.0, reach));
+  if (gl_FragColor.a <= 0.004) discard;
+`
+
 // ---------------------------------------------------------------- materials
 
 const eachMaterial = (node, fn) => {
@@ -1101,7 +1255,10 @@ export function makeRenderer(canvas, view, viewport) {
     // and a key left out of this set is stringified into the material key on
     // every part of every frame — which would also give twelve identically
     // coloured boxes twelve materials, one per position.
-    'parts', 'at', 'rotation', 'name'
+    'parts', 'at', 'rotation', 'name',
+    // The keyline and the contact shadow are drawn BESIDE the mesh, in their
+    // own materials. Neither changes what the surface is made of.
+    'keyline', 'keylineColour', 'shadow', 'shadowStrength'
   ])
 
   /**
@@ -1468,6 +1625,230 @@ export function makeRenderer(canvas, view, viewport) {
     }
   }
 
+  // ------------------------------------------------ keylines and contact shadows
+
+  /**
+   * The two things that make a moving thing readable, and who gets them.
+   *
+   * A keyline is a dark line of CONSTANT SCREEN WIDTH round a silhouette; a
+   * contact shadow is a soft ellipse under it. Both belong on the things a
+   * player tracks — the characters, the enemies, the pickups — and on nothing
+   * else: a line round every tuft of grass is edge detail, not readability.
+   * "Has moved since it appeared" is the renderer's own answer to which is
+   * which, read off the record merging already keeps, and any mesh overrides
+   * it by declaring `keyline` in pixels or `shadow` in metres. A `parts` body
+   * and a model both work; a GLB's own materials are never touched, so a model
+   * gets its keyline even though it cannot be given a material at all.
+   *
+   * Every number here is a default a game may set through `renderer.readability`.
+   */
+  const readability = {
+    keyline: 2.2,               // screen pixels
+    keylineColour: '#1d1418',
+    shadow: true,
+    shadowColour: '#0d1409',
+    shadowStrength: 0.44,
+    /** Where the floor is. The same y `toWorld` drops an unhit ray onto. */
+    groundY: 0,
+    /** Metres of lift over which a shadow spreads out and fades to nothing. */
+    shadowRange: 1.6
+  }
+
+  // One value, shared by every keyline material, so a resize costs no rebuild.
+  const framePixels = { value: new THREE.Vector2(1, 1) }
+  const keylineMaterials = new Map()
+
+  /**
+   * A back-faced copy grown in screen space: the inverted hull, in pixels.
+   *
+   * Basic rather than a raw shader so three still owns fog, tone mapping and
+   * the output colour space — a keyline is a flat colour and needs nothing
+   * else from a material.
+   */
+  function keylineMaterial(width, colour) {
+    const key = `${width}|${colour}`
+    const cached = keylineMaterials.get(key)
+    if (cached) return cached
+
+    const material = new THREE.MeshBasicMaterial({
+      color: readColour(colour, 'mesh.keylineColour') || new THREE.Color('#000000'),
+      side: THREE.BackSide, depthTest: true, depthWrite: true
+    })
+    material.onBeforeCompile = shader => {
+      shader.uniforms.keylineWidth = { value: width }
+      shader.uniforms.framePixels = framePixels
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float keylineWidth;\nuniform vec2 framePixels;')
+        .replace('#include <project_vertex>', `#include <project_vertex>\n${KEYLINE_GROWTH}`)
+    }
+    // Two materials whose GLSL differs must not share a compiled program.
+    material.customProgramCacheKey = () => `keyline:${width}`
+    keylineMaterials.set(key, material)
+    return material
+  }
+
+  /** The hull this entity's keyline is drawn from, built once per shape. */
+  function hullFor(entity, object, declared, shape) {
+    let key
+    if (declared.model) {
+      // Built from the loaded file, so it is the rest pose: a limb `pose`
+      // swings moves inside its own outline. That is a pixel or two on a leg at
+      // play distance, and it buys one draw call per character instead of one
+      // per limb.
+      if (!namedNodes.has(object)) return null
+      key = `model:${declared.model}`
+    } else if (shape?.kind === 'parts') {
+      key = `parts:${partsOf(declared, `${entity.type}.mesh`).signature}`
+    } else {
+      key = `${shape?.kind}:${shape?.w},${shape?.h},${shape?.d}`
+    }
+    if (!hullCache.has(key)) hullCache.set(key, hullGeometry(object))
+    return hullCache.get(key)
+  }
+
+  /** How wide this entity's keyline is, in screen pixels. Zero is none. */
+  function keylineWidth(declared, moved) {
+    if (declared.keyline === undefined) return moved ? readability.keyline : 0
+    return Math.max(0, number(declared.keyline, 0, 'mesh.keyline'))
+  }
+
+  function updateKeyline(entity, object, declared, shape, moved) {
+    const width = keylineWidth(declared, moved)
+    const drawn = object.userData.keylineMesh
+    const colour = declared.keylineColour ?? readability.keylineColour
+
+    if (width <= 0) {
+      if (drawn) { object.remove(drawn); object.userData.keylineMesh = null }
+      return
+    }
+    if (drawn && drawn.userData.width === width && drawn.userData.colour === colour) return
+    if (drawn) object.remove(drawn)
+
+    const geometry = hullFor(entity, object, declared, shape)
+    // A model still loading. The next frame builds it, and there is no state
+    // to keep.
+    if (!geometry) return
+
+    const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour))
+    // Read by hullGeometry, and by the batcher deciding what to hide.
+    hull.userData.keyline = true
+    hull.userData.width = width
+    hull.userData.colour = colour
+    object.add(hull)
+    object.userData.keylineMesh = hull
+  }
+
+  /**
+   * Every contact shadow in the frame, in one draw call.
+   *
+   * The art budget allows one shadow-casting light, so this is a projected
+   * ellipse and not a second shadow map. Capacity grows and is never given
+   * back: a horde that peaked at three hundred will peak again.
+   */
+  const SHADOW_QUAD = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
+  const shadowPlaces = []
+  let contactShadows = null
+  let contactStrengths = null
+
+  function contactShadowMaterial() {
+    const material = new THREE.MeshBasicMaterial({
+      color: readColour(readability.shadowColour, 'readability.shadowColour') || new THREE.Color('#000000'),
+      transparent: true, depthWrite: false, fog: false
+    })
+    material.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float contactStrength;\nvarying float vContactStrength;\nvarying vec2 vContact;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvContactStrength = contactStrength;\nvContact = position.xz * 2.0;')
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vContactStrength;\nvarying vec2 vContact;')
+        .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${CONTACT_SHADOW_FADE}`)
+    }
+    material.customProgramCacheKey = () => 'contact-shadow'
+    return material
+  }
+
+  function growContactShadows(wanted) {
+    // Against the room allocated, not against `count` — `count` is last frame's
+    // number of shadows and says nothing about how many will fit.
+    if (contactShadows && contactShadows.instanceMatrix.count >= wanted) return
+    const room = Math.max(64, 2 ** Math.ceil(Math.log2(wanted)))
+    if (contactShadows) {
+      scene.remove(contactShadows)
+      contactShadows.dispose()
+    }
+    contactStrengths = new THREE.InstancedBufferAttribute(new Float32Array(room), 1)
+    SHADOW_QUAD.setAttribute('contactStrength', contactStrengths)
+    contactShadows = new THREE.InstancedMesh(SHADOW_QUAD, contactShadowMaterial(), room)
+    // The matrices are rewritten every frame, so a bounding sphere computed
+    // from them is a frame out of date and would cull live shadows.
+    contactShadows.frustumCulled = false
+    contactShadows.layers.set(DRAWN)
+    scene.add(contactShadows)
+  }
+
+  /**
+   * Note where one entity's shadow goes, and how hard it presses.
+   *
+   * It tightens and darkens as the thing nears the ground, which is what says
+   * a bird is flying and a rat is walking.
+   */
+  function noteContactShadow(entity, declared, shape, moved) {
+    const asked = declared.shadow ?? (moved && readability.shadow)
+    if (!asked || !shape) return
+    const scale = entity.scale ?? 1
+    const across = Math.max(shape.w, shape.d) * scale
+    const stated = typeof asked === 'number' ? asked : across * 0.55
+    if (!(stated > 0)) return
+
+    const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - readability.groundY) / readability.shadowRange))
+    shadowPlaces.push({
+      x: entity.x,
+      z: entity.z || 0,
+      radius: stated * (1 + lift * 0.7),
+      strength: (declared.shadowStrength ?? readability.shadowStrength) * (1 - lift) ** 1.5
+    })
+  }
+
+  /**
+   * Give one entity its keyline and note its shadow. True if it has a keyline.
+   *
+   * Scenery leaves in the first three lines. Several hundred props that never
+   * move must not pay to read their own shape again on every frame.
+   */
+  function updateReadability(entity, object, declared) {
+    const moved = stillness.get(entity.id)?.moved === true
+    const asks = declared.keyline !== undefined || declared.shadow !== undefined
+    if (!moved && !asks) return false
+
+    const shape = meshShape(entity)
+    updateKeyline(entity, object, declared, shape, moved)
+    if (!entity.hidden) noteContactShadow(entity, declared, shape, moved)
+    return !!object.userData.keylineMesh
+  }
+
+  const shadowMatrix = new THREE.Matrix4()
+
+  /** Write the frame's shadows into the instanced mesh. Called once per sync. */
+  function placeContactShadows() {
+    if (!shadowPlaces.length) {
+      if (contactShadows) contactShadows.count = 0
+      return
+    }
+    growContactShadows(shadowPlaces.length)
+    // Just clear of the floor, or the two surfaces fight for the same pixels.
+    const y = readability.groundY + 0.015
+    for (let i = 0; i < shadowPlaces.length; i++) {
+      const place = shadowPlaces[i]
+      shadowMatrix.makeScale(place.radius * 2, 1, place.radius * 2)
+      shadowMatrix.setPosition(place.x, y, place.z)
+      contactShadows.setMatrixAt(i, shadowMatrix)
+      contactStrengths.setX(i, place.strength)
+    }
+    contactShadows.count = shadowPlaces.length
+    contactShadows.instanceMatrix.needsUpdate = true
+    contactStrengths.needsUpdate = true
+  }
+
   // ------------------------------------------------------ merging static work
 
   /**
@@ -1500,7 +1881,13 @@ export function makeRenderer(canvas, view, viewport) {
     if (batch) { batch.members.delete(id); batch.dirty = true }
     record.batch = null
     const object = meshes.get(id)
-    if (object) object.layers.set(DRAWN)
+    if (object) drawOn(object, DRAWN)
+  }
+
+  /** Put an object and its keyline on one layer. A layer is not inherited. */
+  function drawOn(object, layer) {
+    object.layers.set(layer)
+    object.userData.keylineMesh?.layers.set(layer)
   }
 
   function joinBatch(entity, record, key, materialKey) {
@@ -1533,7 +1920,7 @@ export function makeRenderer(canvas, view, viewport) {
 
       const members = [...batch.members].map(id => meshes.get(id)).filter(Boolean)
       if (members.length < MERGE_MINIMUM) {
-        for (const member of members) member.layers.set(DRAWN)
+        for (const member of members) drawOn(member, DRAWN)
         if (!batch.members.size) batches.delete(key)
         continue
       }
@@ -1547,7 +1934,7 @@ export function makeRenderer(canvas, view, viewport) {
       batch.object.castShadow = members[0].castShadow
       batch.object.receiveShadow = members[0].receiveShadow
       scene.add(batch.object)
-      for (const member of members) member.layers.set(MERGED)
+      for (const member of members) drawOn(member, MERGED)
     }
   }
 
@@ -1560,12 +1947,16 @@ export function makeRenderer(canvas, view, viewport) {
     const signature = `${entity.x},${entity.y},${entity.z || 0},${facingRadians(entity)},${entity.scale ?? 1}|${described.look}`
 
     let record = stillness.get(entity.id)
-    if (!record) stillness.set(entity.id, record = { signature: null, frames: 0, batch: null })
+    if (!record) stillness.set(entity.id, record = { signature: null, frames: 0, batch: null, moved: false })
 
     if (record.signature !== signature) {
       // It moved. Leave the batch this frame, before anything is drawn, or the
       // merged copy stays behind at the old place as a ghost.
       leaveBatch(entity.id)
+      // The first signature is where it appeared, not a move. Every one after
+      // it is, and the answer sticks: an enemy that stops to bite must not
+      // drop its keyline and its shadow for as long as it stands still.
+      if (record.signature !== null) record.moved = true
       record.signature = signature
       record.frames = 0
       return
@@ -1701,6 +2092,8 @@ export function makeRenderer(canvas, view, viewport) {
   const stats = {
     drawCalls: 0, triangles: 0,
     entities: 0, merged: 0, batches: 0,
+    // One draw call each, and one for every contact shadow together.
+    keylines: 0, contactShadows: 0,
     materials: 0, textures: 0, geometries: 0, programs: 0
   }
 
@@ -1763,6 +2156,9 @@ export function makeRenderer(canvas, view, viewport) {
    */
   function readyCamera() {
     updateCamera()
+    // The keyline is measured in the pixels the card actually draws, which is
+    // the viewport times the pixel ratio, not the viewport.
+    renderer.getDrawingBufferSize(framePixels.value)
     const camera = activeCamera()
     // A camera's updateMatrixWorld also refreshes matrixWorldInverse, which is
     // the half project() and the raycaster actually read.
@@ -1801,6 +2197,14 @@ export function makeRenderer(canvas, view, viewport) {
     // the lights needs somewhere to read the switch and set its quality.
     get shadowMap() { return renderer.shadowMap },
 
+    /**
+     * Keyline width and contact shadow, for everything that does not say.
+     *
+     * Written to, not replaced: `renderer.readability.keyline = 3`. A colour
+     * changed here reaches the next keyline built, not the ones already drawn.
+     */
+    readability,
+
     resize,
     frameSize,
 
@@ -1808,6 +2212,8 @@ export function makeRenderer(canvas, view, viewport) {
     sync(world) {
       const painters = flat()
       const live = new Set()
+      shadowPlaces.length = 0
+      let keylines = 0
 
       world.entities.forEach((entity, i) => {
         live.add(entity.id)
@@ -1838,6 +2244,8 @@ export function makeRenderer(canvas, view, viewport) {
           // Depth decides what covers what, so there is nothing to order.
           object.renderOrder = 0
           considerForMerging(entity, described, opacity, !!declared.model || Array.isArray(declared.parts))
+          // After merging, which is where "has this ever moved" is answered.
+          if (updateReadability(entity, object, declared)) keylines++
           return
         }
 
@@ -1879,12 +2287,15 @@ export function makeRenderer(canvas, view, viewport) {
       }
 
       rebuildBatches()
+      placeContactShadows()
 
       // Counted after the rebuild, and only from batches that actually drew:
       // a group that never reached MERGE_MINIMUM has members but no merged
       // geometry, and reporting those as merged would flatter the number this
       // exists to be honest about.
       stats.entities = world.entities.length
+      stats.keylines = keylines
+      stats.contactShadows = shadowPlaces.length
       stats.merged = 0
       stats.batches = 0
       for (const batch of batches.values()) {
@@ -2240,6 +2651,9 @@ export function makeRenderer(canvas, view, viewport) {
       for (const key of [...variantCache.keys()]) if (matches(key)) variantCache.delete(key)
       if (modelCache.has(file)) modelCache.delete(file)
       if (modelCache.has(name)) modelCache.delete(name)
+      // The keyline is traced from the file, so an edited model needs a new one.
+      hullCache.delete(`model:${file}`)
+      hullCache.delete(`model:${name}`)
       alreadySaid.clear()
       invalidateEverything()
     }
