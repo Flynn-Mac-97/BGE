@@ -1,12 +1,15 @@
 /**
  * The ray battery: what sits at a screen point, over a grid, and from an
- * entity — proved headless, on the meadow's own misplaced floor.
+ * entity — proved headless.
  *
- * The meadow's floor collider sits six metres below the y = 0 plane its
- * `about` text claims — the level's own authored mismatch, and the clearest
- * real case for "what is under this thing, and how far". A downward ray
- * from the kitten's edited placement, before anything falls, measures it.
+ * A downward ray from the kitten is the check that matters, and the rule it
+ * guards is that the kitten is placed standing on the meadow. It used to
+ * assert a six-metre drop, which was the floor being misplaced; the floor was
+ * put right and the test then guarded the break instead of the rule.
  */
+
+/** How far under the kitten's placement the ground may be and still be under its feet. */
+const STANDING = 0.5
 const PLAY_VIEW = 'meadow-play'
 
 export default {
@@ -18,8 +21,8 @@ export default {
     const down = await test.run('see.ray', { from: 'you', direction: 'down' })
     test.is(down.hits.length, 1, 'nothing sits between the kitten and the floor')
     test.is(down.hits[0].id, 'floor', 'the floor is what a downward ray from the kitten finds')
-    test.near(down.hits[0].distance, 6, 0.1,
-      `the misplaced floor sits about six metres below the kitten's placement — got ${down.hits[0].distance}`)
+    test.ok(down.hits[0].distance <= STANDING,
+      `the kitten is placed standing on the meadow — ${down.hits[0].distance}m from its box to the ground`)
     test.ok(!!down.hits[0].about, 'the hit carries what the author wrote the floor to be')
     test.ok(typeof down.limits === 'string' && /BOXES/.test(down.limits),
       'the reply states the box-versus-silhouette limit rather than hiding it')

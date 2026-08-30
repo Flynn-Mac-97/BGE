@@ -4,35 +4,57 @@
  * Everything a minute of this game is worth is here and nowhere else. Nothing
  * in this file touches an entity or the world: it answers questions about a
  * number of minutes, so the whole design can be printed without playing it —
- * `run horde.curve` — and tuned by editing eight constants.
+ * `run horde.curve` — and tuned by editing the constants below.
  *
- *   rateAt         spawns a second, 6 climbing to a cap of 30
+ *   RUN_SECONDS    how long a run lasts before the kitten has survived it
+ *   rateAt         spawns a second
  *   aliveCapAt     how many may stand on the meadow at once
  *   healthScaleAt  what an enemy's health is multiplied by
  *   speedScaleAt   the same for speed, with a low ceiling — a horde that
  *                  outruns the kitten is not harder, it is over
  *   SCHEDULE       which families are in the bag, and how heavily
+ *
+ * **The run is three minutes and the arc is built to be felt at that length.**
+ * A row every half minute, a swarm every half minute between them, and each
+ * change lands inside the thirty seconds after a card was taken — so a pick and
+ * the next escalation are the same beat of the game. The three minutes matter:
+ * every curve below is read in minutes and tuned against that length, and
+ * changing one without the others gives a run that climbs to nothing.
  */
+
+/** How long the kitten has to last. The run ends `survived` at this many seconds. */
+const RUN_SECONDS = 180
 
 /** Every enemy type this game has, in the order they are unlocked. */
 export const FAMILIES = ['rat', 'crow', 'hound', 'wasp', 'boar']
 
 /**
- * Which families are in the bag, from which minute, and how big a batch arrives.
+ * Which families are in the bag, from which half minute, and how big a batch
+ * arrives.
  *
  * Weights, not probabilities, so a row is edited by changing one number rather
  * than by rebalancing all of them. Rats fall away but never vanish: the late
  * game still needs chaff, or there is nothing cheap left to kill.
+ *
+ * Crows open the run rather than rats. The spawn ring is twenty-two metres out
+ * and a rat walks at 1.95, so a rat-only opening leaves the kitten with nothing
+ * in range for eleven seconds; a crow covers the same ground in four and the
+ * first kill lands about two seconds in. Rats are the body of the crowd from
+ * the half minute on.
+ *
+ * Each family enters where it changes what the player has to do: wasps at one
+ * minute outrun the kitten, hounds at ninety seconds cannot be shot down on the
+ * way in, and the boar at two minutes is the first thing that kills in one hit
+ * if it is not dodged.
  */
 const SCHEDULE = [
-  { minute: 0,    cluster: [2, 4], weights: { rat: 10 } },
-  { minute: 0.75, cluster: [2, 5], weights: { rat: 10, crow: 5 } },
-  { minute: 2,    cluster: [2, 5], weights: { rat: 9, crow: 7, hound: 1 } },
-  { minute: 3.5,  cluster: [2, 6], weights: { rat: 7, crow: 7, hound: 2, wasp: 4 } },
-  { minute: 5,    cluster: [3, 7], weights: { rat: 6, crow: 6, hound: 3, wasp: 5, boar: 2 } },
-  { minute: 7,    cluster: [3, 8], weights: { rat: 4, crow: 6, hound: 4, wasp: 6, boar: 3 } },
-  { minute: 10,   cluster: [4, 10], weights: { rat: 3, crow: 5, hound: 5, wasp: 7, boar: 5 } },
-  { minute: 14,   cluster: [5, 12], weights: { rat: 2, crow: 5, hound: 6, wasp: 8, boar: 6 } }
+  { minute: 0,   cluster: [2, 3],  weights: { crow: 8, rat: 6 } },
+  { minute: 0.5, cluster: [3, 5],  weights: { rat: 10, crow: 6 } },
+  { minute: 1,   cluster: [3, 6],  weights: { rat: 9, crow: 6, wasp: 4 } },
+  { minute: 1.5, cluster: [3, 7],  weights: { rat: 8, crow: 6, wasp: 5, hound: 2 } },
+  { minute: 2,   cluster: [4, 8],  weights: { rat: 6, crow: 6, wasp: 6, hound: 3, boar: 2 } },
+  { minute: 2.5, cluster: [4, 9],  weights: { rat: 5, crow: 6, wasp: 7, hound: 4, boar: 3 } },
+  { minute: 3,   cluster: [5, 10], weights: { rat: 4, crow: 6, wasp: 8, hound: 5, boar: 4 } }
 ]
 
 /**
@@ -40,18 +62,30 @@ const SCHEDULE = [
  *
  * The crowd's size is whichever of two limits binds — the alive cap, or the
  * kill rate. A survivor's screen is meant to be cap-limited, so the rate must
- * beat the kill rate with room to spare in every minute. Measured with the real
- * four weapons taking a card at every level: they kill about 5 a second by
- * minute four, and at 2.2 + 1.5/min the crowd sagged to 60% of its cap while
- * the drip fell behind. Vampire Survivors is 50-100 on screen in the first
- * minute and 300+ late; these numbers hold the crowd at its cap the whole run.
+ * beat the kill rate with room to spare in every minute. Measured with a built
+ * kitten taking a card at every level: it kills about 5 a second by the third
+ * minute, and a drip that falls behind leaves the crowd sagging under its own
+ * cap. These numbers hold it at the cap from the first half minute on.
  */
-const RATE_AT_START = 6
-const RATE_PER_MINUTE = 2.4
+const RATE_AT_START = 2
+const RATE_PER_MINUTE = 2.6
 const MOST_PER_SECOND = 30
 
-const ALIVE_AT_START = 60
-const ALIVE_PER_MINUTE = 55
+/**
+ * The cap is the pressure the player feels, so it carries the shape of the run.
+ *
+ * Twenty-two on screen at the start is a skirmish the two starting weapons hold
+ * without help; a hundred and thirty-six at three minutes is a wall only a
+ * built kitten walks out of. A straight line on purpose — the steps the player
+ * feels are the schedule rows and the swarms, and a stepped cap on top of those
+ * put two beats against each other.
+ *
+ * Measured: at 22 + 55/min the kitten died at 1:21 whatever it picked, which is
+ * a run with no second half. These numbers give a drafted build the full three
+ * minutes and an unbuilt one about ninety seconds.
+ */
+const ALIVE_AT_START = 22
+const ALIVE_PER_MINUTE = 38
 
 /**
  * The hard ceiling on live enemies.
@@ -77,14 +111,29 @@ const ALIVE_PER_MINUTE = 55
  */
 const MOST_ALIVE = 600
 
-const HEALTH_PER_MINUTE = 0.42
-const SPEED_PER_MINUTE = 0.03
-const MOST_EXTRA_SPEED = 0.35
+/**
+ * Health and speed over a three-minute run: an enemy at the peak has 2.2 times
+ * the health it opened with and moves 27% faster.
+ *
+ * The speed ceiling is the important one. The kitten runs at 5, a rat at 1.95
+ * and a wasp at 6.2; raise the ceiling and every family outruns the kitten,
+ * which does not make the run harder, it makes running pointless.
+ */
+const HEALTH_PER_MINUTE = 0.4
+const SPEED_PER_MINUTE = 0.09
+const MOST_EXTRA_SPEED = 0.3
 
-/** A named wave every minute: one family, one bearing, all at once. */
-const SWARM_EVERY = 60
-const SWARM_AT_START = 24
-const SWARM_PER_MINUTE = 9
+/**
+ * A named wave every half minute: one family, one bearing, all at once.
+ *
+ * This is the beat of the run. The drip is a background the player stops
+ * noticing; a swarm is a wall arriving from one side that has to be run from,
+ * and it is what makes one half minute feel unlike the last. Half a minute
+ * because it has to land inside the thirty seconds after a card was taken.
+ */
+const SWARM_EVERY = 30
+const SWARM_AT_START = 10
+const SWARM_PER_MINUTE = 14
 
 /**
  * How hard the spawner leans away from a family it already has too many of,
@@ -137,6 +186,7 @@ export default {
       families: FAMILIES,
       mostAlive: MOST_ALIVE,
       swarmEvery: SWARM_EVERY,
+      runSeconds: RUN_SECONDS,
       waveAt,
       rateAt,
       aliveCapAt,
@@ -185,9 +235,10 @@ export default {
      *   run horde.curve 30     thirty
      */
     run(context, args) {
-      const upTo = Number(Array.isArray(args) ? args[0] : args) || 20
+      const upTo = Number(Array.isArray(args) ? args[0] : args) || RUN_SECONDS / 60
       const rows = []
-      for (let minute = 0; minute <= upTo; minute++) {
+      // Half minutes, because the schedule and the swarms both step on them.
+      for (let minute = 0; minute <= upTo; minute += 0.5) {
         const wave = waveAt(minute)
         rows.push({
           minute,
@@ -200,7 +251,7 @@ export default {
           families: Object.entries(wave.weights).map(([f, w]) => `${f}:${w}`).join(' ')
         })
       }
-      return { mostAlive: MOST_ALIVE, swarmEvery: SWARM_EVERY, rows }
+      return { runSeconds: RUN_SECONDS, mostAlive: MOST_ALIVE, swarmEvery: SWARM_EVERY, rows }
     }
   }]
 }

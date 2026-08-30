@@ -98,18 +98,23 @@ export default {
     test.ok(before.visible.some(entry => entry.id === 'you'), 'the kitten starts on screen')
     test.is(before.counts.offscreenByType.rat ?? 0, 0, 'no rats before the run starts')
 
-    // Play to thirty seconds, taking the first card at each level-up screen —
-    // a held world is a screen asking, and snapshot's `paused` names it.
-    test.simulate(8)
-    await test.run('choice.pick', 1)
-    test.simulate(22)
-    for (let taken = 0; context.choiceScreen?.isOpen && taken < 5; taken++) {
-      await test.run('choice.pick', 1)
+    // Play to thirty seconds, taking the first card at each level-up screen.
+    // A level-up holds the world, and a held step moves no clock at all, so the
+    // screen has to be answered inside the loop or `simulate(30)` stops early
+    // at whatever second the first card came up.
+    for (let slice = 0; slice < 60; slice++) {
+      while (context.choiceScreen?.isOpen) await test.run('choice.pick', 1)
+      test.simulate(0.5)
     }
+    while (context.choiceScreen?.isOpen) await test.run('choice.pick', 1)
+    test.ok(context.runClock.seconds >= 29, `the run really reached ${context.runClock.clock}`)
 
     const during = await test.run('see.describe', { view: PLAY_VIEW, between: ['you', 'floor'] })
-    const rats = during.visible.filter(entry => entry.type === 'rat')
-    test.ok(rats.length >= 8, `a crowd is on screen at 0:30 — ${rats.length} rats visible`)
+    // Any family, not rats: which one is on the meadow at a given second is the
+    // schedule's business, and a crowd is what this is asking about.
+    const families = context.hordeSchedule.families
+    const crowd = during.visible.filter(entry => families.includes(entry.type))
+    test.ok(crowd.length >= 8, `a crowd is on screen at 0:30 — ${crowd.length} enemies visible`)
     test.ok(during.visible.some(entry => entry.id === 'you'), 'the kitten is still on screen')
     test.ok(during.counts.offscreen > 0, 'more of the horde is arriving from off screen')
 

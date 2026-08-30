@@ -146,8 +146,8 @@ function forgetTheLost(context) {
 
 export default {
   name: 'Horde Waves',
-  needs: ['Horde', 'Horde Schedule', 'Spawn Ring'],
-  about: 'The spawn clock: a steady drip of clusters, a swarm on every minute, and recycling from the back so the crowd stays current.',
+  needs: ['Horde', 'Horde Schedule', 'Spawn Ring', 'Run Clock'],
+  about: 'The spawn clock: a steady drip of clusters, a swarm every half minute, recycling from the back so the crowd stays current, and the length of a run.',
 
   onLoad(context) {
     const begin = () => {
@@ -159,6 +159,10 @@ export default {
         swarms: 0,
         sweptAt: 0
       }
+      // A run has an end the player can reach. The horde is what fills those
+      // minutes, so its schedule says how many there are: last them and the run
+      // ends `survived` instead of only ever ending `died`.
+      context.runClock?.limit(context.hordeSchedule.runSeconds)
     }
     begin()
     context.bus.on('level:loaded', begin)

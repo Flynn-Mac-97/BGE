@@ -14,6 +14,12 @@
   - an enemy whose `properties.health` hits zero by any means dies on the next
     step: the sweep trusts the number, not the caller
   - bus `enemy:died` → `{ entity, family, at, bounty, by }`, fired before it goes
+  - **a death leaves the roster at once and the body a moment later.** The enemy
+    is taken out of the crowd on the step it dies, so a corpse neither steers
+    nor holds a place under the population cap, and the body stands for
+    `BODY_LINGER` so Hit Reaction has frames to collapse it in. Health removes a
+    body it declared dead; this file removes one that only had its
+    `properties.health` set to zero.
   - `world.state.enemies` and `world.state.kills`, so a HUD needs no wiring
 - Per-enemy numbers on `properties`: `health` `maxHealth` `speed` `radius`
   `contactDamage` `bounty` `hover` `wander` `family`.

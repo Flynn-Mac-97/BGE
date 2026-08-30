@@ -2,7 +2,7 @@
  * Kitten Weapons — the four things a kitten fights with, and their numbers.
  *
  * You never press attack in this game. Everything here goes off on its own
- * clock, and the whole of playing it is watching four cooldowns overlap into
+ * clock, and the whole of playing it is watching cooldowns overlap into
  * something that clears a screen. So the design brief for each weapon is not
  * "what does it do" but "what does it do that the other three do not":
  *
@@ -14,9 +14,13 @@
  * One aims, one guards, one clears, one covers your retreat. A build that
  * happens to be strong is a build where those four cover each other.
  *
+ * **The kitten starts with Claw Dart alone.** The other three are cards, so the
+ * first three level-ups each change what the next thirty seconds look like
+ * rather than nudging a number. Kitten Upgrades hands them out.
+ *
  * Every number lives in `stats` and nothing here reads a number from anywhere
- * else, because another lane owns upgrades and its whole job is to change these
- * from outside:  context.autoWeapons.upgrade(you, 'yarn ball', { count: '+1' })
+ * else, because Kitten Upgrades owns changing them from outside:
+ * context.autoWeapons.upgrade(you, 'yarn ball', { count: '+1' })
  *
  * The engine's side of all this — cooldowns, damage, projectiles, flash,
  * numbers, hit stop — is in `plugins/builtin`. Nothing in this file is a
@@ -25,6 +29,16 @@
 
 /** Who the weapons belong to. The level places exactly one, with this id. */
 const PLAYER = 'you'
+
+/**
+ * What the kitten is armed with before the first card.
+ *
+ * Two, not four and not one. One aimed attack and one that clears the ring you
+ * are standing in is the least a player can be given and still have a decision
+ * about where to stand; a third and a fourth are cards, so the first two
+ * level-ups change what the run looks like instead of nudging a number.
+ */
+const STARTERS = ['claw dart', 'purr wave']
 
 /**
  * What counts as something to shoot at.
@@ -55,7 +69,7 @@ function facing(player) {
 export default {
   name: 'Kitten Weapons',
   about: 'Claw Dart, Yarn Ball, Purr Wave and Hairball — four cooldowns that fire themselves.',
-  needs: ['Auto Weapons', 'Projectiles', 'Health', 'Impact', 'Kitten Rings'],
+  needs: ['Auto Weapons', 'Projectiles', 'Health', 'Impact', 'Run Clock', 'Kitten Rings'],
 
   inspect: context => {
     const player = context.world.byId(PLAYER)
@@ -79,9 +93,13 @@ export default {
       if (!player) return
       // The player is the one thing that must not be swept up when it dies.
       context.health.give(player, { removeOnDeath: false, linger: 0 })
-      for (const name of ['claw dart', 'yarn ball', 'purr wave', 'hairball']) {
-        context.autoWeapons.give(player, name)
-      }
+      for (const name of STARTERS) context.autoWeapons.give(player, name)
+      // Retry loads the level again, which replaces every entity. The run clock
+      // must be handed a lookup rather than a body, or the second run watches
+      // the first run's corpse, finds it gone on the first step and ends at
+      // 0:00. Kitten Danger hands it a body on `play:started`, which never
+      // fires again after a reload, so this puts the lookup back.
+      context.runClock?.watch(() => context.world.byId(PLAYER))
     })
   },
 
