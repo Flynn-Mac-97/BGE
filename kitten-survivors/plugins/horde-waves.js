@@ -30,8 +30,19 @@ const SWARM_AHEAD = 0.7
 const FORGET_BEYOND = 2.4
 const FORGET_EVERY = 0.5
 
-/** Owing more than this many spawns means the cap has been holding the horde back. Forgiven, so a lull cannot burst. */
-const MOST_OWED = 26
+/**
+ * How many seconds of spawn debt may bank while the meadow is full.
+ *
+ * Debt held through a full screen is paid the moment recycling makes room, so
+ * the crowd snaps back to its cap instead of refilling at the drip's leisure.
+ * Forgiveness is measured in seconds of the current rate rather than a flat
+ * count — a flat 26 was two seconds of minute twenty, and discarding at that
+ * scale is why the crowd used to sit well under its own cap.
+ */
+const OWED_SECONDS = 4
+
+/** How long the drip rests after the meadow refuses a cluster, so a full screen is not re-asked sixty times a second. */
+const REST_WHEN_FULL = 0.3
 
 let clock = null
 
@@ -143,6 +154,7 @@ export default {
       clock = {
         owed: 0,
         pending: 0,
+        restingUntil: 0,
         nextSwarm: context.hordeSchedule.swarmEvery,
         swarms: 0,
         sweptAt: 0
@@ -188,13 +200,20 @@ export default {
         const [low, high] = wave.cluster
         clock.pending = context.random.int(low, high)
       }
-      if (clock.owed >= clock.pending) {
+      if (clock.owed >= clock.pending && context.time >= clock.restingUntil) {
         const family = schedule.pickFamily(wave.weights, horde.census(), Math.max(1, horde.count))
-        spawnCluster(context, family, clock.pending)
-        clock.owed -= clock.pending
+        const sent = spawnCluster(context, family, clock.pending)
+        // Paid down by what actually arrived. Subtracting the whole cluster
+        // when the cap refused part of it silently discarded the rest, and
+        // that discard is why the crowd used to sit well under its own cap.
+        clock.owed -= sent
+        if (sent < clock.pending) clock.restingUntil = context.time + REST_WHEN_FULL
         clock.pending = 0
       }
-      if (clock.owed > MOST_OWED) clock.owed = MOST_OWED
+      // The meadow being full banks debt rather than discarding it, but only a
+      // few seconds' worth — a long lull must not burst all at once.
+      const mostOwed = schedule.rateAt(minutes) * OWED_SECONDS
+      if (clock.owed > mostOwed) clock.owed = mostOwed
 
       if (context.time - clock.sweptAt >= FORGET_EVERY) {
         clock.sweptAt = context.time
