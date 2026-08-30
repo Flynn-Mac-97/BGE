@@ -19,12 +19,10 @@ one agent once; a node reaches every agent that touches a matching file, for as
 long as it is true.
 
 An instruction node that **ranks the options for a job** is the most valuable
-shape. `agents/art.md` is the worked example: it says that a character is a
-Blender model, that a few solids are `mesh.parts`, that a box is a blockout, and
-that going straight to the last row is how a game ends up made of boxes. It came
-from a lane that built a cat out of eighteen boxes because nothing told it there
-was a better route — and the Blender skill existed the whole time, gated behind
-triggers the task never said.
+shape. `agents/art.md` is the worked example: a character is a Blender model, a
+few solids are `mesh.parts`, a box is a blockout. It exists because a lane
+built a character from 18 boxes while the Blender skill sat unused behind
+triggers its task never matched.
 
 So when a run teaches something:
 
@@ -38,8 +36,9 @@ Check what a real task pulls before trusting it:
 `node bin/engine.mjs agent.context '{"task":"...","files":["..."]}'`. A `triggers`
 list is only as good as the words people actually write.
 
-None of it is fixed. A node that describes a route we have since beaten is worse
-than no node, so the file says to change it in the same task that beats it.
+None of it is fixed. A node describing a route better ones have replaced is
+worse than no node, so each file says to update it in the same task that finds
+the better route.
 
 ## Which project
 

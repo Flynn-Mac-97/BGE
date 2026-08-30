@@ -23,13 +23,8 @@ plugins/builtin/
 ```
 
 Physics is a plugin. The inspector is a plugin. Delete both and the engine still
-boots — you get a static scene and no detail pane, and nothing else notices.
-
-Every name in this codebase is spelled out. `properties` not props, `context`
-not ctx, `entity` not e, `seconds` not dt, `velocityX` not vx. Plugins are named
-the way you would say them out loud — `Inspector Panel`, `Terminal Bridge`.
-Nobody reading this code for the first time should have to decode it first, and
-that includes a model reading it cold.
+boots — a static scene, no detail pane, nothing else notices. Naming rules are
+in `ARCHITECTURE.md`.
 
 ## The kernel modules
 
@@ -80,8 +75,7 @@ wanting the same key. It reports that collision by name and keeps the first.
 Turning a plugin off withdraws its contributions immediately; the next reload
 skips it entirely. A plugin cannot be un-loaded mid-session — its `onLoad` has
 already run and may hold DOM or listeners — so anything it added to `context`
-stays until then. The Plugin Browser browser is the visible proof of the
-whole arrangement: switch off the inspector and watch it go.
+stays until reload.
 
 ## Boot
 
@@ -123,7 +117,7 @@ the only `define` channel that survives dev, because Vite's define plugin
 returns early when not building, so a bare identifier is replaced in a
 production build and silently left alone in development.
 
-Step 7 matters more than it looks. The dev server builds `.engine/index.json` by
+Step 7: the dev server builds `.engine/index.json` by
 *importing* each type file and reading its actual `properties`, hooks and asset
 references — not by parsing text. So the index is exact: it is what the editor's
 search reads, and `.engine/index.agent.json` is the compact view the
@@ -150,12 +144,11 @@ frame
 In edit mode the fixed step never runs — just sync and draw. That is the entire
 difference between editing and playing.
 
-`loop.holdFor(seconds)` is the one thing that can skip a step: hit stop, the two or
-three frames a game freezes on so a heavy blow lands as a blow. The clock and
-the schedule keep running through it, so `context.time` never becomes a second
-clock that disagrees with the first, and it is rounded to whole steps because a
-fraction of a fixed step is not a fixed step. `Impact` is the plugin that uses
-it. There is still no general time scale and no pause.
+`loop.holdFor(seconds)` is the one thing that can skip a step: hit stop, the
+brief freeze on a heavy hit. The clock and schedule keep running through it, so
+`context.time` stays a single clock, and it rounds to whole steps because a
+fraction of a fixed step is not a fixed step. `Impact` drives it. There is
+still no general time scale.
 
 **Physics never touches the renderer.** It reads and writes `e.x` / `e.y`; the
 renderer reads the same numbers. Swapping the renderer would not affect physics
@@ -178,7 +171,6 @@ time  random  after  every  cancel          the deterministic runtime
 input  camera  play  audio  hud             contributed by plugins
 ```
 
-That last line is the proof the design works. `input`, `camera`, `play` and
-`hud` are not kernel. Plugins added them to `context`, and `player.js` uses
-`context.input.axis('x')` and `context.camera.shake()` as though they always existed.
-A plugin you write can do the same.
+`input`, `camera`, `play` and `hud` are not kernel: plugins added them to
+`context`, and game code calls `context.input.axis('x')` or
+`context.camera.shake()` with no import. A plugin you write can add its own.

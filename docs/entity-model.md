@@ -96,11 +96,9 @@ export default {
 }
 ```
 
-Composition was avoided for a long time on the grounds that it costs tokens.
-Duplication costs more, and it costs them in the worse place: copying `float`
-into five type files means five reads, five edits, and one of the five silently
-diverging when somebody updates four. A shared file is read once and edited
-once.
+Duplication costs more than composition: copying `float` into five type files
+means five reads, five edits, and one of the five silently diverging when
+somebody updates four. A shared file is read once and edited once.
 
 Four rules keep this from becoming a component system:
 

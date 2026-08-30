@@ -6,19 +6,19 @@
 - Use the browser only to inspect drawing or live editor state.
 - Use git only in the CLI layer.
 
-## A tool is a plugin about the folder rule
+## The folder rule for tools
 
-The same split as plugins: **the machinery is the engine's, the art direction is
-the game's.**
+The same split plugins follow: **the machinery is the engine's, the art
+direction is the game's.**
 
 - `tools/lib/` — anything a second game would want. Seeded random, noise, colour,
   PNG and WAV encoding, seam checks. No game nouns.
 - `tools/make-<game>-<thing>.mjs` — what *this* game's surfaces look like. Its
   palette, its structures, its list. Name the game here; that is the point.
 - **Look in `tools/lib/` before writing a generator.** `make-kitten-survivors-textures.mjs`
-  was written as a fresh 864-line file and 250 of its lines were line-identical
-  to the Counter-Strike tool — the same random, the same hashes, the same noise,
-  the same encoder. Copying is how a shared thing gets three owners and no fixes.
+  was written as a fresh 864-line file with 250 lines line-identical to the
+  Counter-Strike tool — same random, hashes, noise, encoder. Copies drift, and
+  a fix lands in one of them.
 - Extract when you copy the second time, not the third. A tool is a small file:
   moving a helper costs minutes, and the next agent pays for every copy.
 - Prove an extraction by regenerating and diffing the output. Same bytes, or it

@@ -90,9 +90,8 @@ export default {
 `properties` doubles as the inspector schema — declared once, in code.
 
 Nothing here is abbreviated. `properties`, not props. `context`, not ctx.
-`entity`, not e. `seconds`, not dt. A short name saves nobody anything worth
-having when they are meeting the code for the first time — and a model reading
-it cold is in exactly that position, every time.
+`entity`, not e. `seconds`, not dt. A short name saves nothing and costs every
+first-time reader — which an AI model is on every read — a decoding step.
 
 ### A behaviour
 
@@ -155,8 +154,8 @@ texture instead of stretching it, so one 16-wide platform draws sixteen bricks.
 
 Everything is `NearestFilter` with no mipmaps, so pixel art stays crisp. A
 texture that fails to load falls back to the type tint **and** reports itself
-in `engine.errors()` — a blank viewport with an empty log is the worst thing
-to hand an agent.
+in `engine.errors()` — a blank viewport with an empty log gives an agent
+nothing to act on.
 
 The demo art is generated from text, not committed as opaque binary:
 
@@ -428,9 +427,9 @@ is reported against.
 
 ## Driving it from a terminal
 
-The engine hosts no AI. It opens a door, and whichever CLI you run walks
-through it — Claude Code, Codex, Aider, your own script. Run it beside the
-browser; nothing is embedded and nothing is locked in.
+The engine hosts no AI. Any CLI can drive it — Claude Code, Codex, Aider, your
+own script. Run it beside the browser; nothing is embedded and nothing is
+locked in.
 
 ```
 npm run dev                              # keep the tab open
@@ -475,8 +474,8 @@ project files are imported by path instead of by URL. A test asserts that a
 headless snapshot and an attached editor's snapshot match entity for entity, so
 the two cannot drift apart unnoticed.
 
-This is what makes a fan-out of agents possible. One dev server has one world,
-and ten agents stepping it trample each other. Ten headless worlds never meet.
+This is what makes a fan-out of agents possible: one dev server has one shared
+world; headless worlds are one per process and fully isolated in memory.
 
 ```
 for lvl in a b c; do node bin/engine.mjs --headless run tests.run --level $lvl & done; wait
@@ -489,8 +488,8 @@ isolated — give a writer its own git worktree, or keep writers to one lane.
 **Not possible:** drawing. There is no canvas, so no screenshot and no `pick`.
 
 `index`, `tree`, `check` and `pain` need nothing running either — they read the
-project straight off disk. The moment you most want `check` is rarely the moment
-the dev server is healthy.
+project straight off disk, so `check` still works when the dev server is the
+thing that is broken.
 
 For a real frame with no monitor, headless Chrome is still the client, and
 nothing about driving it changes:

@@ -15,9 +15,10 @@
   reach for raw DOM.
 - **Failure is contained by name.** A plugin that throws is disabled with its
   name and reason reported; it cannot take the editor down.
-- **Silence is the enemy.** A missing texture falls back to a flat colour *and*
-  reports itself. A blank viewport with an empty error log is the worst thing
-  the engine can hand an agent.
+- **Silence is the enemy** — never fail without saying so. A missing texture
+  falls back to a flat colour *and* reports itself. A blank viewport with an
+  empty error log gives an agent nothing to act on. Code cites this rule by
+  name.
 
 ## What is deliberately not here
 
@@ -27,8 +28,8 @@
 - No scene format beyond JSON placements.
 - No editor state that is not either in a file or trivially recomputed — with
   one exception, `History`. It holds this session's past states of the level in
-  memory, and they are neither on disk nor recomputable. Photoshop's history is
-  session-only too. The level on disk stays the truth: every step writes it.
+  memory, neither on disk nor recomputable. The level on disk stays the truth:
+  every step writes it.
 - No CSS in game code. The editor is styled by `engine/style.css`; a game draws
   into the canvas.
 
@@ -55,7 +56,7 @@ one another.
 Time scale has one piece of it now: `loop.holdFor(seconds)` skips whole fixed steps
 for hit stop, and `Impact` drives it. A pause and a general slow-motion are
 still not there, and a fractional time scale would need the fixed step to stop
-being fixed — which is a bigger decision than it looks.
+being fixed, which changes every determinism guarantee at once.
 
 The game also runs in the editor's own page, so an infinite loop in game code
 freezes the editor — though `--headless` now gives you somewhere else to run it.

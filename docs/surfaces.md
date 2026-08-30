@@ -22,8 +22,8 @@ No save button anywhere. Every edit lands on disk immediately, which is what
 lets the status bar say "saved" unconditionally.
 
 One guard: **a simulated world refuses to save.** A level records where things
-*start*; once the simulation has run the world holds where things *ended*, so
-writing it back would replace the level with a freeze-frame of a playthrough.
+*start*; a run leaves the world holding where things *ended*, and writing that
+back would overwrite the level with the run's end state.
 
 ## Driving it from outside
 
@@ -40,10 +40,10 @@ The bridge's transport is the dev server's existing websocket. No extra port, no
 extra dependency, and it dies with the dev server.
 
 `--headless` skips all of that and starts a world in the CLI process. It exists
-so several agents can work at once: one dev server has one world, and ten agents
-stepping it trample each other, while ten headless worlds never meet. Memory is
-private — world, clock, random stream, selection. `project/` is not, because it
-is on disk, so anything that *writes* still needs its own worktree or its own
-lane. Headless cannot draw; when you need a frame, use a browser.
+so several agents can work at once: one dev server has one shared world;
+headless worlds are one per process. Memory is private — world, clock, random
+stream, selection. `project/` is not, because it is on disk, so anything that
+*writes* still needs its own worktree or its own lane. Headless cannot draw;
+for a frame, use a browser.
 
-The engine hosts no AI. It opens a door; whichever CLI you run walks through it.
+The engine hosts no AI. Any CLI can drive it.

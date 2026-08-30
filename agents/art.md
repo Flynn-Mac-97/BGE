@@ -1,8 +1,8 @@
 # Making something you can see
 
 Pick the cheapest option that reaches the quality the task asks for. Read down;
-stop at the first row that fits. Going straight to the bottom row is how a game
-ends up made of boxes.
+stop at the first row that fits. Skipping straight to the bottom row produces a
+game made of boxes.
 
 ## Geometry — a thing in the world
 
@@ -14,8 +14,8 @@ ends up made of boxes.
 | a wall, floor, slab, blockout | `mesh: { box: [...] }` | none |
 
 Blender needs the GUI open and **BlenderMCP → Connect** pressed. If it is not
-connected, say so and ask — do not silently fall back to boxes. A cat built from
-eighteen boxes is a cat-shaped pile of boxes, and it cost more than modelling one.
+connected, say so and ask — do not silently fall back to boxes. An 18-box
+character cost more tokens than a Blender model and read worse.
 
 `rotation` in a level is Y-only and in degrees. Anything that needs to tip or
 roll is a model, not a placement.
@@ -40,8 +40,8 @@ you can say what a downloaded one would get wrong.
 
 ## Before you build
 
-- Read the project's art language document if it has one. Four agents making
-  meshes at once need one language, or the frame has two games in it.
+- Read the project's art language document if it has one. Parallel agents need
+  one shared language or the frame mixes styles.
 - Look at what the engine already draws. `plugins/builtin/materials.agent.md`
   lists nine materials with every parameter; `lights.agent.md` lists every key.
 - The camera decides what detail is worth paying for. Ask how far away and how
