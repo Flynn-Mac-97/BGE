@@ -200,6 +200,11 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      * Run the simulation for `seconds` deterministically, without waiting on
      * real time or a visible tab. Returns the resulting snapshot, so a single
      * call answers "what happens if I let this run".
+     *
+     * Compact by default, the same as `snapshot`, and `{ entities: true }`
+     * asks for the list. A step in the middle of a script is almost never the
+     * reply anybody wanted, and answering every one of them with the whole
+     * meadow cost more than the measurement that followed it.
      */
     simulate(seconds = 1, options = {}) {
       const started = loop.running
@@ -214,7 +219,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         for (const e of [...world.entities]) world.hook(e, 'start', editor.context)
       }
       loop.step(Math.round(seconds * 60))
-      return api.snapshot({ entities: true, ...options })
+      return api.snapshot(options)
     },
     spawn: (type, placement) => entityView(editor.context.spawn(type, placement)),
     destroy: id => editor.context.destroy(world.byId(id)),
