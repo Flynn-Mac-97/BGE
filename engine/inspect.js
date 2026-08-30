@@ -68,7 +68,27 @@ export function makeLog(bus) {
   return { lines, push }
 }
 
-export function makeInspect({ world, loader, loop, files, bus, editor, view, log }) {
+export function makeInspect({ world, loader, loop, files, bus, editor, view, log, reload }) {
+  /**
+   * A fact the kernel learned while booting, said once and then not again.
+   *
+   * A page reload rebuilds the world, and a rebuilt world nobody announced is
+   * one an agent goes on reading as though it were the world it left. The
+   * kernel knows; this is how it gets to say so. One field, named for what
+   * happened — `worldWasRestored` or `worldWasReset` — and absent whenever
+   * there is nothing to say, so it can never become noise.
+   */
+  const note = out => {
+    const said = reload?.()
+    if (said) out[said.key] = said.sentence
+    return out
+  }
+
+  /** A reply with room for one more key: a plain object, not a number or a list. */
+  const plainReply = value =>
+    !!value && typeof value === 'object' && !Array.isArray(value) &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+
   // A log made here started after the plugins did, so it heard none of what
   // they raised. Read that back out of the loader. A log passed in was already
   // listening and has it all, in the order it happened.
@@ -149,7 +169,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       if (options.log) out.log = log.lines.slice(-40)
       if (options.timers) out.timers = loop.timers
       if (options.commands) out.commands = loader.contrib.commands.map(c => c.id)
-      return out
+      return note(out)
     },
 
     /**
@@ -174,7 +194,11 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
       if (command.toolbar !== false && loader.contrib.menus.includes(command)) editor.context.redraw()
-      return out
+      // A reply is where an agent is certainly looking, so a waiting note rides
+      // on one — but only on a reply with room for it. A command that answers
+      // with a number or a list answers with exactly that, and the note waits
+      // for the next question shaped to carry it.
+      return plainReply(out) ? note({ ...out }) : out
     },
 
     entity(id) {
