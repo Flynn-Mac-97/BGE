@@ -17,7 +17,10 @@ const HEIGHT = 0.5
 const LENGTH = 0.34
 
 export default {
-  mesh: { box: [WIDTH, HEIGHT, LENGTH], tint: '#2e2a38' },
+  // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
+  // The spread wings overshoot the hull on purpose: the hull is what a weapon
+  // hits, the wings are what says "bird" from a camera looking down.
+  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#2e2a38' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {
