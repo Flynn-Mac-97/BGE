@@ -22,7 +22,7 @@ import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFil
 import { convexHull } from '../../engine/frame-facts.js'
 import { describe } from './see/describe.js'
 import { resolveView, view } from './see/views.js'
-import { occlusion, isolate, find, diff, camera } from './see/queries.js'
+import { occlusion, isolate, find, diff, camera, identify } from './see/queries.js'
 import { ray } from './see/ray.js'
 
 let frameNumber = 0
@@ -147,7 +147,8 @@ export default {
       find: predicates => find(context, predicates),
       diff: options => diff(context, options),
       camera: () => camera(context),
-      ray: options => ray(context, options)
+      ray: options => ray(context, options),
+      identify: options => identify(context, options)
     }
   },
 
@@ -194,6 +195,14 @@ export default {
       id: 'see.ray',
       label: 'What sits at a screen point, a grid of them, or in a direction from an entity',
       run: (context, options) => ray(context, options || {})
+    },
+    {
+      id: 'see.identify',
+      // The one question the plugin was built for: a player points at something
+      // and asks what it is. `see.ray` answers the same point from geometry;
+      // this answers it from the pixel the renderer actually drew.
+      label: 'What is drawn at this screen point, by the renderer that drew it',
+      run: (context, options) => identify(context, options || {})
     },
     {
       id: 'see.sketch',
