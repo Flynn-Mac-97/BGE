@@ -18,6 +18,7 @@
  * and the visible canvas is never drawn to.
  */
 import { describe } from './describe.js'
+import { convexHull } from '../../../engine/frame-facts.js'
 
 /** render.js keeps merged members on layer 1 for the raycaster. Change both together. */
 const MERGED_LAYER = 1
@@ -110,6 +111,54 @@ export async function visibility(context, ids) {
     const pixels = mounted.fullPass()
     const map = decode(mounted, pixels)
     return queried.map(id => measure(mounted, pixels, map, id, entryOf.get(id)))
+  } finally {
+    mounted.unmount()
+  }
+}
+
+/**
+ * Pixel-true screen hulls: the convex hull of each named entity's frontmost
+ * pixels, from one full ID pass. For every row an entity appears on, only its
+ * leftmost and rightmost pixel matter — the hull of those edge points is the
+ * hull of the whole pixel set. Percent coordinates, top-down, like every
+ * screen answer. An entity with no visible pixels is absent from the answer.
+ */
+export async function silhouettes(context, ids) {
+  const missing = noRenderer(context)
+  if (missing) return missing
+  const mounted = await mount(context)
+  try {
+    const pixels = mounted.fullPass()
+    const { width, height } = mounted
+    const wanted = new Set(ids)
+    const idOfIndex = new Map()
+    mounted.ids.forEach((id, index) => { if (id && wanted.has(id)) idOfIndex.set(index, id) })
+
+    const edges = new Map()
+    for (let row = 0; row < height; row++) {
+      for (let column = 0; column < width; column++) {
+        const id = idOfIndex.get(indexAt(pixels, (row * width + column) * 4))
+        if (!id) continue
+        // GL stored the rows bottom-up; the answer speaks top-down.
+        const y = height - 1 - row
+        let spans = edges.get(id)
+        if (!spans) edges.set(id, spans = new Map())
+        const span = spans.get(y)
+        if (!span) spans.set(y, [column, column])
+        else if (column < span[0]) span[0] = column
+        else if (column > span[1]) span[1] = column
+      }
+    }
+
+    const hulls = {}
+    for (const [id, spans] of edges) {
+      const points = []
+      for (const [y, [left, right]] of spans) {
+        points.push([left / width * 100, y / height * 100], [(right + 1) / width * 100, y / height * 100])
+      }
+      hulls[id] = convexHull(points).map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10])
+    }
+    return hulls
   } finally {
     mounted.unmount()
   }

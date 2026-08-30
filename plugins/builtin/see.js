@@ -370,6 +370,22 @@ export default {
           pen.drawImage(canvas, 0, 0)
         }
 
+        // Where the renderer can say, a marked hull is upgraded from box
+        // corners to the entity's drawn silhouette — one ID pass, before the
+        // camera is put back, so the trace matches the frame just taken. The
+        // box hull stands where an entity drew nothing.
+        if (options.marks !== false && !crop && !studio) {
+          try {
+            const { silhouettes } = await import(/* @vite-ignore */ './see/id-buffer.js')
+            const traced = await silhouettes(context, description.visible.filter(v => v.mark).map(v => v.id))
+            for (const entry of description.visible) {
+              if (entry.mark && traced?.[entry.id]?.length >= 3) entry.hull = traced[entry.id]
+            }
+          } catch {
+            // No ID pass, no upgrade — the box hulls already drawn are honest.
+          }
+        }
+
         for (const other of concealed) other.hidden = false
         for (const child of overlays) child.visible = true
         if (studio) {

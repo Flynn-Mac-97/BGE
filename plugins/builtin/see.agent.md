@@ -132,9 +132,11 @@ HUD), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`.
 Marks are HULLS: each marked entity is outlined in its TYPE's colour, drawn
 on its own pixels — one colour per type, so a busy frame is a handful of
 colours. The reply and sidecar carry `palette` (type → hex) and each marked
-entry's `hull` (its screen outline as [x, y] percent points). The subject is
-white and wider. Ground an answer in colour + the sidecar's positions, never
-in floating text.
+entry's `hull` (its screen outline as [x, y] percent points). In a capture
+the hull traces the entity's drawn silhouette from the ID buffer; in a
+sketch or bare describe it is the projected box. The subject is white and
+wider. Ground an answer in colour + the sidecar's positions, never in
+floating text.
 
 ## A moment in time
 
