@@ -20,6 +20,8 @@ Read down; stop at the first row that answers.
 
 | question | use | costs |
 |---|---|---|
+| **what is THAT thing, at this spot on screen** | `see.identify '{"at":[50,50]}'` | nothing; ID buffer, falls back to boxes |
+| what does a ray pass through, from a point or in a direction | `see.ray '{"at":[50,50]}'`, `'{"grid":[6,4]}'`, `'{"from":"you","direction":"down"}'` | nothing; works everywhere |
 | what is on screen — counts, positions, sizes, coverage, regions, overlaps, between | `see.describe` | nothing; works everywhere |
 | which entities match predicates — type, region, size, depth, cut, occlusion, distance | `see.find` | nothing; works everywhere |
 | one entity in full — world box, screen box, cover, velocity, camera relation | `see.isolate` | nothing; may step the world once |
@@ -39,6 +41,8 @@ the verb is exact where a look is at or near chance:
 
 | never ask a picture | ask this |
 |---|---|
+| what is that thing on screen, what am I looking at | `see.identify` with the screen point — never guess it from a mark or a name |
+| is anything floating, sunk, or built to the wrong surface | `see.describe` — read `heightGaps`, which names the band and the type above it |
 | how many of X are there | `see.describe`, `see.find` |
 | which is in front, what is blocking it | `see.occlusion` |
 | how far apart, how big, how fast | `see.isolate`, `describe` with `between` |
@@ -112,9 +116,30 @@ workflow by hand.
 
 ## Query commands
 
+- `see.identify '{"at":[50,50]}'` — what is drawn at one screen point, as
+  percent, x right and y down. Answers the entity's id, its type, and what its
+  author says it is. The ID buffer answers where a renderer drew the frame;
+  boxes answer otherwise, and `rendererWhy` names why the renderer did not. A
+  blank buffer from a hidden tab is refused rather than read as empty sky.
+  This is the verb for "what is that thing" — do not infer identity from a
+  mark number, a type name, or the source.
+- `see.ray '{"at":[50,50]}'` — every entity a ray through that screen point
+  passes, nearest first, with distance and the author's description.
+  `'{"grid":[6,4]}'` casts that over the frame and answers what is really in
+  front of the camera, an order of magnitude smaller than a full entity dump.
+  `'{"from":"you","direction":"down"}'` answers what is under a thing and how
+  far — the support test. Rays hit collider and mesh BOXES, not drawn
+  silhouettes, so a thin model can be missed; `limits` says so in every reply.
 - `see.describe '{...}'` — the index every other answer builds on: camera,
   visible entities with screen positions (percent, x right, y down), sizes,
   depth, marks, off-screen counts, coverage, overlaps, occlusions, regions.
+  Every one of those is a projection. Four fields are not, and they are where a
+  structural fault shows: `verticalSpan` is each type's bottom and top face in
+  world units; `heightGaps` names a height band nothing occupies and the type
+  above it; `sizeOutliers` names an entity sized unlike its own kind;
+  `stackedEntities` names entities at one position where only the front one is
+  ever seen. The last three carry a `why` sentence and appear only when they
+  have something to say. Read them before ranking anything yourself.
 - `see.occlusion '{"of":"you"}'` — off frame answers `offscreen`, not zero.
   `visibleFraction` divides visible pixels by the PROJECTED BOX, so a shaped
   model reads below 1 with nothing blocking it — compare against its own

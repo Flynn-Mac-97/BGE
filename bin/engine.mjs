@@ -475,7 +475,16 @@ if (op === 'check') {
   // Gathered separately from the index so a broken plugin cannot stop the rest
   // of the project being reported, and the other way round.
   const failed = await pluginImportFailures(CHECKOUT, PROJECT)
-  const problems = [...pluginProblems(failed), ...problemsIn(await buildIndex(PROJECT))]
+  // What a fresh agent reads before its first call: the generated files against
+  // their source, and every plugin's guide against the commands it registers.
+  // These are the only problems whose cost falls entirely on an agent — a stale
+  // guide is read all session and there is no second chance to correct it.
+  const { agentRegistrationProblems } = await import('../engine/agent-registration.mjs')
+  const problems = [
+    ...pluginProblems(failed),
+    ...problemsIn(await buildIndex(PROJECT)),
+    ...await agentRegistrationProblems(CHECKOUT, path.basename(PROJECT))
+  ]
   // Warnings are reported and never fail the run. A warning that broke the
   // chain would be turned off, and then it reports nothing at all.
   const failures = fatal(problems)

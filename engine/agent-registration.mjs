@@ -312,10 +312,58 @@ async function manifestSkillProblems(root) {
     }))
 }
 
+/**
+ * The ids in a plugin's `commands` array, and nothing else.
+ *
+ * Panels, menus and fields carry ids of the same shape, so a plain search over
+ * the file names things no agent would ever call. The array is read by
+ * bracket depth from `commands:` to its close; a plugin that builds its
+ * commands somewhere else answers nothing rather than a guess.
+ */
+function commandIds(source) {
+  const start = source.search(/\bcommands:\s*\[/)
+  if (start < 0) return []
+  let depth = 0
+  let index = source.indexOf('[', start)
+  const from = index
+  for (; index < source.length; index++) {
+    if (source[index] === '[') depth++
+    else if (source[index] === ']' && --depth === 0) break
+  }
+  return [...source.slice(from, index).matchAll(/id:\s*'([a-z][\w-]*\.[\w.-]+)'/g)].map(match => match[1])
+}
+
+/**
+ * Commands a plugin registers that its own guide never names.
+ *
+ * The guide is what an agent reads before its first call, so a verb missing
+ * from it is a verb nothing will use.
+ *
+ * A warning, not a failure: a plugin may register something deliberately
+ * internal, and a guide is prose that cannot be generated from an id.
+ */
+export async function undocumentedCommandProblems(root, projectDirectory) {
+  const problems = []
+  for (const guide of await pluginGuides(root, projectDirectory)) {
+    if (!guide.enabled || !guide.hasSource) continue
+    const source = await fs.readFile(path.join(root, guide.sourceFromRoot), 'utf8').catch(() => null)
+    if (source === null) continue
+    const missing = [...new Set(commandIds(source))].filter(id => !guide.body.includes(id)).sort()
+    if (!missing.length) continue
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: `registers ${missing.join(', ')} and its guide names none of them. An agent reads the guide before its first call, so an undocumented verb is one nothing will use`
+    })
+  }
+  return problems
+}
+
 /** Everything this module reports, for one call from `check`. */
 export async function agentRegistrationProblems(root, projectDirectory) {
   return [
     ...await generatedFileProblems(root, projectDirectory),
-    ...await skillRegistrationProblems(root, projectDirectory)
+    ...await skillRegistrationProblems(root, projectDirectory),
+    ...await undocumentedCommandProblems(root, projectDirectory)
   ]
 }
