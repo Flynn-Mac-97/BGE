@@ -233,13 +233,24 @@ function sketch(context, options = {}) {
   return { description, width, height, pixels }
 }
 
-const asFiles = (name, pngBase64, description) => ({
-  __files: [
-    { path: `agent-runs/see/${name}.png`, base64: pngBase64 },
-    { path: `agent-runs/see/${name}.json`, base64: Buffer.from(JSON.stringify(description)).toString('base64') }
-  ],
-  marks: Object.fromEntries((description.visible || []).filter(v => v.mark).map(v => [v.mark, v.id]))
-})
+/**
+ * In node the frames land on disk right here, so a test or a plugin gets real
+ * paths back, not a payload — the `__files` route exists only for the
+ * browser, which cannot write and hands its bytes to the CLI instead.
+ */
+async function writeFiles(name, png, description) {
+  const { mkdir, writeFile } = await import('node:fs/promises')
+  const { join, dirname } = await import('node:path')
+  const { fileURLToPath } = await import('node:url')
+  const folder = join(dirname(fileURLToPath(import.meta.url)), '../../agent-runs/see')
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, `${name}.png`), png)
+  await writeFile(join(folder, `${name}.json`), JSON.stringify(description))
+  return {
+    files: [`agent-runs/see/${name}.png`, `agent-runs/see/${name}.json`],
+    marks: Object.fromEntries((description.visible || []).filter(v => v.mark).map(v => [v.mark, v.id]))
+  }
+}
 
 export default {
   name: 'See',
@@ -271,7 +282,7 @@ export default {
         const { encodePng } = await import(/* @vite-ignore */ '../../tools/lib/texture.mjs')
         const png = encodePng(drawn.width, drawn.height, drawn.pixels)
         const name = options.name || `${context.editor.levelName}-sketch-${++frameNumber}`
-        return { ...asFiles(name, png.toString('base64'), drawn.description), counts: drawn.description.counts }
+        return { ...(await writeFiles(name, png, drawn.description)), counts: drawn.description.counts }
       }
     },
     {
