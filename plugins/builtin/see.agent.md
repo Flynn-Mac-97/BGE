@@ -55,14 +55,17 @@ are exact, and every reply's `method` field names how it was computed.
 - Add `"brief": true` to describe in a busy scene: only marked entities are
   listed, with every count kept. A full meadow lists 700 props without it.
 
-## Inspect one model, in four calls
+## Inspect one model, in one call
 
 ```sh
-node bin/engine.mjs run see.find '{"type":"rat"}'        # exists? get an id
-node bin/engine.mjs spawn rat '{"at":[0,0.2,2]}'         # only if count was 0
-node bin/engine.mjs run see.capture '{"subject":"rat-0","alone":true}'
-node bin/engine.mjs destroy rat-0                        # remove what you spawned
+node bin/engine.mjs run see.capture '{"subject":"rat"}'
 ```
+
+`subject` takes an entity id OR a type name. A live instance is used when one
+exists; otherwise the type is previewed — spawned, framed alone against the
+sky, captured, and removed, with `preview` in the reply. A name that is
+neither answers early with the list of types. Never build a spawn-and-look
+workflow by hand.
 
 ## Query commands
 

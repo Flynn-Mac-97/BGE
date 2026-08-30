@@ -1775,6 +1775,9 @@ export function makeRenderer(canvas, view, viewport) {
     // the picture came out of rather than whichever was built first.
     get camera() { return activeCamera() },
     get stats() { return { ...stats } },
+    /** 'loading' | 'ready' | 'failed' | null — so a capture can wait for a
+        declared model instead of shipping the placeholder box. */
+    modelState: file => modelCache.get(file)?.status || null,
     // Which lights cast is a decision about the level, and the plugin that owns
     // the lights needs somewhere to read the switch and set its quality.
     get shadowMap() { return renderer.shadowMap },

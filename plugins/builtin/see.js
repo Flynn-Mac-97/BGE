@@ -24,6 +24,39 @@ import { occlusion, isolate, find, diff, camera } from './see/queries.js'
 
 let frameNumber = 0
 
+/**
+ * A subject may be an entity id, or just a TYPE name. A live instance wins;
+ * with none, the plugin previews the type itself — a temporary spawn, framed
+ * alone, destroyed on the way out — because "show me the rat" should not
+ * require the caller to invent a spawn-look-clean workflow. Two agents spent
+ * fifty calls each building exactly that by hand. A name that is neither an
+ * id nor a type answers early with what exists, instead of inviting a search.
+ */
+async function withSubject(context, options, run) {
+  const wanted = options.subject
+  if (!wanted || context.world.byId(wanted)) return run(options)
+
+  if (!context.world.types.has(wanted)) {
+    return {
+      error: `no entity or type "${wanted}"`,
+      types: [...context.world.types.keys()],
+      hint: 'name a live entity id, or a type — a type is previewed without needing an instance'
+    }
+  }
+
+  const instance = context.world.all(wanted)[0]
+  if (instance) return run({ ...options, subject: instance.id })
+
+  const spawned = context.spawn(wanted, { at: [0, 2, 0] })
+  try {
+    const result = await run({ ...options, subject: spawned.id, alone: options.alone ?? true })
+    if (result && typeof result === 'object') result.preview = { type: wanted, spawnedAndRemoved: true }
+    return result
+  } finally {
+    context.destroy(spawned)
+  }
+}
+
 export default {
   name: 'See',
   about: 'Frames and frame facts from any camera — computed facts first, pixels only when pixels are the question.',
@@ -47,7 +80,7 @@ export default {
       label: 'What is on screen, as computed facts — no pixels, no vision read',
       run: async (context, options) => {
         const resolved = await resolveView(context, options || {})
-        return resolved.error ? resolved : describe(context, resolved)
+        return resolved.error ? resolved : withSubject(context, resolved, opts => describe(context, opts))
       }
     },
     {
@@ -63,7 +96,7 @@ export default {
     {
       id: 'see.isolate',
       label: 'One entity in full — world box, screen box, cover, velocity, camera relation',
-      run: (context, options) => isolate(context, options || {})
+      run: (context, options) => withSubject(context, options || {}, opts => isolate(context, opts))
     },
     {
       id: 'see.find',
@@ -86,6 +119,7 @@ export default {
       run: async (context, options = {}) => {
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
+        return withSubject(context, options, async options => {
         const name = options.name || `${context.editor.levelName}-sketch-${++frameNumber}`
         // In the browser a 2D canvas encodes the PNG itself — no zlib, and
         // the caller gets a dataUrl it can show without touching disk.
@@ -104,6 +138,7 @@ export default {
         const { encodePng } = await import(/* @vite-ignore */ '../../tools/lib/texture.mjs')
         const png = encodePng(drawn.width, drawn.height, drawn.pixels)
         return { ...(await writeFrameFiles(name, png, drawn.description)), counts: drawn.description.counts }
+        })
       }
     },
     {
@@ -168,6 +203,7 @@ export default {
         }
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
+        return withSubject(context, options, async options => {
         const description = describe(context, options)
         if (description.error) return description
 
@@ -177,6 +213,29 @@ export default {
         if (options.subject) Object.assign(wants, description.camera, options.camera || {})
         const moved = Object.keys(wants).length > 0
         if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
+
+        // A declared model may still be downloading — a preview spawned a
+        // moment ago always is — and drawing now captures the placeholder box.
+        const subjectEntity = options.subject && context.world.byId(options.subject)
+        const declaredModel = subjectEntity && (subjectEntity.mesh || subjectEntity._definition?.mesh)?.model
+        for (let waited = 0; waited < 40 && declaredModel
+          && context.renderer.modelState?.(declaredModel) !== 'ready'
+          && context.renderer.modelState?.(declaredModel) !== 'failed'; waited++) {
+          context.renderer.sync(context.world)
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+
+        // `alone` must be true of the pixels, not only of the description:
+        // everything but the subject and the lights is hidden for the draw.
+        const concealed = []
+        if (options.alone && subjectEntity) {
+          for (const other of context.world.entities) {
+            if (other === subjectEntity || other.hidden || other.type === 'light') continue
+            other.hidden = true
+            concealed.push(other)
+          }
+        }
+
         // Always drawn fresh, never copied as-is: a hidden or throttled tab
         // stops painting, and its stale canvas reads back as nothing.
         context.renderer.sync(context.world)
@@ -189,8 +248,9 @@ export default {
         const pen = copy.getContext('2d')
         pen.drawImage(canvas, 0, 0)
 
-        if (moved) {
-          Object.assign(view, kept)
+        for (const other of concealed) other.hidden = false
+        if (moved) Object.assign(view, kept)
+        if (moved || concealed.length) {
           context.renderer.sync(context.world)
           context.renderer.draw()
         }
@@ -267,6 +327,7 @@ export default {
           marks: Object.fromEntries(description.visible.filter(v => v.mark).map(v => [v.mark, v.id])),
           counts: description.counts
         }
+        })
       }
     }
   ]
