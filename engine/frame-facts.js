@@ -105,11 +105,19 @@ export function facingOffset(entity, other) {
   return { degreesOff: Math.round(off * 180 / Math.PI), facingIt: off < Math.PI / 6 }
 }
 
-/** Axis-aligned world boxes, centred on the entity, feet at the centre's base. */
+/**
+ * Axis-aligned world boxes, centred on the entity, feet at the centre's base.
+ *
+ * Touching includes exact contact, so a thing standing on a floor touches it.
+ * Float arithmetic never lands on the boundary exactly, so the comparison
+ * carries a tolerance of a tenth of a millimetre — below anything a level
+ * measures in, and wide enough for the error in a sum of positions and sizes.
+ */
+const CONTACT = 0.0001
 export function boxesTouch(a, b) {
-  return Math.abs(a.x - b.x) < (a.w + b.w) / 2
-    && Math.abs(a.y - b.y) < (a.h + b.h) / 2
-    && Math.abs(a.z - b.z) < ((a.l || 0) + (b.l || 0)) / 2
+  return Math.abs(a.x - b.x) <= (a.w + b.w) / 2 + CONTACT
+    && Math.abs(a.y - b.y) <= (a.h + b.h) / 2 + CONTACT
+    && Math.abs(a.z - b.z) <= ((a.l || 0) + (b.l || 0)) / 2 + CONTACT
 }
 
 /**
