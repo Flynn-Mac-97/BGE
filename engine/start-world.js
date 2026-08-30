@@ -332,6 +332,9 @@ export async function startWorld({
     // The deterministic runtime. Game code uses these instead of the wall clock,
     // Math.random and setTimeout — which is what makes simulate() repeatable.
     random: loop.random,
+    // For anything that only draws. Kept apart from `random` so a change to an
+    // effect cannot move where an enemy spawns.
+    drawing: loop.drawing,
     after: (seconds, fn) => loop.after(seconds, fn),
     every: (seconds, fn) => loop.every(seconds, fn),
     cancel: id => loop.cancel(id)

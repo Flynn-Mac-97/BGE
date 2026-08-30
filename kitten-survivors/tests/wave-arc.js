@@ -64,7 +64,10 @@ export default {
     test.simulate(1 / 60)
     const crowded = context.horde.count
     context.damage(rat, 9999, { from: you, source: 'test' })
-    test.simulate(0.15)
+    // A kill lands hit stop, and a held step runs no fixed system, so a window
+    // in seconds watches nothing happen. Drain the hold, then ask.
+    for (let step = 0; step < 60 && context.loop.holding > 0; step++) test.simulate(1 / 60)
+    test.simulate(0.05)
     test.is(context.horde.count, crowded - 1, 'a dead enemy leaves the population cap as soon as it dies')
     test.ok(context.world.entities.includes(rat), 'but its body stays, so the collapse has somewhere to happen')
     test.simulate(1)

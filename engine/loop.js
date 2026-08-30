@@ -16,6 +16,9 @@ const STEP = 1 / 60
 const MAX_CATCHUP = 5
 const DEFAULT_SEED = 1
 
+/** Separates the drawing stream from the simulation's at the same seed. */
+const DRAWING_OFFSET = 0x9e3779b9
+
 /**
  * How far mulberry32 moves its state on every draw.
  *
@@ -106,6 +109,16 @@ export function makeLoop({ onFixed, onFrame, onError }) {
   let held = 0
 
   const random = makeRandom(DEFAULT_SEED)
+
+  /**
+   * A second stream, for anything that only draws.
+   *
+   * Sharing one stream makes a visual change a gameplay change: adding a dot to
+   * a burst shifts every later draw, so enemies spawn somewhere else. Seeded
+   * from the same number, so a run still repeats; not resumed by `resume`,
+   * because a resumed run has to play the same, not look the same.
+   */
+  const drawing = makeRandom(DEFAULT_SEED ^ DRAWING_OFFSET)
   let timers = []
   let nextTimer = 1
 
@@ -211,6 +224,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
     get steps() { return steps },
 
     random,
+    drawing,
 
     /** Stop time under this name. Naming it is what lets two holders overlap. */
     hold(reason = 'paused') { holds.add(reason); return reason },
@@ -259,6 +273,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
       // with nothing on screen saying why.
       holds.clear()
       random.reset(seed)
+      drawing.reset((seed ?? random.seed) ^ DRAWING_OFFSET)
     },
 
     /**

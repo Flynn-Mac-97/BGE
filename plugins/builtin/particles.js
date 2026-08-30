@@ -308,7 +308,9 @@ export default {
 
   onLoad(context) {
     if (context.particles) console.error('[particles] something else already put particles on context — replacing it')
-    particles.bind(context.random, () => context.time)
+    // The drawing stream, not the simulation's: a burst that took draws from
+    // the simulation made every visual change a gameplay change.
+    particles.bind(context.drawing || context.random, () => context.time)
     context.particles = particles
     // A new level is a new run: old smoke sits at coordinates that now mean
     // somewhere else, on a clock that went back to zero.
