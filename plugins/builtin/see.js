@@ -20,73 +20,12 @@
  * by level name and a frame number, never by a clock.
  */
 import { makeProjector } from '../../engine/camera-project.js'
+import { boundsOf, typeColour, frameSubject, facingOffset, boxesTouch, DIGITS } from '../../engine/frame-facts.js'
 
 /** Marks past this are noise: tags start overlapping and reads degrade. */
 const MOST_MARKS = 40
 
 let frameNumber = 0
-
-/** The drawn extents of an entity, in world units: width, height, length. */
-function boundsOf(entity) {
-  const mesh = entity.mesh || entity._definition?.mesh
-  if (mesh?.box) return { w: mesh.box[0], h: mesh.box[1], l: mesh.box[2] || 0 }
-  if (Array.isArray(mesh?.parts)) {
-    let w = 0, h = 0, l = 0
-    for (const part of mesh.parts) {
-      if (!part.box) continue
-      w = Math.max(w, Math.abs(part.at?.[0] || 0) * 2 + part.box[0])
-      h = Math.max(h, (part.at?.[1] || 0) + part.box[1])
-      l = Math.max(l, Math.abs(part.at?.[2] || 0) * 2 + (part.box[2] || 0))
-    }
-    if (w || h) return { w, h, l }
-  }
-  const sprite = entity.sprite || entity._definition?.sprite
-  if (sprite?.width || sprite?.height) return { w: sprite.width || 1, h: sprite.height || 1, l: 0 }
-  const collider = entity.collider || entity._definition?.collider
-  if (collider?.box) return { w: collider.box[0], h: collider.box[1], l: collider.box[2] || 0 }
-  if (collider?.circle) return { w: collider.circle * 2, h: collider.circle * 2, l: collider.circle * 2 }
-  return { w: 1, h: 1, l: 1 }
-}
-
-/** A stable colour per type name, so two sketches of one world agree. */
-function typeColour(name) {
-  let hash = 0
-  for (const character of String(name)) hash = (hash * 31 + character.charCodeAt(0)) >>> 0
-  const hue = hash % 360
-  const bright = 0.45 + ((hash >>> 9) % 40) / 100
-  const [r, g, b] = hueToRgb(hue, 0.65, bright)
-  return [r, g, b, 255]
-}
-
-function hueToRgb(hue, saturation, lightness) {
-  const a = saturation * Math.min(lightness, 1 - lightness)
-  const at = n => {
-    const k = (n + hue / 30) % 12
-    return Math.round((lightness - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255)
-  }
-  return [at(0), at(8), at(4)]
-}
-
-/**
- * A camera to look at one entity: a three-quarter front view, because a model
- * is judged by its face and silhouette and a straight-behind view shows
- * neither. The subject's own facing decides where "front" is.
- */
-function frameSubject(entity, bounds) {
-  const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * 2.5)
-  const pitch = -0.35
-  const facing = Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
-  // The eye is placed past the nose and off to one side; its yaw looks back.
-  const azimuth = facing + Math.PI - 0.6
-  const flat = distance * Math.cos(-pitch)
-  return {
-    mode: 'third-person-still',
-    x: entity.x + Math.sin(azimuth) * flat,
-    y: entity.y + distance * Math.sin(-pitch),
-    z: (entity.z || 0) + Math.cos(azimuth) * flat,
-    yaw: azimuth, pitch, fov: 50
-  }
-}
 
 function describe(context, options = {}) {
   const view = { ...context.view, ...(options.camera || {}) }
@@ -157,27 +96,69 @@ function describe(context, options = {}) {
   // Whether two bodies interpenetrate is a fact about world boxes, not a
   // judgement — answered here so nobody asks a vision model to eyeball it.
   // Marked entities only: that is what a question names, and it bounds the
-  // pair count.
+  // pair count. `occlusions` is the screen version: whose tag sits on a thing
+  // that is actually behind another — [nearer, farther] pairs.
   const overlaps = []
+  const occlusions = []
   for (let a = 0; a < marked.length; a++) {
     for (let b = a + 1; b < marked.length; b++) {
       if (boxesTouch(marked[a]._world, marked[b]._world)) {
         overlaps.push([marked[a].id, marked[b].id])
       }
+      const near = marked[a].depth <= marked[b].depth ? marked[a] : marked[b]
+      const far = near === marked[a] ? marked[b] : marked[a]
+      if (far.depth - near.depth > 0.5
+        && Math.abs(near.at[0] - far.at[0]) < (near.size[0] + far.size[0]) / 2
+        && Math.abs(near.at[1] - far.at[1]) < (near.size[1] + far.size[1]) / 2) {
+        occlusions.push([near.id, far.id])
+      }
     }
   }
 
-  // The other computable pair question: how far apart two named things are.
+  // Where things are, in the words a question uses: a 3x3 grid of counts by
+  // type, so "the enemies are all top-left" is read, not judged.
+  const regions = {}
+  for (const entry of visible) {
+    const column = entry.at[0] < 33.3 ? 'left' : entry.at[0] < 66.6 ? 'centre' : 'right'
+    const row = entry.at[1] < 33.3 ? 'top' : entry.at[1] < 66.6 ? 'middle' : 'bottom'
+    const cell = row === 'middle' && column === 'centre' ? 'centre' : `${row}-${column}`
+    regions[cell] = regions[cell] || {}
+    regions[cell][entry.type] = (regions[cell][entry.type] || 0) + 1
+  }
+
+  // How much of a marked thing is actually inside the frame. Only said when
+  // it is cut, so an uncut frame costs nothing extra to read.
+  for (const entry of marked) {
+    const clippedW = Math.min(100, entry.at[0] + entry.size[0] / 2) - Math.max(0, entry.at[0] - entry.size[0] / 2)
+    const clippedH = Math.min(100, entry.at[1] + entry.size[1] / 2) - Math.max(0, entry.at[1] - entry.size[1] / 2)
+    const shown = Math.max(0, clippedW) * Math.max(0, clippedH) / (entry.size[0] * entry.size[1] || 1)
+    if (shown < 0.999) entry.cut = round(shown * 100)
+  }
+
+  // The other computable pair questions: how far apart two named things are,
+  // where each sits on screen relative to the other, and whether either is
+  // facing the other — every one a relation vision models measurably get
+  // wrong, and every one arithmetic.
   let between = null
   if (Array.isArray(options.between) && options.between.length === 2) {
     const [first, second] = options.between.map(id => context.world.byId(id))
     if (first && second) {
+      const pointA = projector.place(first.x, first.y, first.z || 0)
+      const pointB = projector.place(second.x, second.y, second.z || 0)
       between = {
         ids: options.between,
         distance: round(Math.hypot(first.x - second.x, first.y - second.y, (first.z || 0) - (second.z || 0))),
         touching: boxesTouch(
           { x: first.x, y: first.y, z: first.z || 0, ...boundsOf(first) },
-          { x: second.x, y: second.y, z: second.z || 0, ...boundsOf(second) })
+          { x: second.x, y: second.y, z: second.z || 0, ...boundsOf(second) }),
+        onScreen: `${options.between[0]} is `
+          + `${pointA.x < pointB.x ? 'left of' : 'right of'} and `
+          + `${pointA.y < pointB.y ? 'above' : 'below'} ${options.between[1]}`
+          + `, ${round(Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y))}% apart`,
+        facing: {
+          [options.between[0]]: facingOffset(first, second),
+          [options.between[1]]: facingOffset(second, first)
+        }
       }
     } else between = { ids: options.between, error: 'one of the two ids does not exist' }
   }
@@ -201,21 +182,13 @@ function describe(context, options = {}) {
     coverage,
     /** Marked pairs whose world boxes interpenetrate — computed, not seen. */
     overlaps,
+    /** [nearer, farther] marked pairs whose screen boxes cross — who hides whom. */
+    occlusions,
+    /** Counts by type in a 3x3 screen grid, named in words. */
+    regions,
     ...(between ? { between } : {})
   }
 }
-
-/** Axis-aligned world boxes, centred on the entity, feet at the centre's base. */
-function boxesTouch(a, b) {
-  return Math.abs(a.x - b.x) < (a.w + b.w) / 2
-    && Math.abs(a.y - b.y) < (a.h + b.h) / 2
-    && Math.abs(a.z - b.z) < ((a.l || 0) + (b.l || 0)) / 2
-}
-
-/** 3x5 digit stamps for marks in a sketch, where there is no font. */
-const DIGITS = ['111101101101111', '010110010010111', '111001111100111', '111001111001111',
-  '101101111001001', '111100111001111', '111100111101111', '111001010010010',
-  '111101111101111', '111101111001111']
 
 function sketch(context, options = {}) {
   const description = describe(context, options)

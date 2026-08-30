@@ -32,9 +32,15 @@ Options, all optional:
 - `marks: false` — clean frame, no tags.
 - `name` — the output file name. Without one, level name + a frame number.
 
-Also computed, never asked of vision: `overlaps` lists marked pairs whose
-world boxes interpenetrate, and a capture's sidecar carries `light` — mean
-and per-cell brightness, 0-100 — so "too dark" is a number.
+Computed, never asked of vision — these are exactly what vision models
+measurably get wrong:
+- `overlaps` — marked pairs whose world boxes interpenetrate (clipping).
+- `occlusions` — [nearer, farther] marked pairs crossing on screen (hiding).
+- `regions` — counts by type in a 3x3 named grid ("the rats are all top-left").
+- `cut` on a marked entry — percent of it inside the frame, when clipped.
+- `between` — distance, touching, left/right/above/below in words, and
+  whether either entity faces the other in degrees.
+- `light` in a capture's sidecar — mean and 4x4-cell brightness, 0-100.
 
 ## Reading a frame with a vision model
 
