@@ -702,6 +702,14 @@ export default {
         }
 
         const name = options.name || `${context.editor.levelName}-${++frameNumber}`
+        // `file` names the whole path, `name` names one inside the run
+        // directory. Both stay under agent-runs/, so a frame never lands in the
+        // project or at the root.
+        const target = options.file ? String(options.file).replace(/^\.\//, '') : `agent-runs/see/${name}.png`
+        if (!target.startsWith('agent-runs/') || !target.endsWith('.png')) {
+          throw new Error(`file must be a .png path under agent-runs/, not "${target}"`)
+        }
+        const sidecarFile = target.replace(/\.png$/, '.json')
         const base64 = copy.toDataURL('image/png').split(',')[1]
         // The sidecar carries every binding the reply carries. A vision reader
         // is handed the PNG and the JSON and never sees the reply, so a map
@@ -712,8 +720,8 @@ export default {
           : btoa(unescape(encodeURIComponent(JSON.stringify(description))))
         return {
           __files: [
-            { path: `agent-runs/see/${name}.png`, base64 },
-            { path: `agent-runs/see/${name}.json`, base64: sidecar }
+            { path: target, base64 },
+            { path: sidecarFile, base64: sidecar }
           ],
           marks,
           ...(crop

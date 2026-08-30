@@ -206,7 +206,13 @@ traced outline in the crop's own coordinates; pass `background` with a colour
 when a test needs a known backdrop), `between` (two ids — distance, touching, relative screen position,
 facing), `ui: false` (hide player-facing overlays — damage numbers and
 anything marked `userData.overlay` — when the question is the world, not the
-HUD), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`.
+HUD), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`
+(writes `agent-runs/see/<name>.png`), `file` (the whole path, which must end
+`.png` and stay under `agent-runs/`; the sidecar takes the same path with a
+`.json` ending).
+
+`see.capture` needs the dev server. Under `--headless` there is no renderer and
+it says so.
 
 Marks are HULLS: each marked entity is outlined in its TYPE's colour, drawn
 on its own pixels — one colour per type, so a busy frame is a handful of

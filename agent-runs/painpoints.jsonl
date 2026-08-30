@@ -242,3 +242,5 @@
 {"id":"p176","resolved":true,"at":"2026-08-30T18:01:50.810Z","note":"the worktree-exists error now names agent.merge and the git commands that free the id"}
 {"id":"p177","resolved":true,"at":"2026-08-30T18:01:50.922Z","note":"the packet is written beside the project in use and its path is returned as run.packet"}
 {"id":"p129","resolved":true,"at":"2026-08-30T18:08:36.728Z","note":"engine.run awaits the command handler, so an async command answers its measurement instead of a pending promise"}
+{"id":"p178","at":"2026-08-30T18:12:44.024Z","kind":"engine","what":"see.capture ignored its documented-looking file option and always wrote agent-runs/see/<name>.png, so a caller naming a path silently got a frame somewhere else."}
+{"id":"p178","resolved":true,"at":"2026-08-30T18:12:44.130Z","note":"see.capture honours file as the whole path, refuses one outside agent-runs, and the guide names both file and name"}
