@@ -20,7 +20,7 @@
  */
 import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
 import { convexHull } from '../../engine/frame-facts.js'
-import { describe } from './see/describe.js'
+import { describe, simplifyHull } from './see/describe.js'
 import { resolveView, view } from './see/views.js'
 import { occlusion, isolate, find, diff, camera, identify } from './see/queries.js'
 import { ray } from './see/ray.js'
@@ -543,7 +543,13 @@ export default {
             const { silhouettes } = await import(/* @vite-ignore */ './see/id-buffer.js')
             const traced = await silhouettes(context, description.visible.filter(v => v.mark).map(v => v.id))
             for (const entry of description.visible) {
-              if (entry.mark && traced?.[entry.id]?.length >= 3) entry.hull = traced[entry.id]
+              if (!entry.mark || !(traced?.[entry.id]?.length >= 3)) continue
+              // A traced silhouette follows every pixel of an edge, so a rat one
+              // percent of the frame wide arrives with fourteen points and
+              // repeats. The sidecar is what reaches a reader, and its budget is
+              // spent on outlines nobody can see at that size.
+              const simplified = simplifyHull(traced[entry.id], Math.max(entry.size[0], entry.size[1]))
+              if (simplified) entry.hull = simplified
             }
           } catch {
             // No ID pass, no upgrade — the box hulls already drawn are honest.
