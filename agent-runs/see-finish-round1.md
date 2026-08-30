@@ -135,6 +135,37 @@ ever answer about hills — the first six pairs on the old frame were all
 hill-on-hill. On the new frame the pairs name a prop hiding gems and rats.
 Fixing what gets marked fixed what the occlusion answer is about.
 
+## Round 2 — the same two probes, after the work merged
+
+Discovery, three fresh low-effort agents, probe prompt verbatim, live editor
+on 5180 simulated to the same moment as round 1:
+
+| round | first engine call | tool calls to it | total tokens | browser-first |
+|---|---|---|---|---|
+| 2a | `see.describe` after the skill | 2 | 34,877 | no |
+| 2b | `see.find` after the skill | 2 | 34,753 | no |
+| 2c | `see.capture` after the skill | 2 | 34,993 | no |
+
+Three of three again. Every one of them opened with the `see-the-game` skill
+and went straight to a query. Round 2b is the one worth reading: it grounded
+its answer in the new work without being told to, quoting "light mean 30/100,
+range 26-32" and a "21-point outline" — the brightness measured over drawn
+pixels and the traced silhouette, both of which did not exist this morning.
+
+Grounded reads, one fresh low-effort agent, PNG and sidecar only, on the new
+busy frame `agent-runs/see/round2-busy.png`, scored against the frozen oracle
+beside it: **4 of 4 again.** It named the kitten and `#4a4ad9`, counted 21
+rats by their marks, gave `patch-1` hiding `xp-gem-469` with `patch-1` nearer
+at depth 11.04 against 17.11, and put the player in the middle third.
+
+The same weak spot showed up in both rounds, and it is worth naming because
+it will not fix itself: the fourth question is always answered by eye —
+"roughly horizontally centered" — never by reading the `at` field that says
+50. Both times the estimate landed in the right third, and both times it was
+luck. A subject near a boundary would break it. The guide now says a screen
+position is read from `at` and never estimated; whether that sentence changes
+the behaviour is a thing to measure next round, not to assume.
+
 ## What the probes exposed about cheap models
 
 All three said the model looked good. Not one was critical, and not one named
