@@ -117,7 +117,8 @@ pitch -1.57), `shot` (a named angle with `subject`: `three-quarter` default,
 `front`, `back`, `side-left`, `side-right`, `top`, `low` — measured from the
 subject's facing), `view` (a saved camera by name — `see.view '{"save":"arena-south"}'`
 keeps the current camera, saved in `<project>/views.json`, committed;
-`see.view` alone lists), `subject` (frame one entity; add `"alone": true` to hide the
+`see.view` alone lists; `'{"go":"arena-south"}'` aims the LIVE camera,
+so the queries answer from that view too), `subject` (frame one entity; add `"alone": true` to hide the
 rest — the studio: neutral light, no post, cropped to the drawn pixels, TRANSPARENT
 background by default; pass `background` with a colour when a test needs a
 known backdrop), `between` (two ids — distance, touching, relative screen position,

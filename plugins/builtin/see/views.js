@@ -35,6 +35,18 @@ export async function view(context, options = {}) {
     return { saved: options.save, camera: views[options.save], views: Object.keys(views) }
   }
 
+  // Aim the live camera at a saved view. Queries read the live camera, so an
+  // agent needs this to ask occlusion or isolate from a view it can name —
+  // there is no other hand on the camera but the mouse.
+  if (typeof options.go === 'string') {
+    const camera = views[options.go]
+    if (!camera) return { error: `no saved view "${options.go}"`, views: Object.keys(views) }
+    for (const [key, value] of Object.entries(camera)) {
+      if (value !== undefined) context.view[key] = value
+    }
+    return { went: options.go, camera }
+  }
+
   if (typeof options.drop === 'string') {
     if (!views[options.drop]) return { error: `no saved view "${options.drop}"`, views: Object.keys(views) }
     delete views[options.drop]

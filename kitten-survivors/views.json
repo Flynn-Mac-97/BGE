@@ -7,5 +7,14 @@
     "pitch": -0.12,
     "fov": 50,
     "mode": "perspective"
+  },
+  "kitten-swarm": {
+    "mode": "perspective",
+    "x": 3.39,
+    "y": -3.58,
+    "z": -4.96,
+    "yaw": 2.54,
+    "pitch": -0.35,
+    "fov": 50
   }
 }
