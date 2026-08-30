@@ -7,16 +7,23 @@
 # leg objects legFrontLeft..legBackRight with their origin at the hip, and the
 # hip buried inside the body mass.
 #
-# The whole identity is TWO ENORMOUS PINK EAR DISCS and a pair of white teeth.
-# A rat this size is 2% of a phone screen and there may be sixty of them, so it
-# gets exactly one shape a child can name and nothing else. The ears are discs
-# rather than cones because a disc keeps its full outline when the camera looks
-# down at it, and the camera always looks down at it.
+# THE OUTLINE SAYS: two discs standing outboard of a small low body, and one
+# thin line dragging behind it. The ear span is 0.34 m against a 0.19 m body,
+# so the discs are nearly twice the width of the thing carrying them, and the
+# tail runs 0.24 m behind the rump at a fifth of their thickness. Six families
+# have to be told apart with the colour removed, so the rat owns "twin discs
+# plus a trailing line" and nothing else may be it.
 #
-# The old rat was a dark brown lump with the ears buried in the body line. Warm
-# rosy rust is the fix: it is the complement of the meadow green, so the rat
-# separates from the floor by hue rather than by value, which is the only kind
-# of contrast that survives a bright frame.
+# Both are held under the cat: a rat that draws more pixels than the player is
+# a rat the player looks at instead of the player. Measured at play distance,
+# the cat is 0.5 m across and 0.67 m tall; the rat clears neither.
+#
+# The ears are discs rather than cones because a disc keeps its full outline
+# when the camera looks down at it, and the camera always looks down at it.
+#
+# Warm rust at 0.29 luminance. Every prop is held above 0.44, so a rat crossing
+# one never shares its value; the hue keeps it off the crow and the hound,
+# which are the other dark families.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -31,14 +38,13 @@ MODEL_PATH = globals().get(
 HIP_HEIGHT = 0.072
 
 COLOURS = {
-    "ratFur": "#c2603f",     # warm rosy rust, saturated against a green field
-    "ratBelly": "#f2d3b8",   # belly, paws, tail
-    "ratEar": "#ff9fb0",     # ear discs and nose — the loudest thing on it
+    "ratFur": "#8f3d25",     # 0.301 luminance, warm rust, saturated against a green field
+    "ratBelly": "#6d3a2e",   # 0.266, belly and paws — faces down, so it carries no shape
+    "ratEar": "#82384a",     # 0.287, ear discs, nose and tail; deep rose, still the rat's own hue
     "ratWhite": "#fffdf5",   # eye whites and the two front teeth
-    "dark": "#2a1c20",       # pupils, ear rims
-    "ratOutline": "#2e0f0c", # the inverted hull, a dark of the rat's own hue
+    "dark": "#2a1c20",       # 0.123, pupils and the ear rims behind the discs
 }
-MATERIAL_ORDER = ["ratFur", "ratBelly", "ratEar", "ratWhite", "dark", "ratOutline"]
+MATERIAL_ORDER = ["ratFur", "ratBelly", "ratEar", "ratWhite", "dark"]
 SLOT = {name: index for index, name in enumerate(MATERIAL_ORDER)}
 
 
@@ -58,7 +64,9 @@ BODY_SECTIONS = 9
 BELLY_ABOVE = -0.40
 
 HEAD_CENTRE = (0.0, 0.150, 0.168)
-HEAD_HALF = (0.100, 0.096, 0.092)
+# Smaller than the ears it carries. The discs have to be the shape the eye
+# lands on, and a head their size makes the whole thing one lump again.
+HEAD_HALF = (0.090, 0.088, 0.084)
 
 
 def body_profile(y):
@@ -84,17 +92,16 @@ def build_body(materials):
         sections.append((y,) + body_profile(y))
     rings = [ring(bm, *values, sides=8, squareness=0.58) for values in sections]
 
-    silhouette = loft(bm, rings)
-    for face in silhouette:
+    body = loft(bm, rings)
+    for face in body:
         centre = face.calc_center_median()
         centre_z, _, half_height = body_profile(centre.y)
         above = (centre.z - centre_z) / max(half_height, 1e-6)
         face.material_index = (SLOT["ratBelly"] if above < BELLY_ABOVE
                                else SLOT["ratFur"])
 
-    silhouette += build_head(bm)
-    silhouette += build_tail(bm)
-    add_shell(bm, silhouette, 0.017, SLOT, "ratOutline")
+    build_head(bm)
+    build_tail(bm)
     return finish(bm, "ratBody", materials)
 
 
@@ -121,30 +128,35 @@ def build_head(bm):
          (0.030, 0.018, 0.028), (0.019, 0.014, 0.019),
          "ratWhite", "dark", forward=0.012)
 
-    # The ears. Everything else on this model exists to hold them up: two pink
-    # discs a third of the body wide, standing upright and turned out, with a
-    # dark rim behind so they still separate against a pale patch of ground.
+    # The ears. Everything else on this model exists to hold them up: two discs
+    # standing upright and turned out, their outer rims 0.170 m from the centre
+    # line against a body half-width of 0.094. The dark rim behind is a step
+    # larger than the rose face, so the disc keeps an edge of its own when the
+    # screen-space outline is not what is separating it.
     for side in (-1, 1):
-        centre = (side * 0.086, HEAD_CENTRE[1] - 0.014, HEAD_CENTRE[2] + 0.106)
+        centre = (side * 0.078, HEAD_CENTRE[1] - 0.014, HEAD_CENTRE[2] + 0.106)
         lean = (1.62, side * 0.34, 0.0)
         back = plate(bm, (centre[0], centre[1] - 0.012, centre[2]),
-                     0.086, 0.092, 0.018, sides=8, tilt=lean)
+                     0.092, 0.098, 0.018, sides=8, tilt=lean)
         paint(back, SLOT, "dark")
-        paint(plate(bm, centre, 0.072, 0.078, 0.018, sides=8, tilt=lean),
+        paint(plate(bm, centre, 0.078, 0.084, 0.018, sides=8, tilt=lean),
               SLOT, "ratEar")
         made += back
     return made
 
 
-# Base to tip, as (y, z, radius). Long, thin and dragging: the one line on the
-# model that is not round, and the reason a rat is not a hamster.
+# Base to tip, as (y, z, radius). It runs 0.20 m behind the rump at a fifth of
+# the ear thickness and finishes almost on the ground: the second half of the
+# outline claim, and the reason a rat is not a hamster. It stops where it does
+# so the whole rat stays inside the 0.62 m hull types/rat.js declares, and so
+# the commonest enemy never draws more pixels than the player.
 TAIL_PATH = [
     (-0.198, 0.114, 0.024),
-    (-0.262, 0.096, 0.019),
-    (-0.328, 0.074, 0.014),
-    (-0.390, 0.052, 0.010),
-    (-0.442, 0.036, 0.007),
-    (-0.482, 0.028, 0.005),
+    (-0.246, 0.096, 0.018),
+    (-0.292, 0.076, 0.013),
+    (-0.332, 0.058, 0.010),
+    (-0.366, 0.042, 0.007),
+    (-0.394, 0.032, 0.005),
 ]
 
 
@@ -177,7 +189,6 @@ LEGS = {
 def build():
     clear_scene()
     materials = build_materials(COLOURS, MATERIAL_ORDER)
-    flat_dark("ratOutline")
     build_body(materials)
     for name, (hip_x, hip_y) in LEGS.items():
         build_leg(name, hip_x, hip_y, HIP_HEIGHT, LEG, 0.012, materials,

@@ -7,15 +7,21 @@
 # wingRight with their origin at the wing root, swept back so the X rotation
 # engine/render.js applies reads as a buzz at the tip.
 #
-# The smallest thing in the game, so it gets the loudest colour and the
-# simplest shape: a hot yellow teardrop with TWO fat black bands and a long
-# pale sting. Two bands, not six — six is a texture, and art/world/bible.md
-# spends no detail on texture. Two bands each a third of the abdomen are
-# geometry, and they still say wasp at 2% of a phone screen.
+# THE OUTLINE SAYS: a needle. It is 0.61 m from nose to sting against 0.12 m
+# across — five times as long as it is wide, where nothing else in the game
+# passes two. The wings are short enough to stay inside that line, so the wasp
+# never reads as the crow's chevron. Six families have to be told apart with
+# the colour removed, so the wasp owns "a straight line with a spike" and
+# nothing else may be it.
 #
-# It flies higher than the crow, so the plan view is all the player gets: from
-# directly above it is a yellow-and-black barred oval with a spike out the
-# back and two pale wings. Nothing else on the meadow is yellow.
+# Deep amber with TWO fat black bands, mass 0.26 luminance. Hot yellow measures
+# 0.77, which is where the ground sits, so a wasp that value vanishes crossing
+# open meadow. Amber keeps the highest saturation in the horde without taking
+# the value that belongs to the floor.
+#
+# Two bands, not six — six is a texture, and art/world/bible.md spends no
+# detail on texture. Two bands each a fifth of the abdomen are geometry, and
+# they still say wasp at 2% of a phone screen.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -30,34 +36,34 @@ MODEL_PATH = globals().get(
 ROOT = (0.030, 0.020, 0.150)
 
 COLOURS = {
-    "waspYellow": "#ffc31f",  # the loudest colour in the game, on the smallest thing
-    "waspBlack": "#241f27",   # two bands, the thorax, the eyes
-    "waspWing": "#e4f2fb",    # pale, so the wings show against a green field
-    "waspSting": "#fff6de",   # the sting and the eye whites
-    "waspOutline": "#2a1800",  # the inverted hull, a dark of the wasp's own hue
+    "waspAmber": "#a85a06",   # 0.394 luminance, the most saturated hue in the horde
+    "waspBlack": "#1a1520",   # 0.089, two bands, the thorax, the eyes
+    "waspWing": "#cfe0ee",    # pale and small; a mark, not mass
+    "waspSting": "#ffeec2",   # the sting and the eye whites
 }
-MATERIAL_ORDER = ["waspYellow", "waspBlack", "waspWing", "waspSting",
-                  "waspOutline"]
+MATERIAL_ORDER = ["waspAmber", "waspBlack", "waspWing", "waspSting"]
 SLOT = {name: index for index, name in enumerate(MATERIAL_ORDER)}
 
 
 # --------------------------------------------------------------- the abdomen
 
-# Sting end to thorax, as (y, centre z, half width, half height).
+# Sting end to thorax, as (y, centre z, half width, half height). Half again
+# as long as the old abdomen and a quarter narrower: length against width is
+# the whole outline claim, so both ends of that ratio are pushed.
 BODY_RINGS = [
-    (-0.196, 0.128, 0.018, 0.016),   # the point the sting leaves
-    (-0.160, 0.132, 0.052, 0.048),
-    (-0.108, 0.140, 0.078, 0.072),   # the widest point
-    (-0.048, 0.146, 0.074, 0.068),
-    (0.004, 0.150, 0.058, 0.054),    # the waist into the thorax
+    (-0.300, 0.126, 0.013, 0.012),   # the point the sting leaves
+    (-0.250, 0.130, 0.042, 0.040),
+    (-0.170, 0.138, 0.058, 0.056),   # the widest point
+    (-0.080, 0.144, 0.052, 0.050),
+    (0.004, 0.150, 0.042, 0.040),    # the waist into the thorax
 ]
-BODY_SECTIONS = 13
+BODY_SECTIONS = 15
 
 # Two bands, as fractions along the abdomen. Wide enough to be shapes.
-BANDS = [(0.20, 0.36), (0.54, 0.70)]
+BANDS = [(0.24, 0.40), (0.56, 0.72)]
 
 HEAD_CENTRE = (0.0, 0.128, 0.156)
-HEAD_HALF = (0.062, 0.052, 0.056)
+HEAD_HALF = (0.050, 0.044, 0.046)
 
 
 def body_profile(y):
@@ -89,28 +95,29 @@ def build_body(materials):
         sections.append((y,) + body_profile(y))
     rings = [ring(bm, *values, sides=8, squareness=0.5) for values in sections]
 
-    silhouette = loft(bm, rings)
-    for face in silhouette:
+    body = loft(bm, rings)
+    for face in body:
         face.material_index = (SLOT["waspBlack"]
                                if banded(face.calc_center_median().y)
-                               else SLOT["waspYellow"])
+                               else SLOT["waspAmber"])
 
-    silhouette += build_sting(bm)
-    silhouette += build_thorax(bm)
-    silhouette += build_head(bm)
-    add_shell(bm, silhouette, 0.011, SLOT, "waspOutline")
+    build_sting(bm)
+    build_thorax(bm)
+    build_head(bm)
     return finish(bm, "waspBody", materials)
 
 
 def build_sting(bm):
-    made = cone(bm, (0.0, -0.194, 0.128), 0.016, (0.0, -0.286, 0.116),
+    # Straight and in line with the body, not curled. A curl would round the
+    # end of the needle off and the outline would stop being a line.
+    made = cone(bm, (0.0, -0.298, 0.126), 0.013, (0.0, -0.442, 0.112),
                 sides=4, turn=math.pi / 4)
     paint(made, SLOT, "waspSting")
     return made
 
 
 def build_thorax(bm):
-    made = rounded_block(bm, (0.0, 0.038, 0.152), (0.066, 0.048, 0.058),
+    made = rounded_block(bm, (0.0, 0.038, 0.152), (0.052, 0.046, 0.050),
                          roundness=0.7)
     paint(made, SLOT, "waspBlack")
     return made
@@ -118,12 +125,12 @@ def build_thorax(bm):
 
 def build_head(bm):
     made = rounded_block(bm, HEAD_CENTRE, HEAD_HALF, roundness=0.8)
-    paint(made, SLOT, "waspYellow")
+    paint(made, SLOT, "waspAmber")
 
     # Eyes big enough to be a third of the head. On a body this small an eye
     # is the only thing that says which end is the front.
-    eyes(bm, SLOT, 0.042, HEAD_CENTRE[1] + 0.022, HEAD_CENTRE[2] + 0.010,
-         (0.026, 0.024, 0.030), (0.017, 0.017, 0.020),
+    eyes(bm, SLOT, 0.034, HEAD_CENTRE[1] + 0.020, HEAD_CENTRE[2] + 0.008,
+         (0.022, 0.020, 0.026), (0.014, 0.014, 0.017),
          "waspSting", "waspBlack", forward=0.010)
 
     for side in (-1, 1):
@@ -137,14 +144,15 @@ def build_head(bm):
 
 # ------------------------------------------------------------------ the wings
 
-# Local to the root: (x out, leading y, trailing y). Short and broad, swept
-# back so the tip rises and falls when the node turns.
+# Local to the root: (x out, leading y, trailing y). Short and swept back so
+# the tip rises and falls when the node turns. The span is 0.30 m against
+# 0.61 m of body: the wings have to stay well inside the needle, or the wasp
+# starts reading as a small crow.
 WING = [
-    (0.000, 0.046, -0.030),
-    (0.062, 0.040, -0.062),
-    (0.126, 0.010, -0.086),
-    (0.172, -0.032, -0.090),
-    (0.196, -0.076, -0.078),
+    (0.000, 0.044, -0.028),
+    (0.048, 0.038, -0.056),
+    (0.090, 0.008, -0.076),
+    (0.118, -0.030, -0.078),
 ]
 
 
@@ -163,7 +171,6 @@ def build_wing(name, side, materials):
 def build():
     clear_scene()
     materials = build_materials(COLOURS, MATERIAL_ORDER)
-    flat_dark("waspOutline")
     build_body(materials)
     build_wing("wingLeft", -1, materials)
     build_wing("wingRight", 1, materials)

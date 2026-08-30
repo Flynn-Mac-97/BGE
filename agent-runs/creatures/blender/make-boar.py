@@ -6,15 +6,22 @@
 # Feet on the origin, nose at Blender +Y, four leg objects legFrontLeft..
 # legBackRight with their origin at the hip and the hip inside the body mass.
 #
-# The identity is a WEDGE and TWO FLARED TUSKS. The body is narrow at the rump
-# and widest at the shoulders, and the tusks are the widest points of all, so
-# from directly above a boar is an arrowhead pointing where it is about to
-# charge. Nothing else in the horde tapers, and the taper is what tells the
-# player which way the charge will go before it starts.
+# THE OUTLINE SAYS: a slab with two hooks out in front of it. The sides are
+# straight and parallel from rump to shoulder, the back edge is flat, the cross
+# section is squared off, and the tusks reach 0.27 m ahead of the face and hook
+# inward. Six families have to be told apart with the colour removed, so the
+# boar owns "a rectangle with horns" and nothing else may be it.
 #
-# Rust red, and darker over the head and shoulders. It shares a screen with the
-# hound and both are large, so the two are told apart by hue before size: hot
-# red against cool slate.
+# Not a wedge. A wedge is a triangle and the crow is already a triangle, so the
+# two would be one shape at two sizes. A rectangle cannot be mistaken for a
+# triangle at any size.
+#
+# The tusks point along the charge, so the tell is in the shape either way.
+#
+# Deep rust red, mass 0.19 luminance, the second darkest family. It shares a
+# screen with the hound and both are large, so the two are told apart by hue
+# and by the gap under the hound before size comes into it. Every prop is held
+# above 0.44, so a boar crossing one never shares its value.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -29,29 +36,29 @@ MODEL_PATH = globals().get(
 HIP_HEIGHT = 0.265
 
 COLOURS = {
-    "boarHide": "#cc4b2b",     # hot rust red, the loudest of the big two
-    "boarMantle": "#7c2a1e",   # one dark shape over the head and shoulders
-    "boarSnout": "#ff8f7c",    # the snout disc, and the ear inners
+    "boarHide": "#7a2718",     # 0.218 luminance, deep rust red
+    "boarMantle": "#4a1510",   # 0.125, one dark shape over the head and shoulders
+    "boarSnout": "#c4625a",    # 0.464, the snout disc and the ear inners; a mark, not mass
     "boarTusk": "#fff4dc",     # tusks and eye whites
-    "dark": "#26141a",         # bristles, pupils, hooves
-    "boarOutline": "#1c0709",  # the inverted hull
+    "dark": "#1a0d10",         # bristles, pupils, hooves
 }
-MATERIAL_ORDER = ["boarHide", "boarMantle", "boarSnout", "boarTusk",
-                  "dark", "boarOutline"]
+MATERIAL_ORDER = ["boarHide", "boarMantle", "boarSnout", "boarTusk", "dark"]
 SLOT = {name: index for index, name in enumerate(MATERIAL_ORDER)}
 
 
 # ------------------------------------------------------------------ the body
 
-# Tail to neck, as (y, centre z, half width, half height). The taper is the
-# whole design: 0.13 at the rump against 0.30 at the shoulders.
+# Tail to neck, as (y, centre z, half width, half height). Parallel sides are
+# the whole design: 0.32 at the rump against 0.34 at the shoulders, and a flat
+# back edge. A taper here would make the plan view a triangle, which is the
+# crow's shape.
 BODY_RINGS = [
-    (-0.520, 0.330, 0.062, 0.058),   # rump cap
-    (-0.450, 0.336, 0.132, 0.126),   # rump, the narrow end
-    (-0.300, 0.348, 0.186, 0.176),
-    (-0.120, 0.362, 0.252, 0.232),
-    (0.060, 0.372, 0.300, 0.268),    # shoulders, the widest point
-    (0.170, 0.362, 0.252, 0.226),    # neck, already dropping toward the head
+    (-0.470, 0.348, 0.290, 0.150),   # rump, the flat back edge
+    (-0.440, 0.350, 0.320, 0.174),
+    (-0.300, 0.352, 0.332, 0.192),
+    (-0.120, 0.354, 0.338, 0.202),
+    (0.060, 0.356, 0.340, 0.208),    # shoulders
+    (0.170, 0.354, 0.326, 0.200),    # neck, still full width
 ]
 BODY_SECTIONS = 10
 
@@ -61,8 +68,10 @@ MANTLE_FROM = -0.060
 MANTLE_ABOVE = -0.20
 BELLY_ABOVE = -0.62
 
-HEAD_CENTRE = (0.0, 0.360, 0.316)
-HEAD_HALF = (0.196, 0.202, 0.152)
+HEAD_CENTRE = (0.0, 0.360, 0.330)
+# Wide and shallow, so the front of the animal is a straight edge rather than
+# a snout narrowing to a point.
+HEAD_HALF = (0.240, 0.150, 0.136)
 
 
 def body_profile(y):
@@ -88,8 +97,8 @@ def build_body(materials):
         sections.append((y,) + body_profile(y))
     rings = [ring(bm, *values, sides=8, squareness=0.66) for values in sections]
 
-    silhouette = loft(bm, rings)
-    for face in silhouette:
+    body = loft(bm, rings)
+    for face in body:
         centre = face.calc_center_median()
         centre_z, _, half_height = body_profile(centre.y)
         above = (centre.z - centre_z) / max(half_height, 1e-6)
@@ -100,47 +109,49 @@ def build_body(materials):
         else:
             face.material_index = SLOT["boarHide"]
 
-    silhouette += build_head(bm)
-    silhouette += build_bristles(bm)
-
-    add_shell(bm, silhouette, 0.026, SLOT, "boarOutline")
+    build_head(bm)
+    build_bristles(bm)
     return finish(bm, "boarBody", materials)
 
 
 def build_head(bm):
-    made = rounded_block(bm, HEAD_CENTRE, HEAD_HALF, roundness=0.5)
+    made = rounded_block(bm, HEAD_CENTRE, HEAD_HALF, roundness=0.34)
     paint(made, SLOT, "boarMantle")
 
-    # The snout: a flat pink disc on the front of the head, facing forward and
-    # tipped up so the camera catches it. It is the one warm light mark on a
-    # dark head and it names which end is the front from any angle.
-    snout = plate(bm, (0.0, HEAD_CENTRE[1] + 0.196, HEAD_CENTRE[2] - 0.036),
-                  0.086, 0.070, 0.048, sides=8, tilt=(1.30, 0.0, 0.0))
+    # The snout: a flat disc on the front of the head, facing forward and
+    # tipped up so the camera catches it. It is the one light mark on a dark
+    # head and it names which end is the front from any angle.
+    snout = plate(bm, (0.0, HEAD_CENTRE[1] + 0.146, HEAD_CENTRE[2] - 0.030),
+                  0.090, 0.066, 0.044, sides=8, tilt=(1.30, 0.0, 0.0))
     paint(snout, SLOT, "boarSnout")
     made += snout
 
-    eyes(bm, SLOT, 0.116, HEAD_CENTRE[1] + 0.118, HEAD_CENTRE[2] + 0.076,
+    eyes(bm, SLOT, 0.146, HEAD_CENTRE[1] + 0.084, HEAD_CENTRE[2] + 0.070,
          (0.046, 0.030, 0.038), (0.028, 0.022, 0.026),
          "boarTusk", "dark", forward=0.020)
 
-    # Tusks: the widest points on the animal, curving out and up from the jaw.
-    # They are the plan-view signature and they are sized for that, not for a
-    # real pig.
+    # Tusks: two hooks running FORWARD past the face and curling inward at the
+    # tip, not up. Up puts them in the top edge of the outline, where they read
+    # as a crest; forward puts them out in clear air ahead of a flat front, and
+    # a rectangle with two horns is a shape nothing else in the game has. They
+    # point along the charge, so they are still the tell.
     for side in (-1, 1):
         tusk = rings_at(bm, [
-            (side * 0.130, HEAD_CENTRE[1] + 0.120, HEAD_CENTRE[2] - 0.108, 0.036),
-            (side * 0.194, HEAD_CENTRE[1] + 0.168, HEAD_CENTRE[2] - 0.072, 0.030),
-            (side * 0.252, HEAD_CENTRE[1] + 0.196, HEAD_CENTRE[2] + 0.010, 0.023),
-            (side * 0.290, HEAD_CENTRE[1] + 0.190, HEAD_CENTRE[2] + 0.096, 0.015),
-            (side * 0.304, HEAD_CENTRE[1] + 0.176, HEAD_CENTRE[2] + 0.152, 0.008),
+            (side * 0.150, HEAD_CENTRE[1] + 0.090, HEAD_CENTRE[2] - 0.090, 0.038),
+            (side * 0.220, HEAD_CENTRE[1] + 0.190, HEAD_CENTRE[2] - 0.070, 0.031),
+            (side * 0.256, HEAD_CENTRE[1] + 0.290, HEAD_CENTRE[2] - 0.048, 0.024),
+            (side * 0.240, HEAD_CENTRE[1] + 0.372, HEAD_CENTRE[2] - 0.026, 0.017),
+            (side * 0.194, HEAD_CENTRE[1] + 0.424, HEAD_CENTRE[2] - 0.012, 0.010),
         ], sides=5, squareness=0.3)
         faces = loft(bm, tusk)
         paint(faces, SLOT, "boarTusk")
         made += faces
 
-        ear = cone(bm, (side * 0.126, HEAD_CENTRE[1] - 0.088, HEAD_CENTRE[2] + 0.128),
-                   0.058, (side * 0.176, HEAD_CENTRE[1] - 0.136,
-                           HEAD_CENTRE[2] + 0.238), sides=4, turn=math.pi / 4)
+        # Ears laid back along the skull. A pricked ear would break the flat
+        # top edge the slab depends on.
+        ear = cone(bm, (side * 0.166, HEAD_CENTRE[1] - 0.060, HEAD_CENTRE[2] + 0.096),
+                   0.060, (side * 0.246, HEAD_CENTRE[1] - 0.150,
+                           HEAD_CENTRE[2] + 0.128), sides=4, turn=math.pi / 4)
         paint(ear, SLOT, "boarMantle")
         made += ear
     return made
@@ -148,13 +159,14 @@ def build_head(bm):
 
 def build_bristles(bm):
     # Five dark spikes down the spine. A ridge, not a fur pattern: five shapes
-    # a camera resolves rather than a texture it cannot.
+    # a camera resolves rather than a texture it cannot. Low, so the top edge
+    # of the outline stays flat and the boar never grows the hound's crest.
     made = []
-    ridge = [(0.120, 0.632, 0.048, 0.108),
-             (0.010, 0.646, 0.054, 0.126),
-             (-0.108, 0.638, 0.052, 0.118),
-             (-0.230, 0.612, 0.044, 0.096),
-             (-0.348, 0.576, 0.036, 0.074)]
+    ridge = [(0.120, 0.560, 0.048, 0.052),
+             (0.010, 0.562, 0.054, 0.060),
+             (-0.108, 0.558, 0.052, 0.056),
+             (-0.230, 0.550, 0.044, 0.046),
+             (-0.348, 0.540, 0.036, 0.036)]
     for y, z, radius, height in ridge:
         made += cone(bm, (0.0, y, z - 0.030), radius, (0.0, y - 0.020, z + height),
                      sides=4, turn=math.pi / 4)
@@ -175,18 +187,18 @@ LEG = [
     (-0.265, 0.006, 0.050),
 ]
 
+# Under the four corners of the slab, so the footprint is a rectangle too.
 LEGS = {
-    "legFrontLeft": (-0.196, 0.062),
-    "legFrontRight": (0.196, 0.062),
-    "legBackLeft": (-0.140, -0.336),
-    "legBackRight": (0.140, -0.336),
+    "legFrontLeft": (-0.244, 0.056),
+    "legFrontRight": (0.244, 0.056),
+    "legBackLeft": (-0.236, -0.348),
+    "legBackRight": (0.236, -0.348),
 }
 
 
 def build():
     clear_scene()
     materials = build_materials(COLOURS, MATERIAL_ORDER)
-    flat_dark("boarOutline")
     build_body(materials)
     for name, (hip_x, hip_y) in LEGS.items():
         build_leg(name, hip_x, hip_y, HIP_HEIGHT, LEG, 0.014, materials,

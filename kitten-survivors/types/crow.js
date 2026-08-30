@@ -7,14 +7,14 @@
  * layer from the rats on the floor, and the player can see both at once in a
  * screen that is otherwise solid with bodies.
  *
- * One wide swept arrowhead: two long wings, a round head between them, and a
- * hot orange beak. The wings span 0.68 m against a 0.28 m hull, so the
- * silhouette is the opposite of a rat in every dimension, which is what makes
- * the two tellable apart at a glance.
+ * Its outline says A CHEVRON: 0.95 m of wingspan against 0.55 m of body, so it
+ * is the only shape in the game wider than it is long, and the wings sweep back
+ * past the tail so the trailing edge is cut by a deep notch. That is the one
+ * thing no other family's outline says.
  *
- * Blue-black, and the darkest family. The hound gave up its near-black so a
- * dark shape on the meadow means one thing. The beak is the only saturated
- * mark on it, and it is what makes a near-black shape findable at all.
+ * Blue-black at 0.14 luminance, the darkest family. The five enemy families are
+ * held under 0.38 and every prop above 0.44, so an enemy crossing a prop never
+ * shares its value. The orange beak is the only mark above that band on it.
  *
  * It is drawn from `models/crow.glb`, which keeps two wings named `wingLeft`
  * and `wingRight` with their origin at the shoulder. `applyPose` in
@@ -37,13 +37,13 @@ const BEAT_SWING = 0.5
 
 export default {
   about: 'the swarming enemy. Arrives in flocks from one bearing, so the threat is the flock, not a bird',
-  appearance: 'A blue-black bird with long swept-back wings and a hot orange beak, flying at chest height. It reads as a layer above the enemies on the floor, and it is the darkest family on the meadow.',
+  appearance: 'A blue-black chevron flying at chest height, wider than it is long, with a notch cut into its trailing edge and one hot orange beak. The darkest family on the meadow.',
   looksWrongWhen: 'it is a plain tinted box — models/crow.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  // The spread wings overshoot the hull on purpose: the hull is what a weapon
-  // hits, the wings are what says "bird" from a camera looking down.
-  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#3d4674' },
+  // The spread wings overshoot the hull: the hull is what a weapon hits, the
+  // wings are the shape that is read.
+  mesh: { model: 'models/crow.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#262b4a' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {

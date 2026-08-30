@@ -10,16 +10,22 @@
 # that X rotation into a visible flap: the further back the tip, the further it
 # rises and falls.
 #
-# The silhouette is one wide swept arrowhead. It is the only family the camera
-# sees from above with nothing under it, so the plan view is the whole design:
-# two long wings, a round head between them, and one hot orange beak.
+# THE OUTLINE SAYS: a chevron, and the only shape in the game wider than it is
+# long. The span is 0.95 m against 0.55 m of body, and the wings sweep so far
+# back that their tips finish behind the tail, which cuts a deep notch into the
+# trailing edge. Six families have to be told apart with the colour removed, so
+# the crow owns "wide, concave at the back, no legs" and nothing else may be it.
 #
-# Blue-black, not brown-black. A neutral dark on a warm bright field reads as
-# a hole; a blue dark reads as a bird. The orange beak is the only saturated
-# mark on it and it is what makes a near-black shape findable at all.
+# The tail fan is small on purpose. A wide fan fills the notch and the chevron
+# collapses into a blob.
 #
-# The feet are modelled INTO the body, tucked up. The previous crow carried two
-# leg stubs hanging in clear air below the belly.
+# Blue-black, and the darkest family in the game at 0.14 luminance. Every prop
+# is held above 0.44, so a crow crossing one never shares its value. The orange
+# beak is the only mark above that band and it is small.
+#
+# The feet are modelled INTO the body, tucked up. A separate leg object under a
+# hovering body leaves a gap of clear air that reads as breakage, and the gap
+# under a body is the hound's claim.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -35,33 +41,33 @@ MODEL_PATH = globals().get(
 SHOULDER = (0.062, 0.030, 0.225)
 
 COLOURS = {
-    "crowBody": "#3d4674",   # blue-black; a neutral dark reads as a hole
-    "crowWing": "#2e3559",   # a step darker, so the wing edge shows on the body
-    "crowBeak": "#ff9b21",   # the one saturated mark, and the whole find cue
+    "crowBody": "#262b4a",   # 0.174 luminance; a neutral dark reads as a hole, a blue dark reads as a bird
+    "crowWing": "#1b1f38",   # 0.126, a step darker so the wing edge shows on the body
+    "crowBeak": "#ff8a12",   # 0.605, the one mark above the prop band, and small
     "crowWhite": "#f4f1ff",  # eye whites
-    "dark": "#14161f",       # pupils
-    "crowOutline": "#0a0b14",  # the inverted hull; also what parts one bird from the next in a flock
+    "dark": "#0f111a",       # pupils
 }
-MATERIAL_ORDER = ["crowBody", "crowWing", "crowBeak", "crowWhite", "dark",
-                  "crowOutline"]
+MATERIAL_ORDER = ["crowBody", "crowWing", "crowBeak", "crowWhite", "dark"]
 SLOT = {name: index for index, name in enumerate(MATERIAL_ORDER)}
 
 
 # ------------------------------------------------------------------ the body
 
-# Tail to neck, as (y, centre z, half width, half height). A teardrop: widest
-# at the shoulders where the wings leave, tapering to the tail fan.
+# Tail to neck, as (y, centre z, half width, half height). A flat teardrop:
+# widest at the shoulders where the wings leave. Half the height of the old
+# body, because a chevron has to be flat — mass in the middle rebuilds the
+# blob the wings exist to break.
 BODY_RINGS = [
-    (-0.190, 0.198, 0.026, 0.020),   # tail root
-    (-0.140, 0.202, 0.062, 0.056),   # rump
-    (-0.060, 0.208, 0.086, 0.078),   # belly
-    (0.020, 0.216, 0.092, 0.084),    # shoulders, the widest point
-    (0.078, 0.232, 0.064, 0.060),    # neck
+    (-0.176, 0.200, 0.024, 0.015),   # tail root
+    (-0.130, 0.202, 0.058, 0.042),   # rump
+    (-0.056, 0.206, 0.080, 0.058),   # belly
+    (0.020, 0.212, 0.086, 0.062),    # shoulders, the widest point
+    (0.072, 0.222, 0.060, 0.046),    # neck
 ]
 BODY_SECTIONS = 8
 
-HEAD_CENTRE = (0.0, 0.140, 0.258)
-HEAD_HALF = (0.082, 0.078, 0.076)
+HEAD_CENTRE = (0.0, 0.132, 0.244)
+HEAD_HALF = (0.076, 0.072, 0.066)
 
 
 def body_profile(y):
@@ -85,14 +91,13 @@ def build_body(materials):
     for index in range(BODY_SECTIONS):
         y = tail_end + (neck_end - tail_end) * index / (BODY_SECTIONS - 1)
         sections.append((y,) + body_profile(y))
-    silhouette = loft(bm, [ring(bm, *values, sides=8, squareness=0.55)
-                           for values in sections])
-    paint(silhouette, SLOT, "crowBody")
+    body = loft(bm, [ring(bm, *values, sides=8, squareness=0.55)
+                     for values in sections])
+    paint(body, SLOT, "crowBody")
 
-    silhouette += build_head(bm)
-    silhouette += build_tail(bm)
+    build_head(bm)
+    build_tail(bm)
     build_feet(bm)
-    add_shell(bm, silhouette, 0.015, SLOT, "crowOutline")
     return finish(bm, "crowBody", materials)
 
 
@@ -100,10 +105,10 @@ def build_head(bm):
     made = rounded_block(bm, HEAD_CENTRE, HEAD_HALF, roundness=0.78)
     paint(made, SLOT, "crowBody")
 
-    # The beak: long, chunky and level. A short beak on a round head reads as
-    # an owl, and the flock has to read as crows.
-    beak = cone(bm, (0.0, HEAD_CENTRE[1] + 0.052, HEAD_CENTRE[2] - 0.004), 0.042,
-                (0.0, HEAD_CENTRE[1] + 0.164, HEAD_CENTRE[2] - 0.016),
+    # The beak: chunky and level. Short, because body length is what a chevron
+    # trades away — a long beak makes the bird as long as it is wide.
+    beak = cone(bm, (0.0, HEAD_CENTRE[1] + 0.048, HEAD_CENTRE[2] - 0.004), 0.038,
+                (0.0, HEAD_CENTRE[1] + 0.126, HEAD_CENTRE[2] - 0.014),
                 sides=4, turn=math.pi / 4)
     paint(beak, SLOT, "crowBeak")
 
@@ -118,10 +123,9 @@ def build_tail(bm):
     # bird's tail sits in level flight. The plate's own plane is horizontal at
     # zero tilt, so a near-upright tilt would stand it on edge and the top-down
     # camera would see a fin rather than a tail.
-    # Set well forward of the rump: the body ends in a 0.026 m point and the
-    # hexagon starts in one, so a tail placed just behind it touches at a point
-    # and reads as detached from directly above.
-    made = plate(bm, (0.0, -0.186, 0.200), 0.082, 0.118, 0.022,
+    # Narrow: the wings finish 0.10 m behind it and the gap between them is the
+    # notch that makes the outline a chevron. A wide fan fills the notch.
+    made = plate(bm, (0.0, -0.172, 0.202), 0.046, 0.094, 0.018,
                  sides=6, tilt=(-0.22, 0.0, 0.0))
     paint(made, SLOT, "crowWing")
     return made
@@ -139,16 +143,21 @@ def build_feet(bm):
 
 # ------------------------------------------------------------------ the wings
 
-# Local to the shoulder: (x out, leading y, trailing y). The chord narrows and
-# the whole wing sweeps back, so the tip is 0.20 m behind the shoulder — that
-# offset is what an X rotation converts into up-and-down at the tip.
+# Local to the shoulder: (x out, leading y, trailing y). The chord stays broad
+# to mid span so the wing is a plate rather than a stick, and the whole wing
+# sweeps back until the tip is 0.33 m behind the shoulder — further back than
+# the tail. That sweep is what cuts the notch, and the offset is what an X
+# rotation converts into up-and-down at the tip.
+#
+# Tip at x 0.412 on a shoulder 0.062 out gives a 0.95 m span against 0.55 m of
+# body. Nothing else in the game is wider than it is long.
 WING = [
-    (0.000, 0.096, -0.112),
-    (0.092, 0.090, -0.156),
-    (0.178, 0.056, -0.184),   # the chord stays broad to mid span, or it reads as a stick
-    (0.250, -0.006, -0.190),
-    (0.304, -0.078, -0.172),
-    (0.336, -0.150, -0.198),   # the tip runs to a point behind the trailing edge
+    (0.000, 0.100, -0.104),
+    (0.116, 0.086, -0.150),
+    (0.226, 0.040, -0.196),
+    (0.318, -0.036, -0.240),
+    (0.376, -0.130, -0.276),
+    (0.412, -0.226, -0.300),   # the tip finishes behind the tail fan
 ]
 
 
@@ -160,10 +169,7 @@ def build_wing(name, side, materials):
     # to put its faces back on the outside.
     if side < 0:
         sections.reverse()
-    wing = blade(bm, sections, 0.024, 0.0)
-    paint(wing, SLOT, "crowWing")
-    # The wings ARE the silhouette of this family, so they carry the rim too.
-    add_shell(bm, wing, 0.014, SLOT, "crowOutline")
+    paint(blade(bm, sections, 0.024, 0.0), SLOT, "crowWing")
     return finish(bm, name, materials, origin=(side * SHOULDER[0],
                                                SHOULDER[1], SHOULDER[2]))
 
@@ -171,7 +177,6 @@ def build_wing(name, side, materials):
 def build():
     clear_scene()
     materials = build_materials(COLOURS, MATERIAL_ORDER)
-    flat_dark("crowOutline")
     build_body(materials)
     build_wing("wingLeft", -1, materials)
     build_wing("wingRight", 1, materials)

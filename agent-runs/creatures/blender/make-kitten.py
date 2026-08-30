@@ -15,17 +15,27 @@
 # the body between them is short. At 5% of a phone screen a correctly
 # proportioned cat is a smudge, and only the head-to-body ratio survives.
 #
-# The kitten is the only WHITE thing in the game. A hundred enemies are warm
-# mid-tones on a green field, so white is the one value nothing else claims,
-# and it is spent on the face, the chest, the four paws and the tail tip — the
-# parts a camera looking down at 60 degrees actually sees. The tail is held up
-# and hooked because a vertical line at the centre of the frame is the fastest
-# thing on screen to find.
+# THE OUTLINE SAYS: a hook. The tail runs back out of the rump, rises, and
+# curls hard to one side, so from above the cat is a compact body with a thick
+# J behind it. Six families have to be told apart with the colour removed, so
+# the cat owns "a body with a hook" and nothing else may be it — the rat's tail
+# is the only other line behind a body, and it is thin, dark and straight.
+#
+# It is also the only BRIGHT family. The measured play frame runs a median of
+# 0.72 luminance and the five enemies are now held under 0.38, so the top
+# surfaces of the cat — back, head and the whole upper tail — are 0.92 white
+# and it is the one thing on screen above the ground. Ginger is kept for the
+# ears, the legs, the flanks and the base of the tail, which the camera sees
+# edge-on at 60 degrees and which read as the marks on a white cat.
+#
+# White on the chest, the paws and the tail tip is white this camera never
+# sees: those faces point away from it, and what is left from above is a ginger
+# cat at 0.67 on a 0.72 ground, which is no contrast at all.
 #
 # There are no tabby bars. Five dark bands across the back is surface pattern,
 # the one thing art/world/bible.md forbids (edgeDensity at most 0.045), and at
-# phone size it reads as noise. One dark cap over the head and shoulders does
-# the same job as a single shape.
+# phone size it reads as noise. One ginger brow band does the same job as a
+# single shape.
 
 LIB_PATH = globals().get(
     "LIB_PATH", "Z:/Code/browser game engine/tools/blender/lib.py")
@@ -42,15 +52,13 @@ MODEL_PATH = globals().get(
 HIP_HEIGHT = 0.155
 
 COLOURS = {
-    "kittenFur": "#f5a03c",     # hot ginger, saturated well above the meadow
-    "kittenCap": "#d2701c",     # one dark shape over head and shoulders
-    "kittenWhite": "#fffaf0",   # face, chest, paws, tail tip — nothing else is white
+    "kittenWhite": "#f4e8d5",   # 0.915 luminance, the mass: back, head, tail. Warm, not paper white — a pure white clips under a 2.85 sun
+    "kittenFur": "#ef8f22",     # 0.610, hot ginger, the marks: ears, legs, flanks, tail base
+    "kittenCap": "#c06412",     # 0.446, the ear backs and the brow
     "kittenPink": "#ff9aa8",    # nose and inner ear
-    "dark": "#241a24",          # pupils, ear backs
-    "kittenOutline": "#3a1508", # the inverted hull, a near-black of the cat's own hue
+    "dark": "#241a24",          # pupils
 }
-MATERIAL_ORDER = ["kittenFur", "kittenCap", "kittenWhite", "kittenPink",
-                  "dark", "kittenOutline"]
+MATERIAL_ORDER = ["kittenFur", "kittenCap", "kittenWhite", "kittenPink", "dark"]
 SLOT = {name: index for index, name in enumerate(MATERIAL_ORDER)}
 
 
@@ -70,11 +78,10 @@ BODY_RINGS = [
 ]
 BODY_SECTIONS = 11
 
-# The cap covers the back from the shoulders forward and the whole head. One
-# patch, no periodic band: a banded tube reads as a caterpillar from above.
-CAP_FROM = -0.060
-CAP_ABOVE = 0.35
-BELLY_ABOVE = -0.42
+# The white covers everything the camera can see from 60 degrees up: one patch
+# running the length of the back. No periodic band — a banded tube reads as a
+# caterpillar from above, and art/world/bible.md spends no detail on pattern.
+WHITE_ABOVE = 0.05
 
 HEAD_CENTRE = (0.0, 0.255, 0.300)
 HEAD_HALF = (0.150, 0.134, 0.133)
@@ -103,46 +110,33 @@ def build_body(materials):
         sections.append((y,) + body_profile(y))
     rings = [ring(bm, *values, sides=8, squareness=0.60) for values in sections]
 
-    silhouette = loft(bm, rings)
-    for face in silhouette:
+    body = loft(bm, rings)
+    for face in body:
         centre = face.calc_center_median()
         centre_z, _, half_height = body_profile(centre.y)
         above = (centre.z - centre_z) / max(half_height, 1e-6)
-        if above < BELLY_ABOVE:
-            face.material_index = SLOT["kittenWhite"]
-        elif above > CAP_ABOVE and centre.y > CAP_FROM:
-            face.material_index = SLOT["kittenCap"]
-        else:
-            face.material_index = SLOT["kittenFur"]
+        face.material_index = (SLOT["kittenWhite"] if above > WHITE_ABOVE
+                               else SLOT["kittenFur"])
 
-    silhouette += build_head(bm)
-    silhouette += build_tail(bm)
-    add_shell(bm, silhouette, 0.020, SLOT, "kittenOutline")
+    build_head(bm)
+    build_tail(bm)
     return finish(bm, "kittenBody", materials)
 
 
 def build_head(bm):
-    # The cap runs over the top and back of the head and stops at the brow, so
-    # the face below it is one clean pale field for the eyes to sit in.
+    # White over the crown and the face, ginger under the cheek line. The head
+    # is 40% of the standing height and it faces this camera, so it carries
+    # more of the cat's mass value than anything else on the model.
     made = rounded_block(bm, HEAD_CENTRE, HEAD_HALF, roundness=0.74)
     for face in made:
-        centre = face.calc_center_median()
-        above = centre.z - HEAD_CENTRE[2]
-        if above > HEAD_HALF[2] * 0.30 and centre.y < HEAD_CENTRE[1] + HEAD_HALF[1] * 0.55:
-            face.material_index = SLOT["kittenCap"]
-        else:
-            face.material_index = SLOT["kittenFur"]
+        above = face.calc_center_median().z - HEAD_CENTRE[2]
+        face.material_index = (SLOT["kittenWhite"] if above > -HEAD_HALF[2] * 0.30
+                               else SLOT["kittenFur"])
 
-    # The blaze: a wide white wedge up the front of the face. It is the single
-    # brightest patch on the animal and it faces the camera at this pitch.
-    paint(rounded_block(bm, (0.0, HEAD_CENTRE[1] + 0.086, HEAD_CENTRE[2] - 0.030),
-                        (0.086, 0.052, 0.078), roundness=0.55), SLOT, "kittenWhite")
-
-    # The blaze carries on over the brow, so the cat has a white mark at the
-    # head end as well as at the tail tip. Those two are what a player picks
-    # the cat out by when the camera is looking down at the top of it.
-    paint(rounded_block(bm, (0.0, HEAD_CENTRE[1] + 0.030, HEAD_CENTRE[2] + 0.098),
-                        (0.062, 0.072, 0.052), roundness=0.6), SLOT, "kittenWhite")
+    # A ginger brow band across the top of the face. One dark line under a
+    # white crown is what stops the head reading as a featureless ball.
+    paint(rounded_block(bm, (0.0, HEAD_CENTRE[1] + 0.100, HEAD_CENTRE[2] + 0.100),
+                        (0.104, 0.038, 0.024), roundness=0.5), SLOT, "kittenCap")
 
     paint(cone(bm, (0.0, HEAD_CENTRE[1] + 0.128, HEAD_CENTRE[2] - 0.014), 0.022,
                (0.0, HEAD_CENTRE[1] + 0.160, HEAD_CENTRE[2] - 0.026),
@@ -168,30 +162,38 @@ def build_head(bm):
     return made
 
 
-# Base to tip, as (y, z, radius). Thick and held up, hooked forward at the top:
-# the one part of the cat above the horde, and the thing a player finds first.
+# Base to tip, as (x, y, z, radius). The cat's own outline mark: a thick tail
+# that runs back and up out of the rump and then hooks hard to one side, so
+# from above it is a J behind the body. Nothing else in the game has a hook.
+#
+# The hook is in the ground plane, not in height. This camera is close to plan,
+# so a metre of height projects to a fraction of a metre on screen and a purely
+# vertical tail foreshortens to nothing; a metre of ground does not.
+#
+# Thick all the way to the tip. A tapering tail is 3 px across at the top at
+# play distance, which is under the width of the outline meant to separate it.
 TAIL_PATH = [
-    (-0.238, 0.222, 0.052),
-    (-0.272, 0.276, 0.048),
-    (-0.296, 0.340, 0.043),
-    (-0.302, 0.404, 0.038),
-    (-0.286, 0.464, 0.033),
-    (-0.248, 0.512, 0.029),
-    (-0.196, 0.540, 0.026),
-    (-0.142, 0.548, 0.024),
+    (0.000, -0.238, 0.222, 0.056),
+    (0.000, -0.302, 0.288, 0.058),
+    (0.006, -0.356, 0.356, 0.058),
+    (0.026, -0.400, 0.418, 0.055),
+    (0.070, -0.426, 0.468, 0.051),
+    (0.128, -0.430, 0.502, 0.047),
+    (0.186, -0.410, 0.522, 0.043),
 ]
 
 
 def build_tail(bm):
-    rings = rings_along(bm, TAIL_PATH, sides=6, squareness=0.35)
+    rings = rings_at(bm, TAIL_PATH, sides=6, squareness=0.35)
     faces = loft(bm, rings)
     around = len(rings[0])
     for index, face in enumerate(faces):
         segment = index // around
-        # White for the last third only. A ringed tail is a pattern, and a
-        # pattern is what the bible spends no pixels on.
-        face.material_index = (SLOT["kittenWhite"] if segment >= len(rings) - 3
-                               else SLOT["kittenFur"])
+        # Ginger for the first segment only, so the mast is one unbroken white
+        # line and the ginger reads as where it leaves the body. A ringed tail
+        # is a pattern, and the bible spends no pixels on pattern.
+        face.material_index = (SLOT["kittenFur"] if segment < 1
+                               else SLOT["kittenWhite"])
     return faces
 
 
@@ -227,7 +229,6 @@ LEGS = {
 def build():
     clear_scene()
     materials = build_materials(COLOURS, MATERIAL_ORDER)
-    flat_dark("kittenOutline")
     build_body(materials)
     for name, (hip_x, hip_y, path, paw_forward) in LEGS.items():
         build_leg(name, hip_x, hip_y, HIP_HEIGHT, path, paw_forward, materials,

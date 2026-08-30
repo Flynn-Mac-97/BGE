@@ -14,6 +14,10 @@
 # quadruped tube does not: an eye pair, a flat scalloped collar, a swept
 # blade, and a flat disc.
 #
+# No outline helper. The keyline is a screen-space pass in engine/render.js at
+# a constant pixel width; a modelled hull shrinks with distance, costs about a
+# quarter of a creature's triangles, and is wound inside out.
+#
 # Ground is Blender z = 0. Nose is Blender +Y — the exporter maps that to
 # glTF -Z, the direction the camera faces at yaw 0.
 
@@ -97,69 +101,6 @@ def eyes(bm, slot, offset_across, y, z, sclera_half, pupil_half,
                             sclera_half, roundness=0.85), slot, white)
         paint(rounded_block(bm, (side * offset_across, y + forward, z + lift),
                             pupil_half, roundness=0.85), slot, dark_material)
-
-
-def add_shell(bm, faces, thickness, slot, material):
-    """
-    An inverted hull: the silhouette copied, pushed out along its own normals,
-    with the winding flipped so only the far side of the copy draws. The near
-    side is culled and the far side is hidden behind the model, which leaves a
-    dark rim exactly the width of `thickness` around the outline.
-
-    Every Brawl Stars character carries one, and it is what holds a small
-    bright shape together against any floor. It costs one extra primitive and
-    the face count of whatever is passed in, so pass the body and the head and
-    leave the teeth and the eyes out — detail inside the silhouette adds
-    nothing to an edge.
-
-    The material it is painted with must have `use_backface_culling` on, or
-    glTF exports it double sided and the shell hides the model.
-
-    Normals are recalculated first and not trusted: `loft` in tools/blender/lib.py
-    winds its quads so the normal points INTO the body, while `rounded_block`
-    winds the other way. Pushing along an unchecked normal shrinks half the
-    shell inside the model, where it is never seen.
-    """
-    wanted = list(faces)
-    bmesh.ops.recalc_face_normals(bm, faces=wanted)
-
-    # Faces only: duplicate pulls in their verts and edges, and naming a vert
-    # twice — which two faces sharing an edge always do — is refused.
-    copied = bmesh.ops.duplicate(bm, geom=wanted)
-    made = [item for item in copied["geom"] if isinstance(item, bmesh.types.BMFace)]
-    grown = [item for item in copied["geom"] if isinstance(item, bmesh.types.BMVert)]
-
-    bmesh.ops.recalc_face_normals(bm, faces=made)
-    bm.normal_update()
-    for vert in grown:
-        vert.co = vert.co + vert.normal * thickness
-
-    # Inward-facing, so the near half of the shell is culled and only the half
-    # behind the model draws — which is the rim.
-    bmesh.ops.reverse_faces(bm, faces=made)
-    for face in made:
-        face.material_index = slot[material]
-    return made
-
-
-FLOOR_LIGHT = 0.4
-
-
-def flat_dark(name):
-    """Make an outline material nearly lightless.
-
-    A little emission at the base colour keeps the rim from going flat black on
-    the shaded side, so it reads the same however the creature is turned. Keep
-    it low: at full strength the rim brightens to the value of the body it is
-    meant to separate from, and then there is no outline at all.
-    """
-    material = bpy.data.materials[name]
-    material.use_backface_culling = True
-    shader = material.node_tree.nodes["Principled BSDF"]
-    shader.inputs["Emission Color"].default_value = shader.inputs["Base Color"].default_value
-    shader.inputs["Emission Strength"].default_value = FLOOR_LIGHT
-    shader.inputs["Roughness"].default_value = 1.0
-    return material
 
 
 def check_ready(names):

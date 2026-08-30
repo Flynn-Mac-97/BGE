@@ -10,12 +10,16 @@
  * The charge itself lives in the Horde plugin, because when a boar decides to
  * run is a rule of this game rather than a property of a box.
  *
- * Broad, long and rust red — heavy like a hound but unmistakably a different
- * colour, because the two of them share a screen and both are large.
+ * Its outline says A SLAB WITH TWO HOOKS: straight parallel sides from rump to
+ * shoulder, a flat back edge, a squared cross section, and two cream tusks
+ * reaching 0.27 m ahead of the face and curling inward. That is the one thing
+ * no other family's outline says, and the tusks point along the charge, so the
+ * tell survives being a rectangle instead of a wedge.
  *
- * The body is a wedge: narrow at the rump, widest at the shoulders, with two
- * cream tusks flaring wider still. From directly above it is an arrowhead
- * pointing where the charge will go, which is the tell made visible.
+ * Deep rust red at 0.19 luminance. The five enemy families are held under 0.38
+ * and every prop above 0.44, so an enemy crossing a prop never shares its
+ * value. The hound is the other large enemy and shares its screen; hue and the
+ * gap under the hound part the two before size comes into it.
  *
  * It is drawn from `models/boar.glb`, which keeps four legs named
  * `legFrontLeft` through `legBackRight` with their origin at the hip, so
@@ -36,11 +40,13 @@ const STRIDE_SWING = 0.46
 
 export default {
   about: 'the charging enemy, and the only one whose attack the player can read coming and dodge',
-  appearance: 'A broad rust-red wedge, narrow at the rump and widest at the tusks, with a dark head, a pink snout and a ridge of black bristles. It stops, winds up, then crosses ground fast in a straight line.',
+  appearance: 'A dark rust slab with straight parallel sides and a flat back edge, carrying two cream tusks that reach out ahead of its face. It stops, winds up, then crosses ground fast in a straight line.',
   looksWrongWhen: 'it is a plain tinted box — models/boar.glb has not loaded',
 
   // Feet-on-origin lowpoly model; the tinted box only stands in while it loads.
-  mesh: { model: 'models/boar.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#cc4b2b' },
+  // The tusks overshoot the hull: the hull is what a weapon hits, the hooks
+  // are the shape that is read.
+  mesh: { model: 'models/boar.glb', anchor: 'feet', box: [WIDTH, HEIGHT, LENGTH], tint: '#7a2718' },
   collider: { box: [WIDTH, HEIGHT, LENGTH] },
 
   properties: {
