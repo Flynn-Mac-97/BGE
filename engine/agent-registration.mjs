@@ -41,6 +41,16 @@ const ENGINE = 'glass'
 const skillNameFor = guide => `${ENGINE}-${guide.frontmatter.skill || guide.stem}`
 
 /**
+ * Whether a plugin belongs in the listing at all.
+ *
+ * The listing is what an agent reads before its first tool call, and it costs
+ * every agent every session, so it holds what an agent drives. A panel, a
+ * gizmo or a renderer half is worked by a person in the editor and says
+ * `skill: none`.
+ */
+const listedForAgents = guide => !['none', 'false'].includes((guide.frontmatter.skill || '').toLowerCase())
+
+/**
  * How long a derived description may run.
  *
  * Every agent reads every description at session start, so the listing's whole
@@ -199,7 +209,7 @@ export async function generatedAgentFiles(root, projectDirectory) {
   for (const guide of await pluginGuides(root, projectDirectory)) {
     // A disabled plugin registers nothing: its commands are not there, and a
     // listed skill for a missing command is worse than no listing.
-    if (!guide.enabled) continue
+    if (!guide.enabled || !listedForAgents(guide)) continue
     const skill = skillNameFor(guide)
     const description = describedBy(guide)
     if (!description || !SKILL_NAME.test(skill)) continue
@@ -290,7 +300,9 @@ export async function generatedFileProblems(root, projectDirectory) {
 export async function skillRegistrationProblems(root, projectDirectory) {
   const problems = []
   for (const guide of await pluginGuides(root, projectDirectory)) {
-    if (!guide.enabled) continue
+    // An opt-out is a decision, not a broken declaration: the guide still
+    // arrives in a packet when the task names the plugin.
+    if (!guide.enabled || !listedForAgents(guide)) continue
     const { skill, description, triggers, match } = guide.frontmatter
 
     if (skill && !SKILL_NAME.test(skill)) {

@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Inspector Panel
 
 - Shows the selected entity and its editable values.

@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Play Focus
 
 - Gives the game input focus while playing.

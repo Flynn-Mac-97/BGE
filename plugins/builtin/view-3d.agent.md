@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # 3D View
 
 - Flies the editor viewport around the level in 3D — the editor's own camera, separate from the game camera.

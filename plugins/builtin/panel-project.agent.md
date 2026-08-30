@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Project Panel
 
 - Shows project files and lets people place types.

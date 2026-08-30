@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Transform Tool
 
 - Moves, turns, and scales selected entities in the editor.

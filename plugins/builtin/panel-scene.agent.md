@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Scene Panel
 
 - This is the editor viewport and selection surface.

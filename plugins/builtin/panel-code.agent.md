@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Code Panel
 
 - Opens project and agent Markdown files for editing.

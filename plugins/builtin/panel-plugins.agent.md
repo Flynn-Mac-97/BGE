@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Plugin Browser
 
 - Lists plugins and turns them on or off.

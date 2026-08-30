@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Particle Painter
 
 - Draws the Particles field: camera-facing quads in shared buffers on `context.renderer.scene`, one draw call per texture-and-blend group.

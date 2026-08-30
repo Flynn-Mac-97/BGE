@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # Panel Layout
 
 - Lets people resize editor panels.

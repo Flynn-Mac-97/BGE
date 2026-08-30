@@ -1,3 +1,7 @@
+---
+skill: none
+---
+
 # 3D Transform Gizmo
 
 - Move, rotate and scale the selection in the 3D view — the same vocabulary the level file speaks.
