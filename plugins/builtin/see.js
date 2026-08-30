@@ -358,8 +358,16 @@ export default {
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
         return withSubject(context, options, async options => {
-        const description = describe(context, options)
+        let description = describe(context, options)
         if (description.error) return description
+        // A game is designed for a screen shape, and the window an agent has is
+        // not it. `size` states the shape to judge — [width, height] in pixels.
+        const sized = Array.isArray(options.size) && options.size.length === 2
+          ? options.size.map(Number)
+          : null
+        if (options.size && !sized) {
+          return { error: `size is [width, height] in pixels, for example {"size":[540,960]}` }
+        }
 
         const view = context.view
         const kept = keepView(view)
@@ -383,6 +391,12 @@ export default {
         // a throw mid-draw all hand the editor back the world it lent.
         try {
         if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
+        // Before every measurement below, so screen positions belong to the
+        // frame delivered rather than to the window.
+        if (sized) {
+          context.renderer.frameSize(sized[0], sized[1])
+          description = describe(context, options)
+        }
 
         // A declared model may still be downloading — a preview spawned a
         // moment ago always is — and drawing now captures the placeholder box.
@@ -536,7 +550,9 @@ export default {
           // the GL one, so a frame taken from GL alone shows a game with no
           // interface. They are stretched to the GL canvas because a layer is
           // sized in CSS pixels and the GL canvas in device pixels.
-          if (options.ui !== false) {
+          // A layer is laid out for the window, so at a stated size it can only
+          // be stretched. Left out unless the caller asked for it by name.
+          if (options.ui !== false && (!sized || options.ui === true)) {
             for (const layer of document.querySelectorAll('canvas.hud-layer, canvas.screen-layer')) {
               if (layer.width && layer.height) pen.drawImage(layer, 0, 0, copy.width, copy.height)
             }
@@ -566,6 +582,7 @@ export default {
         }
 
         } finally {
+          if (sized) context.renderer.resize()
           for (const other of concealed) other.hidden = false
           revealOverlays(overlays)
           if (studio) {
@@ -576,7 +593,7 @@ export default {
             context.renderer.passes?.set(studio.passes)
           }
           if (moved) Object.assign(view, kept)
-          if (moved || studio || concealed.length || overlays.length) {
+          if (sized || moved || studio || concealed.length || overlays.length) {
             // The editor's own picture is stale after a borrowed camera or a
             // dimmed scene; a repaint that fails must not become the answer.
             try {
@@ -736,6 +753,14 @@ export default {
           ...(crop
             ? { subject: subjectEntity.id, unmarked: description.unmarked }
             : { palette: description.palette }),
+          ...(sized
+            ? {
+              size: [copy.width, copy.height],
+              interface: options.ui === true
+                ? 'stretched from the window layout — judge the world here, the interface at window size'
+                : 'left out: a HUD is laid out for the window and can only be stretched to this size'
+            }
+            : {}),
           counts: description.counts
         }
         })

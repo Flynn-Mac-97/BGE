@@ -207,7 +207,10 @@ when a test needs a known backdrop), `between` (two ids — distance, touching, 
 facing), `ui: false` (hide everything player-facing — the HUD, any game screen,
 damage numbers, anything marked `userData.overlay` — when the question is the
 world; leave it on to judge the interface, which is drawn over the frame and is
-in it by default), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`
+in it by default), `size` (`[width, height]` in pixels — draw at the shape the
+game is designed for instead of the window's; the HUD is laid out for the window
+so it is left out unless `ui: true` asks for it stretched, and the window's own
+size is put back after), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`
 (writes `agent-runs/see/<name>.png`), `file` (the whole path, which must end
 `.png` and stay under `agent-runs/`; the sidecar takes the same path with a
 `.json` ending).
