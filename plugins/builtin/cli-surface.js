@@ -37,8 +37,11 @@ const OFFLINE = [
   { op: 'pain.resolve <id> "<done>"', purpose: 'mark a painpoint resolved' },
   { op: 'agent.context [file...]', purpose: 'the small instruction packet for a task' },
   { op: 'agent.prepare <id> [file...]', purpose: 'claim files and get a packet; parallel writers get a worktree' },
-  { op: 'agent.status', purpose: 'active and finished agent runs' },
-  { op: 'agent.release <id> --checked', purpose: 'finish a run once its required checks are recorded' }
+  { op: 'agent.status [--all]', purpose: 'live runs, lanes still to merge, and leftovers on disk; --all prints the raw registry' },
+  { op: 'agent.release <id> [--blocked]', purpose: 'run the packet checks and finish a run; failing checks leave it active' },
+  { op: 'agent.merge <id>', purpose: 'merge the lane, run its deferred checks, remove its worktree and branch' },
+  { op: 'agent.sweep [--dry-run]', purpose: 'delete worktrees and directories left by lanes whose work is in HEAD' },
+  { op: 'agent.skills', purpose: 'rewrite AGENTS.md, CLAUDE.md and the generated skill copies' }
 ]
 
 const FLAGS = [

@@ -69,9 +69,13 @@ friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
           pain.list [--all]    pain.resolve <id> "<what you did>"
 agents    agent.context [file...]
           agent.prepare <id> [file...] [--parallel]
-          agent.status         agent.release <id> [--blocked "<why>"]
+          agent.status [--all] live runs, lanes to merge, leftovers on disk
+          agent.release <id> [--blocked "<why>"]
           agent.merge <id>     merge the lane, run its deferred checks, remove
                                its worktree and branch
+          agent.sweep [--dry-run]
+                               delete worktrees and directories left by lanes
+                               whose work is already in HEAD
 
 Args that parse as JSON are sent as JSON, everything else as a string.
 Flags (--foo) collect into a trailing options object.
@@ -451,8 +455,51 @@ if (op.startsWith('agent.')) {
       process.exit(0)
     }
 
+    /**
+     * What is live, and where the registry and git disagree.
+     *
+     * The whole registry carries every run's captured check output, so reading
+     * it costs more than the collisions it prevents. The default answers the
+     * two questions a lane actually asks — which files are claimed, and what
+     * still needs merging — and `--all` keeps the raw records available.
+     */
     if (op === 'agent.status') {
-      out(agents.readAgentRegistry(REPO))
+      if (flags.all) {
+        out(agents.readAgentRegistry(REPO))
+        process.exit(0)
+      }
+      const states = agents.agentState(REPO)
+      const live = states.filter(state => state.live)
+      const disagrees = states.filter(state => state.disagrees)
+      const leftBehind = states.filter(state => !state.live && state.ownsWorktree && state.onDisk)
+      out({
+        runs: states.length,
+        live: live.map(state => ({
+          id: state.id, files: state.files, startedAt: state.startedAt, branch: state.branch
+        })),
+        // Named separately because the safe reading of a stale `complete` is to
+        // merge again, and merging again is what wastes a lane.
+        needsMerge: states
+          .filter(state => !state.live && state.provenByGit && !state.landed)
+          .map(state => ({ id: state.id, branch: state.branch, recorded: state.recorded })),
+        alreadyInHead: disagrees.map(state => ({ id: state.id, recorded: state.recorded, branch: state.branch })),
+        leftBehind: leftBehind.map(state => ({ id: state.id, workspace: state.workspace, listedByGit: state.hasWorktree })),
+        // Only when a sweep has something to remove. A record that disagrees
+        // with git and has nothing left on disk needs no action at all.
+        ...(leftBehind.length || disagrees.some(state => state.branchExists)
+          ? { next: 'node bin/engine.mjs agent.sweep' }
+          : {})
+      })
+      process.exit(0)
+    }
+
+    /**
+     * Delete what finished lanes left in `.agent-worktrees`.
+     *
+     * `--dry-run` lists without deleting.
+     */
+    if (op === 'agent.sweep') {
+      out(agents.sweepAgents(REPO, { dryRun: flags['dry-run'] === true || flags.dryRun === true }))
       process.exit(0)
     }
 
@@ -477,7 +524,7 @@ if (op.startsWith('agent.')) {
       process.exit(0)
     }
 
-    die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, agent.release, or agent.merge`)
+    die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, agent.release, agent.merge, agent.sweep, or agent.skills`)
   } catch (error) {
     die(1, String(error?.message || error), error?.stack)
   }

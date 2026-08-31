@@ -98,9 +98,31 @@ export const claimsCollide = (root, left, right) => {
   return fs.existsSync(path.join(root, normal(deeper)))
 }
 
+/**
+ * A free id, given the ones already taken.
+ *
+ * Suffixed rather than random so the suggestion still names the work.
+ */
+function freeId(taken, id) {
+  let n = 2
+  while (taken.has(`${id}-${n}`)) n++
+  return `${id}-${n}`
+}
+
 function assertAvailable(root, runs, id, files, parallel) {
   const active = runs.filter(run => run.status === 'active')
   if (active.some(run => run.id === id)) throw new Error(`agent task "${id}" is already active`)
+
+  // Every verb that takes an id resolves it against this file, so two records
+  // sharing one id cannot be told apart. A merged run may keep its name; an
+  // unfinished one still answers to it.
+  const unfinished = runs.filter(run => run.id === id && run.status !== 'merged')
+  if (unfinished.length) {
+    const taken = new Set(runs.map(run => run.id))
+    throw new Error(
+      `agent task "${id}" already exists and is not merged (status: ${unfinished[unfinished.length - 1].status}). ` +
+      `Land it with agent.merge ${id}, or use a different id such as "${freeId(taken, id)}".`)
+  }
 
   const conflicts = active.filter(run =>
     files.some(file => (run.files || []).some(claimed => claimsCollide(root, file, claimed))))
@@ -329,26 +351,197 @@ export function mergeAgent(root, id) {
     throw failure
   }
 
-  // The checks a lane could not run are run here, once, now that its work is in
-  // the main worktree where a dev server and an editor tab can exist.
+  // The commit is durable, so record it before anything that can fail. Cleanup
+  // and the deferred checks come after: a worktree this process cannot delete
+  // must not cost the registry its only note that the work landed.
+  let merged
+  editRegistry(main, registry => {
+    const found = sameRun(registry.runs, run)
+    if (!found) throw new Error(`agent task "${id}" left the registry mid-merge`)
+    found.status = 'merged'
+    found.mergedAt = new Date().toISOString()
+    merged = found
+    return registry
+  })
+
+  // Run here, once, now the work is in the worktree a dev server and an editor
+  // tab can exist in.
   const serial = (run.deferred || []).map(check => runCheck(main, check))
   const broke = serial.filter(check => !check.ok)
 
-  git(main, ['worktree', 'remove', '--force', run.workspace])
-  git(main, ['branch', '-d', run.branch])
+  const cleanup = removeWorktree(main, run)
 
-  let merged
   editRegistry(main, registry => {
-    const found = registry.runs.find(entry => entry.id === id)
-    found.status = 'merged'
-    found.mergedAt = new Date().toISOString()
+    const found = sameRun(registry.runs, run)
+    if (!found) return registry
     if (serial.length) found.serialChecks = serial
+    if (!cleanup.ok) found.leftBehind = cleanup.why
     merged = { ...found }
     return registry
   })
 
-  // Merged and reported, not merged and hidden. The work is in; whether it is
-  // good is the next thing anybody needs to know.
-  return { ...merged, merged: true, serialChecks: serial, ok: broke.length === 0,
-    ...(broke.length ? { why: `merged, but ${broke.length} deferred check(s) failed here: ${broke.map(check => check.command).join(', ')}` } : {}) }
+  const problems = [
+    ...(broke.length ? [`${broke.length} deferred check(s) failed here: ${broke.map(check => check.command).join(', ')}`] : []),
+    ...(cleanup.ok ? [] : [cleanup.why])
+  ]
+  return {
+    ...merged,
+    merged: true,
+    serialChecks: serial,
+    cleaned: cleanup.ok,
+    ok: problems.length === 0,
+    ...(problems.length ? { why: `merged, but ${problems.join('; ')}` } : {})
+  }
+}
+
+/** Absolute paths git currently lists as worktrees. */
+function gitWorktrees(main) {
+  return git(main, ['worktree', 'list', '--porcelain'])
+    .split(/\r?\n/)
+    .filter(line => line.startsWith('worktree '))
+    .map(line => path.resolve(line.slice('worktree '.length)))
+}
+
+const branchExists = (main, branch) => {
+  try { git(main, ['rev-parse', '--verify', '--quiet', branch]); return true } catch { return false }
+}
+
+const inHead = (main, branch) => {
+  try { git(main, ['merge-base', '--is-ancestor', branch, 'HEAD']); return true } catch { return false }
+}
+
+/**
+ * What git says about a run, as against what the registry recorded.
+ *
+ * The registry is written by whichever verb ran last, and a verb that fails
+ * part way writes nothing. Git holds the commits either way, so state is read
+ * from git and the stored status is kept only to be compared against it.
+ */
+export function agentState(root) {
+  const main = mainWorktree(root)
+  const worktrees = new Set(gitWorktrees(main))
+  const mainPath = path.resolve(main)
+  return readAgentRegistry(main).runs.map(run => {
+    // A merge deletes the lane's branch, so a missing ref is the normal end
+    // state and git has nothing left to test. Only a branch that still exists
+    // can be proved landed or not; without one the record is all there is.
+    const hasBranch = Boolean(run.branch) && branchExists(main, run.branch)
+    const landed = hasBranch ? inHead(main, run.branch) : run.status === 'merged'
+    const state = {
+      id: run.id,
+      recorded: run.status,
+      startedAt: run.startedAt,
+      files: run.files || [],
+      workspace: run.workspace || null,
+      landed,
+      provenByGit: hasBranch,
+      branch: run.branch || null,
+      branchExists: hasBranch,
+      // A run in the current workspace records the main worktree as its
+      // workspace, which is never a leftover.
+      ownsWorktree: Boolean(run.workspace) && path.resolve(run.workspace) !== mainPath,
+      hasWorktree: run.workspace ? worktrees.has(path.resolve(run.workspace)) : false,
+      onDisk: run.workspace ? fs.existsSync(run.workspace) : false
+    }
+    state.live = run.status === 'active'
+    // The registry disagreeing with git is the reading nobody gets from the
+    // stored status, and it decides whether a lane still needs merging.
+    state.disagrees = hasBranch && landed && run.status !== 'merged'
+    return state
+  })
+}
+
+/**
+ * Remove what finished lanes left in `.agent-worktrees`.
+ *
+ * Two leftovers, from the same cause: a worktree git still lists whose work is
+ * already in HEAD, and a directory git does not list at all, left by a removal
+ * that deleted some of the files and then failed. Only runs already in HEAD are
+ * touched, so unmerged work is never deleted.
+ */
+export function sweepAgents(root, { dryRun = false } = {}) {
+  const main = mainWorktree(root)
+  const home = path.join(main, '.agent-worktrees')
+  const worktrees = new Set(gitWorktrees(main))
+  const states = new Map(agentState(root)
+    .filter(state => state.workspace)
+    .map(state => [path.resolve(state.workspace), state]))
+
+  const removed = []
+  const kept = []
+  for (const name of fs.existsSync(home) ? fs.readdirSync(home) : []) {
+    const directory = path.join(home, name)
+    if (!fs.statSync(directory).isDirectory()) continue
+    const listed = worktrees.has(path.resolve(directory))
+    const state = states.get(path.resolve(directory))
+
+    if (listed && !(state && state.landed)) {
+      kept.push({ directory, why: state ? 'its work is not in HEAD yet' : 'git lists it and no run record explains it' })
+      continue
+    }
+
+    if (dryRun) { removed.push({ directory, listed, would: true }); continue }
+    try {
+      if (listed) git(main, ['worktree', 'remove', '--force', directory])
+      else fs.rmSync(directory, { recursive: true, force: true })
+      removed.push({ directory, listed })
+      const branch = state?.branch
+      if (branch && branchExists(main, branch) && inHead(main, branch)) {
+        try { git(main, ['branch', '-d', branch]) } catch { /* a branch left behind is not a failure to sweep */ }
+      }
+    } catch (error) {
+      kept.push({ directory, why: String(error.stderr || error.message).trim() })
+    }
+  }
+
+  // A worktree git lists whose directory a failed removal already deleted keeps
+  // answering `git worktree list` until this runs.
+  try { git(main, ['worktree', 'prune']) } catch { /* prune is advisory */ }
+
+  // A lane branch outlives its worktree when removal succeeded and the branch
+  // delete did not, and it is what keeps a landed run reading as unmerged.
+  const branches = []
+  const live = new Set(gitWorktrees(main))
+  for (const state of agentState(root)) {
+    if (!state.branch || !state.branchExists || !state.landed) continue
+    if (state.workspace && live.has(path.resolve(state.workspace))) continue
+    if (dryRun) { branches.push({ branch: state.branch, would: true }); continue }
+    try { git(main, ['branch', '-d', state.branch]); branches.push({ branch: state.branch }) } catch { /* keep going */ }
+  }
+  return { removed, branches, kept, ok: kept.length === 0 }
+}
+
+/**
+ * The registry's own copy of a run, matched on when it started.
+ *
+ * An id is reused across sessions, so matching on id alone stamps the oldest
+ * record with the newest outcome.
+ */
+const sameRun = (runs, run) =>
+  runs.find(entry => entry.id === run.id && entry.startedAt === run.startedAt)
+
+/**
+ * Take a merged lane's worktree and branch away, and say so if it could not.
+ *
+ * Removal fails while another process holds a file open in the worktree — on
+ * Windows a dev server the lane started and never stopped is enough. The merge
+ * has already happened by then, so this reports rather than throws, and
+ * `agent.sweep` finishes the job once the holder exits.
+ */
+function removeWorktree(main, run) {
+  try {
+    git(main, ['worktree', 'remove', '--force', run.workspace])
+  } catch (error) {
+    return {
+      ok: false,
+      why: `could not remove the worktree at ${run.workspace} — ${String(error.stderr || error.message).trim()}. ` +
+        `Stop anything running inside it, then run: node bin/engine.mjs agent.sweep`
+    }
+  }
+  try {
+    git(main, ['branch', '-d', run.branch])
+  } catch (error) {
+    return { ok: false, why: `worktree removed, but branch ${run.branch} remains — ${String(error.stderr || error.message).trim()}` }
+  }
+  return { ok: true }
 }

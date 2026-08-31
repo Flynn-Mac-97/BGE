@@ -6,7 +6,10 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import { matchesAgentPattern, readAgentWorkspace, resolveAgentContext } from '../engine/agent-workspace.js'
-import { contextFromDisk, prepareAgent, readAgentRegistry, releaseAgent, mergeAgent } from '../engine/agent-workspace-node.mjs'
+import {
+  contextFromDisk, prepareAgent, readAgentRegistry, releaseAgent, mergeAgent,
+  agentState, sweepAgents
+} from '../engine/agent-workspace-node.mjs'
 import { onDisk } from '../engine/start-world-node.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -244,4 +247,213 @@ test('small tasks stay put and parallel tasks receive worktrees', async t => {
   assert.equal(execFileSync('git', ['-C', root, 'branch', '--list', parallel.branch], { encoding: 'utf8' }).trim(), '',
     'the branch is gone')
   assert.equal(readAgentRegistry(root).runs.find(run => run.id === 'parallel-fix').status, 'merged')
+})
+
+/**
+ * A checkout with the agent manifests in it, ready for lanes.
+ *
+ * The fixture has no engine, so its required checks cannot pass. Every lane
+ * here releases blocked, which skips the checks and still exercises merging,
+ * state and sweeping.
+ */
+function laneFixture(t) {
+  const fixtures = path.join(ROOT, '.tmp-agent-tests')
+  fs.mkdirSync(fixtures, { recursive: true })
+  const root = fs.mkdtempSync(path.join(fixtures, 'engine-agent-lanes-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+
+  fs.mkdirSync(path.join(root, 'project'), { recursive: true })
+  fs.mkdirSync(path.join(root, 'engine'), { recursive: true })
+  fs.cpSync(path.join(ROOT, 'agents'), path.join(root, 'agents'), { recursive: true })
+  fs.cpSync(path.join(ROOT, 'project/agents'), path.join(root, 'project/agents'), { recursive: true })
+  fs.copyFileSync(path.join(ROOT, 'AGENTS.md'), path.join(root, 'AGENTS.md'))
+  fs.copyFileSync(path.join(ROOT, 'ARCHITECTURE.md'), path.join(root, 'ARCHITECTURE.md'))
+  fs.writeFileSync(path.join(root, 'engine/world.js'), 'export const world = true\n')
+  fs.writeFileSync(path.join(root, 'engine/render.js'), 'export const render = true\n')
+  fs.writeFileSync(path.join(root, '.gitignore'), '.agent-worktrees/\nproject/.engine/\n')
+
+  const git = args => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  git(['init']); git(['config', 'user.email', 'agent-test@example.invalid']); git(['config', 'user.name', 'Agent Test'])
+  git(['add', '.']); git(['commit', '-m', 'baseline'])
+  return { root, git }
+}
+
+/** Give a lane a commit of its own, so merging it is a real merge. */
+function commitInLane(lane, name) {
+  fs.writeFileSync(path.join(lane.workspace, `${name}.txt`), `${name}\n`)
+  const run = args => execFileSync('git', ['-C', lane.workspace, ...args], { stdio: ['ignore', 'pipe', 'pipe'] })
+  run(['add', '.']); run(['commit', '-m', `work from ${name}`])
+}
+
+const stateOf = (root, id) => agentState(root).filter(state => state.id === id).pop()
+
+test('a merge is recorded even when the worktree cannot be removed', async t => {
+  const { root, git } = laneFixture(t)
+
+  const lane = await prepareAgent(root, 'stuck', { files: ['engine/world.js'], parallel: true })
+  commitInLane(lane, 'stuck')
+  releaseAgent(root, 'stuck', { status: 'blocked', note: 'fixture' })
+
+  // Deleting git's administrative copy makes `worktree remove` fail on every
+  // platform, which is what a file another process holds open does on Windows.
+  fs.rmSync(path.join(root, '.git/worktrees/stuck'), { recursive: true, force: true })
+
+  const merged = mergeAgent(root, 'stuck')
+  assert.equal(merged.merged, true)
+  assert.equal(merged.cleaned, false, 'removal was expected to fail in this fixture')
+  assert.match(merged.why, /agent\.sweep/, 'the reply must say how to finish the cleanup')
+
+  // The commit is durable, so the registry says merged whatever cleanup did.
+  assert.equal(readAgentRegistry(root).runs.find(run => run.id === 'stuck').status, 'merged')
+  assert.equal(stateOf(root, 'stuck').landed, true)
+  assert.match(git(['log', '--oneline']), /work from stuck/)
+})
+
+test('an unmerged id cannot be reused and a merged one can', async t => {
+  const { root } = laneFixture(t)
+
+  const first = await prepareAgent(root, 'twice', { files: ['engine/world.js'], parallel: true })
+  commitInLane(first, 'first')
+  releaseAgent(root, 'twice', { status: 'blocked', note: 'fixture' })
+
+  // Released but not merged: every verb that takes an id would now have two
+  // records to choose between.
+  await assert.rejects(
+    prepareAgent(root, 'twice', { files: ['engine/render.js'], parallel: true }),
+    /already exists and is not merged[\s\S]*twice-2/)
+
+  mergeAgent(root, 'twice')
+  const again = await prepareAgent(root, 'twice', { files: ['engine/render.js'], parallel: true })
+  assert.equal(again.id, 'twice')
+  assert.equal(readAgentRegistry(root).runs.filter(run => run.id === 'twice').length, 2)
+})
+
+test('state comes from git, not from the recorded status', async t => {
+  const { root } = laneFixture(t)
+
+  const lane = await prepareAgent(root, 'drift', { files: ['engine/world.js'], parallel: true })
+  commitInLane(lane, 'drift')
+  releaseAgent(root, 'drift', { status: 'blocked', note: 'fixture' })
+
+  const before = stateOf(root, 'drift')
+  assert.equal(before.landed, false)
+  assert.equal(before.provenByGit, true)
+  assert.equal(before.disagrees, false)
+
+  // Merged by hand, the way a person resolving a conflict does, so the registry
+  // never hears about it.
+  execFileSync('git', ['-C', root, 'merge', '--no-ff', '-m', 'merged by hand', 'agent/drift'], { stdio: 'ignore' })
+
+  const after = stateOf(root, 'drift')
+  assert.equal(after.landed, true, 'git says the work is in HEAD')
+  assert.equal(after.recorded, 'blocked', 'the registry still says otherwise')
+  assert.equal(after.disagrees, true)
+})
+
+test('a sweep clears landed leftovers and never touches unmerged work', async t => {
+  const { root } = laneFixture(t)
+  const home = path.join(root, '.agent-worktrees')
+
+  const landed = await prepareAgent(root, 'landed', { files: ['engine/world.js'], parallel: true })
+  commitInLane(landed, 'landed')
+  releaseAgent(root, 'landed', { status: 'blocked', note: 'fixture' })
+  execFileSync('git', ['-C', root, 'merge', '--no-ff', '-m', 'merged by hand', 'agent/landed'], { stdio: 'ignore' })
+
+  const unmerged = await prepareAgent(root, 'unmerged', { files: ['engine/render.js'], parallel: true })
+  commitInLane(unmerged, 'unmerged')
+  releaseAgent(root, 'unmerged', { status: 'blocked', note: 'fixture' })
+
+  // A directory git no longer lists, left by a removal that deleted part of the
+  // worktree and then failed.
+  const orphan = path.join(home, 'orphan')
+  fs.mkdirSync(orphan, { recursive: true })
+  fs.writeFileSync(path.join(orphan, 'leftover.txt'), 'x\n')
+
+  const planned = sweepAgents(root, { dryRun: true })
+  assert.ok(planned.removed.every(entry => entry.would), 'a dry run removes nothing')
+  assert.ok(fs.existsSync(orphan), 'a dry run leaves the orphan on disk')
+  assert.ok(fs.existsSync(unmerged.workspace))
+
+  const swept = sweepAgents(root)
+  const gone = swept.removed.map(entry => path.basename(entry.directory)).sort()
+  assert.deepEqual(gone, ['landed', 'orphan'])
+
+  assert.ok(!fs.existsSync(landed.workspace), 'a landed worktree is removed')
+  assert.ok(!fs.existsSync(orphan), 'an orphan directory is deleted')
+  assert.ok(fs.existsSync(unmerged.workspace), 'work that is not in HEAD is kept')
+  assert.ok(swept.kept.some(entry => path.basename(entry.directory) === 'unmerged'))
+
+  // The landed lane's branch goes with its worktree; the unmerged one stays.
+  const branches = execFileSync('git', ['-C', root, 'branch', '--list'], { encoding: 'utf8' })
+  assert.doesNotMatch(branches, /agent\/landed/)
+  assert.match(branches, /agent\/unmerged/)
+})
+
+test('a sweep deletes a landed branch whose worktree is already gone', async t => {
+  const { root, git } = laneFixture(t)
+
+  const landed = await prepareAgent(root, 'orphan-branch', { files: ['engine/world.js'], parallel: true })
+  commitInLane(landed, 'orphan-branch')
+  releaseAgent(root, 'orphan-branch', { status: 'blocked', note: 'fixture' })
+  git(['merge', '--no-ff', '-m', 'merged by hand', 'agent/orphan-branch'])
+
+  // Removing the worktree by hand leaves the branch, which is what keeps a
+  // landed run reading as unmerged.
+  git(['worktree', 'remove', '--force', landed.workspace])
+  assert.equal(stateOf(root, 'orphan-branch').branchExists, true)
+
+  const planned = sweepAgents(root, { dryRun: true })
+  assert.ok(planned.branches.some(entry => entry.branch === 'agent/orphan-branch' && entry.would))
+  assert.equal(stateOf(root, 'orphan-branch').branchExists, true, 'a dry run deletes no branch')
+
+  const swept = sweepAgents(root)
+  assert.ok(swept.branches.some(entry => entry.branch === 'agent/orphan-branch'))
+  assert.doesNotMatch(git(['branch', '--list']), /agent\/orphan-branch/)
+})
+
+test('a sweep keeps the branch of a lane that is still checked out', async t => {
+  const { root, git } = laneFixture(t)
+
+  const lane = await prepareAgent(root, 'still-out', { files: ['engine/world.js'], parallel: true })
+  commitInLane(lane, 'still-out')
+  releaseAgent(root, 'still-out', { status: 'blocked', note: 'fixture' })
+  git(['merge', '--no-ff', '-m', 'merged by hand', 'agent/still-out'])
+
+  // Landed, but a worktree still has the branch checked out, so deleting it
+  // would leave that worktree on a branch git no longer knows.
+  const swept = sweepAgents(root, { dryRun: true })
+  assert.ok(!swept.branches.some(entry => entry.branch === 'agent/still-out'),
+    'a branch checked out in a live worktree is left alone')
+})
+
+test('a run in the current workspace is never reported as a leftover', async t => {
+  const { root } = laneFixture(t)
+
+  await prepareAgent(root, 'in-place', { files: ['engine/world.js'] })
+  releaseAgent(root, 'in-place', { status: 'blocked', note: 'fixture' })
+
+  const state = stateOf(root, 'in-place')
+  assert.equal(state.ownsWorktree, false, 'the main worktree is not a lane worktree')
+  assert.equal(state.onDisk, true)
+  assert.deepEqual(sweepAgents(root).removed, [], 'a sweep leaves the checkout alone')
+})
+
+test('merging a reused id records the run that was merged', async t => {
+  const { root } = laneFixture(t)
+
+  const first = await prepareAgent(root, 'shared', { files: ['engine/world.js'], parallel: true })
+  commitInLane(first, 'first')
+  releaseAgent(root, 'shared', { status: 'blocked', note: 'fixture' })
+  mergeAgent(root, 'shared')
+
+  const second = await prepareAgent(root, 'shared', { files: ['engine/render.js'], parallel: true })
+  commitInLane(second, 'second')
+  releaseAgent(root, 'shared', { status: 'blocked', note: 'fixture' })
+  mergeAgent(root, 'shared')
+
+  const records = readAgentRegistry(root).runs.filter(run => run.id === 'shared')
+  assert.equal(records.length, 2)
+  assert.ok(records.every(run => run.status === 'merged'), 'both records report their own outcome')
+  assert.notEqual(records[0].mergedAt, records[1].mergedAt, 'each merge stamped its own record')
+  assert.match(execFileSync('git', ['-C', root, 'log', '--oneline'], { encoding: 'utf8' }), /work from second/)
 })
