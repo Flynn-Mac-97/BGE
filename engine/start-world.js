@@ -256,6 +256,13 @@ export async function startWorld({
    * level with a freeze-frame of a playthrough. Refuse, and say how to get back.
    */
   async function saveLevel() {
+    // A page a lane opened to render in is a viewer: its world is its own, and
+    // the checkout is shared. Checked before every other reason, because this
+    // one is about who is asking rather than about what the world holds.
+    if (globalThis.__engineViewer) {
+      console.warn('[save] skipped — this page renders for a lane and never writes the checkout.')
+      return { skipped: 'viewer' }
+    }
     if (world.simulated) {
       console.warn('[save] skipped — the world has been simulated, so it no longer holds start positions. Stop play mode (or engine.stop()) to reload the level first.')
       return { skipped: 'simulated' }

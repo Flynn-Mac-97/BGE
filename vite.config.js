@@ -7,6 +7,7 @@ import path from 'node:path'
 import { buildIndex as buildProjectIndex, problemsIn, fatal, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
 import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
 import { chooseClient, explainClientError, isLive, publicClient } from './engine/bridge-clients.mjs'
+import { workLock, permits } from './engine/work-lock.mjs'
 
 const ROOT = process.cwd()
 
@@ -373,6 +374,17 @@ function bridge() {
           })
         }
 
+        // A lane's render page may drive its own world and may never write a
+        // file; the person's editor may not write while a lane is working. Held
+        // here because this is the one door every call comes through.
+        const lock = workLock(ROOT)
+        const { allowed, why: held } = permits(lock, op, chosen.headless ? 'lane' : 'person')
+        if (!allowed) {
+          return send(res, 423, {
+            ok: false, code: 'held', error: held, lock, serves: ROOT
+          })
+        }
+
         const id = ++seq
         const pending = new Promise(resolve => {
           waiting.set(id, resolve)
@@ -435,6 +447,10 @@ if (hot) {
   let id = asked || sessionStorage.getItem(key)
   if (!id) { id = Math.random().toString(36).slice(2, 10) }
   sessionStorage.setItem(key, id)
+  // A page opened under a name is one a lane renders in. Its world is its own;
+  // the checkout is shared, so it never writes a file. Set before the editor
+  // boots, because the first thing a level load can do is save.
+  if (asked) globalThis.__engineViewer = true
   const announce = () => hot.send('engine:tab', {
     id,
     url: location.href,

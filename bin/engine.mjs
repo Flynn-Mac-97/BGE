@@ -599,6 +599,17 @@ if (op === 'check') {
  * in a worktree would leave the servers exactly where the problem started.
  */
 /**
+ * Whether agents are working, and so whether anybody else may write.
+ *
+ * Read off disk, so it answers with no dev server: the question "may I edit
+ * this" has to be answerable before anything is started.
+ */
+if (op === 'lock') {
+  const { workLock } = await import('../engine/work-lock.mjs')
+  finish(workLock(CHECKOUT))
+}
+
+/**
  * Headless browsers started to render for a lane.
  *
  * `lanes` lists them, each proved against its own debugging port. `lanes.start`

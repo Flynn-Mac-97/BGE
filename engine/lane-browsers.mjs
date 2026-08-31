@@ -67,24 +67,42 @@ export function forgetLaneBrowser(root, client) {
  * its socket open, and a socket still closing when the process exits trips a
  * libuv assertion on Windows that is printed after the command's own output.
  */
-function answers(port) {
-  // node:http with `agent: false`, not fetch: fetch keeps its connection in a
-  // pool this code cannot close, and a socket still closing when the CLI exits
-  // aborts the process on Windows with a libuv assertion. Here the socket is
-  // this function's to destroy.
+/**
+ * What the browser on this port calls itself, or null if it does not answer.
+ *
+ * Recorded with every lane because Chrome updates itself. Frames are compared
+ * across loops on different days, so a renderer change between two of them
+ * would otherwise read as an art regression with nothing to point at.
+ */
+export function browserVersion(port) {
+  return ask(port).then(said => said?.Browser || null)
+}
+
+function ask(port) {
   return new Promise(resolve => {
     const request = http.get({
       host: '127.0.0.1', port, path: '/json/version', agent: false, timeout: 1500
     }, response => {
-      const ok = response.statusCode === 200
-      response.resume()
-      response.once('end', () => { request.destroy(); resolve(ok) })
+      let body = ''
+      response.setEncoding('utf8')
+      response.on('data', chunk => { body += chunk })
+      response.once('end', () => {
+        request.destroy()
+        if (response.statusCode !== 200) return resolve(null)
+        try { resolve(JSON.parse(body)) } catch { resolve(null) }
+      })
     })
-    const fail = () => { request.destroy(); resolve(false) }
+    const fail = () => { request.destroy(); resolve(null) }
     request.once('error', fail)
     request.once('timeout', fail)
   })
 }
+
+// node:http with `agent: false`, not fetch: fetch keeps its connection in a
+// pool this code cannot close, and a socket still closing when the CLI exits
+// aborts the process on Windows with a libuv assertion. Here the socket is this
+// function's to destroy.
+const answers = port => ask(port).then(said => said !== null)
 
 const alive = pid => {
   try { process.kill(pid, 0); return true } catch { return false }
@@ -147,7 +165,10 @@ export async function startLaneBrowser(root, {
   recordLaneBrowser(root, entry)
 
   for (let attempt = 0; attempt < 80; attempt++) {
-    if (await answers(port)) return { ...entry, ready: true, browser }
+    const version = await browserVersion(port)
+    if (version) {
+      return { ...recordLaneBrowser(root, { ...entry, version }), ready: true, browser }
+    }
     if (browser.exitCode !== null) break
     await new Promise(resolve => setTimeout(resolve, 250))
   }
