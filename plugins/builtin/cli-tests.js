@@ -1,13 +1,13 @@
 /**
  * CLI Tests — make the engine's own CLI test suite inspectable.
  *
- * The suite lives in test/cli.test.mjs and runs outside the browser (it spawns
+ * The suite lives in test/cli.bridge.mjs and runs outside the browser (it spawns
  * the real CLI), so this plugin contributes no runner — it makes the suite
  * visible in the plugin surface and answers how to run it.
  */
 const info = () => ({
-  suite: 'test/cli.test.mjs',
-  run: 'node test/cli.test.mjs',
+  suite: 'test/cli.bridge.mjs',
+  run: 'node test/cli.bridge.mjs',
   full: 'npm test',
   offline: 'node --test test/cli.offline.test.mjs && node --test test/agent-workspace.test.mjs',
   needs: ['a dev server', 'one open editor tab', 'the editor on level1 (the demo level)'],
@@ -19,7 +19,7 @@ export default {
   name: 'CLI Tests',
   about: 'Inspect the engine\'s own CLI test suites — the bridge suite and the offline door suite.',
   inspect: () => [
-    { title: 'How to run', rows: [['bridge', 'node test/cli.test.mjs'], ['offline', 'node --test test/cli.offline.test.mjs'], ['full', 'npm test']] },
+    { title: 'How to run', rows: [['bridge', 'node test/cli.bridge.mjs'], ['offline', 'node --test test/cli.offline.test.mjs'], ['full', 'npm test']] },
     { title: 'Needs', rows: info().needs.map(n => [n, '']) }
   ],
   commands: [{

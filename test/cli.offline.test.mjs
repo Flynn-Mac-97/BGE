@@ -2,7 +2,7 @@
 /**
  * CLI offline tests — the door itself, with nothing running.
  *
- * The bridge suite (test/cli.test.mjs) needs a dev server and an open editor
+ * The bridge suite (test/cli.bridge.mjs) needs a dev server and an open editor
  * tab, so its offline assertions are unreachable without one. This suite
  * proves the same door works with nothing running: exit codes, argument
  * coercion, the determinism lint, offline check, and both ledger lifecycles

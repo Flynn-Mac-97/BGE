@@ -240,7 +240,7 @@ export async function prepareAgent(root, id, request = {}, projectDirectory = 'p
  * after the lane's work has landed. Matched by substring because a manifest
  * writes the whole command line.
  */
-const SERIAL = ['npm test', 'test/cli.test.mjs']
+const SERIAL = ['npm test', 'test/cli.bridge.mjs']
 const isSerial = check => SERIAL.some(needle => check.includes(needle))
 
 /**
