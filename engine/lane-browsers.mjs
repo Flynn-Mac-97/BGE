@@ -10,6 +10,9 @@
  * is written down here, and the reader proves an entry by asking its debugging
  * port rather than trusting the file — the same rule the server registry
  * follows, for the same reason.
+ *
+ * One client name is one browser. A start that overwrote a live record would
+ * lose the only handle on a running process, so it is refused instead.
  */
 import fs from 'node:fs'
 import http from 'node:http'
@@ -60,13 +63,27 @@ export function forgetLaneBrowser(root, client) {
   writeLaneBrowsers(root, readLaneBrowsers(root).filter(entry => entry.client !== client))
 }
 
+/** The record for one client name, or undefined. */
+const recordFor = (root, client) => readLaneBrowsers(root).find(entry => entry.client === client)
+
 /**
- * Whether a debugging port still answers as the browser we started.
+ * Store what the page reports about its own frame.
  *
- * The body is read even though only the status matters: an unread body holds
- * its socket open, and a socket still closing when the process exits trips a
- * libuv assertion on Windows that is printed after the command's own output.
+ * The window size asked of Chrome is not the size a frame comes out at —
+ * editor chrome takes the difference — so the two are separate fields and
+ * neither stands in for the other. Called once the page has attached, because
+ * only the page knows the second number.
  */
+export function recordLaneViewport(root, client, { viewport, pixelRatio } = {}) {
+  const found = recordFor(root, client)
+  if (!found) return null
+  return recordLaneBrowser(root, {
+    ...found,
+    ...(viewport ? { viewportReported: viewport } : {}),
+    ...(Number.isFinite(pixelRatio) ? { pixelRatio } : {})
+  })
+}
+
 /**
  * What the browser on this port calls itself, or null if it does not answer.
  *
@@ -78,6 +95,13 @@ export function browserVersion(port) {
   return ask(port).then(said => said?.Browser || null)
 }
 
+/**
+ * Ask a debugging port who it is, or null if it does not answer.
+ *
+ * The body is read even though only the status matters: an unread body holds
+ * its socket open, and a socket still closing when the process exits trips a
+ * libuv assertion on Windows that is printed after the command's own output.
+ */
 function ask(port) {
   return new Promise(resolve => {
     const request = http.get({
@@ -130,6 +154,52 @@ export async function listLaneBrowsers(root) {
 }
 
 /**
+ * Make a client name available, or refuse because a browser still holds it.
+ *
+ * One name is one browser. Replacing the record would leave the running
+ * Chromium and its profile directory with nothing pointing at them, so no later
+ * stop could reach either. A record whose process is gone is litter: it and its
+ * profile directory are removed and the name is free again.
+ *
+ * Returns the record it removed, or null when the name was already free.
+ */
+export async function freeLaneName(root, client) {
+  const found = recordFor(root, client)
+  if (!found) return null
+  if (alive(found.pid)) {
+    const port = await answers(found.port)
+      ? `answering on port ${found.port}`
+      : `not answering on port ${found.port}`
+    throw new Error(
+      `a lane browser is already called "${client}": process ${found.pid}, ${port}`
+      + (found.startedAt ? `, started ${found.startedAt}` : '')
+      + `.\nStop it first:  node bin/engine.mjs lanes.stop ${client}`)
+  }
+  forgetLaneBrowser(root, client)
+  if (found.profile) {
+    try { fs.rmSync(found.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+  }
+  return found
+}
+
+/**
+ * What Chrome is told to open. Separate from the start so a test can read it
+ * without running a browser.
+ */
+export const laneBrowserArguments = ({ port, profile, width, height, page }) => [
+  '--headless=new',
+  `--remote-debugging-port=${port}`,
+  `--user-data-dir=${profile}`,
+  '--no-first-run', '--no-default-browser-check',
+  `--window-size=${width},${height}`,
+  // One CSS pixel is one device pixel, so a frame's file dimensions are the
+  // profile that was asked for. Without it a HiDPI host writes the same profile
+  // at twice the size and two machines disagree about one frame.
+  '--force-device-scale-factor=1',
+  page
+]
+
+/**
  * Start a headless browser for one lane and wait until its page is up.
  *
  * `client` becomes the page's bridge name, passed in the URL, so the caller
@@ -140,25 +210,22 @@ export async function startLaneBrowser(root, {
   client, url, port, width = 540, height = 960, chrome = findChrome()
 }) {
   if (!client) throw new Error('a lane browser needs a client name')
+  await freeLaneName(root, client)
   const profile = fs.mkdtempSync(path.join(process.env.TEMP || '/tmp', `lane-${client}-`))
   const page = url + (url.includes('?') ? '&' : '?') + `client=${encodeURIComponent(client)}`
 
   // Detached with no pipes: the browser has to outlive the command that started
   // it, the way a dev server does. Inheriting stdio would end it when the
   // starting process exits and close the pipes.
-  const browser = spawn(chrome, [
-    '--headless=new',
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${profile}`,
-    '--no-first-run', '--no-default-browser-check',
-    `--window-size=${width},${height}`,
-    page
-  ], { stdio: 'ignore', detached: true })
+  const browser = spawn(chrome, laneBrowserArguments({ port, profile, width, height, page }),
+    { stdio: 'ignore', detached: true })
   browser.unref()
 
   const entry = {
     client, port, url: page, pid: browser.pid, profile, serves: root,
-    profileSize: `${width}x${height}`, startedAt: new Date().toISOString()
+    // What Chrome was told, not what any frame measures. `recordLaneViewport`
+    // adds what the page reports, under its own name.
+    windowAsked: `${width}x${height}`, startedAt: new Date().toISOString()
   }
   // Written before the wait, so a browser that never comes up is still findable
   // and stoppable rather than an orphan nothing recorded.
@@ -174,6 +241,10 @@ export async function startLaneBrowser(root, {
   }
   try { browser.kill() } catch { /* already gone */ }
   forgetLaneBrowser(root, client)
+  // Windows holds the profile until the process is gone; a start that failed
+  // must not leave a directory nothing records.
+  await new Promise(resolve => setTimeout(resolve, 500))
+  try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
   throw new Error(`the lane browser for "${client}" never opened its debugging port ${port}`)
 }
 
@@ -195,7 +266,22 @@ export async function stopLaneBrowsers(root, client = null) {
   // Give Windows a moment to release the profile before deleting it.
   if (stopped.length) await new Promise(resolve => setTimeout(resolve, 500))
   for (const entry of wanted) {
-    try { fs.rmSync(entry.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+    if (entry.profile) {
+      try { fs.rmSync(entry.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+    }
   }
-  return { stopped, remaining: readLaneBrowsers(root).length }
+  // A port that still answers is a browser this stop did not reach. Reporting
+  // the records removed without saying so would call the checkout clear.
+  for (const entry of stopped) {
+    if (await answers(entry.port)) entry.stillAnswering = true
+  }
+  const missed = stopped.filter(entry => entry.stillAnswering)
+  return {
+    stopped,
+    remaining: readLaneBrowsers(root).length,
+    ...(missed.length ? {
+      warning: `port ${missed.map(entry => entry.port).join(', ')} still answers after the stop. `
+        + `A browser is attached that this registry does not describe.`
+    } : {})
+  }
 }

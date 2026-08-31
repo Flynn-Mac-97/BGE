@@ -39,6 +39,35 @@ behind it. Any command id also works as a verb, so a plugin that adds
 The bridge's transport is the dev server's existing websocket. No extra port, no
 extra dependency, and it dies with the dev server.
 
+**Every call names its target.** One dev server can have several pages attached
+— the person's editor and one headless page per lane — so a call carries
+`--client <id>` and reaches that page alone. With two or more attached, an
+untargeted call is refused with the list rather than broadcast; the fastest page
+to answer is not the right one. Every reply says which page answered, and an
+answer from a page the caller did not name fails the call. Two pages cannot hold
+one name: the second is refused, and only the page's own nonce — kept in its
+session storage across reload — separates a reconnect from an impostor.
+
+## The work lock
+
+While lanes work, the shared checkout has one writer at a time. The lock is
+derived, never stored: an active run in the agent registry, or a lane browser
+whose process is still alive. Nothing has to remember to unlock.
+
+- A **lane's render page** is refused every op that writes a file, always. Its
+  world is its own; the checkout is shared.
+- The **person's editor** is refused every writing op while a lane works. Reads
+  answer as usual, and the refusal names the lanes.
+- Which of the two a caller is comes from the lane browser registry, never from
+  what the page reports about itself. A page can set `navigator.webdriver` or
+  its user agent; it cannot write a registry entry.
+
+`engine/work-lock.mjs` decides and enforces nothing. `vite.config.js` enforces at
+all three write doors — `POST /api/engine`, `POST /api/file` and
+`POST /api/agent-file` — each answering `423 {code:"held"}`. `engine/files.js`
+holds a kernel guard on top, so a lane's page refuses its own write before it
+reaches the wire. `node bin/engine.mjs lock` says who holds it.
+
 `--headless` skips all of that and starts a world in the CLI process. It exists
 so several agents can work at once: one dev server has one shared world;
 headless worlds are one per process. Memory is private — world, clock, random

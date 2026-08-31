@@ -23,14 +23,36 @@ import { makeLoader } from './loader.js'
 import { makeInspect, makeLog } from './inspect.js'
 
 /**
- * How big the viewport is, when nothing has measured one.
+ * The screen a game is drawn for, when the game declares none.
  *
  * The camera clamps to level bounds using the viewport size, so without a fixed
  * default the same level would frame differently in a small window than in a
  * large one — and a headless run would disagree with both. Declaring it means a
  * camera position is reproducible, which is the whole promise of `simulate()`.
  */
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 }
+const DEFAULT_DEVICE = { width: 1280, height: 720, pixelRatio: 1, orientation: 'landscape' }
+
+const positive = value => (Number.isFinite(value) && value > 0 ? value : null)
+
+/**
+ * The target device a game declares under `device` in game.json, filled in from
+ * the default.
+ *
+ * One declaration, read by everything that needs a screen shape: the viewport
+ * every camera clamps against, and the size `see.capture` draws at. A game that
+ * declares a shape nothing reads gets art measured at the wrong shape.
+ */
+function readDevice(game) {
+  const declared = game?.device || {}
+  const width = positive(declared.width) ?? DEFAULT_DEVICE.width
+  const height = positive(declared.height) ?? DEFAULT_DEVICE.height
+  return {
+    width,
+    height,
+    pixelRatio: positive(declared.pixelRatio) ?? DEFAULT_DEVICE.pixelRatio,
+    orientation: declared.orientation || (height > width ? 'portrait' : 'landscape')
+  }
+}
 
 /**
  * Where the camera is looking. Session state, not renderer state.
@@ -71,7 +93,8 @@ export async function startWorld({
   projectDirectory = 'project',
   /** The browser mounts its shell and renderer here. Headless does nothing. */
   attachScreen = async () => {},
-  viewport = { ...DEFAULT_VIEWPORT },
+  /** A measured screen. Overrides the game's declared device when given. */
+  viewport: measuredViewport = null,
   view = { ...DEFAULT_VIEW }
 } = {}) {
   const bus = makeBus()
@@ -81,6 +104,14 @@ export async function startWorld({
   const world = makeWorld(bus)
   const loader = makeLoader(bus)
   const files = openFiles(bus)
+
+  // Read before anything is built: game.json names the screen the game is drawn
+  // for, which sets the viewport, and the plugins that are off, which must be
+  // off before any of them boots.
+  let game = {}
+  try { game = JSON.parse(await files.read('game.json')) } catch { /* optional */ }
+  const device = readDevice(game)
+  const viewport = measuredViewport || { width: device.width, height: device.height }
 
   const editor = {
     // The directory, which is a parameter; and the title, which the project's
@@ -110,7 +141,7 @@ export async function startWorld({
   }
 
   const context = {}
-  Object.assign(context, { world, files, bus, loader, editor, view, viewport })
+  Object.assign(context, { world, files, bus, loader, editor, view, viewport, device })
   editor.context = context
   // world.destroy runs onDestroy and needs a context to hand it. Without this the
   // hook received undefined, which nothing noticed because most onDestroy
@@ -378,14 +409,8 @@ export async function startWorld({
     loader.add(definition, cameFromBuiltin.get(definition) === true)
   }
 
-  // Which plugins are off, before any of them run. game.json used to be read
-  // after boot and the list applied by a plugin's own onLoad, so a "disabled"
-  // plugin still had its onLoad called — it had already subscribed, taken a
-  // context key and registered whatever it registers, and only then was marked
-  // off. Turning a plugin off has to mean it never ran, or it does not mean
-  // anything.
-  let game = {}
-  try { game = JSON.parse(await files.read('game.json')) } catch { /* optional */ }
+  // Turning a plugin off has to mean it never ran, so the list is applied
+  // before boot.
   for (const name of game.plugins?.disabled || []) loader.enable(name, false)
 
   loader.boot(context)
@@ -422,7 +447,7 @@ export async function startWorld({
   // here costs a headless world anything: there is no session to restore from.
   await carryWorldThroughReload({ world, loop, editor, view, bus, context, engine })
 
-  return { context, engine, world, loop, loader, bus, files, editor, view, viewport }
+  return { context, engine, world, loop, loader, bus, files, editor, view, viewport, device }
 }
 
 const round = n => Math.round(n * 1000) / 1000

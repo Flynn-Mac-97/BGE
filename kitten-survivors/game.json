@@ -1,9 +1,12 @@
 {
   "title": "Kitten Survivors",
   "startLevel": "meadow",
-  "window": {
-    "width": 1280,
-    "height": 720
+  "device": {
+    "comment": "The screen this game is drawn for and judged at. art/world/bible.md and art/interface/bible.md rule against a portrait phone with a 1080 px short edge, which is 540x960 at pixel ratio 2. The engine viewport and every see.capture read this.",
+    "width": 540,
+    "height": 960,
+    "pixelRatio": 2,
+    "orientation": "portrait"
   },
   "plugins": {
     "comment": "Mouse Look captures the pointer the moment play starts and rebinds the keys for a shooter. Nothing here is aimed with a mouse.",

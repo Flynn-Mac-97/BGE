@@ -28,6 +28,62 @@ import { ray } from './see/ray.js'
 let frameNumber = 0
 
 /**
+ * Which client this page is: `?client=<name>` for a lane, else the random
+ * session id the tab beacon wrote (`engine:tab-id`, set in vite.config.js).
+ * The frame counter runs per page, so a name is what keeps two lanes counting
+ * from one apart off the same path. Headless there is no page and no client.
+ */
+function clientName() {
+  if (typeof location === 'undefined') return null
+  const asked = new URLSearchParams(location.search).get('client')
+  const name = asked || readSessionValue('engine:tab-id')
+  return name ? String(name).replace(/[^a-z0-9_-]+/gi, '-') : null
+}
+
+function readSessionValue(key) {
+  try { return sessionStorage.getItem(key) } catch { return null }
+}
+
+/**
+ * Is a frame already written at this path? The dev server serves the checkout,
+ * so one HEAD answers it — and Vite answers a missing path with the editor's
+ * HTML, so the content type is the test and the status is not. A probe that
+ * cannot run answers no; refusing on a failed check would block a capture for
+ * nothing.
+ */
+async function frameWritten(path) {
+  if (typeof fetch !== 'function' || typeof location === 'undefined') return false
+  try {
+    const answer = await fetch('/' + encodeURI(path), { method: 'HEAD', cache: 'no-store' })
+    return (answer.headers.get('content-type') || '').startsWith('image/png')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A generated frame name no file on disk holds. `kind` separates the image
+ * verbs; the counter steps past what is written, so nothing is replaced.
+ */
+async function freeFrameName(context, kind) {
+  const stem = [context.editor.levelName, clientName(), kind].filter(Boolean).join('-')
+  let name = `${stem}-${++frameNumber}`
+  for (let tries = 0; tries < 50 && await frameWritten(`agent-runs/see/${name}.png`); tries++) {
+    name = `${stem}-${++frameNumber}`
+  }
+  return name
+}
+
+/**
+ * The screen the game declares in game.json, `[width, height]` in CSS pixels,
+ * or null. A game is designed for a screen; the window an agent has is not it.
+ */
+function declaredShape(context) {
+  const device = context.device
+  return device?.width > 0 && device?.height > 0 ? [device.width, device.height] : null
+}
+
+/**
  * Hide player-facing overlay objects for one draw. Anything a plugin marks
  * `userData.overlay = true` — damage numbers and their kin — is HUD in the
  * scene, not world, and `ui: false` leaves it out of the frame.
@@ -211,7 +267,7 @@ export default {
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
         return withSubject(context, options, async options => {
-        const name = options.name || `${context.editor.levelName}-sketch-${++frameNumber}`
+        const name = options.name || await freeFrameName(context, 'sketch')
         const description = describe(context, options)
         if (description.error) return description
         // An alone shot promises one thing in the frame, and none of it is not
@@ -339,7 +395,7 @@ export default {
           }
         }
         const sheet = composeSheet(cells, { columns: lenses.length })
-        const name = options.name || `${context.editor.levelName}-moment-${++frameNumber}`
+        const name = options.name || await freeFrameName(context, 'moment')
         return {
           __files: browserFiles(name, sheet.toDataURL('image/png').split(',')[1], moments),
           dataUrl: sheet.toDataURL('image/png'),
@@ -360,14 +416,22 @@ export default {
         return withSubject(context, options, async options => {
         let description = describe(context, options)
         if (description.error) return description
-        // A game is designed for a screen shape, and the window an agent has is
-        // not it. `size` states the shape to judge — [width, height] in pixels.
-        const sized = Array.isArray(options.size) && options.size.length === 2
-          ? options.size.map(Number)
+        // `size` states the shape to judge — [width, height] in pixels. With
+        // nothing stated the game's declared device decides it, so every frame
+        // of a game comes out at the screen its art is ruled against.
+        const stated = Array.isArray(options.size) && options.size.length === 2
+          ? options.size.map(Number).filter(side => Number.isFinite(side) && side > 0)
           : null
-        if (options.size && !sized) {
+        if (options.size && stated?.length !== 2) {
           return { error: `size is [width, height] in pixels, for example {"size":[540,960]}` }
         }
+        const sized = stated || declaredShape(context)
+        // The window's own shape, read before the frame size replaces it. The
+        // HUD is laid out for the window, so it can be composited honestly only
+        // when the frame is that shape.
+        const windowShape = context.renderer.size
+        const stretched = !!sized
+          && (sized[0] !== Math.round(windowShape.w) || sized[1] !== Math.round(windowShape.h))
 
         const view = context.view
         const kept = keepView(view)
@@ -550,9 +614,9 @@ export default {
           // the GL one, so a frame taken from GL alone shows a game with no
           // interface. They are stretched to the GL canvas because a layer is
           // sized in CSS pixels and the GL canvas in device pixels.
-          // A layer is laid out for the window, so at a stated size it can only
-          // be stretched. Left out unless the caller asked for it by name.
-          if (options.ui !== false && (!sized || options.ui === true)) {
+          // A layer is laid out for the window, so at any other shape it can
+          // only be stretched. Left out unless the caller asked for it by name.
+          if (options.ui !== false && (!stretched || options.ui === true)) {
             // A hidden tab runs no frames, so the layers hold whatever was
             // painted last. The world is drawn fresh above and is fine; the
             // interface would be a picture of an older screen.
@@ -668,6 +732,24 @@ export default {
           measuredFraction: Math.round(litSeen / Math.max(1, looked) * 100) / 100
         }
 
+        // Which screen this frame was taken at, so a set of frames can be
+        // checked for mixed shapes after the fact instead of trusting a reply
+        // nobody kept. `frame` is the PNG's own pixels; `pixelRatio` is what
+        // the canvas actually drew at, not what the game asked for.
+        const shape = sized || [Math.round(windowShape.w), Math.round(windowShape.h)]
+        description.profile = {
+          width: shape[0],
+          height: shape[1],
+          orientation: shape[1] > shape[0] ? 'portrait' : 'landscape',
+          from: stated ? 'the size given' : sized ? 'game.json device' : 'the window',
+          frame: [copy.width, copy.height],
+          // A studio frame is cropped to the drawn pixels, so its PNG is
+          // smaller than the screen it was drawn on and no ratio relates them.
+          ...(crop
+            ? { cropped: true }
+            : { pixelRatio: Math.round(copy.width / Math.max(1, shape[0]) * 100) / 100 })
+        }
+
         // Marks are hulls: each marked entity outlined in its TYPE's colour,
         // right on its own pixels — a numbered tag floats above the thing it
         // tags, where game text (damage numbers) also lives, and a reader
@@ -735,14 +817,20 @@ export default {
             + 'There is no description either — nothing here tells you what anything is, so read the picture.'
         }
 
-        const name = options.name || `${context.editor.levelName}-${++frameNumber}`
         // `file` names the whole path, `name` names one inside the run
         // directory. Both stay under agent-runs/, so a frame never lands in the
         // project or at the root.
-        const target = options.file ? String(options.file).replace(/^\.\//, '') : `agent-runs/see/${name}.png`
+        const callerNamed = Boolean(options.file || options.name)
+        const target = options.file
+          ? String(options.file).replace(/^\.\//, '')
+          : `agent-runs/see/${options.name || await freeFrameName(context, '')}.png`
         if (!target.startsWith('agent-runs/') || !target.endsWith('.png')) {
           throw new Error(`file must be a .png path under agent-runs/, not "${target}"`)
         }
+        // A generated path never replaces a frame — `freeFrameName` stepped
+        // past what is written. A path the caller stated is theirs to reuse,
+        // and the reply names what it replaced. No frame goes silently.
+        const replaced = callerNamed && await frameWritten(target) ? target : null
         const sidecarFile = target.replace(/\.png$/, '.json')
         const base64 = copy.toDataURL('image/png').split(',')[1]
         // The sidecar carries every binding the reply carries. A vision reader
@@ -761,12 +849,15 @@ export default {
           ...(crop
             ? { subject: subjectEntity.id, unmarked: description.unmarked }
             : { palette: description.palette }),
-          ...(sized
+          size: [copy.width, copy.height],
+          profile: description.profile,
+          ...(replaced ? { replaced } : {}),
+          ...(stretched
             ? {
-              size: [copy.width, copy.height],
               interface: options.ui === true
                 ? 'stretched from the window layout — judge the world here, the interface at window size'
-                : 'left out: a HUD is laid out for the window and can only be stretched to this size'
+                : 'left out: a HUD is laid out for the window and can only be stretched to this shape. '
+                  + 'Pass {"ui":true} to have it stretched in, or resize the window to this shape.'
             }
             : {}),
           counts: description.counts

@@ -62,6 +62,17 @@ servers   servers              every dev server this checkout started — port,
                                editor tabs attached to each, hidden ones named
           servers.stop [<port>]     stop that one, or all of them when no port
                                is given. Safe when nothing is running
+lanes     lanes                every headless browser started for a lane, each
+                               proved against its own debugging port
+          lanes.start <client> [--profile 540x960] [--debugPort N]
+                               start one and wait for its page. Refused when a
+                               browser of that name is already running, so a
+                               second start can never orphan the first
+          lanes.stop [<client>]     stop one, or all of them
+          clients              who is attached to this server, and which one an
+                               untargeted call would reach
+          lock                 whether lanes are working, and so whether anybody
+                               else may write
 debug     errors    log [n]    watch    eval '<js>'
 friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
                engine friction only — a game defect goes in your report, not here
@@ -92,8 +103,14 @@ Flags (--foo) collect into a trailing options object.
   --timeout MS   default 8000
   --raw          force one-line JSON      --pretty  force indented
                  (default: indented at a terminal, compact when captured)
+  --client NAME  which attached page answers. Required once two are attached
+  --verbose      name the answering client on stderr, and print error detail
 
 Exit 0 ok, 1 error, 2 no editor attached (open ${HOST}).
+
+Every reply says which client answered. With --client the name is printed on
+stderr, and an answer from any other client fails the call. stdout stays the
+op's plain JSON, so nothing parsing it has to change.
 
 index, tree, check and pain read the project straight off disk, so they answer
 with nothing running. Everything else drives a live editor unless --headless
@@ -103,6 +120,20 @@ servers and servers.stop need no editor either. They read what each dev server
 wrote down and then prove every line by asking the port, because a server killed
 outright leaves its record behind and a record alone is not evidence. A port
 answering for somebody else's checkout is named and never stopped for you.
+
+lanes proves every entry against its debugging port the same way. A lane browser
+has no window, so the registry is the only handle on one: one name is one
+browser, and lanes.start refuses a name a live browser holds rather than
+replacing the record. A record keeps windowAsked, the size Chrome was told, and
+viewportReported, what the page says — editor chrome makes them differ, so no
+single number is the frame size.
+
+While a lane works the checkout is locked. Every op that writes is refused with
+exit 1 and a reason naming the lanes; reads answer as usual. A lane's own render
+page is refused every file write whatever the lock says, because its world is
+its own and the checkout is shared. Which of the two you are is read from the
+lane registry, never from what the page reports about itself. Say \`lock\` to see
+the holders, \`lanes.stop\` to end a lane browser, \`agent.release\` to end a run.
 
 Agent commands also need nothing running. Small prepared tasks use this
 workspace; parallel writers get a git worktree and require a clean baseline.
@@ -127,7 +158,8 @@ and pain.list ranks by it. A vague number beats no number.
  * boolean — a general "the next word is the value" rule would swallow the
  * following argument and the failure would look like the flag doing nothing.
  */
-const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project', 'client'])
+const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project', 'client',
+                             'profile', 'debugPort'])
 
 const argv = process.argv.slice(2)
 const flags = {}
@@ -163,7 +195,7 @@ const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
                  'kind', 'where', 'fix', 'cost', 'reads', 'all',
                  'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked',
-                 'client', 'dry-run', 'dryRun']) delete options[k]
+                 'client', 'dry-run', 'dryRun', 'profile', 'debugPort']) delete options[k]
 
 let args = words.map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
@@ -201,7 +233,43 @@ async function call(op, args, ms = timeout) {
   if (body.code === 'no-client' || body.code === 'no-reply') die(2, body.error)
   if (body.code) die(1, body.error)
   if (!body.ok) die(1, body.error || 'unknown error', body.stack)
+  nameTheAnswerer(body.answeredBy)
   return body.result
+}
+
+/** One client on one line: enough to tell it from the others. */
+function describeAnswerer(who) {
+  const marks = [who.headless ? 'headless' : null, who.viewport || null, who.hidden ? 'hidden' : null]
+    .filter(Boolean).join(', ')
+  return marks ? `${who.id} (${marks})` : who.id
+}
+
+/**
+ * Say which client answered, and refuse an answer from one nobody asked for.
+ *
+ * The server sends `answeredBy` with every reply. It goes to stderr so stdout
+ * stays the op's plain JSON result, which is the shape callers parse.
+ *
+ * An untargeted call is refused by the server whenever two or more clients are
+ * attached, so a call carrying `--client` is exactly the case where more than
+ * one could have answered — that is when the name is printed without being
+ * asked for. `--verbose` prints it with one client attached too.
+ */
+let lastAnswerer = null
+function nameTheAnswerer(who) {
+  const asked = typeof flags.client === 'string' ? flags.client : null
+  if (asked && who?.id && who.id !== asked) {
+    die(1, `"${asked}" was named but "${who.id}" answered. No client may answer for another.`)
+  }
+  if (!asked && !flags.verbose) return
+  if (!who?.id) {
+    if (flags.verbose) process.stderr.write('[bridge] the server did not say which client answered\n')
+    return
+  }
+  // `watch` polls in a loop; say it once, and again only if somebody else answers.
+  if (who.id === lastAnswerer) return
+  lastAnswerer = who.id
+  process.stderr.write(`[bridge] answered by ${describeAnswerer(who)}\n`)
 }
 
 async function get(pathname) {
@@ -610,6 +678,23 @@ if (op === 'lock') {
 }
 
 /**
+ * What a lane's page says its own viewport is, asked of the dev server.
+ *
+ * The debugging port answers as soon as the browser is up, which is before the
+ * page has loaded and announced itself, so this polls for a few seconds. An
+ * empty answer means the page never said, and nothing is recorded.
+ */
+async function laneViewport(client, tries = 12) {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const answer = await fetch(`${host}/api/server`).then(reply => reply.json()).catch(() => null)
+    const tab = (answer?.tabs || []).find(entry => entry.id === client)
+    if (tab?.viewport) return { viewport: tab.viewport, pixelRatio: tab.pixelRatio }
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
+  return {}
+}
+
+/**
  * Headless browsers started to render for a lane.
  *
  * `lanes` lists them, each proved against its own debugging port. `lanes.start`
@@ -631,7 +716,11 @@ if (op === 'lanes' || op === 'lanes.start' || op === 'lanes.stop') {
     if (op === 'lanes.start') {
       const name = typeof args[0] === 'string' ? args[0] : null
       if (!name) die(1, 'usage: lanes.start <client> [--port N] [--profile 540x960]')
-      const [width, height] = String(flags.profile || '540x960').split('x').map(Number)
+      const asked = typeof flags.profile === 'string' ? flags.profile : '540x960'
+      const [width, height] = asked.split('x').map(Number)
+      if (!Number.isFinite(width) || !Number.isFinite(height)) {
+        die(1, `--profile takes WIDTHxHEIGHT, got ${JSON.stringify(flags.profile)}`)
+      }
       const started = await browsers.startLaneBrowser(CHECKOUT, {
         client: name,
         url: host + '/',
@@ -639,7 +728,13 @@ if (op === 'lanes' || op === 'lanes.start' || op === 'lanes.stop') {
         width, height
       })
       const { browser, ...said } = started
-      finish({ ...said, drive: `node bin/engine.mjs snapshot --client ${name}` })
+      // The window size is what Chrome was told; the frame is smaller by the
+      // editor chrome. Record the page's own number beside it, never instead.
+      const recorded = browsers.recordLaneViewport(CHECKOUT, name, await laneViewport(name)) || said
+      finish({
+        ...said, ...recorded,
+        drive: `node bin/engine.mjs snapshot --client ${name}`
+      })
     }
 
     if (op === 'lanes.stop') {

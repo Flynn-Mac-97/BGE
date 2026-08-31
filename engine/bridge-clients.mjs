@@ -6,14 +6,72 @@
  * the first reply makes the fastest page the answer, which is not the same as
  * the right one — a hidden tab answered a capture with a blank frame that way.
  * So a call names its client, and a call that cannot name one is refused with
- * the list rather than guessed at.
+ * the list rather than guessed at. Naming only works while one name means one
+ * page, so mergeClient refuses a second page claiming a name already in use.
  */
 
 /** Whether a page's socket is still open. */
 export const isLive = entry => entry?.client?.socket?.readyState === 1
 
-/** A client as a caller sees it: everything except the socket. */
-export const publicClient = ({ client, ...rest }) => rest
+/**
+ * A client as a caller sees it.
+ *
+ * The socket and the nonce stay on the server. A caller that could read the
+ * nonce could send it back and take the name it belongs to.
+ */
+export const publicClient = ({ client, nonce, ...rest }) => rest
+
+/** The same page, proven by a value only that page holds. */
+const samePage = (entry, nonce) => Boolean(nonce) && entry.nonce === nonce
+
+/**
+ * The stored entry, built from what the page said. Only the server knows
+ * `project` and `serves`, so the caller sets its own — in `said` or on the
+ * stored entry — and never leaves the page's values standing.
+ */
+const clientEntry = (client, said, { name, nonce, since }) => ({
+  client,
+  id: name,
+  nonce,
+  url: String(said?.url || ''),
+  title: String(said?.title || ''),
+  project: String(said?.project || ''),
+  serves: String(said?.serves || ''),
+  hidden: said?.hidden === true,
+  viewport: String(said?.viewport || ''),
+  pixelRatio: Number(said?.pixelRatio) || 1,
+  headless: said?.headless === true,
+  since,
+  lastSaid: new Date().toISOString()
+})
+
+/**
+ * Store what a page announced about itself.
+ *
+ * `clients` is keyed by socket. Returns `{ ok: true }`, or
+ * `{ error: 'name-taken', existing }` and stores nothing.
+ *
+ * A name is how a caller targets one page, so two pages cannot hold one name.
+ * The second page is refused and the first keeps both the name and its calls.
+ * `said.nonce` is the page's own value and survives reload, so it separates one
+ * page reconnecting from a different page claiming the same name. A name whose
+ * page has gone is free again.
+ */
+export function mergeClient(clients, socket, client, said) {
+  const name = String(said?.id || 'unnamed')
+  const nonce = said?.nonce ? String(said.nonce) : ''
+  const [rivalSocket, held] =
+    [...clients].find(([key, entry]) => key !== socket && entry.id === name) || []
+  if (held) {
+    if (isLive(held) && !samePage(held, nonce)) return { error: 'name-taken', existing: held }
+    // A reconnect announces on a new socket before the old one closes. One page
+    // holds one entry, or every call to it is ambiguous.
+    clients.delete(rivalSocket)
+  }
+  const since = clients.get(socket)?.since || held?.since || new Date().toISOString()
+  clients.set(socket, clientEntry(client, said, { name, nonce, since }))
+  return { ok: true }
+}
 
 /**
  * Pick the client for a call.
@@ -29,7 +87,9 @@ export function chooseClient(entries, wanted) {
   }
   const named = live.filter(entry => entry.id === wanted)
   if (!named.length) return { error: 'unknown-client', live }
-  // Two pages can claim one name: `?client=` is whatever the opener asked for.
+  // mergeClient refuses a second page claiming a live name, so two live entries
+  // under one name mean an entry was stored some other way. Neither is the
+  // right answer, so refuse and list them.
   if (named.length > 1) return { error: 'ambiguous-client', live: named }
   return { chosen: named[0] }
 }
@@ -58,6 +118,10 @@ export function explainClientError(error, { wanted, live, where, timeout, chosen
   }
   if (error === 'ambiguous-client') {
     return `more than one client calls itself "${wanted}":\n  ${named}`
+  }
+  if (error === 'name-taken') {
+    return `"${wanted}" is already attached and answering:\n  ${named}\n` +
+      `Open this page under another name with ?client=<id>.`
   }
   if (error === 'many-clients') {
     return `${live.length} clients are attached and none was named, so this call has no one answer. ` +

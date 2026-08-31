@@ -17,7 +17,7 @@ Depth 1 everywhere. One file per thing.
 
 ```
 project/
-  game.json          entry point
+  game.json          entry point: title, startLevel, device, plugins off
   types/             coin.js  player.js  bat.js       what things ARE and DO
   behaviours/        float.js  spin.js  patrol.js     one trait, shared by any type
   levels/            level1.json                      where things are placed
@@ -27,6 +27,17 @@ project/
   agents/            game instructions and skill settings
   .engine/index.json generated; the editor's copy, plus index.agent.json for agents
 ```
+
+`game.json` names the screen the game is drawn for, once:
+
+```json
+{ "device": { "width": 540, "height": 960, "pixelRatio": 2, "orientation": "portrait" } }
+```
+
+The viewport every camera clamps against comes from it, and so does the shape
+`see.capture` draws at — so a set of frames is one shape and can be compared. A
+measured browser window overrides it. A game that declares no device gets
+1280x720 landscape.
 
 ## Agent workspace
 
@@ -486,6 +497,21 @@ anything `spawn` or `simulate` does.
 **Shared, because it is on disk:** `project/`. So `set` and `save` are *not*
 isolated — give a writer its own git worktree, or keep writers to one lane.
 **Not possible:** drawing. There is no canvas, so no screenshot and no `pick`.
+
+For a frame, a lane gets its own headless browser instead of sharing the
+person's: `lanes.start <name>` opens one at a stated window size, `lanes` lists
+them and `lanes.stop` ends them. Each is one record in the lane registry, and
+one name is one browser — a start is refused while a browser of that name is
+running rather than orphaning it.
+
+While any lane works the shared checkout is locked. Every writing op is refused
+with a reason naming the lanes; reads answer as usual; a lane's own render page
+is refused every file write whatever the lock says. `node bin/engine.mjs lock`
+says who holds it. Details in [docs/surfaces.md](docs/surfaces.md).
+
+With more than one page attached, a call must name the one it is for:
+`--client <id>`. An untargeted call is refused with the list, and every reply
+says which page answered.
 
 `index`, `tree`, `check` and `pain` need nothing running either — they read the
 project straight off disk, so `check` still works when the dev server is the

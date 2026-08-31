@@ -207,13 +207,43 @@ when a test needs a known backdrop), `between` (two ids — distance, touching, 
 facing), `ui: false` (hide everything player-facing — the HUD, any game screen,
 damage numbers, anything marked `userData.overlay` — when the question is the
 world; leave it on to judge the interface, which is drawn over the frame and is
-in it by default), `size` (`[width, height]` in pixels — draw at the shape the
-game is designed for instead of the window's; the HUD is laid out for the window
-so it is left out unless `ui: true` asks for it stretched, and the window's own
-size is put back after), `marks` (`"tags"` for the old numbered stamps, `false` for none), `name`
+in it by default), `size` (`[width, height]` in pixels — override the shape for
+one frame; the window's own size is put back after), `marks` (`"tags"` for the
+old numbered stamps, `false` for none), `name`
 (writes `agent-runs/see/<name>.png`), `file` (the whole path, which must end
 `.png` and stay under `agent-runs/`; the sidecar takes the same path with a
 `.json` ending).
+
+## The shape a frame comes out at
+
+A game declares the screen it is drawn for once, as `device` in `game.json`:
+`{ "device": { "width": 540, "height": 960, "pixelRatio": 2, "orientation":
+"portrait" } }`. `see.capture` draws at that shape with nothing asked for, so
+every frame of one game is the same shape and a set can be compared. A game that
+declares no device gets the window. `size` overrides both for one call.
+
+Every capture reply and sidecar carries `profile`: `width`, `height`,
+`orientation`, `from` (`game.json device` | `the size given` | `the window`),
+`frame` — the PNG's own pixels — and the measured `pixelRatio`. Check a frame's
+shape against `profile`, not against a reply nobody kept. A studio crop is
+smaller than the screen it was drawn on, so it reports `cropped: true` instead
+of a ratio.
+
+The PNG is the profile multiplied by the page's device pixel ratio. A lane
+browser is started at ratio 1, so a lane's frame is exactly the profile; a
+HiDPI tab writes the same profile at twice the pixels. `profile.frame` and
+`profile.pixelRatio` say which you have, so compare frames on `profile`, never
+on file dimensions.
+
+The HUD is laid out for the WINDOW. Whenever the frame shape differs from the
+window's it is left out and the reply's `interface` field says so; `{"ui":true}`
+puts it in, stretched. A declared portrait profile on a landscape editor window
+therefore captures the world alone by default.
+
+A generated frame name carries the page's client name — `meadow-alpha-1.png`,
+`meadow-bravo-1.png` — so two lanes capturing at once never write one path, and
+the counter steps past frames already on disk. A path given as `name` or `file`
+is yours to reuse; the reply carries `replaced: <path>` when it overwrote one.
 
 `see.capture` needs the dev server. Under `--headless` there is no renderer and
 it says so.
@@ -309,8 +339,8 @@ A question whose answer is stuck returns no information at all.
 ## Limits
 
 - `coverage` sums boxes before overlap — comparison, not screen share.
-- `see.capture` answers from whichever attached tab replies first — keep
-  one editor tab open; frame size is that tab's canvas size.
+- `see.capture` answers from the tab the call names. With two pages attached,
+  name one with `--client <id>`; an untargeted call is refused with the list.
 - Queries compute from entity bounds — no lighting, material, animation or
   texture truth. Those need `capture`.
 - HUD and screens are words already: `hud.read`, `screen.read`.

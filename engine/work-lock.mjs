@@ -1,14 +1,17 @@
 /**
  * Whether agents are working, and so whether anybody else may write.
  *
- * Two writers in one checkout is the failure this prevents: a person editing
- * the level a lane is building, or a lane's own render page saving the level
- * back to disk. Both were possible, and both are silent until the file is
- * already wrong.
+ * Two writers in one checkout overwrite each other: a person editing the level
+ * a lane is building, or a lane's render page saving the level back to disk.
  *
  * The lock is derived, never stored: an active run in the agent registry, or a
- * recorded lane browser. Nothing has to remember to unlock, because there is
- * no lock to forget.
+ * lane browser whose process is still alive. Nothing has to remember to unlock,
+ * because there is no lock to forget.
+ *
+ * This module decides; it does not enforce. `vite.config.js` consults `permits`
+ * at three doors: `POST /api/engine`, `POST /api/file` and
+ * `POST /api/agent-file`. A route that reaches disk without asking is not
+ * covered by anything here.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -24,15 +27,6 @@ export const WRITING_OPS = new Set([
   'edit.duplicate', 'history.undo', 'history.redo', 'history.jump', 'history.clear'
 ])
 
-/**
- * Ops a lane's own render page still needs.
- *
- * A lane drives its own page to play a run and take a frame, so those are not
- * writes as far as it is concerned — its world is its own. What it must never
- * do is put anything on disk in the shared checkout.
- */
-export const LANE_MAY = new Set(['play', 'stop', 'simulate', 'seed', 'select'])
-
 /** Ops that write a file, whoever asks. */
 export const WRITES_A_FILE = new Set([
   'saveLevel', 'new.file', 'code.save', 'set', 'spawn', 'destroy',
@@ -47,34 +41,105 @@ export const WRITES_A_FILE = new Set([
  */
 const COORDINATION = 'project/.engine'
 
+/**
+ * Whether a process id still exists.
+ *
+ * Synchronous, because every caller of this module is: the CLI answers "may I
+ * edit this" with no server up, and the server asks on every request. A port
+ * probe would make all of them async.
+ *
+ * EPERM means a process with that id exists and belongs to somebody else. A
+ * reused id reads as alive, which can only hold the lock longer than it should;
+ * `lanes` proves a browser properly by asking its debugging port.
+ */
+function processAlive(pid) {
+  const id = Number(pid)
+  if (!Number.isInteger(id) || id <= 0) return false
+  try {
+    process.kill(id, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+/** Lane browser records split by whether their process still exists. */
+function proveLaneBrowsers(browsers) {
+  const live = []
+  const stale = []
+  for (const entry of browsers) {
+    if (processAlive(entry.pid)) live.push(entry)
+    else stale.push(entry)
+  }
+  return { live, stale }
+}
+
+const staleSentence = stale => {
+  if (!stale.length) return ''
+  const one = stale.length === 1
+  return `Stale lane browser record${one ? '' : 's'}, process gone: ` +
+    `${stale.map(entry => entry.id).join(', ')}. Run lanes.stop to clear ${one ? 'it' : 'them'}.`
+}
+
 export function workLock(root) {
   const engineDirectory = path.join(root, COORDINATION)
   const runs = readJson(path.join(engineDirectory, 'agents.json'))?.runs || []
   const browsers = readJson(path.join(engineDirectory, 'lane-browsers.json'))?.browsers || []
+  const { live, stale } = proveLaneBrowsers(browsers)
 
+  // An agent run records no process id, so there is nothing to prove it
+  // against; it ends with agent.release.
   const working = runs.filter(run => run.status === 'active')
   const holders = [
     ...working.map(run => ({ kind: 'run', id: run.id, files: run.files || [], since: run.startedAt })),
-    ...browsers.map(entry => ({ kind: 'browser', id: entry.client, port: entry.port, since: entry.startedAt }))
+    ...live.map(entry => ({ kind: 'browser', id: entry.client, pid: entry.pid, port: entry.port, since: entry.startedAt }))
   ]
+  const staleRecords = stale.map(entry => ({
+    kind: 'browser',
+    id: entry.client,
+    pid: entry.pid ?? null,
+    port: entry.port,
+    why: `process ${entry.pid ?? 'unrecorded'} is gone`
+  }))
+  const note = staleSentence(staleRecords)
 
-  if (!holders.length) return { locked: false, holders: [] }
+  if (!holders.length) return { locked: false, holders: [], stale: staleRecords, ...(note ? { note } : {}) }
   const names = [...new Set(holders.map(holder => holder.id))]
   return {
     locked: true,
     holders,
+    stale: staleRecords,
     why: `${names.length === 1 ? 'a lane is' : `${names.length} lanes are`} working: ${names.join(', ')}. ` +
       `Editing here would change files they are building against. ` +
-      `They release with agent.release, and lanes.stop ends a lane browser.`
+      `They release with agent.release, and lanes.stop ends a lane browser.` +
+      (note ? ` ${note}` : '')
   }
+}
+
+/**
+ * Whether a client is a lane's render page or the person's editor.
+ *
+ * Read from the lane browser registry: the server started those browsers and
+ * chose their names, so the caller cannot write this answer. What a page says
+ * about itself — `navigator.webdriver`, the user agent — is set by whoever
+ * launched it and decides nothing.
+ *
+ * A name with no live record is the person, so an unrecognised caller obeys the
+ * work lock. Every real lane has a live record, and a live record holds the
+ * lock, so this fallback exempts nobody by mistake.
+ */
+export function roleOfClient(root, clientId) {
+  if (!clientId) return 'person'
+  const browsers = readJson(path.join(root, COORDINATION, 'lane-browsers.json'))?.browsers || []
+  const record = browsers.find(entry => entry.client === clientId)
+  return record && processAlive(record.pid) ? 'lane' : 'person'
 }
 
 /**
  * Whether one op may run, for one caller.
  *
- * `role` is 'person' for the editor somebody is looking at, and 'lane' for a
- * render page a lane drives. A lane may play and capture in its own page and
- * may never write a file.
+ * `role` comes from `roleOfClient`, never from the caller. A lane may play and
+ * capture in its own page and may never write a file through this door.
  */
 export function permits(lock, op, role = 'person') {
   if (role === 'lane') {

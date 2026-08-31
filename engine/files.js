@@ -7,8 +7,21 @@
  * The four things it does — index, tree, read, write — are handed in as a
  * transport, because the browser reaches disk over HTTP and node reaches it
  * directly. Everything above this line stays the same either way: the counting
- * of pending writes, the events, and the refusal to have a save button.
+ * of pending writes, the events, the guards asked before every write, and the
+ * refusal to have a save button.
  */
+
+/**
+ * The name this page announced to the server, sent with every write.
+ *
+ * The server decides what a client may do from its own lane registry, and needs
+ * a name to look one up. Written by the tab beacon in `vite.config.js` under
+ * this key; a page that stored nothing sends nothing and is treated as the
+ * person's editor.
+ */
+const clientName = () => {
+  try { return globalThis.sessionStorage?.getItem('engine:tab-id') || '' } catch { return '' }
+}
 
 /** Talk to the dev server. The transport the editor uses. */
 export function overHTTP() {
@@ -19,6 +32,8 @@ export function overHTTP() {
     return body
   }
 
+  const writeHeaders = () => ({ 'content-type': 'application/json', 'x-engine-client': clientName() })
+
   return {
     index: () => j('/api/index'),
     tree: () => j('/api/tree'),
@@ -27,15 +42,31 @@ export function overHTTP() {
     readAgent: async (scope, path) => (await j('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
     write: (path, text) => j('/api/file', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: writeHeaders(),
       body: JSON.stringify({ path, text })
     }),
     writeAgent: (scope, path, text) => j('/api/agent-file', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: writeHeaders(),
       body: JSON.stringify({ scope, path, text })
     })
   }
+}
+
+/**
+ * A page a lane opened to render in never writes the shared checkout.
+ *
+ * `__engineViewer` is set by the tab beacon before the editor boots, and holds
+ * the lane's name. This is the kernel's own guard, not a plugin's: it states
+ * who the page is rather than a project policy, so nothing removes it. Every
+ * write reaches disk through this module, so this one check covers the editor,
+ * every plugin, and anything typed into the console.
+ */
+const laneRenderPageGuard = () => {
+  const lane = globalThis.__engineViewer
+  if (!lane) return null
+  const who = typeof lane === 'string' ? `lane "${lane}"` : 'a lane'
+  return `this page renders for ${who}, and a lane render page never writes the shared checkout`
 }
 
 export function makeFiles(bus, transport = overHTTP()) {
@@ -44,17 +75,16 @@ export function makeFiles(bus, transport = overHTTP()) {
   /**
    * Asked before every write, and any one of them may refuse it.
    *
-   * The kernel performs the write, so only the kernel can stop one — but the
-   * kernel has no business holding a policy about who may write what. A guard
-   * returns a reason to refuse, or nothing to allow, and the policy lives in
-   * whatever plugin registered it. Turn that plugin off and writes are open
-   * again, which is the point: a guard nobody can disable is a guard people
-   * route around.
+   * The kernel performs the write, so only the kernel can stop one. Beyond its
+   * own guard above it holds no policy about who may write what: a guard
+   * returns a reason to refuse, or nothing to allow, and a plugin's policy goes
+   * off with the plugin. A guard nobody can disable is a guard people route
+   * around.
    *
    * A guard that throws is treated as a refusal with its message, because a
    * broken guard must not silently become permission.
    */
-  const guards = new Set()
+  const guards = new Set([laneRenderPageGuard])
   const refusal = (path, scope) => {
     for (const guard of guards) {
       let why

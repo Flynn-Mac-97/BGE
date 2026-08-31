@@ -6,8 +6,8 @@ import path from 'node:path'
 // same code. Two implementations of "what is in this project" would drift.
 import { buildIndex as buildProjectIndex, problemsIn, fatal, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
 import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
-import { chooseClient, explainClientError, isLive, publicClient } from './engine/bridge-clients.mjs'
-import { workLock, permits } from './engine/work-lock.mjs'
+import { chooseClient, describeClient, explainClientError, isLive, mergeClient, publicClient } from './engine/bridge-clients.mjs'
+import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
 
 const ROOT = process.cwd()
 
@@ -107,6 +107,31 @@ function safeAgent(scope, rel) {
   return abs.startsWith(base + path.sep) ? abs : null
 }
 
+/**
+ * The op name the file routes are judged as.
+ *
+ * `POST /api/file` and `POST /api/agent-file` do one thing — put text at a
+ * path — and that is `code.save`. Work Lock answers per op, so the routes have
+ * to name one of the ops it knows writes a file.
+ */
+const FILE_ROUTE_OP = 'code.save'
+
+/**
+ * Whether a file-route write is refused, and why.
+ *
+ * These routes are the transport under `files.write`, so a lock on
+ * `/api/engine` alone leaves every write from a page or a terminal open. The
+ * caller's role comes from the lane registry, never from what it claims to be:
+ * `engine/files.js` sends the page's announced name in `x-engine-client`, and a
+ * request with no name is judged as the person.
+ */
+const refusedFileWrite = request => {
+  const lock = workLock(ROOT)
+  const role = roleOfClient(ROOT, String(request.headers['x-engine-client'] || ''))
+  const { allowed, why } = permits(lock, FILE_ROUTE_OP, role)
+  return allowed ? null : { ok: false, code: 'held', error: why, lock, serves: ROOT }
+}
+
 /** One project, one index. Rebuilt on every write, never cached. */
 const buildIndex = () => buildProjectIndex(PROJECT)
 
@@ -196,6 +221,8 @@ function api() {
           }
 
           if (url.pathname === '/api/file' && req.method === 'POST') {
+            const refused = refusedFileWrite(req)
+            if (refused) return send(res, 423, refused)
             const { path: rel, text } = await readBody(req)
             const abs = safe(rel || '')
             if (!abs) return send(res, 400, { error: 'path outside project' })
@@ -213,6 +240,8 @@ function api() {
           }
 
           if (url.pathname === '/api/agent-file' && req.method === 'POST') {
+            const refused = refusedFileWrite(req)
+            if (refused) return send(res, 423, refused)
             const { scope, path: rel, text } = await readBody(req)
             const abs = safeAgent(scope, rel)
             if (!abs) return send(res, 400, { error: 'bad agent file path' })
@@ -375,10 +404,12 @@ function bridge() {
         }
 
         // A lane's render page may drive its own world and may never write a
-        // file; the person's editor may not write while a lane is working. Held
-        // here because this is the one door every call comes through.
+        // file; the person's editor may not write while a lane is working. The
+        // file routes hold the same rule, because a write reaches disk through
+        // them as well. The role comes from the lane registry, so a page cannot
+        // claim its way out of it.
         const lock = workLock(ROOT)
-        const { allowed, why: held } = permits(lock, op, chosen.headless ? 'lane' : 'person')
+        const { allowed, why: held } = permits(lock, op, roleOfClient(ROOT, chosen.id))
         if (!allowed) {
           return send(res, 423, {
             ok: false, code: 'held', error: held, lock, serves: ROOT
@@ -440,6 +471,7 @@ const TAB_BEACON_SOURCE = `
 const hot = import.meta.hot
 if (hot) {
   const key = 'engine:tab-id'
+  const nonceKey = 'engine:tab-nonce'
   // A page opened as ?client=<name> keeps that name, so a lane can target its
   // own headless page by a name it chose instead of a value it must first go
   // and read. Anything else keeps a random name for the length of the session.
@@ -447,12 +479,22 @@ if (hot) {
   let id = asked || sessionStorage.getItem(key)
   if (!id) { id = Math.random().toString(36).slice(2, 10) }
   sessionStorage.setItem(key, id)
+  // Two pages can claim one name, because ?client= is whatever the opener
+  // asked for. The nonce belongs to this page and survives its own reload, so
+  // the server can tell a page reconnecting from a second page taking its name.
+  let nonce = sessionStorage.getItem(nonceKey)
+  if (!nonce) {
+    nonce = Math.random().toString(36).slice(2, 10)
+    sessionStorage.setItem(nonceKey, nonce)
+  }
   // A page opened under a name is one a lane renders in. Its world is its own;
-  // the checkout is shared, so it never writes a file. Set before the editor
+  // the checkout is shared, so it never writes a file. The name is kept, not a
+  // flag, so a refused write says which lane asked. Set before the editor
   // boots, because the first thing a level load can do is save.
-  if (asked) globalThis.__engineViewer = true
+  if (asked) globalThis.__engineViewer = id
   const announce = () => hot.send('engine:tab', {
     id,
+    nonce,
     url: location.href,
     title: document.title,
     hidden: document.hidden,
@@ -486,31 +528,19 @@ function serverRegistry() {
 
     configureServer(server) {
       // Keyed by the raw socket, so a tab that closes takes its entry with it.
+      // Whether an announcement is a reconnect or a second page claiming a live
+      // page's name is decided by `mergeClient`, from the nonce the beacon
+      // sends; this server holds the list and nothing more.
       server.ws.on('engine:tab', (said, client) => {
         const socket = client.socket
-        const known = clients.get(socket)
-        // A page that reconnects announces on a new socket while the old one is
-        // still open, which would leave two live entries for one page and make
-        // every call to it ambiguous. An id names a page, so the newest
-        // announcement replaces any earlier entry claiming that name.
-        const name = String(said?.id || 'unnamed')
-        for (const [key, entry] of clients) {
-          if (key !== socket && entry.id === name) clients.delete(key)
+        // Which checkout and project this is comes from the server, last, so a
+        // page cannot report a project it is not being served.
+        const merged = mergeClient(clients, socket, client,
+          { ...said, project: PROJECT_DIRECTORY, serves: ROOT })
+        if (merged.error) {
+          console.warn(`[engine] tab "${said?.id}" refused — ${merged.error}: ${describeClient(merged.existing)} holds that name`)
+          return
         }
-        clients.set(socket, {
-          client,
-          id: name,
-          url: String(said?.url || ''),
-          title: String(said?.title || ''),
-          project: PROJECT_DIRECTORY,
-          serves: ROOT,
-          hidden: said?.hidden === true,
-          viewport: String(said?.viewport || ''),
-          pixelRatio: Number(said?.pixelRatio) || 1,
-          headless: said?.headless === true,
-          since: known?.since || new Date().toISOString(),
-          lastSaid: new Date().toISOString()
-        })
         socket.once?.('close', () => clients.delete(socket))
       })
 
