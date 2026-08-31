@@ -64,6 +64,12 @@ const sameLook = (a, b, key) => {
  * the box. de_dust2 came out at 3,300 lines where 1,300 would do, and every read
  * of that file paid the difference. `properties` has always merged; this is the
  * same rule applied to the other thing a placement customises.
+ *
+ * `tint` is the key this surprises people on. A tint MULTIPLIES the texture
+ * rather than standing in for one, so a tint on the TYPE is not a fallback: it
+ * colours every textured placement that did not state its own, and the level
+ * file says nothing about it. `check` reports that pair — see `tintProblems` in
+ * engine/project-index.mjs.
  */
 const mergeLook = (base, over, key) => {
   const a = expand(base, key)

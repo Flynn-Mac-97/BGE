@@ -16,6 +16,23 @@ const STEP = 1 / 60
 const MAX_CATCHUP = 5
 const DEFAULT_SEED = 1
 
+/**
+ * Wall milliseconds a tick rate is measured over. Long enough that one slow
+ * frame is not a verdict, short enough to catch a tab being hidden mid-run.
+ */
+const RATE_WINDOW = 1000
+
+/**
+ * Engine seconds per wall second below which the run is reported as slow.
+ *
+ * Half speed is not a hitch. Every position, count and timing read while the
+ * loop is under this is of a game that has barely moved.
+ */
+const SLOW = 0.5
+
+/** Wall milliseconds between repeats of the slow-loop report. */
+const REPORT_EVERY = 10_000
+
 /** Separates the drawing stream from the simulation's at the same seed. */
 const DRAWING_OFFSET = 0x9e3779b9
 
@@ -136,6 +153,87 @@ export function makeLoop({ onFixed, onFrame, onError }) {
    */
   const holds = new Set()
 
+  /**
+   * What is driving the frames, and how fast the run is really going.
+   *
+   * A hidden tab gets no animation frames, so the loop falls back to a timer the
+   * browser clamps to roughly one tick a second. MAX_CATCHUP plus `acc = 0` then
+   * turn that low tick rate into slow motion rather than dropped frames, and
+   * every other number the engine reports — the clock, entity positions,
+   * renderer stats — stays healthy while the game runs at a twentieth of real
+   * speed. Nothing else measures this, so it is measured here.
+   */
+  let driver = 'stopped'
+  let windowStart = 0
+  let windowTicks = 0
+  let windowFixed = 0
+  let measured = null
+  let startedWall = 0
+  let startedFixed = 0
+  let reportedAt = -Infinity
+
+  const openWindow = now => { windowStart = now; windowTicks = 0; windowFixed = fixed }
+
+  /**
+   * Baseline the rate measurement against the clock as it is now.
+   *
+   * Called wherever the clock is set rather than advanced. Without it, `reset`
+   * would put the clock back to zero while the baseline stayed where it was, and
+   * the loop would report itself hours behind a wall clock it had never run
+   * against.
+   */
+  function restartMeasuring(now = performance.now()) {
+    startedWall = now
+    startedFixed = fixed
+    measured = null
+    reportedAt = -Infinity
+    openWindow(now)
+  }
+
+  /** Wall seconds the engine clock has lost since play started. */
+  const behindBy = () =>
+    running ? Math.max(0, (performance.now() - startedWall) / 1000 - (fixed - startedFixed)) : 0
+
+  /**
+   * Ticks and engine seconds per wall second.
+   *
+   * The window still open wins once it has run longer than a full window: a
+   * driver that has stopped firing altogether closes no window, and the last
+   * closed one would go on reporting the speed the game used to run at. Null
+   * before there is anything to divide by.
+   */
+  function measure() {
+    const openSeconds = (performance.now() - windowStart) / 1000
+    const sample = openSeconds * 1000 >= RATE_WINDOW
+      ? { seconds: openSeconds, ticks: windowTicks, advanced: fixed - windowFixed }
+      : measured
+    if (!sample || sample.seconds <= 0) return null
+    return {
+      ticksPerSecond: round(sample.ticks / sample.seconds),
+      gameSpeed: round(sample.advanced / sample.seconds)
+    }
+  }
+
+  /** One sentence naming the driver, the rate, and what it costs the reader. */
+  const slowSentence = rate =>
+    `[loop] the game is running at ${rate.gameSpeed}x real time — driver ${driver} is delivering ` +
+    `${rate.ticksPerSecond} ticks a second, and the clock is ${round(behindBy())}s behind the wall ` +
+    `clock. Every reading taken while this holds is of a game that has barely moved.`
+
+  /**
+   * Say it once, then no more often than REPORT_EVERY while it holds.
+   *
+   * Through `console.error` because that is the channel `snapshot().errors`
+   * reads, and a loop this slow makes every other number in the snapshot wrong.
+   */
+  function reportIfSlow(now) {
+    const rate = measure()
+    if (!rate || rate.gameSpeed >= SLOW) { reportedAt = -Infinity; return }
+    if (now - reportedAt < REPORT_EVERY) return
+    reportedAt = now
+    console.error(slowSentence(rate))
+  }
+
   function runTimers() {
     if (!timers.length) return
     // Snapshot first: a callback may add or cancel timers, and mutating the
@@ -177,9 +275,16 @@ export function makeLoop({ onFixed, onFrame, onError }) {
     if (canAnimate) cancelAnimationFrame(raf)
     clearInterval(timer)
     timer = 0
-    if (!running) return
-    if (onScreen()) raf = requestAnimationFrame(tick)
-    else timer = setInterval(() => tick(performance.now()), 16)
+    if (!running) { driver = 'stopped'; return }
+    if (onScreen()) {
+      driver = 'requestAnimationFrame'
+      raf = requestAnimationFrame(tick)
+    } else {
+      // Named for the cause. "The tab is hidden" is the one fact an agent cannot
+      // see, and every symptom of it points at the renderer instead.
+      driver = canAnimate ? 'setInterval (tab hidden)' : 'setInterval (no animation frames)'
+      timer = setInterval(() => tick(performance.now()), 16)
+    }
   }
 
   // Switching tabs mid-play swaps drivers rather than stalling.
@@ -190,6 +295,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
   function tick(now) {
     if (!running) return
     if (onScreen()) raf = requestAnimationFrame(tick)
+    windowTicks++
 
     const seconds = Math.min((now - last) / 1000, 0.25)
     last = now
@@ -207,6 +313,12 @@ export function makeLoop({ onFixed, onFrame, onError }) {
     if (catchup === MAX_CATCHUP) acc = 0
 
     onFrame(seconds, fixed)
+
+    if (now - windowStart >= RATE_WINDOW) {
+      measured = { seconds: (now - windowStart) / 1000, ticks: windowTicks, advanced: fixed - windowFixed }
+      openWindow(now)
+      reportIfSlow(now)
+    }
   }
 
   return {
@@ -234,24 +346,47 @@ export function makeLoop({ onFixed, onFrame, onError }) {
     get holds() { return [...holds] },
 
     /**
+     * What is driving the frames and how fast the run is really going.
+     *
+     * `gameSpeed` is engine seconds per wall second, so 1 is real time and 0.05
+     * is the hidden-tab case. `warning` is present only when the run is under
+     * SLOW; the same sentence goes to `console.error`, which puts it in
+     * `snapshot().errors`.
+     *
+     * The rate fields are absent until a window has closed, and while stopped,
+     * because a made-up zero reads as a stalled game.
+     */
+    get state() {
+      if (!running) return { driver: 'stopped' }
+      const rate = measure()
+      const out = { driver, ...(rate || {}), behindSeconds: round(behindBy()) }
+      if (rate && rate.gameSpeed < SLOW) out.warning = slowSentence(rate)
+      return out
+    },
+
+    /**
      * Start playing.
      *
      * A hidden tab gets no animation frames, so play mode would report itself
      * as running while nothing moved — the most confusing possible state to
      * hand an agent. A timer takes over when the tab is not visible. Browsers
-     * clamp background timers to about a second, so it is slow rather than
-     * smooth; the deterministic answer for headless work is still `step()`.
+     * clamp background timers to about a second, and MAX_CATCHUP turns that into
+     * slow motion rather than dropped frames, so read `state` for the driver and
+     * the measured speed. The deterministic answer for headless work is still
+     * `step()`.
      */
     start() {
       if (running) return
       running = true
       last = performance.now()
       acc = 0
+      restartMeasuring(last)
       schedule()
     },
 
     stop() {
       running = false
+      driver = 'stopped'
       if (canAnimate) cancelAnimationFrame(raf)
       clearInterval(timer)
       timer = 0
@@ -274,6 +409,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
       holds.clear()
       random.reset(seed)
       drawing.reset((seed ?? random.seed) ^ DRAWING_OFFSET)
+      restartMeasuring()
     },
 
     /**
@@ -301,6 +437,7 @@ export function makeLoop({ onFixed, onFrame, onError }) {
       acc = 0
       for (const t of timers) { t.start += shift; t.at += shift }
       random.resume(seed ?? random.seed, draws)
+      restartMeasuring()
       return { time: fixed, steps, seed: random.seed, draws: random.draws }
     },
 

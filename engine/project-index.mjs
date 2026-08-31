@@ -224,6 +224,9 @@ export async function buildIndex(projectDirectory) {
           if (Array.isArray(loaded.mesh?.box)) entry.meshBox = loaded.mesh.box
           if (Array.isArray(loaded.collider?.box)) entry.colliderBox = loaded.collider.box
         }
+        // A tint on a type multiplies into every textured placement that did not
+        // state its own — see `tintProblems`, which is the only reader.
+        if (loaded.mesh?.tint != null) entry.meshTint = loaded.mesh.tint
         if (loaded.animation) entry.animation = Object.keys(loaded.animation)
         // What this type composes. Listed here so "what does a crate do" is one
         // index lookup rather than opening the type and then every behaviour.
@@ -334,6 +337,7 @@ export async function buildIndex(projectDirectory) {
   // it places, so checking placements while `index.types` is still filling in
   // would miss a type read later and silently pass every placement of it.
   index.invariantProblems = invariantProblems(index, levelPlacements)
+  index.tintProblems = tintProblems(index, levelPlacements)
 
   await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
   await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index, null, 2))
@@ -604,6 +608,71 @@ export function invariantProblems(index, levelPlacements) {
 }
 
 /**
+ * Is this tint white — the one value that multiplies nothing?
+ *
+ * Written as a hex string in a level and sometimes as a number in a type, so
+ * both forms are read. Anything unreadable counts as not-white, because a tint
+ * nobody can evaluate is exactly the one worth reporting.
+ */
+function tintIsWhite(tint) {
+  if (typeof tint === 'number') return tint === 0xffffff
+  const said = String(tint ?? '').trim().toLowerCase()
+  return said === 'white' || said === '#fff' || said === '#ffffff'
+}
+
+/**
+ * Every placement that draws a texture through a tint its type set.
+ *
+ * A placement's `mesh` merges over the type's key by key, so `tint` on a type is
+ * not a fallback: it multiplies into every textured placement that did not state
+ * its own. The level names no colour at all, so nothing in the file a reader
+ * opens is wrong, and the only symptom is a frame that comes back the wrong
+ * colour.
+ *
+ * A warning, not a failure. A type may be tinted on purpose, so the pair is a
+ * strong smell rather than proof.
+ *
+ * One line per type and level with a count, the way a missing asset is reported:
+ * a single type repaints hundreds of placements, and hundreds of identical lines
+ * are worse than one.
+ */
+export function tintProblems(index, levelPlacements) {
+  const out = []
+  for (const [levelName, placements] of Object.entries(levelPlacements || {})) {
+    const level = index.levels[levelName]
+    if (!level || level.error) continue
+
+    const hit = new Map()
+    placements.forEach((placement, at) => {
+      const type = index.types[placement?.type]
+      if (!type || type.meshTint == null || tintIsWhite(type.meshTint)) return
+      const mesh = placement?.mesh
+      // A string mesh is the texture shorthand and states no tint either, so it
+      // is caught by the same rule.
+      const texture = typeof mesh === 'string' ? mesh : mesh?.texture
+      if (!texture || (mesh && typeof mesh === 'object' && 'tint' in mesh)) return
+      const seen = hit.get(placement.type)
+        || { count: 0, first: placement.id ?? `#${at}`, tint: type.meshTint, typeFile: type.file }
+      seen.count++
+      hit.set(placement.type, seen)
+    })
+
+    for (const [typeName, seen] of hit) {
+      const times = seen.count === 1 ? 'once' : `${seen.count} times`
+      out.push({
+        file: level.file,
+        warning: true,
+        why: `level "${levelName}" gives type "${typeName}" a textured mesh with no tint of its own ${times}` +
+          ` (first "${seen.first}"), and the type declares mesh.tint ${JSON.stringify(seen.tint)}` +
+          ` — a placement's mesh merges key by key, so that tint multiplies the texture on every one of them.` +
+          ` State a tint on the placements, or take it off ${seen.typeFile}.`
+      })
+    }
+  }
+  return out
+}
+
+/**
  * One line saying how big the asset problem is, ahead of the list itself.
  *
  * "231 missing assets" and "one missing asset" are two different situations and
@@ -790,6 +859,9 @@ export function problemsIn(index) {
     // A type's own declared rule, broken by a placement — built once, inside
     // buildIndex, because it needs every type loaded first.
     ...(index.invariantProblems || []),
+    // A tint on a type multiplies the texture of every placement that did not
+    // state its own, and neither file reads as wrong on its own.
+    ...(index.tintProblems || []),
     ...assetSummary(missing),
     ...missing,
     ...Object.entries(index.tests).filter(([, t]) => t.error)
