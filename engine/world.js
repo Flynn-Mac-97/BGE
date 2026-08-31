@@ -470,4 +470,12 @@ function behaviourPlacement(e) {
   return names.every(n => out[n] && !Object.keys(out[n]).length) ? names : out
 }
 
-const round = n => Math.round(n * 1000) / 1000
+/**
+ * Three decimal places, over a number or a list of them.
+ *
+ * `rotation` is written both ways: a bare number is yaw in degrees, `[x, y, z]`
+ * is pitch, yaw and roll in degrees. A list must stay a list — `Math.round` of
+ * one is NaN, and JSON writes NaN as null, so a save would drop it.
+ */
+const round = value =>
+  Array.isArray(value) ? value.map(round) : Math.round(value * 1000) / 1000

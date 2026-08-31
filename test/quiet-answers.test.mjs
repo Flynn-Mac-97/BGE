@@ -16,6 +16,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { makeLoop } from '../engine/loop.js'
+import { makeWorld } from '../engine/world.js'
 import { buildIndex, problemsIn, fatal, tintProblems } from '../engine/project-index.mjs'
 
 // ------------------------------------------------------------------ p105
@@ -203,6 +204,36 @@ test('a placement with no texture is not reported', () => {
 test('a type with no tint is not reported', () => {
   const index = { types: { prop: { file: 'types/prop.js' } }, levels: { arena: { file: 'levels/arena.json' } } }
   assert.deepEqual(tintProblems(index, { arena: [textured] }), [])
+})
+
+// ------------------------------------------------------------------ p272
+
+/** One entity in a world, saved back out. The bus is only emitted to. */
+function savedPlacement(placement) {
+  const world = makeWorld({ on() {}, emit() {} })
+  world.retype('prop', {})
+  world.spawn('prop', { type: 'prop', at: [1, 2, 3], ...placement })
+  return world.toLevel().entities[0]
+}
+
+test('a three-axis rotation survives a toLevel round trip unchanged', () => {
+  const saved = savedPlacement({ rotation: [10, 20, 30] })
+  assert.deepEqual(saved.rotation, [10, 20, 30])
+  // JSON is where the loss showed: Math.round of a list is NaN, written as null.
+  assert.equal(JSON.parse(JSON.stringify(saved)).rotation.join(), '10,20,30')
+})
+
+test('a bare yaw still comes back as exactly the number it was', () => {
+  assert.equal(savedPlacement({ rotation: 45 }).rotation, 45)
+})
+
+test('every axis of a rotation is rounded, not just carried through', () => {
+  assert.deepEqual(savedPlacement({ rotation: [10.00049, 20.5, 30.12349] }).rotation,
+    [10, 20.5, 30.123])
+})
+
+test('positions still round to three places', () => {
+  assert.deepEqual(savedPlacement({ at: [1.00049, 2.5, 3.12349] }).at, [1, 2.5, 3.123])
 })
 
 // --------------------------------------------------- p85, through buildIndex
