@@ -35,8 +35,9 @@ that the entity does not model is written straight back out.
 ### Which way a body is facing
 
 Two names, and they are not a duplicate — they are the two places a facing comes
-from. `rotation` is the editor's handle, in **degrees** about Y, because degrees
-are what an author types into an inspector and reads back off a level file.
+from. `rotation` is the editor's handle, in **degrees**, because degrees are what
+an author types into an inspector and reads back off a level file. A bare number
+is yaw; `[x, y, z]` is pitch, yaw and roll, the same form `mesh.parts` takes.
 `yaw` is what game code sets while the world is running, in **radians**, because
 radians are what every other angle in the engine is in: the camera's aim, a
 raycast, the answer `Math.atan2` gives.

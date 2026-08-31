@@ -17,8 +17,8 @@ Blender needs the GUI open and **BlenderMCP → Connect** pressed. If it is not
 connected, say so and ask — do not silently fall back to boxes. Boxes cost more
 tokens than a model and read worse.
 
-`rotation` in a level is Y-only and in degrees. Anything that needs to tip or
-roll is a model, not a placement.
+`rotation` in a level is in degrees. A bare number is yaw; `[x, y, z]` is pitch,
+yaw and roll, the same form `mesh.parts` takes.
 
 ## Textures and flat images
 

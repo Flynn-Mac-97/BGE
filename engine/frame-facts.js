@@ -6,6 +6,20 @@
  * best. Nothing here reads a renderer, a clock, or a file.
  */
 
+/**
+ * Which way an entity points, in radians about Y.
+ *
+ * `yaw` is what game code sets while running. `rotation` is what the level
+ * declares: a bare number is degrees of yaw, `[x, y, z]` is pitch, yaw and roll
+ * in degrees, the two forms `engine/render.js` reads. Reading an array as a
+ * number gives NaN, which spreads into every bearing computed from it.
+ */
+export function yawOf(entity) {
+  if (Number.isFinite(entity.yaw)) return entity.yaw
+  const declared = Array.isArray(entity.rotation) ? entity.rotation[1] : entity.rotation
+  return (Number(declared) || 0) * Math.PI / 180
+}
+
 /** The drawn extents of an entity, in world units: width, height, length. */
 export function boundsOf(entity) {
   const mesh = entity.mesh || entity._definition?.mesh
@@ -80,7 +94,7 @@ export const SHOTS = {
 export function frameSubject(entity, bounds, shotName) {
   const shot = SHOTS[shotName] || SHOTS['three-quarter']
   const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * shot.distance)
-  const facing = Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
+  const facing = yawOf(entity)
   // The eye is placed out along the shot's bearing; its yaw looks back.
   const azimuth = facing + shot.azimuth
   const flat = distance * Math.cos(-shot.pitch)
@@ -100,7 +114,7 @@ export function frameSubject(entity, bounds, shotName) {
  */
 export function facingOffset(entity, other) {
   const wanted = Math.atan2(-(other.x - entity.x), -((other.z || 0) - (entity.z || 0)))
-  const yaw = Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
+  const yaw = yawOf(entity)
   const off = Math.abs(((wanted - yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
   return { degreesOff: Math.round(off * 180 / Math.PI), facingIt: off < Math.PI / 6 }
 }

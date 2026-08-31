@@ -418,7 +418,7 @@ export function makeWorld(bus) {
         camera,
         entities: entities.map(e => {
           const out = { type: e.type, at: [round(e.x), round(e.y), round(e.z)] }
-          if (e.rotation) out.rotation = round(e.rotation)
+          if (e.rotation) out.rotation = roundTurn(e.rotation)
           if (e.scale !== 1) out.scale = round(e.scale)
           if (e.note) out.note = e.note
           if (e.collider && e.collider !== e._definition.collider) out.collider = e.collider
@@ -465,3 +465,13 @@ function behaviourPlacement(e) {
 }
 
 const round = n => Math.round(n * 1000) / 1000
+
+/**
+ * Round a rotation, keeping the form it was written in.
+ *
+ * A bare number is yaw in degrees; `[x, y, z]` is pitch, yaw and roll, the two
+ * forms `engine/render.js` reads. `Math.round` of an array is NaN, which
+ * `JSON.stringify` writes as `null`, so rounding both alike would delete a
+ * declared pitch and roll on save.
+ */
+const roundTurn = turn => Array.isArray(turn) ? turn.map(round) : round(turn)
