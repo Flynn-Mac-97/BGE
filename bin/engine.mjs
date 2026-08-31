@@ -127,7 +127,7 @@ and pain.list ranks by it. A vague number beats no number.
  * boolean — a general "the next word is the value" rule would swallow the
  * following argument and the failure would look like the flag doing nothing.
  */
-const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project'])
+const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project', 'client'])
 
 const argv = process.argv.slice(2)
 const flags = {}
@@ -162,7 +162,8 @@ const coerce = w => {
 const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
                  'kind', 'where', 'fix', 'cost', 'reads', 'all',
-                 'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked']) delete options[k]
+                 'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked',
+                 'client', 'dry-run', 'dryRun']) delete options[k]
 
 let args = words.map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
@@ -173,7 +174,10 @@ if (Object.keys(options).length) args.push(options)
 async function call(op, args, ms = timeout) {
   // Serialise outside the try: a bad argument is a usage error, and reporting
   // it as "server unreachable" sends you debugging the wrong machine.
-  const payload = JSON.stringify({ op, args, timeout: ms })
+  const payload = JSON.stringify({
+    op, args, timeout: ms,
+    ...(typeof flags.client === 'string' ? { client: flags.client } : {})
+  })
 
   let res
   try {
@@ -192,7 +196,10 @@ async function call(op, args, ms = timeout) {
   if (body.serves && path.resolve(body.serves) !== path.resolve(REPO)) {
     die(2, `the server at ${host} serves\n  ${path.resolve(body.serves)}\nbut this command runs from\n  ${path.resolve(REPO)}\nDrive this workspace's own server with --port, or run --headless.`)
   }
-  if (body.code === 'no-client') die(2, body.error)
+  // Nothing to talk to is exit 2; the wrong number of things to talk to is a
+  // usage error the caller fixes with --client, so it is exit 1.
+  if (body.code === 'no-client' || body.code === 'no-reply') die(2, body.error)
+  if (body.code) die(1, body.error)
   if (!body.ok) die(1, body.error || 'unknown error', body.stack)
   return body.result
 }
@@ -263,11 +270,19 @@ function reportedFailure(value) {
   return Array.isArray(value.tests) && value.tests.some(reportedFailure)
 }
 
-// One exit code for every path: the op ran, and the answer says whether it passed.
+/**
+ * One exit code for every path: the op ran, and the answer says whether it
+ * passed.
+ *
+ * This ends the process. Every op runs at the top level of this file, so a
+ * `finish` that only set `process.exitCode` would fall through into the ops
+ * below it and run one of them.
+ */
 const finish = value => {
   out(value === undefined ? { ok: true } : value)
   process.exit(reportedFailure(value) ? 1 : 0)
 }
+
 
 // ------------------------------------------------------------------ painpoints
 /**
@@ -583,6 +598,70 @@ if (op === 'check') {
  * running this is to clean up after itself, and a command that refused to run
  * in a worktree would leave the servers exactly where the problem started.
  */
+/**
+ * Headless browsers started to render for a lane.
+ *
+ * `lanes` lists them, each proved against its own debugging port. `lanes.start`
+ * adds one, `lanes.stop` ends one or all. A browser with no window leaves no
+ * other trace, so these are the only way to find one that outlived its run.
+ */
+if (op === 'lanes' || op === 'lanes.start' || op === 'lanes.stop') {
+  const browsers = await import('../engine/lane-browsers.mjs')
+  try {
+    if (op === 'lanes') {
+      const list = await browsers.listLaneBrowsers(CHECKOUT)
+      finish({
+        running: list.filter(entry => entry.alive).length,
+        browsers: list,
+        ...(list.some(entry => !entry.alive) ? { next: 'node bin/engine.mjs lanes.stop' } : {})
+      })
+    }
+
+    if (op === 'lanes.start') {
+      const name = typeof args[0] === 'string' ? args[0] : null
+      if (!name) die(1, 'usage: lanes.start <client> [--port N] [--profile 540x960]')
+      const [width, height] = String(flags.profile || '540x960').split('x').map(Number)
+      const started = await browsers.startLaneBrowser(CHECKOUT, {
+        client: name,
+        url: host + '/',
+        port: Number(flags.debugPort || 0) || 9400 + (await browsers.listLaneBrowsers(CHECKOUT)).length,
+        width, height
+      })
+      const { browser, ...said } = started
+      finish({ ...said, drive: `node bin/engine.mjs snapshot --client ${name}` })
+    }
+
+    if (op === 'lanes.stop') {
+      finish(await browsers.stopLaneBrowsers(CHECKOUT, typeof args[0] === 'string' ? args[0] : null))
+    }
+  } catch (error) {
+    die(1, String(error?.message || error))
+  }
+}
+
+/**
+ * Who is attached to this server, and which one a call would reach.
+ *
+ * Asked over HTTP rather than through the bridge, because the whole point is
+ * to answer when more than one client is attached and the bridge refuses.
+ */
+if (op === 'clients') {
+  let answer
+  try {
+    answer = await (await fetch(`${host}/api/server`)).json()
+  } catch (error) {
+    die(2, `cannot reach the dev server at ${host}. Is \`npm run dev\` running?`, String(error))
+  }
+  const attached = answer.tabs || []
+  finish({
+    server: { url: host, project: answer.project, serves: answer.serves, pid: answer.pid },
+    attached,
+    // An untargeted call needs exactly one, so say which one it would be.
+    wouldAnswer: attached.length === 1 ? attached[0].id : null,
+    ...(attached.length > 1 ? { next: `name one with --client <id>` } : {})
+  })
+}
+
 if (op === 'servers' || op === 'servers.stop') {
   const { listServers, stopServers } = await readProject()
   const named = typeof args[0] === 'number' ? args[0] : flags.port ? Number(flags.port) : null

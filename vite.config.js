@@ -6,6 +6,7 @@ import path from 'node:path'
 // same code. Two implementations of "what is in this project" would drift.
 import { buildIndex as buildProjectIndex, problemsIn, fatal, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
 import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
+import { chooseClient, explainClientError, isLive, publicClient } from './engine/bridge-clients.mjs'
 
 const ROOT = process.cwd()
 
@@ -231,11 +232,22 @@ function api() {
 }
 
 /**
+ * Every page attached to this server, keyed by its websocket.
+ *
+ * Shared by the bridge and the server registry: the registry learns who is
+ * there from the tab beacon, and the bridge needs the same list to send a call
+ * to one of them rather than to all.
+ */
+const clients = new Map()
+
+const liveClients = () => [...clients.values()].filter(isLive)
+
+/**
  * Relay between a terminal and the live editor.
  *
- * `POST /api/engine {op, args}` is broadcast over the dev-server websocket;
- * the Terminal Bridge plugin answers from inside the page. This exists so the
- * engine is not the thing that hosts an AI — it is the thing an AI attaches
+ * `POST /api/engine {op, args, client}` goes to one page over the dev-server
+ * websocket; the Terminal Bridge plugin answers from inside it. This exists so
+ * the engine is not the thing that hosts an AI — it is the thing an AI attaches
  * to, whichever one the user happens to run.
  */
 function bridge() {
@@ -331,19 +343,35 @@ function bridge() {
         })
       })
 
-      server.ws.on('engine:reply', message => {
+      server.ws.on('engine:reply', (message, client) => {
         const resolve = waiting.get(message.id)
-        // A second open tab answers too. First reply wins; the rest are dropped.
+        // A call goes to one client now, so a reply with no pending id is from
+        // a client that answered after the caller gave up.
         if (!resolve) return
         waiting.delete(message.id)
-        resolve(message)
+        const answered = [...clients.values()].find(entry => entry.client === client)
+        resolve({ ...message, answeredBy: answered ? publicClient(answered) : null })
       })
 
       server.middlewares.use(async (req, res, next) => {
         if (req.url.split('?')[0] !== '/api/engine' || req.method !== 'POST') return next()
 
-        const { op, args = [], timeout = 8000 } = await readBody(req)
+        const { op, args = [], timeout = 8000, client: wanted } = await readBody(req)
         if (!op) return send(res, 400, { error: 'missing op' })
+
+        // This server's own port. A fixed one sends a lane driving its own
+        // server to somebody else's tab.
+        const where = `http://localhost:${server.config.server.port}`
+        const { chosen, error, live = [] } = chooseClient([...clients.values()], wanted)
+        if (error) {
+          return send(res, error === 'no-client' ? 502 : 409, {
+            ok: false,
+            code: error,
+            error: explainClientError(error, { wanted, live, where }),
+            clients: live.map(publicClient),
+            serves: ROOT
+          })
+        }
 
         const id = ++seq
         const pending = new Promise(resolve => {
@@ -352,15 +380,13 @@ function bridge() {
             if (waiting.delete(id)) {
               resolve({
                 ok: false,
-                code: 'no-client',
-                // This server's own port. A fixed one sends a lane driving its
-                // own server to somebody else's tab.
-                error: `no editor attached. Open http://localhost:${server.config.server.port} and leave the tab open.`
+                code: 'no-reply',
+                error: explainClientError('no-reply', { chosen, timeout })
               })
             }
           }, timeout)
         })
-        server.ws.send('engine:call', { id, op, args })
+        chosen.client.send('engine:call', { id, op, args })
 
         const reply = await pending
         // Which checkout this server serves, on every reply. A CLI run from a
@@ -402,28 +428,36 @@ const TAB_BEACON_SOURCE = `
 const hot = import.meta.hot
 if (hot) {
   const key = 'engine:tab-id'
-  let id = sessionStorage.getItem(key)
-  if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem(key, id) }
+  // A page opened as ?client=<name> keeps that name, so a lane can target its
+  // own headless page by a name it chose instead of a value it must first go
+  // and read. Anything else keeps a random name for the length of the session.
+  const asked = new URLSearchParams(location.search).get('client')
+  let id = asked || sessionStorage.getItem(key)
+  if (!id) { id = Math.random().toString(36).slice(2, 10) }
+  sessionStorage.setItem(key, id)
   const announce = () => hot.send('engine:tab', {
     id,
     url: location.href,
     title: document.title,
-    hidden: document.hidden
+    hidden: document.hidden,
+    // The size a capture comes out at, and whether anybody can see this page.
+    // Both decide whether a client is the right one to answer, and the server
+    // can read neither from a websocket.
+    viewport: innerWidth + 'x' + innerHeight,
+    pixelRatio: devicePixelRatio,
+    // navigator.webdriver alone is false for a browser started with
+    // --headless=new and no automation flag, so the user agent is read too.
+    headless: navigator.webdriver === true || /headless/i.test(navigator.userAgent)
   })
   announce()
   addEventListener('visibilitychange', announce)
+  addEventListener('resize', announce)
 }
 `
 
 function serverRegistry() {
-  // Keyed by the raw socket, so a tab that closes takes its entry with it and
-  // a reload replaces rather than duplicates.
-  const tabs = new Map()
   let record = null
-
-  const attached = () => [...tabs.values()]
-    .filter(tab => tab.socket.readyState === 1)
-    .map(({ socket, ...tab }) => tab)
+  const attached = () => liveClients().map(publicClient)
 
   return {
     name: 'engine-server-registry',
@@ -435,20 +469,33 @@ function serverRegistry() {
     }],
 
     configureServer(server) {
+      // Keyed by the raw socket, so a tab that closes takes its entry with it.
       server.ws.on('engine:tab', (said, client) => {
         const socket = client.socket
-        const known = tabs.get(socket)
-        tabs.set(socket, {
-          socket,
-          id: String(said?.id || 'unnamed'),
+        const known = clients.get(socket)
+        // A page that reconnects announces on a new socket while the old one is
+        // still open, which would leave two live entries for one page and make
+        // every call to it ambiguous. An id names a page, so the newest
+        // announcement replaces any earlier entry claiming that name.
+        const name = String(said?.id || 'unnamed')
+        for (const [key, entry] of clients) {
+          if (key !== socket && entry.id === name) clients.delete(key)
+        }
+        clients.set(socket, {
+          client,
+          id: name,
           url: String(said?.url || ''),
           title: String(said?.title || ''),
           project: PROJECT_DIRECTORY,
+          serves: ROOT,
           hidden: said?.hidden === true,
+          viewport: String(said?.viewport || ''),
+          pixelRatio: Number(said?.pixelRatio) || 1,
+          headless: said?.headless === true,
           since: known?.since || new Date().toISOString(),
           lastSaid: new Date().toISOString()
         })
-        socket.once?.('close', () => tabs.delete(socket))
+        socket.once?.('close', () => clients.delete(socket))
       })
 
       // What this server is, asked over the wire. A record on disk says what was

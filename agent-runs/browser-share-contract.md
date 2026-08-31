@@ -20,18 +20,19 @@ because no lane shares it.
 `USER` Render access queued when two lanes want a frame at once.
 `USER` The engine may be changed; nothing is fixed.
 `USER` Targets: mobile, Windows, WebGL. iOS is out of scope now.
+`USER` The person's engine locks while lanes work; a click must not break one.
 
 Reinterpreted, not overridden: five *browser* tabs cannot carry this, so lane
-views become tabs inside one page. `LOCAL` p233: "only the front tab draws".
+views become tabs inside one page — `LOCAL` p233, "only the front tab draws".
 One switchable view per worktree is unchanged.
 
 ## Must-pass outcomes
 
 1. **A lane never touches the person's browser, and renders at a stated device
    profile** — an isolated Chromium, at a viewport and pixel ratio it names.
-2. **The viewer shows all lanes live and read-only, and never fakes a frame.**
-   One lane tab per worktree: a schematic from reported state, plus the lane's
-   last real capture, each labelled as what it is.
+2. **The person's engine locks while lanes work, and shows each one.** Editing
+   and play are refused while a lane is active. One lane tab per worktree: a
+   schematic from reported state plus the lane's last capture, each labelled.
 3. **Every bridge call names its target.** No broadcast, no first-reply-wins.
 4. **Five lanes run a full loop with zero lane-minutes lost to browser faults.**
 
@@ -58,15 +59,15 @@ One switchable view per worktree is unchanged.
 | # | Outcome | Build check (builder, today) | Acceptance check (independent evaluator) | Pass | Boundary | Fail | Provenance | Feasibility / cost |
 |---|---|---|---|---|---|---|---|---|
 | 1 | Lane never touches the person's browser, and renders at a stated device profile | `agent.prepare --parallel` for 5 lanes; assert no lane holds a handle to the person's Chrome profile and none issues a `claude-in-chrome` call. Assert every written frame's pixel dimensions equal the profile the lane asked for, and that a frame records the profile it was taken at | James runs a 5-lane loop with the viewer focused, then backgrounded, then minimised; records lane errors. He then reads one blind set and confirms every frame in it shares one profile. Evaluator `STAFFED` (James) | 5/5 lanes complete every render request with the viewer minimised, and every frame in a comparison set is the declared profile | 1 lane needs a retry but completes; profiles still uniform | Any lane blocks or reports "no editor attached"; or a set mixes profiles as loop 3 did (540x960 beside 1920x911) | LOCAL p233, p245, p261 | medium |
-| 2 | Viewer shows all lanes live, read-only, never fakes a frame | Script drives 3 lanes making a known edit each; assert the viewer's lane tab reflects each within 2 s. Assert every panel is labelled schematic or capture, and that a lane whose `engine/render.js` differs from the viewer's shows no schematic claiming to be its drawing | James watches one loop and answers: could you tell, without asking, what each lane was doing? Evaluator `STAFFED` (James) | Yes for every active lane; no viewer action changed a lane's file; no panel is mislabelled | Viewer lags a lane by >2 s but is correct and labelled | Viewer shows stale state as current, a click edits lane files, or a schematic is presented as a real frame | USER intent; LOCAL p131; INFERENCE on 2 s | medium |
+| 2 | Person's engine locks while lanes work, and shows each one | With 3 lanes active, assert every mutating verb (`set`, `spawn`, `destroy`, `play`, level save) is refused with a reason naming the lanes, and that read verbs still answer. Drive a known edit per lane; assert its lane tab reflects it within 2 s and every panel is labelled schematic or capture | James watches one loop and answers two questions: could you tell, without asking, what each lane was doing? And did the engine stop you editing while they ran? Evaluator `STAFFED` (James) | Yes to both; no viewer action changed a lane's file; no panel mislabelled | Viewer lags a lane by >2 s but is correct and labelled; lock still holds | A mutating verb succeeds while a lane is active, a schematic is presented as a real frame, or stale state shows as current | USER intent; LOCAL p131 | medium |
 | 3 | Every bridge call names its target | Open 2 clients; assert a bridge call without a target is refused with both client identities listed, and a targeted call reaches only that client | Reviewer reads the reply schema and confirms client identity (id, url, viewport, headless flag) is present on every reply. Evaluator `STAFFED` (James) | Untargeted call with >1 client exits non-zero and names them; targeted call reaches exactly one | Warns and picks deterministically instead of refusing | Broadcasts and keeps the first reply | LOCAL p131 | small |
 | 4 | Zero lane-minutes lost to browser faults over a full loop | Instrument each lane: log every render request with wait and outcome; sum time in `timeout`/`no editor`/`wedged` | James compares this loop's lost time against loop 3's, which is recorded in `agent-runs/2026-08-31-brawl-stars/`. Evaluator `STAFFED` (James) | 0 lane-minutes lost to browser faults across 5 lanes | Under 2 lane-minutes, none fatal | Any lane dies or a tab must be closed and reopened by hand | LOCAL p217, p233 | medium |
 
 ## Anti-goals
 
-- Not a second renderer. A three.js game reaches every `USER` target through a
-  WebView, and `SOURCE` each renders WebGL through ANGLE. A Chromium frame is
-  the shared proxy; Windows is that path exactly.
+- Not a second renderer. Every `USER` target reaches a three.js game through a
+  WebView, and `SOURCE` each renders WebGL through ANGLE. Windows is that path
+  exactly.
 - Not five WebGL contexts in one page. `SOURCE` Chrome kills the oldest.
 - Not an editable viewer. It observes; it never writes lane files.
 - Not a fix for leaking lane dev servers. That is p246/p247.
@@ -74,19 +75,18 @@ One switchable view per worktree is unchanged.
 
 ## Unknowns and assumptions
 
-- `U1` **resolved, measured 2026-08-31** — Headless Chromium gets the real GPU:
-  `ANGLE (NVIDIA, RTX 4070, Direct3D11)`, WebGL 2.0, no SwiftShader. Five at
-  once each held a context and wrote a byte-identical 540x960 frame. The CLI
-  drove one with no window: 1261 entities, a 32-second run answering two
-  level-up cards, then a clean capture `art.check` measured.
-- `U2` **resolved** — Both, split by consumer. The render service runs the
-  lane's real code, since a lane editing `engine/render.js` must be checked
-  against its own drawing, and each worktree is already a valid server root.
-  The viewer mirrors state, needing no lane code and no `vite.config.js` change.
+- `U1` **resolved 2026-08-31** — Headless Chromium gets the real GPU: `ANGLE
+  (NVIDIA, RTX 4070, Direct3D11)`, WebGL 2.0, no SwiftShader. Five at once each
+  held a context and wrote a byte-identical 540x960 frame. The CLI drove one
+  with no window: 1261 entities, a 32-second run, then a measured capture.
+- `U2` **resolved** — Split by consumer. The render service runs the lane's real
+  code, since a lane editing `engine/render.js` must be checked against its own
+  drawing, and each worktree is already a valid server root. The viewer mirrors
+  state, needing no lane code and no `vite.config.js` change.
 - `U3` non-blocking — Is a serial render queue enough? `INFERENCE`: a frame
   takes under a second and lanes ask rarely. Falsified by a tuning sweep.
 - `U4` out of scope — `USER` deferred iOS.
-- `U5` non-blocking, opened by the probe — A device profile must be set on the
+- `U5` non-blocking, from the probe — A device profile must be set on the
   canvas, not the window: a 540x960 window captured 524x865, editor chrome
   taking the difference. A phone frame needs a chrome-free view.
 - `A1` `INFERENCE` — 2 s viewer latency reads as "live". Untested.
@@ -96,12 +96,12 @@ One switchable view per worktree is unchanged.
 
 ## Optional builder suggestions
 
-Electron is the likely Windows export path, so building the viewer on it would
-prove that path early. Not acceptance criteria.
+Electron is the likely Windows export path; building the viewer on it would
+prove that path early.
 
 ## Research appendix
 
-**Capability** P1. Local inspection plus two searches.
+**Capability** P1. Local inspection, two searches, one measured probe.
 
 **Artifact manifest** All at `99c5ac9`: `vite.config.js:27-30`, `:74`,
 `plugins/builtin/bridge.js:1-46`, `test/cli.test.mjs:523`, `README.md:613`,

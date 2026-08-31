@@ -21,3 +21,4 @@ agent-runs/see-marks/*seed*.json
 # the frame is a working file, and committing it means every run is a diff.
 agent-runs/see/**/*.png
 agent-runs/see/**/*.json
+project/.engine/lane-browsers.json
