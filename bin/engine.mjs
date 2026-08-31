@@ -778,7 +778,20 @@ if (op === 'servers' || op === 'servers.stop') {
     // The default port is asked about whether or not a record mentions it. A
     // server nobody wrote down, sitting where every command looks by default,
     // is the one an agent cannot otherwise see.
-    out(await listServers(CHECKOUT, [Number(flags.port || PORT)]))
+    const listed = await listServers(CHECKOUT, [Number(flags.port || PORT)])
+    // A record for a server that no longer answers is litter. Keeping it makes
+    // a person read four dead ports to find the one live one, so it is dropped
+    // once the port has been asked and did not answer. `--all` keeps them.
+    const gone = (listed.servers || []).filter(entry => !entry.alive && entry.pid)
+    if (gone.length && !flags.all) {
+      const { forgetServer } = await import('../engine/project-index.mjs')
+      for (const entry of gone) {
+        try { forgetServer(CHECKOUT, entry.port, entry.pid) } catch { /* already gone */ }
+      }
+      listed.servers = (listed.servers || []).filter(entry => entry.alive || !entry.pid)
+      listed.forgot = gone.map(entry => ({ port: entry.port, why: entry.why }))
+    }
+    out(listed)
     process.exit(0)
   }
   if (args[0] !== undefined && named === null && args[0] !== 'all') {

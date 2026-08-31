@@ -507,6 +507,42 @@ if (hot) {
     // --headless=new and no automation flag, so the user agent is read too.
     headless: navigator.webdriver === true || /headless/i.test(navigator.userAgent)
   })
+  // The editor names the tab; this only marks it offline. Setting a title here
+  // as well would race the editor's own, which boots after this script.
+  const OFFLINE = 'OFFLINE · '
+  const WHAT = ${JSON.stringify(PROJECT_DIRECTORY)} + ' :' + location.port
+
+  /**
+   * Say that this page's server has gone.
+   *
+   * A dead tab keeps its last frame and still answers a click, so nothing on
+   * screen says the editor behind it has stopped. The banner covers the page so
+   * the state is readable without clicking into the tab.
+   */
+  const DEAD_ID = 'engine-server-gone'
+  const showDead = () => {
+    if (document.getElementById(DEAD_ID)) return
+    if (!document.title.startsWith(OFFLINE)) document.title = OFFLINE + document.title
+    const banner = document.createElement('div')
+    banner.id = DEAD_ID
+    banner.textContent = 'This tab\\u2019s engine has stopped — ' + WHAT +
+      '. Nothing here is live. Close it, or start that server again.'
+    banner.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:2147483647',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'padding:2rem', 'text-align:center',
+      'background:rgba(24,10,10,0.92)', 'color:#ffb4a8',
+      'font:600 15px/1.6 ui-monospace,monospace', 'cursor:default'
+    ].join(';')
+    document.body.appendChild(banner)
+  }
+  const clearDead = () => {
+    document.getElementById(DEAD_ID)?.remove()
+    document.title = document.title.replace(OFFLINE, '')
+  }
+  hot.on('vite:ws:disconnect', showDead)
+  hot.on('vite:ws:connect', clearDead)
+
   announce()
   addEventListener('visibilitychange', announce)
   addEventListener('resize', announce)

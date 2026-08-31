@@ -88,11 +88,10 @@ async function findPlugins(loader) {
 async function boot() {
   const root = document.getElementById('app')
 
-  // Say which project this tab is, where a human looks first. Several editors
-  // can be open at once — lanes run their own — and a tab that just says
-  // "engine" is how a Counter-Strike editor gets played in the middle of a
-  // kitten gauntlet before anyone notices the port.
-  document.title = `${PROJECT_DIRECTORY} — engine`
+  // Say which project and which server this tab is, where a person looks
+  // first. Several editors can be open at once, on several ports, and two tabs
+  // naming only the project are told apart by nothing.
+  document.title = `${PROJECT_DIRECTORY} :${location.port} — engine`
 
   const { context, engine, world, loop } = await startWorld({
     openFiles: bus => makeFiles(bus),
