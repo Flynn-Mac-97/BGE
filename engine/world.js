@@ -64,6 +64,12 @@ const sameLook = (a, b, key) => {
  * the box. de_dust2 came out at 3,300 lines where 1,300 would do, and every read
  * of that file paid the difference. `properties` has always merged; this is the
  * same rule applied to the other thing a placement customises.
+ *
+ * `tint` is the key this surprises people on. A tint MULTIPLIES the texture
+ * rather than standing in for one, so a tint on the TYPE is not a fallback: it
+ * colours every textured placement that did not state its own, and the level
+ * file says nothing about it. `check` reports that pair — see `tintProblems` in
+ * engine/project-index.mjs.
  */
 const mergeLook = (base, over, key) => {
   const a = expand(base, key)
@@ -418,7 +424,7 @@ export function makeWorld(bus) {
         camera,
         entities: entities.map(e => {
           const out = { type: e.type, at: [round(e.x), round(e.y), round(e.z)] }
-          if (e.rotation) out.rotation = roundTurn(e.rotation)
+          if (e.rotation) out.rotation = round(e.rotation)
           if (e.scale !== 1) out.scale = round(e.scale)
           if (e.note) out.note = e.note
           if (e.collider && e.collider !== e._definition.collider) out.collider = e.collider
@@ -464,14 +470,12 @@ function behaviourPlacement(e) {
   return names.every(n => out[n] && !Object.keys(out[n]).length) ? names : out
 }
 
-const round = n => Math.round(n * 1000) / 1000
-
 /**
- * Round a rotation, keeping the form it was written in.
+ * Three decimal places, over a number or a list of them.
  *
- * A bare number is yaw in degrees; `[x, y, z]` is pitch, yaw and roll, the two
- * forms `engine/render.js` reads. `Math.round` of an array is NaN, which
- * `JSON.stringify` writes as `null`, so rounding both alike would delete a
- * declared pitch and roll on save.
+ * `rotation` is written both ways: a bare number is yaw in degrees, `[x, y, z]`
+ * is pitch, yaw and roll in degrees. A list must stay a list — `Math.round` of
+ * one is NaN, and JSON writes NaN as null, so a save would drop it.
  */
-const roundTurn = turn => Array.isArray(turn) ? turn.map(round) : round(turn)
+const round = value =>
+  Array.isArray(value) ? value.map(round) : Math.round(value * 1000) / 1000
