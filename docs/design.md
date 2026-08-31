@@ -36,12 +36,21 @@
 ## Known gaps
 
 The runtime is much thinner than the tooling. Missing: tilemaps and bulk
-placement, scene flow between levels, saving game state, parenting, raycasts,
-triggers separate from solids, gamepad and touch input, time scale, and any
-way to export a playable build. 3D model loading is no longer on this list —
-`mesh: { model: '<file>.glb' }` loads a GLB and `entity.pose` swings its named
-nodes. GLB crowds do not instance yet, which is the current cost of using them
-for enemies.
+placement, scene flow between levels, saving game state, parenting, gamepad and
+touch input, time scale, and any way to export a playable build.
+
+Three things have come off this list. Check the code before putting one back:
+
+- **3D model loading.** `mesh: { model: '<file>.glb' }` loads a GLB and
+  `entity.pose` swings its named nodes. GLB crowds do not instance yet, which is
+  the current cost of using them for enemies.
+- **Raycasts.** `context.raycast(origin, direction, maxDistance, { ignore, hit })`
+  returns the nearest entity with a 3D collider box, plus the point, the face
+  normal and the distance. Physics 3D registers it, and `run physics3d.raycast`
+  casts one from a terminal.
+- **Triggers separate from solids.** `properties.body: 'trigger'` reports
+  contacts through `onCollide` and pushes nothing. Only `body: 'solid'` blocks,
+  and only `body: 'dynamic'` is moved; both physics plugins agree on that.
 
 Frame-phase systems only run while the world is playing, so anything drawn by
 one — particles, damage numbers — is invisible in edit mode. An effect can only
