@@ -128,22 +128,73 @@ function revealOverlays(hidden) {
 }
 
 /**
- * What a browser-only command needs and does not have, plus the headless verb
- * that answers the same question without it — never a bare "browser only".
+ * What a drawing command needs and does not have, plus the headless verb that
+ * answers the same question without it — never a bare "browser only".
  *
- * `see.capture` and `see.moment` hold the plugin's only state-changing code:
- * camera borrow and restore, overlay conceal and reveal, waiting for a model
- * to finish loading. A refusal that stops before naming what is missing
- * leaves that code with no automated test any lane can run, so this names
- * every missing piece instead of the first one found.
+ * The test is the surface, not the DOM. A headless world started with
+ * `renderer: 'null'` answers the same surface and draws nothing, so the whole
+ * mutate-and-restore path below runs and every frame comes back blank. Without
+ * that, a headless run has no renderer and this refuses.
  */
 function needsRenderer(context, verb, instead) {
   const missing = []
-  if (typeof document === 'undefined') missing.push('no DOM — this is a headless run')
   if (!context.renderer) missing.push('no context.renderer')
   if (!context.shell?.canvas) missing.push('no context.shell.canvas')
+  if (!canMakeCanvas(context)) missing.push('no way to make a canvas — no DOM and no renderer.createCanvas')
   if (!missing.length) return null
-  return { why: `${verb} draws through the browser renderer: ${missing.join(', ')}.`, missing, instead }
+  return { why: `${verb} draws through a renderer: ${missing.join(', ')}.`, missing, instead }
+}
+
+const canMakeCanvas = context =>
+  typeof document !== 'undefined' || typeof context.renderer?.createCanvas === 'function'
+
+/** A blank canvas of this size, from the DOM or from a renderer with no DOM. */
+function makeCanvas(context, width, height) {
+  const canvas = typeof document !== 'undefined'
+    ? document.createElement('canvas')
+    : context.renderer.createCanvas(width, height)
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+
+/** True only of a real backgrounded tab. A headless world has no tab to hide. */
+const tabHidden = () => typeof document !== 'undefined' && document.hidden === true
+
+/**
+ * Why a frame came back with nothing in it. A renderer that draws nothing is a
+ * different fault from a tab that stopped drawing, and one fix does not answer
+ * the other.
+ */
+const blankFrameReason = context => context.renderer?.blank
+  ? 'this world has the renderer surface with nothing behind it, so every frame is blank. '
+    + 'Use see.sketch for a frame headless, or capture through a browser.'
+  : 'the answering tab is not drawing (hidden, throttled, or stale). Focus one editor tab and close the others.'
+
+/** Below this share of the level in frame, a capture is measuring a view nobody plays. */
+const REPRESENTATIVE_SHARE = 0.05
+
+/** Under this many entities, a share says nothing — a small level has no crowd to miss. */
+const ENOUGH_TO_JUDGE = 20
+
+/**
+ * Whether the frame holds enough of the level to be judged as the game's look.
+ *
+ * A camera override frames whatever it is pointed at, and a clear patch of
+ * ground gives brightness and coverage numbers no art change can move. Says so
+ * rather than leaving the reader to notice. A `subject` shot frames one thing on
+ * purpose and is never measured.
+ */
+function unrepresentativeFrame(description, options) {
+  if (options.subject || options.alone) return null
+  const visible = description.counts?.visible || 0
+  const total = visible + (description.counts?.offscreen || 0)
+  if (total < ENOUGH_TO_JUDGE) return null
+  const share = visible / total
+  if (share >= REPRESENTATIVE_SHARE) return null
+  return `this frame holds ${visible} of the level's ${total} entities, ${Math.round(share * 100)}% — `
+    + 'the camera may be pointed where the game never looks, and numbers measured here say nothing '
+    + 'about the art. see.view \'{"aim":"you","back":3}\' frames a position that is played.'
 }
 
 /**
@@ -370,6 +421,9 @@ export default {
         // the two halves of a cell are two different views and every honest
         // disagreement is drowned in one manufactured one.
         const borrowsCamera = !!(options.camera || options.subject)
+        // The sheet is drawn and joined on DOM canvases (frame-sketch.js), so a
+        // world with no DOM steps and restores but produces no picture.
+        const composes = typeof document !== 'undefined'
         let overlays = []
         const cells = []
         const moments = []
@@ -386,6 +440,17 @@ export default {
             bindMarks(description)
             moments.push({ afterSteps: step, counts: description.counts, palette: description.palette, marks: description.marks, marked: description.visible.filter(v => v.mark) })
             for (const lens of lenses) {
+              if (lens !== 'types') {
+                context.renderer.sync(context.world)
+                // Hidden per cell: a step between cells lets the overlay's own
+                // plugin turn its sprites back on.
+                overlays = options.ui === false ? concealOverlays(context) : []
+                context.renderer.draw()
+              }
+              // The sheet is composed on DOM canvases, so without a DOM the
+              // world is still stepped and the camera still borrowed and put
+              // back — there is simply no picture at the end of it.
+              if (!composes) { revealOverlays(overlays); overlays = []; continue }
               const cell = document.createElement('canvas')
               const drawn = lens === 'types' && sketchOnCanvas(description, options)
               cell.width = drawn ? drawn.canvas.width : Math.round(context.viewport.width / 2)
@@ -393,11 +458,6 @@ export default {
               const pen = cell.getContext('2d')
               if (drawn) pen.drawImage(drawn.canvas, 0, 0)
               else {
-                context.renderer.sync(context.world)
-                // Hidden per cell: a step between cells lets the overlay's own
-                // plugin turn its sprites back on.
-                overlays = options.ui === false ? concealOverlays(context) : []
-                context.renderer.draw()
                 pen.drawImage(context.shell.canvas, 0, 0, cell.width, cell.height)
                 revealOverlays(overlays)
                 overlays = []
@@ -415,6 +475,14 @@ export default {
               context.renderer.sync(context.world)
               context.renderer.draw()
             } catch { /* the cells are already drawn */ }
+          }
+        }
+        if (!composes) {
+          return {
+            error: 'no sheet — the cells are drawn and joined on DOM canvases, and this world has none. '
+              + 'The world was stepped to each instant and the camera put back; see.sketch draws each one.',
+            steps,
+            moments: moments.map(moment => ({ afterSteps: moment.afterSteps, visible: moment.counts.visible }))
           }
         }
         const sheet = composeSheet(cells, { columns: lenses.length })
@@ -487,7 +555,10 @@ export default {
 
         // A declared model may still be downloading — a preview spawned a
         // moment ago always is — and drawing now captures the placeholder box.
-        const declaredModel = subjectEntity && (subjectEntity.mesh || subjectEntity._definition?.mesh)?.model
+        // A renderer that draws nothing loads nothing, so there is no arrival
+        // to wait for and waiting would only cost two seconds.
+        const declaredModel = !context.renderer.blank
+          && subjectEntity && (subjectEntity.mesh || subjectEntity._definition?.mesh)?.model
         for (let waited = 0; waited < 40 && declaredModel
           && context.renderer.modelState?.(declaredModel) !== 'ready'
           && context.renderer.modelState?.(declaredModel) !== 'failed'; waited++) {
@@ -573,7 +644,11 @@ export default {
             bottom = y
           }
           if (right <= left || bottom <= top) {
-            return { error: 'the studio drew nothing — the subject rendered no pixels', subject: subjectEntity.id }
+            return {
+              error: 'the studio drew nothing — the subject rendered no pixels',
+              why: blankFrameReason(context),
+              subject: subjectEntity.id
+            }
           }
           const pad = Math.max(12, Math.round((right - left) * 0.08))
           crop = { x: Math.max(0, left - pad), y: Math.max(0, top - pad) }
@@ -594,9 +669,7 @@ export default {
           const traced = convexHull(points)
           if (traced.length >= 3) silhouette = traced.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10])
 
-          copy = document.createElement('canvas')
-          copy.width = crop.w
-          copy.height = crop.h
+          copy = makeCanvas(context, crop.w, crop.h)
           pen = copy.getContext('2d')
           const image = pen.createImageData(crop.w, crop.h)
           for (let y = 0; y < crop.h; y++) {
@@ -617,9 +690,7 @@ export default {
           // Transparent unless the caller asks for a colour — a test may need
           // a known backdrop to assert against, or a mid-tone to judge under.
           if (options.background && options.background !== 'alpha') {
-            const flat = document.createElement('canvas')
-            flat.width = crop.w
-            flat.height = crop.h
+            const flat = makeCanvas(context, crop.w, crop.h)
             flat.getContext('2d').putImageData(image, 0, 0)
             pen.fillStyle = options.background
             pen.fillRect(0, 0, crop.w, crop.h)
@@ -628,9 +699,7 @@ export default {
             pen.putImageData(image, 0, 0)
           }
         } else {
-          copy = document.createElement('canvas')
-          copy.width = canvas.width
-          copy.height = canvas.height
+          copy = makeCanvas(context, canvas.width, canvas.height)
           pen = copy.getContext('2d')
           pen.drawImage(canvas, 0, 0)
           // The HUD and every game screen draw on their own 2D canvases over
@@ -639,7 +708,9 @@ export default {
           // sized in CSS pixels and the GL canvas in device pixels.
           // A layer is laid out for the window, so at any other shape it can
           // only be stretched. Left out unless the caller asked for it by name.
-          if (options.ui !== false && (!stretched || options.ui === true)) {
+          // No DOM, no layers: the HUD and the game screens are drawn by the
+          // browser shell, and a world without one has no interface to composite.
+          if (options.ui !== false && (!stretched || options.ui === true) && typeof document !== 'undefined') {
             // A hidden tab runs no frames, so the layers hold whatever was
             // painted last. The world is drawn fresh above and is fine; the
             // interface would be a picture of an older screen.
@@ -702,6 +773,10 @@ export default {
         // a grid of pixels; if every one is fully transparent the readback
         // failed, and the honest answer says so instead of shipping marks
         // floating on a blank.
+        // Measured from the description, not from pixels, so a blank frame that
+        // is blank BECAUSE the camera points at nothing says both.
+        const framing = unrepresentativeFrame(description, options)
+
         const pixels = pen.getImageData(0, 0, copy.width, copy.height).data
         let anything = false
         const stride = Math.max(4, Math.floor(pixels.length / 4 / 400) * 4)
@@ -710,8 +785,10 @@ export default {
         }
         if (!anything) {
           return {
-            error: 'the canvas read back empty — the answering tab is not drawing (hidden, throttled, or stale). Focus one editor tab and close the others.',
-            hidden: document.hidden === true
+            error: `the canvas read back empty — ${blankFrameReason(context)}`,
+            blank: true,
+            hidden: tabHidden(),
+            ...(framing ? { framing } : {})
           }
         }
 
@@ -772,6 +849,7 @@ export default {
             ? { cropped: true }
             : { pixelRatio: Math.round(copy.width / Math.max(1, shape[0]) * 100) / 100 })
         }
+        if (framing) description.framing = framing
 
         // Marks are hulls: each marked entity outlined in its TYPE's colour,
         // right on its own pixels — a numbered tag floats above the thing it
@@ -874,6 +952,7 @@ export default {
             : { palette: description.palette }),
           size: [copy.width, copy.height],
           profile: description.profile,
+          ...(framing ? { framing } : {}),
           ...(replaced ? { replaced } : {}),
           ...(stretched
             ? {
