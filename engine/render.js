@@ -379,22 +379,71 @@ function totalScale(entity) {
   return (entity.scale ?? 1) * model
 }
 
+/** Degrees off a declaration, in radians. A missing axis is zero, not a complaint. */
+const degrees = (value, where) =>
+  value === undefined || value === null ? 0 : number(value, 0, where) * Math.PI / 180
+
 /**
- * Which way a body is turned, in radians about Y.
+ * How a body is turned, in radians about X, Y and Z.
  *
- * There are two names for this and they are not a duplicate — they are the two
- * places a facing comes from. `rotation` is the editor's handle, in degrees,
- * because degrees are what an author types into an inspector and reads back off
- * a level file. `yaw` is what game code sets while the world is running, in
- * radians, because radians are what every other angle in the engine is in: the
- * camera's aim, a raycast, the answer `Math.atan2` gives.
+ * Two names, and they are not a duplicate — they are the two places a turn comes
+ * from. `rotation` is the editor's handle, in degrees, because degrees are what
+ * an author types into an inspector and reads back off a level file. `yaw` is
+ * what game code sets while the world runs, in radians, because radians are what
+ * every other angle in the engine is in: the camera's aim, a raycast, the answer
+ * `Math.atan2` gives.
  *
- * The running value wins when there is one. Without this a type that turned its
- * body to face where it was running — the plainest thing a character does —
- * faced that way to every plugin that asked and stood facing north on screen.
+ * `rotation` takes either of the two forms `mesh.parts` takes:
+ *
+ *   "rotation": 45             // yaw alone, in degrees
+ *   "rotation": [-12, 45, 3]   // pitch, yaw and roll, in degrees
+ *
+ * The array is how a slope, a leaning post or a tipped rock is placed. Without
+ * it every one of them has to be faked with a stair of boxes.
+ *
+ * A running `yaw` beats the declared yaw and leaves the declared pitch and roll
+ * alone, so a body that turns to face where it is running still leans.
+ *
+ * Exported because this is the one place the format is read, and a test can
+ * check it here without a GL context.
  */
-const facingRadians = entity =>
-  Number.isFinite(entity.yaw) ? entity.yaw : (entity.rotation || 0) * Math.PI / 180
+export function turnRadians(entity) {
+  const declared = entity.rotation
+  const turn = Array.isArray(declared)
+    ? {
+      x: degrees(declared[0], `${entity.type}.rotation[0]`),
+      y: degrees(declared[1], `${entity.type}.rotation[1]`),
+      z: degrees(declared[2], `${entity.type}.rotation[2]`)
+    }
+    : { x: 0, y: degrees(declared, `${entity.type}.rotation`), z: 0 }
+  if (Number.isFinite(entity.yaw)) turn.y = entity.yaw
+  return turn
+}
+
+/**
+ * Turn one object to match its entity.
+ *
+ * YXZ, the order the camera and every attachment group in this file use: yaw,
+ * then pitch, then roll. In XYZ a body that leans and then turns rolls its own
+ * horizon. The order is passed to `set` rather than assigned separately so the
+ * angles and the order reach the quaternion in one write.
+ */
+export function turnObject(object, entity) {
+  const turn = turnRadians(entity)
+  object.rotation.set(turn.x, turn.y, turn.z, 'YXZ')
+}
+
+/**
+ * How far a flat sprite is spun on screen, in radians about Z.
+ *
+ * A sprite is drawn on the screen plane, so its single number is a spin about Z
+ * where a solid body's is a yaw about Y. Same key, two planes, because a flat
+ * game and a solid one mean different things by "turned". From an array it is
+ * the roll, which is the same axis.
+ */
+const spinRadians = entity => Array.isArray(entity.rotation)
+  ? degrees(entity.rotation[2], `${entity.type}.rotation[2]`)
+  : degrees(entity.rotation, `${entity.type}.rotation`)
 
 /**
  * How far to drop a model whose origin is not its middle.
@@ -512,12 +561,12 @@ function partsOf(declared, where = 'mesh') {
       // Only a named part can be posed. Most are not — a stripe or an eye has
       // nothing to say — so naming is opt-in rather than an index nobody typed.
       name: typeof part?.name === 'string' ? part.name : null,
-      // Degrees in the declaration, because that is the unit an author types;
-      // radians here, because that is the unit the scene graph is in.
+      // The same three degrees an entity's own `rotation` array takes, read the
+      // same way, because a part and the body it belongs to are turned alike.
       turn: {
-        x: number(turn[0], 0, `${spot}.rotation[0]`) * Math.PI / 180,
-        y: number(turn[1], 0, `${spot}.rotation[1]`) * Math.PI / 180,
-        z: number(turn[2], 0, `${spot}.rotation[2]`) * Math.PI / 180
+        x: degrees(turn[0], `${spot}.rotation[0]`),
+        y: degrees(turn[1], `${spot}.rotation[1]`),
+        z: degrees(turn[2], `${spot}.rotation[2]`)
       },
       declaration: { ...shared, ...part }
     }
@@ -2127,7 +2176,8 @@ export function makeRenderer(canvas, view, viewport) {
     // merge; a dimmed entity has its own material and would take the whole batch
     // with it; a hidden one has to be able to disappear on its own.
     const canMerge = !isModel && opacity >= 1 && !entity.hidden
-    const signature = `${entity.x},${entity.y},${entity.z || 0},${facingRadians(entity)},${entity.scale ?? 1}|${described.look}`
+    const turn = turnRadians(entity)
+    const signature = `${entity.x},${entity.y},${entity.z || 0},${turn.x},${turn.y},${turn.z},${entity.scale ?? 1}|${described.look}`
 
     let record = stillness.get(entity.id)
     if (!record) stillness.set(entity.id, record = { signature: null, frames: 0, batch: null, moved: false })
@@ -2411,11 +2461,10 @@ export function makeRenderer(canvas, view, viewport) {
         if (entity.mesh) {
           const declared = meshOf(entity)
           // Solid geometry carries its own size, so scale multiplies rather
-          // than sets. Rotation is about Y, not Z: on a wall, `rotation` means
-          // which way it faces, and tipping it over is never what was meant.
+          // than sets.
           const s = totalScale(entity)
           object.scale.set(s, s, s)
-          object.rotation.set(0, facingRadians(entity), 0)
+          turnObject(object, entity)
           // The editor dims a hovered entity to preview it.
           const opacity = entity.opacity ?? 1
           dim(object, opacity)
@@ -2436,7 +2485,7 @@ export function makeRenderer(canvas, view, viewport) {
         }
 
         const { w, h } = drawSize(entity)
-        object.rotation.set(0, 0, (entity.rotation || 0) * Math.PI / 180)
+        object.rotation.set(0, 0, spinRadians(entity))
         object.scale.set(w, h, 1)
         object.material.opacity = entity.opacity ?? 1
         // Painter's order is the layering in 2D: z first, then the order the
@@ -2776,7 +2825,7 @@ export function makeRenderer(canvas, view, viewport) {
         const p = this.toWorld(px, py)
         const hits = world.entities.filter(e => {
           const { w, h } = drawSize(e)
-          const a = -(e.rotation || 0) * Math.PI / 180
+          const a = -spinRadians(e)
           const dx = p.x - e.x, dy = p.y - e.y
           const lx = dx * Math.cos(a) - dy * Math.sin(a)
           const ly = dx * Math.sin(a) + dy * Math.cos(a)
