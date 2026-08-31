@@ -171,11 +171,25 @@ test('a second page claiming a live name is refused, and the first keeps it', as
   assert.match(named[0].url, /client=lane-a/, 'the page that had the name still has it')
 })
 
-test('a reload keeps the name and leaves one entry', async () => {
-  announce({ id: 'lane-b', nonce: 'same', url: 'http://first' }, openSocket())
+test('a reload waits for its own old socket, then keeps the name', async () => {
+  const first = openSocket()
+  announce({ id: 'lane-b', nonce: 'same', url: 'http://first' }, first)
+
+  // A reloading page announces before the socket it replaces has closed. The
+  // server cannot tell that from a second page copying the nonce, so it refuses
+  // and the original keeps the name. The page announces again every few
+  // seconds, which is what makes the refusal recoverable rather than fatal.
   announce({ id: 'lane-b', nonce: 'same', url: 'http://reloaded' }, openSocket())
-  const named = (await tabs()).filter(entry => entry.id === 'lane-b')
-  assert.equal(named.length, 1, 'a reconnect replaces its own entry rather than adding one')
+  let named = (await tabs()).filter(entry => entry.id === 'lane-b')
+  assert.equal(named.length, 1, 'one name is one page, whoever is asking')
+  assert.equal(named[0].url, 'http://first', 'a live page is never evicted by an announcement')
+
+  // Once the old socket has gone the name is free, and the next announcement
+  // takes it. This is the reload completing, one retry later.
+  first.readyState = 3
+  announce({ id: 'lane-b', nonce: 'same', url: 'http://reloaded' }, openSocket())
+  named = (await tabs()).filter(entry => entry.id === 'lane-b')
+  assert.equal(named.length, 1, 'the closed entry went with the name')
   assert.equal(named[0].url, 'http://reloaded')
 })
 

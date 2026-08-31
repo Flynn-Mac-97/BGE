@@ -36,6 +36,9 @@ export function makeLog(bus) {
   bus.on('plugin:error', failure =>
     push('error', failure.file ? 'plugin' : `plugin:${failure.name}`, reasonFor(failure)))
   bus.on('files:written', ({ path }) => push('info', 'files', `wrote ${path}`))
+  // An error, not a note: a write that did not land is the one thing a reader
+  // must not miss, and the reason names who is holding the file.
+  bus.on('files:refused', ({ message }) => push('error', 'files', message))
 
   // "I wrote the file — did it take?" has to be answerable from the log, or an
   // agent has no way to tell a hot swap that worked from one that never ran.
@@ -175,7 +178,10 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         // by five later complaints. Absent when everything loaded, so the
         // healthy snapshot is the size it always was.
         ...(broken.length ? { pluginsFailed: broken.map(reasonFor) } : {}),
-        unsaved: files.pending > 0
+        // A refused write leaves nothing pending, so the count alone reads as
+        // saved. Both halves are needed for `unsaved` to be true.
+        unsaved: files.pending > 0 || !!files.refused,
+        ...(files.refused ? { refused: files.refused.message } : {})
       }
       if (options.entities) out.entities = world.entities.map(e => entityView(e, true))
       if (options.plugins) out.plugins = [...loader.plugins.entries()]
@@ -277,8 +283,14 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     spawn: (type, placement) => entityView(editor.context.spawn(type, placement)),
     destroy: id => editor.context.destroy(world.byId(id)),
 
-    /** Set a field or prop on an entity and persist it. */
-    set(id, key, value) {
+    /**
+     * Set a field or prop on an entity and persist it.
+     *
+     * Async because the save is: an unawaited save turns a refusal into an
+     * unhandled rejection and answers the caller as if the file was written.
+     * A save the editor skipped is named in the reply for the same reason.
+     */
+    async set(id, key, value) {
       const e = world.byId(id)
       if (!e) throw new Error(`no entity "${id}"`)
       if (key in e.properties) {
@@ -286,8 +298,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         if (!e.overrides.includes(key)) e.overrides.push(key)
       } else e[key] = value
       bus.emit('world:changed')
-      editor.saveLevel()
-      return entityView(e)
+      const saved = await editor.saveLevel()
+      const view = entityView(e)
+      return saved?.skipped ? { ...view, notSaved: saved.skipped } : view
     },
 
     /**

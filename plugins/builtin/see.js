@@ -84,6 +84,29 @@ function declaredShape(context) {
 }
 
 /**
+ * The world as the declared screen shows it. An ortho camera fits world units
+ * to viewport pixels, so a wide agent window shows more of the level than a
+ * player ever sees; describing at the declared shape puts every screen
+ * position, and the frame drawn from it, at the shape the art is ruled against.
+ *
+ * `see.capture` does the same through `renderer.frameSize`. This path has no
+ * renderer, so it moves the viewport both of them read. Nothing is awaited
+ * between the swap and the restore: no draw may read a viewport the renderer
+ * is not sized to.
+ */
+function describeAtDeclaredShape(context, options) {
+  const shape = declaredShape(context)
+  if (!shape) return describe(context, options)
+  const kept = { width: context.viewport.width, height: context.viewport.height }
+  Object.assign(context.viewport, { width: shape[0], height: shape[1] })
+  try {
+    return describe(context, options)
+  } finally {
+    Object.assign(context.viewport, kept)
+  }
+}
+
+/**
  * Hide player-facing overlay objects for one draw. Anything a plugin marks
  * `userData.overlay = true` — damage numbers and their kin — is HUD in the
  * scene, not world, and `ui: false` leaves it out of the frame.
@@ -268,7 +291,7 @@ export default {
         if (options.error) return { error: options.error }
         return withSubject(context, options, async options => {
         const name = options.name || await freeFrameName(context, 'sketch')
-        const description = describe(context, options)
+        const description = describeAtDeclaredShape(context, options)
         if (description.error) return description
         // An alone shot promises one thing in the frame, and none of it is not
         // a picture of that thing. Refusing names the subject, where a blank

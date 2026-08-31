@@ -28,6 +28,7 @@ import { makeFiles } from './files.js'
 import { importPlugin } from './plugin-import.js'
 import { startWorld } from './start-world.js'
 import { buildIndex, walk } from './project-index.mjs'
+import { workLock } from './work-lock.mjs'
 
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -133,6 +134,38 @@ export function onDisk(projectDirectory) {
 }
 
 /**
+ * Every write this process refused, oldest first.
+ *
+ * A caller that swallows the rejection still has to fail: the CLI reads this
+ * after the op and exits 1 when anything is in it.
+ */
+const refusedWrites = []
+
+/** What the work lock refused in this process, oldest first. */
+export function writesRefusedHere() {
+  return refusedWrites.slice()
+}
+
+/**
+ * Refuse every write while a lane holds the checkout.
+ *
+ * `vite.config.js` asks `permits` at the server's three doors. A headless world
+ * reaches disk through none of them, so the same rule is registered here.
+ *
+ * The lock is read on every write, not once at start-up, so a run that ends
+ * mid-session frees the checkout with nothing to reset. Reads never reach a
+ * guard, so a locked checkout still answers every question.
+ */
+function refuseWritesWhileLanesWork(checkout) {
+  return (file, scope) => {
+    const lock = workLock(checkout)
+    if (!lock.locked) return null
+    refusedWrites.push({ file, scope, why: lock.why })
+    return lock.why
+  }
+}
+
+/**
  * Every plugin file, read from the directories rather than globbed.
  *
  * `import.meta.glob` is a Vite feature and is expanded at build time. Reading
@@ -197,7 +230,11 @@ export async function startWorldInNode({ root = ROOT, project = 'project', viewp
   }
 
   return startWorld({
-    openFiles: bus => makeFiles(bus, onDisk(projectDirectory)),
+    openFiles: bus => {
+      const files = makeFiles(bus, onDisk(projectDirectory))
+      files.guardWrites(refuseWritesWhileLanesWork(checkout))
+      return files
+    },
     loadPlugins: loader => findPlugins(checkout, projectDirectory, loader),
     importProjectFile: importProjectFileFrom(projectDirectory),
     // The name, not the absolute path: a plugin builds `<project>/plugins` from

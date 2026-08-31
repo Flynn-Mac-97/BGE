@@ -62,17 +62,29 @@ whose process is still alive. Nothing has to remember to unlock.
   what the page reports about itself. A page can set `navigator.webdriver` or
   its user agent; it cannot write a registry entry.
 
-`engine/work-lock.mjs` decides and enforces nothing. `vite.config.js` enforces at
-all three write doors — `POST /api/engine`, `POST /api/file` and
-`POST /api/agent-file` — each answering `423 {code:"held"}`. `engine/files.js`
-holds a kernel guard on top, so a lane's page refuses its own write before it
-reaches the wire. `node bin/engine.mjs lock` says who holds it.
+`engine/work-lock.mjs` decides and enforces nothing. It is enforced in three
+places, and a write reaching disk any other way is not covered by any of them:
 
-`--headless` skips all of that and starts a world in the CLI process. It exists
-so several agents can work at once: one dev server has one shared world;
-headless worlds are one per process. Memory is private — world, clock, random
-stream, selection. `project/` is not, because it is on disk, so anything that
-*writes* still needs its own worktree or its own lane. Headless cannot draw;
-for a frame, use a browser.
+- `vite.config.js`, at all three server write doors — `POST /api/engine`,
+  `POST /api/file` and `POST /api/agent-file` — each answering
+  `423 {code:"held"}`.
+- `engine/files.js`, a kernel guard, so a lane's page refuses its own write
+  before it reaches the wire.
+- `engine/start-world-node.mjs`, a guard on the node file transport, so a
+  `--headless` run refuses a write to a project file and the CLI exits 1.
+
+`node bin/engine.mjs lock` says who holds it.
+
+Two writes are deliberately outside the lock: a capture written to
+`agent-runs/`, because measuring a lane while it works is the point, and
+`engine/agent-workspace-node.mjs`, which writes the run registry the lock is
+derived from.
+
+`--headless` starts a world in the CLI process instead of talking to a server,
+and carries the lock with it. It exists so several agents can work at once: one
+dev server has one shared world; headless worlds are one per process. Memory is
+private — world, clock, random stream, selection. `project/` is not, because it
+is on disk, so anything that *writes* still needs its own worktree or its own
+lane. Headless cannot draw; for a frame, use a browser.
 
 The engine hosts no AI. Any CLI can drive it.

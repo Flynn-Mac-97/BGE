@@ -7,7 +7,8 @@
  * the right one — a hidden tab answered a capture with a blank frame that way.
  * So a call names its client, and a call that cannot name one is refused with
  * the list rather than guessed at. Naming only works while one name means one
- * page, so mergeClient refuses a second page claiming a name already in use.
+ * page, so mergeClient refuses every second page while the page holding the
+ * name is still open.
  */
 
 /** Whether a page's socket is still open. */
@@ -21,8 +22,33 @@ export const isLive = entry => entry?.client?.socket?.readyState === 1
  */
 export const publicClient = ({ client, nonce, ...rest }) => rest
 
-/** The same page, proven by a value only that page holds. */
-const samePage = (entry, nonce) => Boolean(nonce) && entry.nonce === nonce
+/**
+ * The same page coming back to a name its socket has already given up.
+ *
+ * It decides the attach time and nothing else. A nonce can be copied, so it
+ * never takes a name off a page that is still open.
+ */
+const samePage = (entry, nonce) => Boolean(nonce) && entry?.nonce === nonce
+
+/**
+ * The nonce a page announces as its own.
+ *
+ * Chrome copies sessionStorage into a tab opened with window.open, so a popup
+ * starts out holding the opener's nonce. A page with an opener did not start
+ * this session, so the stored value is not its own: mint a fresh one and keep
+ * that instead.
+ *
+ * This runs in the browser. The tab beacon in vite.config.js inlines this
+ * function's own source, so one definition serves both sides and a node test
+ * proves the code the page runs. Keep it self-contained.
+ */
+export function ownNonce(storage, { hasOpener, mint }) {
+  const stored = storage.getItem('engine:tab-nonce')
+  if (stored && !hasOpener) return stored
+  const fresh = mint()
+  storage.setItem('engine:tab-nonce', fresh)
+  return fresh
+}
 
 /**
  * The stored entry, built from what the page said. Only the server knows
@@ -52,23 +78,23 @@ const clientEntry = (client, said, { name, nonce, since }) => ({
  * `{ error: 'name-taken', existing }` and stores nothing.
  *
  * A name is how a caller targets one page, so two pages cannot hold one name.
- * The second page is refused and the first keeps both the name and its calls.
- * `said.nonce` is the page's own value and survives reload, so it separates one
- * page reconnecting from a different page claiming the same name. A name whose
- * page has gone is free again.
+ * A page that holds the name and is still open keeps it, and the second page is
+ * refused. Nothing a second announcement carries can prove it is the first: a
+ * nonce is a value, and a value can be copied. The name is free again only when
+ * the socket holding it closes, or when that same socket announces again.
  */
 export function mergeClient(clients, socket, client, said) {
   const name = String(said?.id || 'unnamed')
   const nonce = said?.nonce ? String(said.nonce) : ''
   const [rivalSocket, held] =
     [...clients].find(([key, entry]) => key !== socket && entry.id === name) || []
-  if (held) {
-    if (isLive(held) && !samePage(held, nonce)) return { error: 'name-taken', existing: held }
-    // A reconnect announces on a new socket before the old one closes. One page
-    // holds one entry, or every call to it is ambiguous.
-    clients.delete(rivalSocket)
-  }
-  const since = clients.get(socket)?.since || held?.since || new Date().toISOString()
+  // Liveness is tested first and alone. Any test that can hand a live page's
+  // name to a second announcement is a hijack, whatever else it checks.
+  if (isLive(held)) return { error: 'name-taken', existing: held }
+  // One page holds one entry, or every call to it is ambiguous.
+  if (held) clients.delete(rivalSocket)
+  const since = clients.get(socket)?.since ||
+    (samePage(held, nonce) ? held.since : '') || new Date().toISOString()
   clients.set(socket, clientEntry(client, said, { name, nonce, since }))
   return { ok: true }
 }

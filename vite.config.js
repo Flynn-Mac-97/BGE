@@ -6,7 +6,8 @@ import path from 'node:path'
 // same code. Two implementations of "what is in this project" would drift.
 import { buildIndex as buildProjectIndex, problemsIn, fatal, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
 import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
-import { chooseClient, describeClient, explainClientError, isLive, mergeClient, publicClient } from './engine/bridge-clients.mjs'
+import { chooseClient, describeClient, explainClientError, isLive, mergeClient, ownNonce, publicClient } from './engine/bridge-clients.mjs'
+import { readLaneBrowsers } from './engine/lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
 
 const ROOT = process.cwd()
@@ -471,7 +472,6 @@ const TAB_BEACON_SOURCE = `
 const hot = import.meta.hot
 if (hot) {
   const key = 'engine:tab-id'
-  const nonceKey = 'engine:tab-nonce'
   // A page opened as ?client=<name> keeps that name, so a lane can target its
   // own headless page by a name it chose instead of a value it must first go
   // and read. Anything else keeps a random name for the length of the session.
@@ -479,14 +479,14 @@ if (hot) {
   let id = asked || sessionStorage.getItem(key)
   if (!id) { id = Math.random().toString(36).slice(2, 10) }
   sessionStorage.setItem(key, id)
-  // Two pages can claim one name, because ?client= is whatever the opener
-  // asked for. The nonce belongs to this page and survives its own reload, so
-  // the server can tell a page reconnecting from a second page taking its name.
-  let nonce = sessionStorage.getItem(nonceKey)
-  if (!nonce) {
-    nonce = Math.random().toString(36).slice(2, 10)
-    sessionStorage.setItem(nonceKey, nonce)
-  }
+  // The nonce says which page this is across its own reloads. One definition,
+  // inlined from engine/bridge-clients.mjs, so a node test proves the rule this
+  // page runs.
+  const ownNonce = ${ownNonce}
+  const nonce = ownNonce(sessionStorage, {
+    hasOpener: Boolean(window.opener),
+    mint: () => Math.random().toString(36).slice(2, 10)
+  })
   // A page opened under a name is one a lane renders in. Its world is its own;
   // the checkout is shared, so it never writes a file. The name is kept, not a
   // flag, so a refused write says which lane asked. Set before the editor
@@ -510,8 +510,33 @@ if (hot) {
   announce()
   addEventListener('visibilitychange', announce)
   addEventListener('resize', announce)
+  // A name stays with the page that holds it until that page's socket closes,
+  // so a reload that announces before the socket it replaces has gone is
+  // refused. Announcing again takes the name back as soon as that socket goes.
+  setInterval(announce, 3000)
 }
 `
+
+/** Where a lane's captures are written. Read from, never written to, here. */
+const SEE_DIRECTORY = path.join(ROOT, 'agent-runs/see')
+
+/**
+ * The newest capture whose filename names this client, or null.
+ *
+ * The name is matched against filenames this function itself listed, never
+ * joined into a path, so no name reaches outside `agent-runs/see`.
+ */
+async function newestLaneFrame(client) {
+  if (!client || /[\\/]/.test(client)) return null
+  let names = []
+  try { names = await fs.readdir(SEE_DIRECTORY) } catch { return null }
+  let newest = null
+  for (const name of names.filter(name => name.endsWith('.png') && name.includes(client))) {
+    const when = await fs.stat(path.join(SEE_DIRECTORY, name)).then(stat => stat.mtimeMs, () => null)
+    if (when !== null && (!newest || when > newest.when)) newest = { name, when }
+  }
+  return newest
+}
 
 function serverRegistry() {
   let record = null
@@ -528,9 +553,11 @@ function serverRegistry() {
 
     configureServer(server) {
       // Keyed by the raw socket, so a tab that closes takes its entry with it.
-      // Whether an announcement is a reconnect or a second page claiming a live
-      // page's name is decided by `mergeClient`, from the nonce the beacon
-      // sends; this server holds the list and nothing more.
+      // `mergeClient` decides whether an announcement may have the name it
+      // asks for; this server holds the list and nothing more.
+      // A page announces again every few seconds, so a socket refused once is
+      // refused again. Warn per socket, or the log buries everything else.
+      const warned = new WeakSet()
       server.ws.on('engine:tab', (said, client) => {
         const socket = client.socket
         // Which checkout and project this is comes from the server, last, so a
@@ -538,7 +565,10 @@ function serverRegistry() {
         const merged = mergeClient(clients, socket, client,
           { ...said, project: PROJECT_DIRECTORY, serves: ROOT })
         if (merged.error) {
-          console.warn(`[engine] tab "${said?.id}" refused — ${merged.error}: ${describeClient(merged.existing)} holds that name`)
+          if (!warned.has(socket)) {
+            warned.add(socket)
+            console.warn(`[engine] tab "${said?.id}" refused — ${merged.error}: ${describeClient(merged.existing)} holds that name`)
+          }
           return
         }
         socket.once?.('close', () => clients.delete(socket))
@@ -547,13 +577,34 @@ function serverRegistry() {
       // What this server is, asked over the wire. A record on disk says what was
       // true when it was written; this is the only thing that says what is true
       // now, which is why the CLI never reports an entry alive without it.
-      server.middlewares.use((req, res, next) => {
-        if (req.url.split('?')[0] !== '/api/server') return next()
-        return send(res, 200, {
-          ...(record || { serves: ROOT, project: PROJECT_DIRECTORY }),
-          pid: process.pid,
-          tabs: attached()
-        })
+      server.middlewares.use(async (req, res, next) => {
+        const url = new URL(req.url, 'http://x')
+        if (url.pathname === '/api/server') {
+          return send(res, 200, {
+            ...(record || { serves: ROOT, project: PROJECT_DIRECTORY }),
+            pid: process.pid,
+            tabs: attached(),
+            // The lane records as written. Proving one means asking its
+            // debugging port, and a viewer polling this route must not wait on
+            // that; `node bin/engine.mjs lanes` proves them.
+            lanes: readLaneBrowsers(ROOT)
+          })
+        }
+
+        // The last frame a lane captured, for a viewer that shows every lane.
+        // Read only, one directory, and the client name never becomes a path.
+        if (url.pathname === '/api/lane-frame') {
+          const newest = await newestLaneFrame(url.searchParams.get('client') || '')
+          if (!newest) return send(res, 404, { error: 'no frame for that client' })
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/png')
+          // Which capture this is, so a viewer can tell a new frame from the
+          // one it already has.
+          res.setHeader('x-engine-frame', newest.name)
+          return res.end(await fs.readFile(path.join(SEE_DIRECTORY, newest.name)))
+        }
+
+        return next()
       })
 
       server.httpServer?.once('listening', () => {

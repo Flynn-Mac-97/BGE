@@ -2,11 +2,9 @@
   "title": "Kitten Survivors",
   "startLevel": "meadow",
   "device": {
-    "comment": "The screen this game is drawn for and judged at. art/world/bible.md and art/interface/bible.md rule against a portrait phone with a 1080 px short edge, which is 540x960 at pixel ratio 2. The engine viewport and every see.capture read this.",
+    "comment": "The screen this game is drawn for and judged at: the portrait phone art/world/bible.md and art/interface/bible.md rule against, 540x960 CSS pixels. width and height are the only fields read. They set the viewport every camera clamps against, and see.capture and see.sketch draw at them, so a frame comes out at the shape the art is ruled at. No pixel ratio is declared because nothing renders at one: a PNG is these pixels times the page's own device pixel ratio, which a lane browser forces to 1, and see.capture measures that ratio into the sidecar's profile. orientation is derived from width and height.",
     "width": 540,
-    "height": 960,
-    "pixelRatio": 2,
-    "orientation": "portrait"
+    "height": 960
   },
   "plugins": {
     "comment": "Mouse Look captures the pointer the moment play starts and rebinds the keys for a shooter. Nothing here is aimed with a mouse.",

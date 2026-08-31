@@ -1,8 +1,9 @@
 /**
  * Kernel: the only writer to disk.
  *
- * There is no save button anywhere in the editor — every edit lands here
- * immediately, which is what lets the status bar state "saved" unconditionally.
+ * There is no save button anywhere in the editor: every edit lands here at
+ * once. A write that a guard or the server refuses is recorded in `refused` and
+ * announced as `files:refused`, so a reader states "saved" only when one is.
  *
  * The four things it does — index, tree, read, write — are handed in as a
  * transport, because the browser reaches disk over HTTP and node reaches it
@@ -73,6 +74,24 @@ export function makeFiles(bus, transport = overHTTP()) {
   let writing = 0
 
   /**
+   * The last write that did not reach disk, and why. Cleared by the next write
+   * that does.
+   *
+   * `pending` counts writes in flight, so after a refusal it reads zero — the
+   * same number a finished write leaves. A reader with only that number reports
+   * "saved to disk" for a write that was refused, so the refusal is kept here
+   * and announced as `files:refused`.
+   */
+  let refused = null
+
+  /** Store a write that did not land, announce it, and return the record. */
+  const noteRefusal = (path, scope, why) => {
+    refused = { path, scope, why, message: `refused to write ${path} — ${why}` }
+    bus.emit('files:refused', refused)
+    return refused
+  }
+
+  /**
    * Asked before every write, and any one of them may refuse it.
    *
    * The kernel performs the write, so only the kernel can stop one. Beyond its
@@ -94,6 +113,12 @@ export function makeFiles(bus, transport = overHTTP()) {
     return null
   }
 
+  /** Throw if a guard refuses this write, after recording the refusal. */
+  const stopIfRefused = (path, scope) => {
+    const why = refusal(path, scope)
+    if (why) throw new Error(noteRefusal(path, scope, why).message)
+  }
+
   return {
     /** Register a write guard. Returns the function that removes it again. */
     guardWrites(guard) {
@@ -107,13 +132,18 @@ export function makeFiles(bus, transport = overHTTP()) {
     async readAgent(scope, path) { return transport.readAgent(scope, path) },
 
     async write(path, text) {
-      const why = refusal(path, 'project')
-      if (why) throw new Error(`refused to write ${path} — ${why}`)
+      stopIfRefused(path, 'project')
       writing++
       bus.emit('files:writing', { path, pending: writing })
       try {
         await transport.write(path, text)
+        refused = null
         bus.emit('files:written', { path })
+      } catch (error) {
+        // The server refuses too — the work lock answers the file routes — and
+        // a write it turned away is as unsaved as one a guard stopped.
+        noteRefusal(path, 'project', String(error?.message || error))
+        throw error
       } finally {
         writing--
         bus.emit('files:writing', { path, pending: writing })
@@ -123,19 +153,25 @@ export function makeFiles(bus, transport = overHTTP()) {
     async writeJSON(path, value) { return this.write(path, JSON.stringify(value, null, 2)) },
 
     async writeAgent(scope, path, text) {
-      const why = refusal(path, scope)
-      if (why) throw new Error(`refused to write ${path} — ${why}`)
+      stopIfRefused(path, scope)
       writing++
       bus.emit('files:writing', { path, scope, pending: writing })
       try {
         await transport.writeAgent(scope, path, text)
+        refused = null
         bus.emit('files:written', { path, scope })
+      } catch (error) {
+        noteRefusal(path, scope, String(error?.message || error))
+        throw error
       } finally {
         writing--
         bus.emit('files:writing', { path, scope, pending: writing })
       }
     },
 
-    get pending() { return writing }
+    get pending() { return writing },
+
+    /** The last write that did not land, or null once one does. */
+    get refused() { return refused }
   }
 }

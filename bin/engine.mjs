@@ -128,12 +128,15 @@ replacing the record. A record keeps windowAsked, the size Chrome was told, and
 viewportReported, what the page says — editor chrome makes them differ, so no
 single number is the frame size.
 
-While a lane works the checkout is locked. Every op that writes is refused with
-exit 1 and a reason naming the lanes; reads answer as usual. A lane's own render
-page is refused every file write whatever the lock says, because its world is
-its own and the checkout is shared. Which of the two you are is read from the
-lane registry, never from what the page reports about itself. Say \`lock\` to see
-the holders, \`lanes.stop\` to end a lane browser, \`agent.release\` to end a run.
+While a lane works the checkout is locked, on both routes to disk. Through the
+dev server every writing op is refused; headless, every write to a project file
+is refused. Either way the exit code is 1 and the reason names the lanes. Reads
+answer as usual, and a headless run that only plays, simulates or measures keeps
+working, because that world is private to the process. A lane's own render page
+is refused every file write whatever the lock says, because its world is its own
+and the checkout is shared. Which of the two you are is read from the lane
+registry, never from what the page reports about itself. Say \`lock\` to see the
+holders, \`lanes.stop\` to end a lane browser, \`agent.release\` to end a run.
 
 Agent commands also need nothing running. Small prepared tasks use this
 workspace; parallel writers get a git worktree and require a clean baseline.
@@ -847,7 +850,20 @@ if (flags.headless) {
   // console.info writes to stdout by default in node; it must join the redirect.
   console.info = toStderr
 
-  const { startWorldInNode } = await import('../engine/start-world-node.mjs')
+  const { startWorldInNode, writesRefusedHere } = await import('../engine/start-world-node.mjs')
+
+  /**
+   * The work lock refused a write, so the run failed whatever the op answered.
+   *
+   * A command that awaits the write throws and dies before this. One that
+   * ignores the rejection would otherwise print its usual result and exit 0,
+   * and the caller would believe the file is on disk.
+   */
+  const failOnRefusedWrite = () => {
+    const [first] = writesRefusedHere()
+    if (first) die(1, `refused to write ${first.file} — ${first.why}`)
+  }
+
   let engine, editor
   try {
     ({ engine, editor } = await startWorldInNode({ root: CHECKOUT, project: PROJECT }))
@@ -881,6 +897,7 @@ if (flags.headless) {
       catch (e) { die(1, `step ${results.length + 1} (${stepOp}): ${String(e?.message || e)}`, e?.stack) }
     }
     console.log = original
+    failOnRefusedWrite()
     finish(results.map(result => result === undefined ? { ok: true } : result))
   }
 
@@ -894,6 +911,7 @@ if (flags.headless) {
   catch (e) { die(1, String(e?.message || e), e?.stack) }
 
   console.log = original
+  failOnRefusedWrite()
   // The loop may hold a timer open. The op is done, so leave rather than wait.
   finish(result)
 }

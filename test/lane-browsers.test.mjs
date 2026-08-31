@@ -8,12 +8,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import http from 'node:http'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 
 import {
-  readLaneBrowsers, recordLaneBrowser, recordLaneViewport, freeLaneName, startLaneBrowser,
+  readLaneBrowsers, recordLaneBrowser, recordLaneViewport, forgetLaneBrowser, freeLaneName,
+  findFreeDebuggingPort, clientsOnPort, listLaneBrowsers, startLaneBrowser,
   stopLaneBrowsers, laneBrowserArguments
 } from '../engine/lane-browsers.mjs'
 
@@ -22,6 +24,37 @@ function checkout(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   fs.mkdirSync(path.join(root, 'project/.engine'), { recursive: true })
   return root
+}
+
+/** Bind a port, as a running browser does. Returns a release. */
+async function holdPort(t, port) {
+  const server = net.createServer()
+  await new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(port, '127.0.0.1', resolve)
+  })
+  let open = true
+  const release = () => new Promise(resolve => {
+    if (!open) return resolve()
+    open = false
+    server.close(resolve)
+  })
+  t.after(release)
+  return release
+}
+
+/** A debugging port that answers for the lanes named, as Chrome does. */
+async function fakeBrowser(t, port, clients) {
+  const targets = clients.map(client => ({ type: 'page', url: `http://localhost:5180/?client=${client}` }))
+  const server = http.createServer((request, response) => {
+    response.setHeader('content-type', 'application/json')
+    response.end(request.url.startsWith('/json/list')
+      ? JSON.stringify(targets)
+      : '{"Browser":"fake/1"}')
+  })
+  await new Promise(resolve => server.listen(port, '127.0.0.1', resolve))
+  t.after(() => { server.closeAllConnections?.(); server.close() })
+  return port
 }
 
 /** A profile directory with a file in it, so its removal is visible. */
@@ -138,6 +171,128 @@ test('a port still answering after a stop is named, not called clear', async t =
   assert.equal(result.remaining, 0, 'the record is gone')
   assert.equal(result.stopped[0].stillAnswering, true, 'something is still attached')
   assert.match(result.warning, new RegExp(String(port)))
+})
+
+test('two lanes never share a port, whatever the record count says', async t => {
+  const root = checkout(t)
+  const from = 39500
+
+  const alphaPort = await findFreeDebuggingPort(root, { from })
+  const releaseAlpha = await holdPort(t, alphaPort)
+  recordLaneBrowser(root, { client: 'alpha', port: alphaPort, pid: process.pid })
+
+  const betaPort = await findFreeDebuggingPort(root, { from })
+  assert.notEqual(betaPort, alphaPort, 'a bound port is not offered again')
+  await holdPort(t, betaPort)
+  recordLaneBrowser(root, { client: 'beta', port: betaPort, pid: process.pid })
+
+  // Stop alpha. One record is left, so counting records names beta's port.
+  forgetLaneBrowser(root, 'alpha')
+  await releaseAlpha()
+
+  const gammaPort = await findFreeDebuggingPort(root, { from })
+  assert.notEqual(gammaPort, betaPort, 'the port beta holds is never handed out')
+  assert.equal(gammaPort, alphaPort, 'the port alpha released is free again')
+  await holdPort(t, gammaPort)
+})
+
+test('a port a record already names is skipped, even before its browser binds', async t => {
+  const root = checkout(t)
+  const from = 39540
+  const first = await findFreeDebuggingPort(root, { from })
+  recordLaneBrowser(root, { client: 'alpha', port: first, pid: process.pid })
+  assert.notEqual(await findFreeDebuggingPort(root, { from }), first,
+    'two starts at once must not pick the same free port')
+})
+
+test('an entry is proved by its port naming the lane, not by any browser answering', async t => {
+  const root = checkout(t)
+  const port = await findFreeDebuggingPort(root, { from: 39560 })
+  await fakeBrowser(t, port, ['beta'])
+  recordLaneBrowser(root, { client: 'beta', port, pid: process.pid })
+  recordLaneBrowser(root, { client: 'gamma', port, pid: process.pid })
+
+  const listed = await listLaneBrowsers(root)
+  const beta = listed.find(entry => entry.client === 'beta')
+  const gamma = listed.find(entry => entry.client === 'gamma')
+
+  assert.equal(beta.alive, true)
+  assert.equal(beta.state, 'running')
+  assert.equal(gamma.alive, false, 'beta must not answer the probe for gamma')
+  assert.equal(gamma.state, 'wrong browser')
+  assert.match(gamma.why, /beta/, 'it says whose browser holds the port')
+})
+
+test('a start on a port another browser holds is refused', async t => {
+  const root = checkout(t)
+  const port = await findFreeDebuggingPort(root, { from: 39580 })
+  await fakeBrowser(t, port, ['beta'])
+
+  await assert.rejects(
+    () => startLaneBrowser(root, {
+      client: 'gamma', url: 'http://localhost:5180/', port, chrome: process.execPath
+    }),
+    /already bound/)
+  assert.deepEqual(readLaneBrowsers(root), [], 'a browser that never started leaves no record')
+  assert.deepEqual(await clientsOnPort(port), ['beta'], 'the port still belongs to beta')
+})
+
+test('a start never takes the port another record names, even when asked to', async t => {
+  const root = checkout(t)
+  const taken = await findFreeDebuggingPort(root, { from: 39590 })
+  recordLaneBrowser(root, { client: 'beta', port: taken, pid: process.pid })
+
+  // A caller that works its port out from a count asks for one beta holds.
+  await assert.rejects(
+    () => startLaneBrowser(root, {
+      client: 'gamma', url: 'http://localhost:5180/', port: taken, chrome: process.execPath
+    }),
+    error => {
+      const started = Number(error.message.match(/debugging port (\d+)/)?.[1])
+      assert.notEqual(started, taken, 'gamma must be given a port of its own')
+      return true
+    })
+  assert.equal(readLaneBrowsers(root).length, 1, 'beta keeps its record')
+})
+
+test('a start with no port takes a free one', async t => {
+  const root = checkout(t)
+  await assert.rejects(
+    () => startLaneBrowser(root, {
+      client: 'alpha', url: 'http://localhost:5180/', chrome: process.execPath
+    }),
+    error => {
+      assert.match(error.message, /never opened its debugging port \d+/, 'a port was allocated')
+      return true
+    })
+})
+
+test('an unreachable port names nobody', async () => {
+  const port = 39599
+  assert.equal(await clientsOnPort(port), null, 'nothing answering is not an empty browser')
+})
+
+test('a browser started in a worktree is owned by the main checkout', async t => {
+  const main = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-lane-main-'))
+  t.after(() => fs.rmSync(main, { recursive: true, force: true }))
+  const git = (...args) =>
+    execFileSync('git', ['-C', main, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  git('init', '--quiet')
+  git('config', 'user.email', 'lane@example.test')
+  git('config', 'user.name', 'lane')
+  git('commit', '--allow-empty', '--quiet', '-m', 'base')
+  const lane = path.join(main, '.agent-worktrees', 'lane-a')
+  git('worktree', 'add', '--quiet', '-b', 'agent/lane-a', lane)
+
+  recordLaneBrowser(lane, { client: 'alpha', port: 39598, pid: deadPid() })
+
+  assert.equal(fs.existsSync(path.join(lane, 'project/.engine/lane-browsers.json')), false,
+    'a worktree writes no registry of its own')
+  assert.equal(readLaneBrowsers(main).length, 1, 'the main checkout lists a lane started in a worktree')
+
+  const result = await stopLaneBrowsers(main, 'alpha')
+  assert.equal(result.stopped.length, 1, 'and can stop it')
+  assert.deepEqual(readLaneBrowsers(lane), [], 'the worktree reads the same registry')
 })
 
 test('a page that reports nothing adds no size', t => {
