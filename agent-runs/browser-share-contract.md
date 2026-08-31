@@ -2,8 +2,8 @@
 
 ## Contract status
 
-provisional. One blocking unknown: whether headless Chromium gets real GPU
-WebGL on this machine (`U1`). One probe settles it. `U2` is resolved below.
+complete. `U1` and `U2` resolved by measurement below. No blocking unknown
+remains; every row's evaluator is staffed.
 
 ## North star
 
@@ -48,6 +48,8 @@ One switchable view per worktree is unchanged.
 | `kitten-survivors/art/world/bible.md:13`, `art/interface/bible.md:13,87` @99c5ac9 | LOCAL, primary | This game | Target is a portrait phone, 390 pt wide, 1080 px short edge | Other games set their own | 99c5ac9 | High |
 | [WebKit ANGLE backend](https://trac.webkit.org/wiki/AngleforWebGL) | SOURCE, official | WebKit / Safari / WKWebView | Safari renders WebGL through ANGLE, as Chrome does; ANGLE translates to D3D11 on Windows and Metal on iOS | Does not promise pixel-identical output across backends | current | Medium |
 | [Capacitor games guide](https://capacitorjs.com/docs/guides/games) | SOURCE, first-party | Capacitor | WebGL and canvas games export to iOS and Android through a WebView | No performance figures given | current | Medium |
+| Measured: U1 probe, `agent-runs/u1-clean.png` @52b96d6 | LOCAL, primary | This machine, Chrome 151 | Headless Chromium renders this engine on the real GPU and the CLI drives it with no window; five at once each kept a context | One machine, one GPU; says nothing about a GPU-less CI box | 2026-08-31 | High |
+| Measured: capture size 524x865 inside a 540x960 window @52b96d6 | LOCAL, primary | Editor capture path | `see.capture` returns the canvas, which is the window minus editor chrome, so a window size is not the frame size | — | 2026-08-31 | High |
 | [Chrome background tabs](https://developer.chrome.com/blog/background_tabs) | SOURCE, official | Chromium | Background tabs get no rAF callbacks | Not about headless instances | 2017, still current | High |
 | [Chromium SwiftShader docs](https://chromium.googlesource.com/chromium/src/+/main/docs/gpu/swiftshader.md) | SOURCE, official | Chromium | Automatic WebGL fallback to SwiftShader is deprecated; context creation will fail rather than fall back | Does not say GPU-backed headless fails | 2026 | Medium |
 
@@ -72,30 +74,30 @@ One switchable view per worktree is unchanged.
 
 ## Unknowns and assumptions
 
-- `U1` **blocking** — Does headless Chromium get GPU-backed WebGL here, or
-  refuse a context? `SOURCE`: SwiftShader fallback is deprecated. Probe: run it
-  on the editor URL, read `WEBGL_debug_renderer_info`, capture a meadow frame,
-  diff against a foreground capture of the same seed.
+- `U1` **resolved, measured 2026-08-31** — Headless Chromium gets the real GPU:
+  `ANGLE (NVIDIA, RTX 4070, Direct3D11)`, WebGL 2.0, no SwiftShader. Five at
+  once each held a context and wrote a byte-identical 540x960 frame. The CLI
+  drove one with no window: 1261 entities, a 32-second run answering two
+  level-up cards, then a clean capture `art.check` measured.
 - `U2` **resolved** — Both, split by consumer. The render service runs the
-  lane's real code: a lane editing `engine/render.js` must be checked against
-  its own drawing, and a headless Chromium on the lane's own dev server does
-  that, since each worktree is already a valid server root. The viewer mirrors
-  reported state, needing no lane code and no `vite.config.js` change.
+  lane's real code, since a lane editing `engine/render.js` must be checked
+  against its own drawing, and each worktree is already a valid server root.
+  The viewer mirrors state, needing no lane code and no `vite.config.js` change.
 - `U3` non-blocking — Is a serial render queue enough? `INFERENCE`: a frame
   takes under a second and lanes ask rarely. Falsified by a tuning sweep.
-- `U4` out of scope — `USER` deferred iOS. Windows and WebGL use the checked
-  path, so no Metal question arises here.
+- `U4` out of scope — `USER` deferred iOS.
+- `U5` non-blocking, opened by the probe — A device profile must be set on the
+  canvas, not the window: a 540x960 window captured 524x865, editor chrome
+  taking the difference. A phone frame needs a chrome-free view.
 - `A1` `INFERENCE` — 2 s viewer latency reads as "live". Untested.
-- `A2` `LOCAL` — Isolated worlds already run together
-  (`test/cli.test.mjs:523`), so per-lane isolation is not new.
-- `A3` `LOCAL` — `project/.engine/servers.json` already records each server's
-  port, url and checkout, so the viewer finds live lanes with no new registry.
+- `A2` `LOCAL` — Isolated worlds already run together (`test/cli.test.mjs:523`).
+- `A3` `LOCAL` — `servers.json` already records each server's port, url and
+  checkout, so the viewer finds lanes with no new registry.
 
 ## Optional builder suggestions
 
-Not acceptance criteria. Electron bundles Chromium, so pixels still match, and
-is the likely Windows export path — building the viewer on it would prove that
-path early.
+Electron is the likely Windows export path, so building the viewer on it would
+prove that path early. Not acceptance criteria.
 
 ## Research appendix
 
@@ -110,7 +112,7 @@ Measured: `see.capture` refused headless.
 **Excluded** Figma multiplayer and Live Share: they solve concurrent human
 editing, not renderer isolation.
 
-**Falsification** Wrong if `U1` shows headless Chromium cannot match a
-foreground frame here: then the person's browser is the only renderer and the
-shape becomes a strict queue over one tab — a different contract, not a tuned
-one. Also wrong if a 5-lane loop loses more lane-minutes than loop 3.
+**Falsification** `U1` held, so the falsifier is scale: wrong if a real 5-lane
+loop, each on its own worktree server rather than five clients of one, loses
+more lane-minutes than loop 3. Also wrong if a headless and a foreground frame
+of one seed disagree enough to flip an `art.check` verdict — untested, cheap.
