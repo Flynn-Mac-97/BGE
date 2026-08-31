@@ -5,8 +5,8 @@
  * The bridge suite (test/cli.test.mjs) needs a dev server and an open editor
  * tab, so its offline assertions are unreachable without one. This suite
  * proves the same door works with nothing running: exit codes, argument
- * coercion, the determinism lint, offline check, and the pain lifecycle
- * (isolated into a temp file via ENGINE_PAIN_FILE).
+ * coercion, the determinism lint, offline check, and both ledger lifecycles
+ * (isolated into temp files via ENGINE_PAIN_FILE and ENGINE_INSIGHT_FILE).
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -34,6 +34,9 @@ const run = (args, options = {}) => {
 
 const painFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'engine-pain-')), 'painpoints.jsonl')
 const withPain = (file, args) => run(args, { env: { ...process.env, ENGINE_PAIN_FILE: file } })
+
+const insightFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'engine-insight-')), 'insights.jsonl')
+const withInsight = (file, args) => run(args, { env: { ...process.env, ENGINE_INSIGHT_FILE: file } })
 
 test('help exits 0 and names the verb groups', () => {
   const r = run(['help'])
@@ -179,6 +182,82 @@ test('pain rejects a bad kind', () => {
     assert.equal(r.code, 1)
   } finally {
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test('insight records, ranks by saving, and adopts', () => {
+  const file = insightFile()
+  try {
+    const recorded = withInsight(file, ['insight', 'derive it from live pids',
+      '--problem', 'state that goes stale after a crash', '--saves', '6000',
+      '--kind', 'method', '--tool', 'a lock verb'])
+    assert.equal(recorded.code, 0)
+    const first = JSON.parse(recorded.stdout)
+    assert.equal(first.id, 'i1', 'first id is i1')
+    assert.equal(first.problem, 'state that goes stale after a crash', 'the search key is stored')
+    assert.equal(first.tool, 'a lock verb')
+
+    withInsight(file, ['insight', 'a cheaper trick', '--saves', '100', '--kind', 'cli'])
+    const listed = JSON.parse(withInsight(file, ['insight.list']).stdout)
+    assert.equal(listed.open, 2)
+    assert.equal(listed.saves, 6100)
+    assert.equal(listed.byKind.method.saves, 6000)
+    assert.deepEqual(listed.insights.map(record => record.id), ['i1', 'i2'], 'the bigger saving ranks first')
+
+    const adopted = withInsight(file, ['insight.adopt', 'i1', 'added the lock verb'])
+    assert.equal(JSON.parse(adopted.stdout).id, 'i1')
+    const after = JSON.parse(withInsight(file, ['insight.list']).stdout)
+    assert.equal(after.open, 1, 'an adopted insight is off the build queue')
+    assert.equal(after.adopted, 1)
+  } finally {
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test('insight.list searches every record, adopted or not', () => {
+  const file = insightFile()
+  try {
+    withInsight(file, ['insight', 'the one that shipped', '--problem', 'ports collide'])
+    withInsight(file, ['insight', 'something else', '--problem', 'unrelated'])
+    withInsight(file, ['insight.adopt', 'i1', 'shipped'])
+
+    const found = JSON.parse(withInsight(file, ['insight.list', 'ports', 'collide']).stdout)
+    assert.equal(found.found, 1, 'every word must match')
+    assert.equal(found.insights[0].id, 'i1', 'an adopted insight is the best answer to a search — a tool exists')
+
+    // Without words the same adopted record is hidden, so searching and
+    // listing cannot be answering the same question.
+    const listed = JSON.parse(withInsight(file, ['insight.list']).stdout)
+    assert.deepEqual(listed.insights.map(record => record.id), ['i2'])
+
+    assert.equal(JSON.parse(withInsight(file, ['insight.list', 'nothingmatchesthis']).stdout).found, 0)
+  } finally {
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test('insight refuses a bad kind, empty text, and an id it has never seen', () => {
+  const file = insightFile()
+  try {
+    assert.equal(withInsight(file, ['insight', 'x', '--kind', 'nonsense']).code, 1)
+    assert.equal(withInsight(file, ['insight']).code, 1, 'an insight with no words says nothing')
+    assert.equal(withInsight(file, ['insight.adopt', 'i9', 'no such thing']).code, 1)
+  } finally {
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test('the two ledgers are separate files', () => {
+  const pain = painFile()
+  const insight = insightFile()
+  try {
+    run(['pain', 'friction'], { env: { ...process.env, ENGINE_PAIN_FILE: pain, ENGINE_INSIGHT_FILE: insight } })
+    run(['insight', 'a solution'], { env: { ...process.env, ENGINE_PAIN_FILE: pain, ENGINE_INSIGHT_FILE: insight } })
+    assert.equal(JSON.parse(withPain(pain, ['pain.list']).stdout).open, 1)
+    assert.equal(JSON.parse(withInsight(insight, ['insight.list']).stdout).open, 1, 'one record each, not two in one')
+  } finally {
+    fs.rmSync(path.dirname(pain), { recursive: true, force: true })
+    fs.rmSync(path.dirname(insight), { recursive: true, force: true })
   }
 })
 

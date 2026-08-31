@@ -20,19 +20,19 @@ const PORT = process.env.ENGINE_PORT || 5180
 const HOST = process.env.ENGINE_HOST || `http://localhost:${PORT}`
 
 /**
- * Where friction gets written down.
+ * Where the two ledgers are written.
  *
- * Anchored to the MAIN worktree, not to this checkout: a parallel agent runs in
- * `.agent-worktrees/<id>`, and a log written there is deleted with the worktree
- * — so the friction found by exactly the runs we most want to learn from was
- * the friction that disappeared. The run registry is anchored the same way.
+ * Both are anchored to the MAIN worktree, not to this checkout: a parallel
+ * agent runs in `.agent-worktrees/<id>`, and a log written there is deleted
+ * with the worktree — so what the runs we most want to learn from found would
+ * be exactly what disappeared. The run registry is anchored the same way.
  *
  * Append-only: two agents working at once both get their line, and nothing
- * rewrites what came before. `ENGINE_PAIN_FILE` points it elsewhere, so a test
- * can isolate the log.
+ * rewrites what came before. `ENGINE_PAIN_FILE` and `ENGINE_INSIGHT_FILE`
+ * point them elsewhere, so a test can isolate a log.
  */
 const HERE = fileURLToPath(new URL('..', import.meta.url))
-const painHome = () => {
+const ledgerHome = () => {
   try {
     const line = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: HERE, encoding: 'utf8' })
       .split(/\r?\n/).find(value => value.startsWith('worktree '))
@@ -40,7 +40,8 @@ const painHome = () => {
   } catch { /* not a git checkout — this repo is still the right answer */ }
   return HERE
 }
-const PAIN_FILE = process.env.ENGINE_PAIN_FILE || path.join(painHome(), 'agent-runs/painpoints.jsonl')
+const PAIN_FILE = process.env.ENGINE_PAIN_FILE || path.join(ledgerHome(), 'agent-runs/painpoints.jsonl')
+const INSIGHT_FILE = process.env.ENGINE_INSIGHT_FILE || path.join(ledgerHome(), 'agent-runs/insights.jsonl')
 
 const HELP = `engine — read and drive the running editor
 
@@ -78,6 +79,11 @@ friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
                engine friction only — a game defect goes in your report, not here
                [--cost <tokens>] [--reads <n>] [--where path] [--fix "..."]
           pain.list [--all]    pain.resolve <id> "<what you did>"
+insight   insight "<what worked>" [--kind method|engine|cli|docs|editor]
+               [--problem "<when to use it>"] [--saves <tokens>] [--where path]
+               [--tool "<what would make this one step>"]
+          insight.list [<words to search>] [--all]
+          insight.adopt <id> "<the tool that now does it>"
 agents    agent.context [file...]
           agent.prepare <id> [file...] [--parallel]
           agent.status [--all] live runs, lanes to merge, leftovers on disk
@@ -112,8 +118,8 @@ Every reply says which client answered. With --client the name is printed on
 stderr, and an answer from any other client fails the call. stdout stays the
 op's plain JSON, so nothing parsing it has to change.
 
-index, tree, check and pain read the project straight off disk, so they answer
-with nothing running. Everything else drives a live editor unless --headless
+index, tree, check, pain and insight read the project straight off disk, so they
+answer with nothing running. Everything else drives a live editor unless --headless
 says to start a world here instead.
 
 servers and servers.stop need no editor either. They read what each dev server
@@ -151,6 +157,12 @@ pain needs no dev server and no editor — friction is worst exactly when
 nothing is running, so recording it must never depend on anything working.
 Record what it COST as well as what it was: --cost is a rough token estimate,
 and pain.list ranks by it. A vague number beats no number.
+
+insight is the other half of the same loop. A painpoint says the engine made
+something hard; an insight says you found a way through, and --saves is what
+the next agent will not spend because you wrote it down. Give --problem so the
+solution can be found again: insight.list <words> searches it. insight.adopt
+closes one, meaning the engine now has a tool that reaches the same answer.
 `
 
 // ------------------------------------------------------------------ argv
@@ -162,7 +174,7 @@ and pain.list ranks by it. A vague number beats no number.
  * following argument and the failure would look like the flag doing nothing.
  */
 const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project', 'client',
-                             'profile', 'debugPort'])
+                             'profile', 'debugPort', 'problem', 'saves', 'tool'])
 
 const argv = process.argv.slice(2)
 const flags = {}
@@ -196,7 +208,7 @@ const coerce = w => {
 // Flags the CLI itself consumes never reach the browser.
 const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
-                 'kind', 'where', 'fix', 'cost', 'reads', 'all',
+                 'kind', 'where', 'fix', 'cost', 'reads', 'all', 'problem', 'saves', 'tool',
                  'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked',
                  'client', 'dry-run', 'dryRun', 'profile', 'debugPort']) delete options[k]
 
@@ -374,32 +386,56 @@ const finish = value => {
  */
 const KINDS = ['engine', 'cli', 'docs', 'editor']
 
-const num = v => {
-  const n = Number(v)
-  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null
+const num = value => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null
 }
 
-const readPain = () => {
-  if (!fs.existsSync(PAIN_FILE)) return []
-  return fs.readFileSync(PAIN_FILE, 'utf8')
+/**
+ * Both ledgers are the same file format, so they share these four.
+ *
+ * A record is one JSON line. A line that will not parse is skipped rather than
+ * thrown on: a half-written line from a killed process must not make the whole
+ * log unreadable.
+ */
+const readLedger = file => {
+  if (!fs.existsSync(file)) return []
+  return fs.readFileSync(file, 'utf8')
     .split('\n').filter(Boolean)
     .map(line => { try { return JSON.parse(line) } catch { return null } })
     .filter(Boolean)
 }
 
-const appendPain = record => fs.appendFileSync(PAIN_FILE, JSON.stringify(record) + '\n', 'utf8')
+const appendLedger = (file, record) => fs.appendFileSync(file, JSON.stringify(record) + '\n', 'utf8')
 
-/** Fold the append-only log into current state: a later `resolved` wins. */
-function foldPain() {
+/**
+ * Fold the append-only log into current state. A later closing line wins.
+ *
+ * `closedKey` is the field that closes a record — `resolved` for a painpoint,
+ * `adopted` for an insight. The shape either side is identical.
+ */
+function foldLedger(file, closedKey) {
   const open = new Map()
-  for (const record of readPain()) {
-    if (record.resolved) {
+  for (const record of readLedger(file)) {
+    if (record[closedKey]) {
       const found = open.get(record.id)
-      if (found) { found.resolved = record.at; found.note = record.note }
+      if (found) { found[closedKey] = record.at; found.note = record.note }
     } else open.set(record.id, { ...record })
   }
   return [...open.values()]
 }
+
+/** Short ids, because an agent types one back to close the record. */
+function nextId(records, prefix) {
+  const taken = new Set(records.map(record => record.id))
+  let n = taken.size + 1
+  while (taken.has(`${prefix}${n}`)) n++
+  return `${prefix}${n}`
+}
+
+const readPain = () => readLedger(PAIN_FILE)
+const appendPain = record => appendLedger(PAIN_FILE, record)
+const foldPain = () => foldLedger(PAIN_FILE, 'resolved')
 
 if (op === 'pain') {
   const what = words.join(' ').trim()
@@ -408,16 +444,11 @@ if (op === 'pain') {
   const kind = typeof flags.kind === 'string' ? flags.kind : 'engine'
   if (!KINDS.includes(kind)) die(1, `--kind must be one of: ${KINDS.join(' ')}`)
 
-  // Ids are short because an agent has to type one back to resolve it.
-  const taken = new Set(readPain().map(r => r.id))
-  let n = taken.size + 1
-  while (taken.has(`p${n}`)) n++
-
   const cost = num(flags.cost)
   const reads = num(flags.reads)
 
   const record = {
-    id: `p${n}`,
+    id: nextId(readPain(), 'p'),
     at: new Date().toISOString(),
     kind,
     what,
@@ -468,6 +499,122 @@ if (op === 'pain.list') {
     unpriced: shown.filter(r => r.cost == null).length,
     byKind,
     painpoints: ranked
+  })
+  process.exit(0)
+}
+
+
+// ------------------------------------------------------------------ insights
+/**
+ * What worked, so the engine can make it the easy path.
+ *
+ * The twin of a painpoint, and the other half of the same loop. A painpoint
+ * says the engine made something hard and ranks by what that cost. An insight
+ * says an agent found a way through and ranks by what it saves next time. Fix
+ * the first and the engine stops hurting; build the second and the engine gets
+ * better at the work.
+ *
+ * An insight is only useful if it is found again, so `--problem` carries the
+ * situation the solution answers and `insight.list <words>` searches it. A
+ * record with no problem is a diary entry nobody can reach.
+ *
+ * `insight.adopt` closes one: the engine now has a tool, verb or instruction
+ * that reaches the same answer directly, so nobody has to work it out again.
+ * An un-adopted insight with a large saving is the next thing to build, the
+ * way an open painpoint with a large cost is the next thing to fix.
+ *
+ * As cheap as `pain` on purpose: no server, no editor, no network. A discovery
+ * is recorded at the moment it is made or it is lost.
+ */
+
+// `method` is a way of working rather than one surface, and most insights are
+// one. The other four match the painpoint kinds so a fix and its discovery
+// group together.
+const INSIGHT_KINDS = ['method', 'engine', 'cli', 'docs', 'editor']
+
+const readInsights = () => readLedger(INSIGHT_FILE)
+const foldInsights = () => foldLedger(INSIGHT_FILE, 'adopted')
+
+/** Every word must appear somewhere in the record. Case is ignored. */
+const insightMatches = (record, words) => {
+  const haystack = [record.what, record.problem, record.where, record.tool, record.note]
+    .filter(Boolean).join(' ').toLowerCase()
+  return words.every(word => haystack.includes(word))
+}
+
+if (op === 'insight') {
+  const what = words.join(' ').trim()
+  if (!what) {
+    die(1, 'say what worked:  insight "derive the lock from live pids instead of storing it" ' +
+      '--problem "state that must not go stale" --saves 6000')
+  }
+
+  const kind = typeof flags.kind === 'string' ? flags.kind : 'method'
+  if (!INSIGHT_KINDS.includes(kind)) die(1, `--kind must be one of: ${INSIGHT_KINDS.join(' ')}`)
+
+  const saves = num(flags.saves)
+
+  const record = {
+    id: nextId(readInsights(), 'i'),
+    at: new Date().toISOString(),
+    kind,
+    what,
+    // The problem is the search key. Without it the solution is unreachable
+    // by anyone who has not already had the idea.
+    ...(typeof flags.problem === 'string' ? { problem: flags.problem } : {}),
+    // Tokens the next agent does not spend because this is written down. It is
+    // what insight.list ranks by, and a rough number beats none.
+    ...(saves !== null ? { saves } : {}),
+    ...(typeof flags.where === 'string' ? { where: flags.where } : {}),
+    // What would turn this into one step: a verb, a check, a line of guidance.
+    ...(typeof flags.tool === 'string' ? { tool: flags.tool } : {})
+  }
+  appendLedger(INSIGHT_FILE, record)
+  out(record)
+  process.exit(0)
+}
+
+if (op === 'insight.adopt') {
+  const id = words.shift()
+  const note = words.join(' ').trim()
+  if (!id) die(1, 'which one?  insight.adopt i3 "added `lock`, which derives it the same way"')
+  if (!foldInsights().some(record => record.id === id)) die(1, `no insight "${id}". Try insight.list`)
+  appendLedger(INSIGHT_FILE, { id, adopted: true, at: new Date().toISOString(), note: note || undefined })
+  out({ id, adopted: true })
+  process.exit(0)
+}
+
+if (op === 'insight.list') {
+  const all = foldInsights()
+  const open = all.filter(record => !record.adopted)
+  const search = words.join(' ').trim().toLowerCase().split(/\s+/).filter(Boolean)
+
+  // Searching looks through everything, listing shows only what is not adopted.
+  // An adopted insight is the best answer to a search — there is already a tool
+  // for it — but it is finished work, so it is not on the build queue.
+  const shown = search.length ? all.filter(record => insightMatches(record, search))
+    : flags.all ? all
+      : open
+
+  const byKind = {}
+  for (const record of shown) {
+    const group = byKind[record.kind] || (byKind[record.kind] = { n: 0, saves: 0 })
+    group.n++
+    group.saves += record.saves || 0
+  }
+
+  // Biggest saving first. An unmeasured insight sorts last rather than as a
+  // zero, so "nobody estimated this" never reads as "this saves nothing".
+  const ranked = [...shown].sort((a, b) => (b.saves ?? -1) - (a.saves ?? -1))
+
+  out({
+    ...(search.length ? { search: search.join(' '), found: shown.length } : {}),
+    open: open.length,
+    adopted: all.length - open.length,
+    saves: shown.reduce((sum, record) => sum + (record.saves || 0), 0),
+    unmeasured: shown.filter(record => record.saves == null).length,
+    byKind,
+    insights: ranked
   })
   process.exit(0)
 }

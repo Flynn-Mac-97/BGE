@@ -170,6 +170,13 @@ is a finding for your report; "nothing told me the level file is generated" is a
 pain. The test is who has to act — a pain is fixed by changing the engine, its
 tools, or its instructions.
 
+Record what worked with `node bin/engine.mjs insight`. The same test decides
+what belongs: an insight is a way of working the ENGINE should make easy, not a
+fact about one game. `--saves` is the tokens the next agent will not spend
+because you wrote it down, and it is what ranks the list — an un-adopted insight
+with a large saving is the next thing to build. Search before you solve
+something hard: `insight.list <words>` matches the `--problem` you were given.
+
 ## Writing files while it runs
 
 The dev server watches `project/` and pushes what changed; `Live File Updates`
