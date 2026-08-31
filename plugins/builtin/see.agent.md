@@ -29,8 +29,8 @@ Read down; stop at the first row that answers.
 | what changed over N steps — appeared, gone, moved, entered or left frame | `see.diff` | nothing; advances the world |
 | why the frame looks wrong — eye inside a box, thing against the lens | `see.camera` | nothing; works everywhere |
 | layout and composition, roughly | `see.sketch` | one small PNG; works everywhere |
-| does it actually look right — art, light, readability, A/B | `see.capture` | a real frame; browser only |
-| render versus scene truth at the same instants | `see.moment` | one sheet; browser only |
+| does it actually look right — art, light, readability, A/B | `see.capture` | a real frame; needs a browser — see "A frame from a terminal" |
+| render versus scene truth at the same instants | `see.moment` | one sheet; needs a browser |
 
 Never ask a vision model what a query answers. Vision models miscount
 overlapping things and misjudge positions and distances; the query numbers
@@ -101,6 +101,42 @@ compare it against the sidecar; absence is a query, not a look.
   Aim first: `see.view '{"aim":"you","back":3}'` frames the followed entity
   and every later query answers from there. The meadow's play camera is saved
   as the view `meadow-play`.
+
+## A frame from a terminal, with no tab of your own
+
+`see.capture` and `see.moment` draw through a browser. `lanes.start` gives you
+a headless one, so an agent that must not touch the person's tab still gets a
+real rendered frame. Four commands, in this order:
+
+```sh
+ENGINE_PORT=5187 npx vite --port 5187 &          # 1. a dev server for THIS checkout
+node bin/engine.mjs --port 5187 lanes.start sight # 2. a headless browser on it
+node bin/engine.mjs --port 5187 run see.capture '{"ui":false}' --client sight
+node bin/engine.mjs lanes.stop sight              # 4. always, before you finish
+```
+
+- **A worktree needs its own server and its own port.** The default port serves
+  the main checkout; a lane started against it renders another workspace's code.
+  `run` refuses that rather than answer from the wrong tree, and the refusal
+  names the fix.
+- **`--port` goes on every call after step 1**, including `lanes.start`. Without
+  it the CLI reaches the default port.
+- In the main workspace with a server already running, skip step 1 and the
+  `--port` flag.
+- A lane browser is started at device pixel ratio 1, so its PNG is exactly the
+  declared profile.
+- `lanes` lists every lane browser, each proved against its debugging port. One
+  left running holds the work lock.
+
+## A world with no GL at all
+
+`startWorldInNode({ renderer: 'null' })` gives a headless world the renderer
+SURFACE with nothing behind it. The drawing commands then run their whole
+mutate-and-restore path — camera borrow, hidden entities, nulled background and
+fog, dimmed lights, emptied post chain — instead of refusing on the first line.
+Every frame comes back blank and every reply says so: `blank: true` and a `why`
+naming the null renderer. This is for testing that path (`test/see-headless.test.mjs`),
+not for looking at a game. To look at a game headless, use `see.sketch`.
 
 ## Inspect one model, in one call
 
@@ -175,8 +211,11 @@ workflow by hand.
   where things are and how the frame is arranged; it cannot say whether a
   shape reads as a rat — that needs `capture` with `subject`.
 - `see.capture '{...}'` — the rendered canvas, marks drawn on top, same
-  files. Browser only. A tab that is not drawing is refused with an error
-  and a `hidden` flag, never returned as a blank frame. The sidecar's
+  files. Needs a browser. A tab that is not drawing is refused with an error
+  and a `hidden` flag, never returned as a blank frame. `framing` appears in
+  the reply and the sidecar when the frame holds under 5% of the level's
+  entities: the camera is pointed where the game never looks, and brightness
+  and coverage measured there say nothing about the art. The sidecar's
   `light` block holds mean and 4x4-cell brightness, 0–100, measured over the
   pixels the draw put down; `over` names which pixels answered and
   `measuredFraction` how many, and a cell with nothing drawn reads `null`.
@@ -184,7 +223,7 @@ workflow by hand.
 - `see.moment '{"steps":[0,6,30]}'` — one sheet: the real render and its
   flat type layer at the same instants, stepped forward, every cell
   labelled. In the pixels but not the scene is a rendering artifact; in the
-  scene but not the pixels is an invisible entity. Browser only; advances
+  scene but not the pixels is an invisible entity. Needs a browser; advances
   the world; `stop` restores. A held clock is refused before any step.
   `camera`, `view` and `subject` aim the LIVE camera for the sheet and put it
   back, so both lenses show one moment. Use a sheet to decide which single
@@ -245,8 +284,9 @@ A generated frame name carries the page's client name — `meadow-alpha-1.png`,
 the counter steps past frames already on disk. A path given as `name` or `file`
 is yours to reuse; the reply carries `replaced: <path>` when it overwrote one.
 
-`see.capture` needs the dev server. Under `--headless` there is no renderer and
-it says so.
+`see.capture` needs the dev server and a page on it — your own tab, or a lane
+browser (see "A frame from a terminal"). Under `--headless` there is no renderer
+and the refusal names `see.sketch`, which takes the same options.
 
 The tab must be in front. A hidden tab runs no frames, so the HUD and screen
 layers hold whatever was painted last while the world is drawn fresh — capture
