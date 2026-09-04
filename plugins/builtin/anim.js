@@ -25,6 +25,7 @@
 export default {
   name: 'Sprite Animation',
 
+  category: 'visuals',
   systems: [{
     phase: 'fixed',
     run(world, seconds) {

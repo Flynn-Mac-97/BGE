@@ -24,6 +24,7 @@ const DEFAULT_CURVE = { base: 5, growth: 1.35, maxLevel: 99 }
 
 export default {
   name: 'Experience',
+  category: 'game',
   about: 'Count experience points against a curve and announce every level gained.',
   inspect: context => {
     const experience = context.experience

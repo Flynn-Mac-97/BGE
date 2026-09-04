@@ -48,6 +48,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value))
 
 export default {
   name: 'Impact',
+  category: 'game',
   about: 'Hit stop and screen shake — the frames a heavy hit freezes on, and the jolt after it.',
 
   inspect: () => [{

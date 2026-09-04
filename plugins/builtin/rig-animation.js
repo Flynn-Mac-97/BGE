@@ -33,6 +33,7 @@ const worlds = new WeakMap()
 export default {
   name: 'Rig Animation',
 
+  category: 'visuals',
   onLoad(context) {
     worlds.set(context.world, { context })
 

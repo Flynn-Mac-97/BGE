@@ -20,6 +20,7 @@ let field = null
 
 export default {
   name: 'Particle Painter',
+  category: 'visuals',
   about: 'Draws the particle field as camera-facing quads on the renderer scene, batched by texture and blend.',
   needs: ['Particles'],
 

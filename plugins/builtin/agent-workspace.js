@@ -73,6 +73,7 @@ function openNode(context, node) {
 export default {
   name: 'Agent Workspace',
 
+  category: 'agents',
   onLoad(context) {
     context.agents = {
       context: async request => resolveAgentContext(reader(context), request, await pluginNodes(context), context.editor.projectDirectory),

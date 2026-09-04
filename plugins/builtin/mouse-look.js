@@ -133,6 +133,7 @@ const HELD_BY_THE_BROWSER = ['Tab', 'Space']
 
 export default {
   name: 'Mouse Look',
+  category: 'engine',
   needs: ['Keyboard Input'],
 
   onLoad(context) {

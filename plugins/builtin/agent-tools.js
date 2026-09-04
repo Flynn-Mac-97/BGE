@@ -89,6 +89,7 @@ async function readShelf() {
 
 export default {
   name: 'Agent Tools',
+  category: 'agents',
   about: 'The tooling shelf in tools/ — scripts written once, kept so nobody regenerates them, and the library they share.',
   inspect: () => [{ title: 'The shelf', rows: [['read with', 'tools.list']] }],
 

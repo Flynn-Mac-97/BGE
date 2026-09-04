@@ -54,6 +54,7 @@ function everything(context) {
 export default {
   name: 'Project Panel',
 
+  category: 'editor',
   panels: [{
     id: 'project',
     title: 'Project · open',

@@ -21,6 +21,7 @@ const HOLD = 'run-over'
 
 export default {
   name: 'Run Clock',
+  category: 'engine',
   about: 'Time a run, end it when the thing it watches dies, and hold the world when it is over.',
   inspect: context => {
     const run = context.runClock

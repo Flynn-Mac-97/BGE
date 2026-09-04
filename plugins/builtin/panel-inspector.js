@@ -11,6 +11,7 @@ const state = { plugin: null, guide: null, error: null }
 export default {
   name: 'Inspector Panel',
 
+  category: 'editor',
   onLoad(context) {
     context.bus.on('plugin:selected', plugin => inspectPlugin(context, plugin))
     context.bus.on('selection:changed', () => {

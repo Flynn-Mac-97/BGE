@@ -37,6 +37,7 @@ const DEFAULTS = {
 
 export default {
   name: 'Pickups',
+  category: 'game',
   about: 'Drop things in the world that latch on inside a radius and accelerate into whoever is collecting.',
   inspect: context => {
     const list = context.pickups?.all() || []

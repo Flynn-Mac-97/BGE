@@ -374,6 +374,7 @@ function animate(material, advance) {
 export default {
   name: 'Materials',
 
+  category: 'visuals',
   onLoad(context) {
     const materials = makeMaterials({ report: message => console.error(message) })
     context.materials = materials

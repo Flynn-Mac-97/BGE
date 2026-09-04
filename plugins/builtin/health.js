@@ -87,6 +87,7 @@ const flatDistance = (a, b) => Math.hypot(a.x - b.x, (a.z || 0) - (b.z || 0))
 
 export default {
   name: 'Health',
+  category: 'game',
   about: 'Health, the one damage verb, and the moment something dies — the arithmetic of a hit, without the theatre.',
 
   inspect: context => {

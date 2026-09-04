@@ -25,6 +25,7 @@
 export default {
   name: 'Editor Markers',
 
+  category: 'editor',
   onLoad(context) {
     // Remembered per entity rather than assumed, because a level is allowed to
     // hide something for its own reasons and stopping play must not reveal it.

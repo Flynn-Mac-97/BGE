@@ -2,6 +2,7 @@
 export default {
   name: 'Panel Layout',
 
+  category: 'editor',
   commands: [
     {
       id: 'layout.read',

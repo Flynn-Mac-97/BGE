@@ -85,6 +85,7 @@ function fold(stats, changes) {
 
 export default {
   name: 'Auto Weapons',
+  category: 'game',
   about: 'Weapons that fire on their own cooldowns, with every number in one bag so an upgrade is a change to a number.',
   needs: ['Health'],
 

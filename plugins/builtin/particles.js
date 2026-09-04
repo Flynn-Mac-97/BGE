@@ -303,6 +303,7 @@ export const art = { bulletHole: '', blood: '' }
 // ------------------------------------------------------------------ the plugin
 export default {
   name: 'Particles',
+  category: 'visuals',
   about: 'Deterministic bursts, trails and sight-blocking clouds — simulated on the fixed clock, recorded headless, drawn by Particle Painter.',
   inspect: context => [{ title: 'Alive', rows: Object.entries(context.particles.state) }],
 

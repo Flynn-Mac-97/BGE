@@ -14,6 +14,26 @@
  */
 const state = { open: false, selected: null }
 
+/**
+ * The categories, in reading order, with the one line each that says what the
+ * group is for.
+ *
+ * Five, deliberately. A list of sixty-five names in load order tells a newcomer
+ * nothing about which one answers their question, and thirty categories would
+ * be the same problem again. `game` is separate because those are the ones most
+ * likely to leave the engine.
+ *
+ * A plugin declares `category` beside its `name`. One that declares none is
+ * listed last under "uncategorised" rather than hidden.
+ */
+const CATEGORIES = [
+  ['engine', 'Engine', 'The world runs: bodies, time, input, behaviours, live reload'],
+  ['visuals', 'Visuals', 'How it looks: lights, materials, sky, animation, particles'],
+  ['game', 'Game', 'Game systems: damage, weapons, pickups, screens, progression'],
+  ['editor', 'Editor', 'The editing surface: panels, tools, gizmos, history'],
+  ['agents', 'Agents', 'What an AI drives: packets, scene inspection, claims, the bridge']
+]
+
 /** Contribution points, in the order they matter to someone reading the list. */
 const POINTS = [
   ['panels', 'panel'],
@@ -25,9 +45,27 @@ const POINTS = [
   ['importers', 'importer']
 ]
 
+/**
+ * The shown plugins, split into categories in reading order.
+ *
+ * Returns only the categories that have something in them, so an empty heading
+ * is never printed. Anything declaring no category, or one nothing knows, is
+ * gathered at the end rather than dropped.
+ */
+function grouped(plugins) {
+  const out = CATEGORIES
+    .map(([id, title, why]) => [id, title, why, plugins.filter(p => p.category === id)])
+    .filter(([, , , items]) => items.length)
+  const known = new Set(CATEGORIES.map(([id]) => id))
+  const rest = plugins.filter(p => !known.has(p.category))
+  if (rest.length) out.push(['uncategorised', 'Uncategorised', 'These declare no category', rest])
+  return out
+}
+
 export default {
   name: 'Plugin Browser',
 
+  category: 'editor',
   // The project's disabled list is applied by the kernel before any plugin
   // boots, not here. Doing it in an onLoad meant a disabled plugin had already
   // run its own onLoad — subscribed, taken its context key — before it was
@@ -62,6 +100,7 @@ export default {
         error: p.error,
         builtin: p.builtin,
         about: p.definition.about || '',
+        category: p.definition.category || '',
         needs: p.definition.needs || [],
         gives: POINTS
           .map(([point, word]) => {
@@ -80,16 +119,24 @@ export default {
       return ui.stack([
         ui.search({ bind: 'q', placeholder: 'name or what it contributes', count: shown.length }),
 
-        ui.section(`Loaded · ${on} of ${all.length} on`, [
-          ui.list({
-            items: shown.filter(p => p.builtin),
-            key: p => p.name,
-            selected: state.selected,
-            dim: p => !p.enabled,
-            row: p => pluginRow(ui, context, p),
-            onPick: p => select(context, p)
-          })
-        ]),
+        ui.text(`Loaded · ${on} of ${all.length} on`, { dim: true }),
+
+        // One section per category, and a section only when it has something to
+        // show — a search that matches four plugins should not print five empty
+        // headings.
+        ...grouped(shown.filter(p => p.builtin)).map(([, title, why, items]) =>
+          ui.section(`${title} · ${items.length}`, [
+            ui.text(why, { dim: true }),
+            ui.list({
+              items,
+              key: p => p.name,
+              selected: state.selected,
+              dim: p => !p.enabled,
+              row: p => pluginRow(ui, context, p),
+              onPick: p => select(context, p)
+            })
+          ])
+        ),
 
         ui.section('This project', [
           ui.list({
@@ -119,6 +166,7 @@ export default {
         name,
         enabled: p.enabled,
         ...(p.error ? { error: p.error } : {}),
+        category: p.definition.category || 'uncategorised',
         gives: Object.fromEntries(POINTS
           .map(([point]) => [point, (p.definition[point] || []).length])
           .filter(([, n]) => n))

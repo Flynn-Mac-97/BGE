@@ -71,6 +71,7 @@ const countKinds = rulings =>
 
 export default {
   name: 'Art Direction',
+  category: 'agents',
   about: 'Gathers visual references per subject — the world, the effects, the interface — measures '
     + 'them, and turns what they agree on into rulings a frame can be checked against. Each '
     + 'subject\'s art bible is generated from that evidence, never typed.',

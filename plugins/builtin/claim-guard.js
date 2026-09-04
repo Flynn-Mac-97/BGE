@@ -54,6 +54,7 @@ const asRepoPath = (path, scope) => scope === 'engine' ? normal(path) : 'project
 
 export default {
   name: 'Claim Guard',
+  category: 'agents',
   about: 'Refuses a write to a file another agent run has claimed, so the run registry stops being advice.',
 
   inspect: () => [{

@@ -30,6 +30,7 @@
 export default {
   name: 'Live File Updates',
 
+  category: 'engine',
   onLoad(context) {
     const hot = import.meta.hot
     if (!hot) return

@@ -18,6 +18,7 @@
 export default {
   name: 'Terminal Bridge',
 
+  category: 'agents',
   onLoad(context) {
     const hot = import.meta.hot
     if (!hot) {

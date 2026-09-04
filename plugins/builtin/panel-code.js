@@ -74,6 +74,7 @@ function pane(ui, context, big) {
 export default {
   name: 'Code Panel',
 
+  category: 'editor',
   panels: [
     {
       id: 'code-expanded',

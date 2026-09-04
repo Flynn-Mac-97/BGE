@@ -36,6 +36,7 @@ const load = (context, file) => context.importProjectFile(file)
 
 export default {
   name: 'Test Runner',
+  category: 'agents',
   about: 'Run the project tests, and remember how they went.',
   inspect: () => {
     const ran = [...results.values()]

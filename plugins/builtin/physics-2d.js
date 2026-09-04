@@ -61,6 +61,7 @@ function resolve(e, solid) {
 export default {
   name: 'Physics 2D',
 
+  category: 'engine',
   systems: [{
     phase: 'fixed',
     run(world, seconds, context) {

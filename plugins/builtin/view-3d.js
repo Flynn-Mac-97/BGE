@@ -45,6 +45,7 @@ const state = {
 
 export default {
   name: '3D View',
+  category: 'visuals',
   about: 'Fly the editor viewport around the level — the editor\'s own 3D camera, separate from the game camera.',
   inspect: context => {
     const v = context.view

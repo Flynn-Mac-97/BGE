@@ -293,6 +293,7 @@ export function resolveLightmaps(block, say = () => {}) {
 export default {
   name: 'Lights',
 
+  category: 'visuals',
   onLoad(context) {
     /** id -> everything this file knows about one live light. */
     const lights = new Map()

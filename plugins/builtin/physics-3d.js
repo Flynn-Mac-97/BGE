@@ -536,6 +536,7 @@ function reportContacts(world, context) {
 export default {
   name: 'Physics 3D',
 
+  category: 'engine',
   onLoad(context) {
     if (context.raycast) {
       console.error('[physics-3d] something else already put a raycast on context — replacing it')

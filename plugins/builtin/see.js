@@ -265,6 +265,7 @@ async function withSubject(context, options, run) {
 
 export default {
   name: 'See',
+  category: 'agents',
   about: 'Frames and frame facts from any camera — computed facts first, pixels only when pixels are the question.',
   inspect: () => [{ title: 'See', rows: [['frames taken', frameNumber]] }],
 

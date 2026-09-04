@@ -107,6 +107,7 @@ const CHASE_PITCH = -1.05
 
 export default {
   name: 'Game Camera',
+  category: 'engine',
   about: 'Follow the player or look around freely — the game camera, separate from the editor viewport.',
   inspect: context => {
     const v = context.view || {}

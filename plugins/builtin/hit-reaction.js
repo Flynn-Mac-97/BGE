@@ -60,6 +60,7 @@ const asVector = value => {
 
 export default {
   name: 'Hit Reaction',
+  category: 'game',
   about: 'Flash, knockback and a death that collapses — the visible half of being hit.',
   needs: ['Health'],
 

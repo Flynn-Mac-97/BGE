@@ -59,6 +59,7 @@ const DEFAULT_SUN = { direction: [-0.4, -1, -0.3], intensity: 0.9, color: '#fff2
 
 export default {
   name: 'World Look',
+  category: 'visuals',
   about: 'The fog and the global light — ambient and sun, declared in the level.',
   inspect: context => {
     const look = context.worldLook?.resolved

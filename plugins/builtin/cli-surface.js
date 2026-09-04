@@ -91,6 +91,7 @@ const liveMenus = context => [...context.loader.contrib.menus].sort(byId)
 
 export default {
   name: 'CLI Surface',
+  category: 'agents',
   about: 'Every way into the engine from a terminal, with a purpose. Kernel and offline ops are curated; plugin commands are read live.',
   inspect: context => [
     { title: 'Kernel surface', rows: KERNEL.map(entry => [entry.op, entry.purpose]) },

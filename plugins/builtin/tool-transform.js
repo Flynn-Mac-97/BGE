@@ -13,6 +13,7 @@ const SNAP_PX = 7
 export default {
   name: 'Transform Tool',
 
+  category: 'editor',
   tools: [{ id: 'select', label: 'Select and transform', icon: '⌖', key: 'v' }],
 
   commands: [

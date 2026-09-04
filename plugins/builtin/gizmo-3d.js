@@ -43,6 +43,7 @@ const state = {
 
 export default {
   name: '3D Transform Gizmo',
+  category: 'editor',
   about: 'Move, rotate and scale the selection in the 3D view — real geometry in the scene, dragged along world axes.',
   inspect: context => [{
     title: 'Gizmo',

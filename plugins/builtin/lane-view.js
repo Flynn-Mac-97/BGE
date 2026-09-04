@@ -42,6 +42,7 @@ const state = { open: false, selected: null, lanes: [], lanesAt: 0, lanesWhy: nu
 export default {
   name: 'Lane View',
 
+  category: 'agents',
   about: 'Shows one lane at a time: a schematic the lane\'s own engine computed from see.describe, and ' +
     'the last frame that lane captured, each labelled and each dated. It polls only the lane you are ' +
     'looking at, and sends nothing but reads.',

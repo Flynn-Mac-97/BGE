@@ -5,6 +5,7 @@
 export default {
   name: 'Scene Panel',
 
+  category: 'editor',
   panels: [{
     id: 'scene',
     title: 'Scene · select',

@@ -25,6 +25,7 @@
 export default {
   name: 'Behaviours',
 
+  category: 'engine',
   commands: [
     {
       id: 'behaviour.attach',

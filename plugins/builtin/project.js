@@ -107,6 +107,7 @@ const headlessAnswer = (context, next) => ({
 export default {
   name: 'Project Switcher',
 
+  category: 'editor',
   about: 'Says which project this editor has open, lists the ones beside it, opens another, ' +
     'gives the untitled project a name, and closes one by opening a fresh untitled project. ' +
     'The dev server repoints itself, so opening a project is a page reload and not a restart.',

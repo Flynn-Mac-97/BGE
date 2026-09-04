@@ -51,6 +51,7 @@ function asPoint(value) {
 export default {
   name: 'Spawn Ring',
 
+  category: 'game',
   onLoad(context) {
     if (context.spawnRing) {
       console.error('[spawn-ring] something else already put a spawnRing on context — replacing it')

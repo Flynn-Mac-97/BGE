@@ -6,6 +6,17 @@ match: plugins/** project/plugins/**
 
 - A plugin is one file: `export default {}`, no manifest, no registration.
 - `name` is the one display name — the browser lists it, `plugins.enable` takes it, errors report against it.
+- `category` is which of five groups it belongs to, and every builtin declares
+  one. `plugin.sizes` names any that does not.
+  - `engine` — the world runs: bodies, time, input, behaviours, live reload
+  - `visuals` — how it looks: lights, materials, sky, animation, particles
+  - `game` — game systems: damage, weapons, pickups, screens, progression
+  - `editor` — the editing surface: panels, tools, gizmos, history
+  - `agents` — what an AI drives: packets, scene inspection, claims, the bridge
+- Pick by what a person is trying to do, not by which file it imports. A
+  capability every game wants is `engine`; a rule a game happens to have is
+  `game`, and `game` is where to look first when deciding what leaves the
+  engine.
 - Fill contribution points, not magic: `panels` `tools` `commands` `fields` `importers` `systems` `menus`.
 - Compose panels from `ui.*`. Never write markup.
 - Give every action a command id, so a button a person can press works from a terminal too.

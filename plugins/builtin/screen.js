@@ -54,6 +54,7 @@ export const FONT = "ui-monospace, 'SF Mono', Menlo, monospace"
 
 export default {
   name: 'Screen',
+  category: 'game',
   about: 'Draw game screens — a title card, a pause menu, a result card — from a list of plain items.',
   inspect: context => {
     const shown = context.screen?.shown() || []

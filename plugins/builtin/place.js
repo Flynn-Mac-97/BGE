@@ -18,6 +18,7 @@
 export default {
   name: 'Place And Attach',
 
+  category: 'editor',
   onLoad(context) {
     // The viewport does not exist yet at load time, so wait for the shell.
     context.bus.on('shell:ready', () => attach(context))

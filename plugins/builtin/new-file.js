@@ -23,6 +23,7 @@ const state = { kind: 'type', name: '', error: null }
 export default {
   name: 'New File',
 
+  category: 'editor',
   panels: [{
     id: 'new-file',
     title: 'New',

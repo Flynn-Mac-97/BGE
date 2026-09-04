@@ -64,6 +64,7 @@ const asVector = value => {
 
 export default {
   name: 'Damage Numbers',
+  category: 'game',
   about: 'The figure that lifts off a hit and fades — how much that did, said where it happened.',
 
   inspect: () => [{

@@ -283,6 +283,7 @@ export function makeGroup(name, context, options = {}) {
 export default {
   name: 'Spatial Hash',
 
+  category: 'engine',
   onLoad(context) {
     if (context.spatial) {
       console.error('[spatial-hash] something else already put a spatial on context — replacing it')

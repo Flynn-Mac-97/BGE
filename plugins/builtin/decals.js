@@ -212,6 +212,7 @@ export const decals = makeDecalWall()
 // ------------------------------------------------------------------ the plugin
 export default {
   name: 'Decals',
+  category: 'visuals',
   about: 'Marks on the surfaces they hit — bullet holes, blood, scorch — within a fixed budget.',
   inspect: context => {
     const s = context.decals.state

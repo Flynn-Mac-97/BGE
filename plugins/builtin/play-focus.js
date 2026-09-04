@@ -180,6 +180,7 @@ export function describeFocus(context) {
 export default {
   name: 'Play Focus',
 
+  category: 'editor',
   onLoad(context) {
     playFocus.context = context
 

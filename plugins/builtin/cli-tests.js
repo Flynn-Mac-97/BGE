@@ -17,6 +17,7 @@ const info = () => ({
 
 export default {
   name: 'CLI Tests',
+  category: 'agents',
   about: 'Inspect the engine\'s own CLI test suites — the bridge suite and the offline door suite.',
   inspect: () => [
     { title: 'How to run', rows: [['bridge', 'node test/cli.bridge.mjs'], ['offline', 'node --test test/cli.offline.test.mjs'], ['full', 'npm test']] },

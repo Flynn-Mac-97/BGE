@@ -22,6 +22,7 @@
 
 export default {
   name: 'Modifiers',
+  category: 'game',
   about: 'Stack named stat changes onto an entity and recompute its properties from the base values.',
   inspect: context => {
     const rows = []

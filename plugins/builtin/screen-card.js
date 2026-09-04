@@ -22,6 +22,7 @@ const PADDING = 22
 
 export default {
   name: 'Screen Card',
+  category: 'game',
   needs: ['Screen'],
   about: 'Adds the card item to Screen — a number, a glyph, a name, a rank and one line.',
 

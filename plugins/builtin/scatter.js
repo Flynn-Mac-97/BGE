@@ -315,6 +315,7 @@ export function growField(rule, random) {
 export default {
   name: 'Scatter',
 
+  category: 'engine',
   about: 'Bulk placement declared in the level: this many of these types, over this area, this far ' +
     'apart, out of these circles and corridors. A scatter is an entity, so the rule is level data the ' +
     'inspector tunes. The field grows with the clock and is never saved into the level; scatter.expand ' +

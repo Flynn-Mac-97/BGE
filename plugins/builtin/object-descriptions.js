@@ -291,6 +291,7 @@ async function record(context, options = {}) {
 export default {
   name: 'Object Descriptions',
 
+  category: 'agents',
   about: 'What each object IS, written on its type and read by every agent surface — '
     + 'about, appearance and looksWrongWhen on a type, and a note on one placement.',
 

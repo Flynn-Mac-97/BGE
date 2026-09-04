@@ -43,6 +43,7 @@ const SKY_RADIUS = 100
 
 export default {
   name: 'Skybox',
+  category: 'visuals',
   about: 'The sky — a flat colour or a panorama over a sphere, declared in the level.',
   inspect: context => {
     const sky = context.skybox?.resolved

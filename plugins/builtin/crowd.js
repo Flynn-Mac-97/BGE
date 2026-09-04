@@ -234,6 +234,7 @@ function makeCrowd(name, context, options = {}) {
 
 export default {
   name: 'Crowd',
+  category: 'game',
   needs: ['Spatial Hash'],
 
   onLoad(context) {

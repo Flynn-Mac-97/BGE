@@ -138,6 +138,7 @@ const EFFECTS = {
 export default {
   name: 'Post Processing',
 
+  category: 'visuals',
   onLoad(context) {
     const post = {
       declared: null,       // the level's "post", exactly as it was written

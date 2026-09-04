@@ -51,6 +51,7 @@ export const choiceScreen = { readKeys: null }
 
 export default {
   name: 'Choice Screen',
+  category: 'game',
   needs: ['Screen', 'Keyboard Input'],
   about: 'Stop the world and offer a row of cards to pick from, by number or by arrow keys.',
   inspect: context => {

@@ -91,6 +91,7 @@ let loading = false
 
 export default {
   name: 'History',
+  category: 'editor',
   about: 'Step back and forward through this session\'s edits, or click a row to jump several at once.',
 
   inspect: () => palette.entries.length

@@ -17,6 +17,7 @@ const ACTIONS = {
 export default {
   name: 'Keyboard Input',
 
+  category: 'engine',
   onLoad(context) {
     const down = new Set()
     const justPressed = new Set()

@@ -57,6 +57,7 @@ async function measure(directory) {
         builtin: place === 'plugins/builtin',
         lines: source.split('\n').length,
         guide: guide ? guide.split('\n').length : null,
+        category: source.match(/^\s*category:\s*'([a-z-]+)'/m)?.[1] || null,
         // A comment may name the game — explaining why something is shaped the
         // way it is often has to. Code that names it is the smell.
         names: place === 'plugins/builtin' ? gameNouns(source, words) : []
@@ -82,6 +83,7 @@ function gameNouns(source, words) {
 
 export default {
   name: 'Plugin Master',
+  category: 'engine',
   about: 'The rules for creating and editing plugins, and a measure of which have grown too big to read cheaply.',
 
   commands: [{
@@ -97,6 +99,10 @@ export default {
       const all = await measure(context.editor.projectDirectory)
       const over = all.filter(entry => entry.lines > BIG).sort((a, b) => b.lines - a.lines)
       const unguided = all.filter(entry => !entry.guide).map(entry => entry.plugin)
+      // The Plugin Browser groups by category, and one that declares none is
+      // listed under "uncategorised" — read by a person as a plugin nobody
+      // could place rather than as a missing field.
+      const uncategorised = all.filter(entry => entry.builtin && !entry.category).map(entry => entry.plugin)
       // A builtin naming the game is a capability written inside one game.
       const branded = all.filter(entry => entry.names.length)
         .map(entry => ({ plugin: entry.plugin, at: entry.names }))
@@ -106,9 +112,10 @@ export default {
         // A guide is how an agent uses a plugin without reading it, so a plugin
         // without one costs its whole length to understand at all.
         unguided,
+        uncategorised,
         over: over.map(entry => ({ plugin: entry.plugin, lines: entry.lines })),
         branded,
-        ok: over.length === 0 && unguided.length === 0 && branded.length === 0
+        ok: over.length === 0 && unguided.length === 0 && branded.length === 0 && uncategorised.length === 0
       }
     }
   }]
