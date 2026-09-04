@@ -22,7 +22,7 @@ import {
 function checkout(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-lane-browsers-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  fs.mkdirSync(path.join(root, 'project/.engine'), { recursive: true })
+  fs.mkdirSync(path.join(root, '.engine'), { recursive: true })
   return root
 }
 
@@ -286,7 +286,7 @@ test('a browser started in a worktree is owned by the main checkout', async t =>
 
   recordLaneBrowser(lane, { client: 'alpha', port: 39598, pid: deadPid() })
 
-  assert.equal(fs.existsSync(path.join(lane, 'project/.engine/lane-browsers.json')), false,
+  assert.equal(fs.existsSync(path.join(lane, '.engine/lane-browsers.json')), false,
     'a worktree writes no registry of its own')
   assert.equal(readLaneBrowsers(main).length, 1, 'the main checkout lists a lane started in a worktree')
 

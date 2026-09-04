@@ -34,12 +34,12 @@ export const WRITES_A_FILE = new Set([
 ])
 
 /**
- * `project/.engine` whatever project is being served: agent runs and lane
- * browsers belong to the checkout, not to one game inside it, and the agent
- * registry is written there too. Reading the served project's directory
- * instead finds nothing and reports a checkout with live lanes as free.
+ * The checkout's own `.engine`, whatever project is open. Agent runs and lane
+ * browsers belong to the checkout, not to a game — a game may be any directory
+ * on disk, and reading the open project's finds nothing and reports a checkout
+ * with live lanes as free.
  */
-const COORDINATION = 'project/.engine'
+const COORDINATION = '.engine'
 
 /**
  * Whether a process id still exists.

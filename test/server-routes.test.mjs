@@ -20,7 +20,7 @@ import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 
 const CHECKOUT = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-routes-'))
-const ENGINE_DIRECTORY = path.join(CHECKOUT, 'project/.engine')
+const ENGINE_DIRECTORY = path.join(CHECKOUT, '.engine')
 fs.mkdirSync(path.join(CHECKOUT, 'project/levels'), { recursive: true })
 fs.mkdirSync(ENGINE_DIRECTORY, { recursive: true })
 fs.writeFileSync(path.join(CHECKOUT, 'project/levels/meadow.json'), '{"entities":[]}')
@@ -37,6 +37,9 @@ lanes([])
 const CONFIG = pathToFileURL(path.join(process.cwd(), 'vite.config.js')).href
 const here = process.cwd()
 process.chdir(CHECKOUT)
+// Named, not defaulted: with no ENGINE_PROJECT the server opens the untitled
+// project beside the checkout, and this fixture's files are in `project`.
+process.env.ENGINE_PROJECT = 'project'
 const config = (await import(CONFIG)).default
 process.chdir(here)
 

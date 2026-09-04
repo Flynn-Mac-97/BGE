@@ -31,7 +31,7 @@ function checkout(t, runs = []) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-node-write-guard-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
 
-  const coordination = path.join(root, 'project/.engine')
+  const coordination = path.join(root, '.engine')
   fs.mkdirSync(coordination, { recursive: true })
   fs.writeFileSync(path.join(coordination, 'agents.json'), JSON.stringify({ runs }))
   fs.writeFileSync(path.join(coordination, 'lane-browsers.json'), JSON.stringify({ browsers: [] }))

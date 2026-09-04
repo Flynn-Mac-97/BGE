@@ -13,11 +13,13 @@
  * failure, not a warning: the listing is read once, at session start, and every
  * agent in that session reads whatever it says.
  *
- * `projectDirectory` is a directory NAME inside `root`, the same parameter the
- * dev server and the CLI already take.
+ * `projectPath` is the open project's directory, resolved against `root` — the
+ * same parameter the dev server and the CLI already take.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { PROJECT_PREFIX } from './asset-path.js'
+import { projectName } from './project-path.mjs'
 
 /** Where the harness looks. Fixed by the harness, not by this project. */
 const SKILL_DIRECTORY = '.claude/skills'
@@ -101,10 +103,9 @@ const SKILL_NAME = /^[a-z0-9][a-z0-9-]*$/
 /** The source of AGENTS.md, which is a copy of it. */
 const BOOTSTRAP = 'agents/bootstrap.md'
 
-const forwardSlashes = text => text.split(path.sep).join('/')
 
 /** The two places plugins are found, engine first, as the loader reads them. */
-const pluginPlaces = (root, projectDirectory) => [
+const pluginPlaces = (root, projectPath) => [
   {
     scope: 'engine',
     directory: path.join(root, 'plugins/builtin'),
@@ -113,9 +114,11 @@ const pluginPlaces = (root, projectDirectory) => [
   },
   {
     scope: 'project',
-    directory: path.join(root, projectDirectory, 'plugins'),
+    directory: path.join(path.resolve(root, projectPath), 'plugins'),
     prefix: 'plugins',
-    fromRoot: `${forwardSlashes(projectDirectory)}/plugins`
+    // `project/`, not the directory's own name: one spelling for a project file
+    // whatever the directory is called and wherever it is.
+    fromRoot: `${PROJECT_PREFIX}/plugins`
   }
 ]
 
@@ -140,12 +143,12 @@ const bodyOf = guide => guide.replace(/^---\s*\n[\s\S]*?\n---\s*/, '')
  * `file` is named from the plugin's own scope, which is how the manifest node
  * and the generated marker name it. `fileFromRoot` is the path to open.
  */
-export async function pluginGuides(root, projectDirectory) {
+export async function pluginGuides(root, projectPath) {
   const game = JSON.parse(
-    await fs.readFile(path.join(root, projectDirectory, 'game.json'), 'utf8').catch(() => '{}'))
+    await fs.readFile(path.join(path.resolve(root, projectPath), 'game.json'), 'utf8').catch(() => '{}'))
   const disabled = new Set(game.plugins?.disabled || [])
   const guides = []
-  for (const place of pluginPlaces(root, projectDirectory)) {
+  for (const place of pluginPlaces(root, projectPath)) {
     let names = []
     try { names = await fs.readdir(place.directory) } catch { continue }
     for (const name of names.filter(name => name.endsWith('.agent.md')).sort()) {
@@ -174,9 +177,9 @@ export async function pluginGuides(root, projectDirectory) {
 }
 
 /** Plugin sources with no guide beside them. */
-export async function pluginsWithoutGuide(root, projectDirectory) {
+export async function pluginsWithoutGuide(root, projectPath) {
   const found = []
-  for (const place of pluginPlaces(root, projectDirectory)) {
+  for (const place of pluginPlaces(root, projectPath)) {
     let names = []
     try { names = await fs.readdir(place.directory) } catch { continue }
     for (const name of names.filter(name => name.endsWith('.js')).sort()) {
@@ -193,7 +196,7 @@ export async function pluginsWithoutGuide(root, projectDirectory) {
  * Nothing is written here. One list serves both the writer and the check, so
  * the two can never disagree about what current means.
  */
-export async function generatedAgentFiles(root, projectDirectory) {
+export async function generatedAgentFiles(root, projectPath) {
   // No source, nothing to generate. `check` calls this, so a missing file has
   // to be an empty answer rather than an exception that stops every other
   // problem being reported.
@@ -206,7 +209,7 @@ export async function generatedAgentFiles(root, projectDirectory) {
     { path: 'AGENTS.md', source: BOOTSTRAP, text: bootstrap },
     { path: 'CLAUDE.md', source: BOOTSTRAP, text: bootstrap }
   ]
-  for (const guide of await pluginGuides(root, projectDirectory)) {
+  for (const guide of await pluginGuides(root, projectPath)) {
     // The listing belongs to the engine, not to whichever game is open. It is
     // written when the workspace opens and does not change when the project
     // does, so two games in one checkout cannot overwrite each other's. A
@@ -252,8 +255,8 @@ async function generatedSkillsOnDisk(root) {
  * A skill left behind keeps a disabled or deleted plugin registered, and the
  * agent that invokes it gets commands that do not exist.
  */
-export async function writeGeneratedAgentFiles(root, projectDirectory) {
-  const files = await generatedAgentFiles(root, projectDirectory)
+export async function writeGeneratedAgentFiles(root, projectPath) {
+  const files = await generatedAgentFiles(root, projectPath)
   for (const file of files) {
     const absolute = path.join(root, file.path)
     await fs.mkdir(path.dirname(absolute), { recursive: true })
@@ -275,8 +278,8 @@ export async function writeGeneratedAgentFiles(root, projectDirectory) {
  * start, so a stale file is read by every agent for a whole session and there
  * is no second chance to correct it.
  */
-export async function generatedFileProblems(root, projectDirectory) {
-  const files = await generatedAgentFiles(root, projectDirectory)
+export async function generatedFileProblems(root, projectPath) {
+  const files = await generatedAgentFiles(root, projectPath)
   const problems = []
   for (const file of files) {
     const onDisk = await fs.readFile(path.join(root, file.path), 'utf8').catch(() => null)
@@ -293,7 +296,7 @@ export async function generatedFileProblems(root, projectDirectory) {
     if (wanted.has(skill.path)) continue
     problems.push({
       file: skill.path,
-      why: `${skill.path} is a generated skill no enabled guide in ${projectDirectory} claims. It registers a plugin that is off or gone. Run "node bin/engine.mjs agent.skills" to remove it`
+      why: `${skill.path} is a generated skill no enabled guide in ${projectName(projectPath)} claims. It registers a plugin that is off or gone. Run "node bin/engine.mjs agent.skills" to remove it`
     })
   }
   return problems
@@ -307,9 +310,9 @@ export async function generatedFileProblems(root, projectDirectory) {
  * skill and the generator would silently drop it — a dropped declaration reads
  * exactly like a plugin that never wanted one.
  */
-export async function skillRegistrationProblems(root, projectDirectory) {
+export async function skillRegistrationProblems(root, projectPath) {
   const problems = []
-  for (const guide of await pluginGuides(root, projectDirectory)) {
+  for (const guide of await pluginGuides(root, projectPath)) {
     // An opt-out is a decision, not a broken declaration: the guide still
     // arrives in a packet when the task names the plugin.
     if (!listedForAgents(guide)) continue
@@ -319,7 +322,7 @@ export async function skillRegistrationProblems(root, projectDirectory) {
       problems.push({
         warning: true,
         file: guide.fileFromRoot,
-        why: `is listed as \`${skillNameFor(guide)}\` and ${projectDirectory} switches it off, so this game lists a tool whose commands it does not have. Enable it, or expect an agent to try a command that is not there`
+        why: `is listed as \`${skillNameFor(guide)}\` and ${projectName(projectPath)} switches it off, so this game lists a tool whose commands it does not have. Enable it, or expect an agent to try a command that is not there`
       })
       continue
     }
@@ -368,7 +371,7 @@ export async function skillRegistrationProblems(root, projectDirectory) {
     }
   }
 
-  for (const source of await pluginsWithoutGuide(root, projectDirectory)) {
+  for (const source of await pluginsWithoutGuide(root, projectPath)) {
     problems.push({
       warning: true,
       file: source,
@@ -430,9 +433,9 @@ function commandIds(source) {
  * A warning, not a failure: a plugin may register something deliberately
  * internal, and a guide is prose that cannot be generated from an id.
  */
-export async function undocumentedCommandProblems(root, projectDirectory) {
+export async function undocumentedCommandProblems(root, projectPath) {
   const problems = []
-  for (const guide of await pluginGuides(root, projectDirectory)) {
+  for (const guide of await pluginGuides(root, projectPath)) {
     if (!guide.enabled || !guide.hasSource) continue
     const source = await fs.readFile(path.join(root, guide.sourceFromRoot), 'utf8').catch(() => null)
     if (source === null) continue
@@ -448,10 +451,10 @@ export async function undocumentedCommandProblems(root, projectDirectory) {
 }
 
 /** Everything this module reports, for one call from `check`. */
-export async function agentRegistrationProblems(root, projectDirectory) {
+export async function agentRegistrationProblems(root, projectPath) {
   return [
-    ...await generatedFileProblems(root, projectDirectory),
-    ...await skillRegistrationProblems(root, projectDirectory),
-    ...await undocumentedCommandProblems(root, projectDirectory)
+    ...await generatedFileProblems(root, projectPath),
+    ...await skillRegistrationProblems(root, projectPath),
+    ...await undocumentedCommandProblems(root, projectPath)
   ]
 }

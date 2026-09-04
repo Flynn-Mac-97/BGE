@@ -22,21 +22,14 @@
  */
 
 /**
- * Which directory under the repository root holds the project.
+ * The one name for the open project.
  *
- * The dev server reads `ENGINE_PROJECT` and declares it here, so the browser
- * fetches from the same directory the server serves. It travels through
- * `import.meta.env` rather than a bare defined identifier because a bare one is
- * only substituted by a production build — Vite's define plugin returns
- * immediately in dev — and a parameter that silently reverts to `project` the
- * moment you actually use the editor is worse than no parameter at all.
- *
- * The `|| {}` is for node, which imports this same file with no bundler
- * anywhere near it. Node is told its project directory as an argument instead,
- * and never asks for a URL.
+ * It is both the URL the browser fetches from and the prefix that names a
+ * project file in a match pattern, a claim or a report. A constant, because the
+ * project may be any directory on disk: the dev server maps this URL onto
+ * whatever it serves, so nothing in either half has to know where that is.
  */
-const environment = import.meta.env || {}
-export const PROJECT_DIRECTORY = environment.ENGINE_PROJECT || 'project'
+export const PROJECT_PREFIX = 'project'
 
 /**
  * The project's own folders. A reference that starts with one of these is
@@ -57,20 +50,9 @@ const PROJECT_FOLDER = /^(assets|levels|types|behaviours|tests|plugins)\//
  * and the only symptom was a missing texture.
  */
 export const assetPath = reference => {
-  const relative = String(reference).replace(/^\/?project\//, '')
+  const relative = String(reference).replace(new RegExp(`^/?${PROJECT_PREFIX}/`), '')
   return PROJECT_FOLDER.test(relative) ? relative : 'assets/' + relative
 }
 
-/**
- * The same answer as a URL the browser can fetch.
- *
- * The prefix is the parameter; `engine/index.js` imports `PROJECT_DIRECTORY`
- * from here for the same reason, so the directory is named in one place and the
- * two spellings cannot drift.
- *
- * `assetPath` above still strips a literal leading `project/`, deliberately: it
- * runs in node as well, where there is no define to read, and a rule that
- * answered differently either side of the split is worse than a stale prefix
- * nobody writes.
- */
-export const assetURL = source => `/${PROJECT_DIRECTORY}/` + assetPath(source)
+/** The same answer as a URL the browser can fetch. */
+export const assetURL = source => `/${PROJECT_PREFIX}/` + assetPath(source)

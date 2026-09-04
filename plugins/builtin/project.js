@@ -1,36 +1,31 @@
 /**
  * Project Switcher — which game this editor has open, and how to leave it.
  *
- * The project directory is a parameter now: the dev server takes `ENGINE_PROJECT`
- * and a headless world takes `--project`. Once it is a parameter, the editor has
- * to be able to say which one it is looking at, because two projects on one
- * checkout look identical from inside the page.
+ * A project is a directory anywhere on disk. The dev server takes
+ * `ENGINE_PROJECT` and a headless world takes `--project`; neither given opens
+ * the untitled project, so the editor always has a game to work in.
  *
- * There is no save button here and there is not going to be one. `engine/files.js`
- * writes straight through — the file on disk IS the project, and a save-only copy
- * of it is the one thing this codebase has never had. So the verbs are open and
- * close, and nothing else.
+ * There is no save button and there is not going to be one. `engine/files.js`
+ * writes straight through — the files on disk ARE the project. Unsaved means
+ * unnamed, not held in memory, so `saveAs` renames the untitled directory
+ * rather than writing a copy of anything.
  *
- * What each verb honestly does:
+ * What each verb does:
  *
- *   close  reloads the page. That is the whole meaning of closing. A plugin
- *          cannot be un-loaded mid-session — its onLoad has already run and it
- *          holds DOM and listeners — and Counter-Strike ships eight project
- *          plugins, so dropping a project without a reload would leave the old
- *          project's panels and context verbs live over the new project's world.
- *   open   reloads the page when the dev server already serves that project.
- *          When it does not, the page cannot repoint a running server, so it
- *          remembers the name and hands back the one command that starts one.
+ *   list    the project directories beside the open one
+ *   open    repoints the dev server, then reloads the page. The reload is what
+ *           drops the old project: a plugin cannot be un-loaded once its onLoad
+ *           has run, so without it the old project's panels and context verbs
+ *           would stay live over the new project's world
+ *   saveAs  renames the untitled directory to a name, then opens it
+ *   close   opens a fresh untitled project, so closing leaves you somewhere
  *
- * It also watches for the case that has no symptom: the server restarted onto a
- * different project while this tab stayed open. The page then reads one
- * project's index and fetches another project's textures. It asks the server
- * which project it serves and reports the disagreement by name.
+ * The page reaches the project only through the `/project/` URL, so where it is
+ * on disk is the server's answer and never the page's guess.
  */
-import { PROJECT_DIRECTORY } from '../../engine/asset-path.js'
 
-/** Panel open, what the server last said it serves, and whether we said it drifted. */
-const state = { open: false, serving: null, reported: false }
+/** What the server last said it serves, and whether we said it drifted. */
+const state = { open: false, serving: null, directory: null, projects: null, reported: false }
 
 /**
  * The projects this browser has opened.
@@ -56,39 +51,65 @@ function remember(name) {
   return list
 }
 
-/** One path segment, so a name can only ever be a directory beside this one. */
-const NAME = /^[A-Za-z0-9._-]+$/
+/** One path segment, and not a dot-directory: the shape a new project may be named. */
+const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
+const ask = async (url, body) => {
+  const response = await fetch(url, body
+    ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+    : undefined)
+  const answer = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(answer.error || `${url} answered ${response.status}`)
+  return answer
+}
 
 /**
  * Ask the dev server which project it serves.
  *
- * Answering null is a real answer: a built page has no dev server, and so the
- * name the page was built with is the only one there is.
+ * Answering null is a real answer: a built page has no dev server, and then the
+ * name the page was loaded with is the only one there is.
  */
 async function askServer(context) {
   try {
-    const body = await (await fetch('/api/project')).json()
+    const body = await ask('/api/project')
     state.serving = typeof body.project === 'string' ? body.project : null
+    state.directory = body.directory || null
+    state.projects = body.projects || null
   } catch {
     state.serving = null
   }
-  if (state.serving && state.serving !== PROJECT_DIRECTORY && !state.reported) {
+  if (state.serving && state.serving !== context.editor.projectName && !state.reported) {
     state.reported = true
-    console.error(`[project] this page was loaded for "${PROJECT_DIRECTORY}" but the dev server now serves` +
-      ` "${state.serving}" — run project.close to reload into it`)
+    console.error(`[project] this page was loaded for "${context.editor.projectName}" but the dev server` +
+      ` now serves "${state.serving}" — run project.close to reload into it`)
   }
   context.redraw()
   return state.serving
 }
 
-const drifted = () => !!state.serving && state.serving !== PROJECT_DIRECTORY
+const drifted = context => !!state.serving && state.serving !== context.editor.projectName
+
+/** Every verb that repoints the server ends the same way, so it is written once. */
+const reopen = answer => {
+  if (answer.project) remember(answer.project)
+  location.reload()
+  return answer
+}
+
+/** A headless world is told its project as an argument, and has no server to ask. */
+const headlessAnswer = (context, next) => ({
+  project: context.editor.projectName,
+  opened: false,
+  why: 'a project is chosen when a world starts, and this world has already started',
+  start: `node bin/engine.mjs --headless --project ${next} snapshot`
+})
 
 export default {
   name: 'Project Switcher',
 
-  about: 'Says which project directory this editor has open, remembers the ones you have opened, ' +
-    'and closes one by reloading the page. Opening a different project starts a new world, so the ' +
-    'page hands back the command rather than pretending it can repoint a running dev server.',
+  about: 'Says which project this editor has open, lists the ones beside it, opens another, ' +
+    'gives the untitled project a name, and closes one by opening a fresh untitled project. ' +
+    'The dev server repoints itself, so opening a project is a page reload and not a restart.',
 
   onLoad(context) {
     // shell:ready only fires where there is a document, which is exactly where
@@ -99,9 +120,9 @@ export default {
   inspect: context => [{
     title: 'Project',
     rows: [
-      ['page', PROJECT_DIRECTORY],
-      ['server', state.serving ?? 'not asked'],
-      ['title', context.editor.projectName],
+      ['name', context.editor.projectName],
+      ['directory', state.directory ?? 'not asked'],
+      ['projects', state.projects ?? 'not asked'],
       ['remembered', String(remembered().length)]
     ]
   }],
@@ -116,7 +137,7 @@ export default {
 
   panels: [{
     id: 'project-switcher',
-    title: 'Project · open and close',
+    title: 'Project · open, name, close',
     dock: 'centre',
     order: 10,
     when: () => state.open,
@@ -129,23 +150,41 @@ export default {
 
     render(ui, context) {
       const typed = String(context.state.name ?? '').trim()
-      const known = [PROJECT_DIRECTORY, ...remembered().filter(name => name !== PROJECT_DIRECTORY)]
+      const open = context.editor.projectName
+      const known = [open, ...remembered().filter(name => name !== open)]
 
       return ui.stack([
         ui.section('Open', [
-          ui.field({ k: 'directory', v: PROJECT_DIRECTORY }),
-          ui.field({ k: 'title', v: context.editor.projectName }),
+          ui.field({ k: 'name', v: open }),
+          ui.field({ k: 'directory', v: state.directory ?? '…' }),
           ui.field({ k: 'levels', v: context.levels().length }),
           ui.field({ k: 'types', v: context.types().length }),
           ui.field({ k: 'plugins', v: context.loader.plugins.size })
         ]),
 
-        drifted()
+        drifted(context)
           ? ui.section('The server moved', [
               ui.text(`The dev server now serves “${state.serving}” and this page was loaded for` +
-                ` “${PROJECT_DIRECTORY}”. Until you reload, the index comes from one project and the` +
+                ` “${open}”. Until you reload, the index comes from one project and the` +
                 ` textures come from the other.`),
-              ui.button('Close and reload', () => context.run('project.close'), { primary: true })
+              ui.button('Reload', () => location.reload(), { primary: true })
+            ])
+          : null,
+
+        // Naming is offered only where it means something. A project that has a
+        // name already is renamed by moving its directory, not by a button that
+        // silently made a second copy.
+        open === 'untitled'
+          ? ui.section('Name this project', [
+              ui.text('This project has no name yet. Naming it moves its directory into the ' +
+                'projects folder — the files are the project, so there is nothing else to save.', { dim: true }),
+              ui.row([
+                ui.field({
+                  k: 'name', v: typed, note: 'letters, digits, dash',
+                  onChange: value => { context.state.name = value }
+                }),
+                ui.button('Save as', () => context.run('project.saveAs', typed), { primary: true })
+              ])
             ])
           : null,
 
@@ -153,12 +192,12 @@ export default {
           ui.list({
             items: known,
             key: name => name,
-            selected: PROJECT_DIRECTORY,
+            selected: open,
             row: name => [
-              ui.glyph(name === PROJECT_DIRECTORY ? '•' : '·'),
+              ui.glyph(name === open ? '•' : '·'),
               ui.label(name),
               ui.spacer(),
-              ui.meta(name === PROJECT_DIRECTORY ? 'open' : name === state.serving ? 'served' : '')
+              ui.meta(name === open ? 'open' : '')
             ],
             onPick: name => context.run('project.open', name),
             emptyText: 'only this one so far'
@@ -167,19 +206,15 @@ export default {
 
         ui.section('Open another', [
           ui.field({
-            k: 'directory', v: typed, note: 'a directory beside this one',
-            onChange: value => { context.state.name = value }
+            k: 'directory', v: '', note: 'a name in the projects folder, or a path',
+            onChange: value => { context.state.directory = value }
           }),
           ui.row([
-            ui.button('Open', () => context.run('project.open', String(context.state.name ?? '').trim())),
+            ui.button('Open', () => context.run('project.open', String(context.state.directory ?? '').trim())),
             ui.spacer(),
             ui.button('Close project', () => context.run('project.close'))
           ])
-        ]),
-
-        ui.text('Closing is a page reload — a plugin cannot be un-loaded once its onLoad has run, ' +
-          'so the only way to drop a project is to load the page again. Opening a different project ' +
-          'restarts the dev server: ENGINE_PROJECT=name npm run dev.', { dim: true })
+        ])
       ])
     }
   }],
@@ -198,24 +233,22 @@ export default {
 
     {
       id: 'project.list',
-      label: 'Which project is open',
-      run: context => {
-        // A headless world is handed its project directory as an argument and
-        // nothing carries that into `context`, so this must not guess: reporting
-        // the default directory for a world opened on another one is a lie.
+      label: 'Which projects there are',
+      async run(context) {
         if (!context.shell) {
           return {
             screen: false,
-            title: context.editor.projectName,
+            open: context.editor.projectName,
             levels: context.levels().length,
-            note: 'a headless world is told its project as an argument — node bin/engine.mjs --headless --project NAME'
+            note: 'a headless world is told its project as an argument — node bin/engine.mjs --headless --project PATH'
           }
         }
+        const body = await ask('/api/project/list')
         return {
-          page: PROJECT_DIRECTORY,
-          serving: state.serving,
-          stale: drifted(),
-          title: context.editor.projectName,
+          open: context.editor.projectName,
+          directory: state.directory,
+          projects: body.projects,
+          names: body.names,
           recent: remembered()
         }
       }
@@ -223,53 +256,43 @@ export default {
 
     {
       id: 'project.open',
-      label: 'Open a project by directory name',
-      async run(context, name) {
-        const wanted = String([].concat(name ?? [])[0] ?? '').trim()
-        if (!wanted) throw new Error('which project? project.open "demo" — a directory name inside the checkout')
-        if (!NAME.test(wanted)) {
-          throw new Error(`"${wanted}" is not a directory name inside the checkout — one segment, no slashes`)
-        }
+      label: 'Open a project by name or path',
+      async run(context, said) {
+        const wanted = String([].concat(said ?? [])[0] ?? '').trim()
+        if (!wanted) throw new Error('which project? project.open "demo" — a name in the projects folder, or a path')
+        if (!context.shell) return headlessAnswer(context, wanted)
+        // A bare name is a project beside the open one; anything else is a path
+        // the server resolves against the checkout.
+        const asked = NAME.test(wanted) ? `${state.projects || ''}/${wanted}` : wanted
+        return reopen(await ask('/api/project/open', { path: asked }))
+      }
+    },
 
-        if (!context.shell) {
-          return {
-            project: wanted,
-            opened: false,
-            why: 'a project is chosen when a world starts, and this world has already started',
-            start: `node bin/engine.mjs --headless --project ${wanted} snapshot`
-          }
+    {
+      id: 'project.saveAs',
+      label: 'Give the untitled project a name',
+      async run(context, said) {
+        const name = String([].concat(said ?? [])[0] ?? '').trim()
+        if (!NAME.test(name)) {
+          throw new Error(`"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot`)
         }
-
-        remember(wanted)
-        // Ask rather than assume: the server may already have been restarted
-        // onto this project, and then opening it really is just a reload.
-        const serving = await askServer(context)
-        if (serving === wanted) {
-          location.reload()
-          return { project: wanted, opened: true }
+        if (!context.shell) return headlessAnswer(context, name)
+        if (context.editor.projectName !== 'untitled') {
+          throw new Error(`"${context.editor.projectName}" already has a name — move its directory to rename it`)
         }
-
-        return {
-          project: wanted,
-          opened: false,
-          serving,
-          why: 'a page cannot repoint the dev server that serves it, and the project is read once at start-up',
-          start: `ENGINE_PROJECT=${wanted} npm run dev`,
-          then: 'project.close — the reload is what drops this project'
-        }
+        return reopen(await ask('/api/project/save-as', { name }))
       }
     },
 
     {
       id: 'project.close',
-      label: 'Close the project — reloads the page',
-      run: context => {
+      label: 'Close the project — opens a fresh untitled one',
+      async run(context) {
         if (!context.shell) {
           return { screen: false, note: 'a headless world ends with its process — there is nothing to close' }
         }
-        const opening = state.serving || PROJECT_DIRECTORY
-        location.reload()
-        return { closed: PROJECT_DIRECTORY, opening }
+        const projects = state.projects || (await askServer(context), state.projects)
+        return reopen(await ask('/api/project/open', { path: `${projects}/.untitled` }))
       }
     }
   ]

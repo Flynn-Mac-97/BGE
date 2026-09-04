@@ -9,27 +9,45 @@ import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
 import { chooseClient, describeClient, explainClientError, isLive, mergeClient, ownNonce, publicClient } from './engine/bridge-clients.mjs'
 import { readLaneBrowsers } from './engine/lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
+import { PROJECT_PREFIX } from './engine/asset-path.js'
+import { ensureProject, projectName, projectsRoot, resolveProject } from './engine/project-path.mjs'
 
 const ROOT = process.cwd()
 
 /**
  * Which project this server serves.
  *
- * One parameter, `ENGINE_PROJECT`, naming a directory inside the checkout.
- * Unset means `project`, so a server started the way it always was serves
- * exactly what it always did.
+ * One parameter, `ENGINE_PROJECT`, a path resolved against the checkout. A bare
+ * name reaches a directory inside it; `../x` or an absolute path reaches one
+ * anywhere. Unset opens the untitled project, so the editor starts with a blank
+ * game and no game files are needed in the checkout. `agents/`, `docs/` and the
+ * builtin plugin guides stay resolved against ROOT, so the engine's own
+ * instructions come from this checkout whatever project is open.
  *
- * It must be a CHILD of the root and nothing further away. The browser fetches
- * project modules and assets by URL from this same root, and `agents/`, `docs/`
- * and the builtin plugin guides are resolved against the root beside it — a
- * project living elsewhere would give two directories that can disagree about
- * which checkout you are in.
+ * The browser never learns this path. It fetches everything under `/project/`,
+ * which `serveProject` below maps onto whatever is served here.
  */
-const PROJECT_DIRECTORY = process.env.ENGINE_PROJECT || 'project'
-const PROJECT = path.join(ROOT, PROJECT_DIRECTORY)
-if (path.dirname(PROJECT) !== ROOT) {
-  throw new Error(
-    `ENGINE_PROJECT must name a directory directly inside ${ROOT} — got ${JSON.stringify(PROJECT_DIRECTORY)}`)
+let PROJECT = resolveProject(ROOT, process.env.ENGINE_PROJECT)
+
+/** What a person is shown. `game.json`'s title is read by the page, not here. */
+let PROJECT_NAME = projectName(PROJECT)
+
+/**
+ * Point this server at another project, without restarting it.
+ *
+ * Opening a project and saving an untitled one both have to repoint a server
+ * the page cannot restart. Everything that reads the project reads it per
+ * request, so the change is this assignment plus two things the server holds
+ * open: the watcher, and the list of directories `/@fs` will serve.
+ */
+function openProject(server, next) {
+  const wanted = path.resolve(ROOT, next)
+  PROJECT = wanted
+  PROJECT_NAME = projectName(wanted)
+  const allow = server.config.server.fs.allow
+  if (!allow.includes(wanted)) allow.push(wanted)
+  if (!wanted.startsWith(ROOT + path.sep)) server.watcher.add(wanted)
+  return { project: PROJECT_NAME, directory: PROJECT }
 }
 
 /**
@@ -50,12 +68,13 @@ const lastWritten = new Map()
  * with `path.sep` matches in one place and silently fails in the other.
  */
 const slash = p => p.split(path.sep).join('/')
-const PROJECT_URL = slash(PROJECT)
+// Read per call, not once: the served project changes when one is opened.
+const projectURL = () => slash(PROJECT)
 const PROJECT_ROOT_URL = slash(ROOT)
-const inProject = p => slash(p).startsWith(PROJECT_URL + '/')
+const inProject = p => slash(p).startsWith(projectURL() + '/')
 
 /** Project-relative, always forward-slashed. */
-const relative = p => slash(p).slice(PROJECT_URL.length + 1)
+const relative = p => slash(p).slice(projectURL().length + 1)
 
 /**
  * Whether the watcher should look at a path at all.
@@ -74,8 +93,12 @@ const relative = p => slash(p).slice(PROJECT_URL.length + 1)
  * work had not been written. In the one workflow this engine exists to support.
  */
 const watched = file => {
-  const inside = slash(path.resolve(file)).slice(PROJECT_ROOT_URL.length)
-  return !/(^|\/)\.[^/]/.test(inside)
+  const full = slash(path.resolve(file))
+  // Relative to whichever root the file is under. The project may be outside
+  // the checkout, and slicing by the wrong root leaves an absolute path whose
+  // own directories are then read as dot-directories.
+  const base = full.startsWith(projectURL() + '/') ? projectURL() : PROJECT_ROOT_URL
+  return !/(^|\/)\.[^/]/.test(full.slice(base.length))
 }
 
 const send = (res, code, body) => {
@@ -134,10 +157,13 @@ const refusedFileWrite = request => {
 }
 
 /** One project, one index. Rebuilt on every write, never cached. */
-const buildIndex = () => buildProjectIndex(PROJECT)
+const buildIndex = () => buildProjectIndex(PROJECT, ROOT)
 
 async function agentPlugins() {
-  const game = JSON.parse(await fs.readFile(path.join(PROJECT, 'game.json'), 'utf8'))
+  // Optional: a new project has no game.json, and refusing to list the plugin
+  // guides would leave the first agent in it with no packet.
+  const game = JSON.parse(
+    await fs.readFile(path.join(PROJECT, 'game.json'), 'utf8').catch(() => '{}'))
   const disabled = new Set(game.plugins?.disabled || [])
   const places = [
     { scope: 'engine', directory: path.join(ROOT, 'plugins/builtin'), prefix: 'plugins/builtin' },
@@ -162,11 +188,11 @@ async function agentPlugins() {
       // disabled plugin's words pull nothing, because the node is disabled
       // with it. This is what makes a guide a skill.
       const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
-      // Named from the project directory in use, not the literal `project` —
-      // the same rule the headless twin follows, or the two disagree about
-      // which file a project plugin's guide belongs to.
+      // `project/` is the one name for a file in the open project — the same
+      // rule the headless twin follows, or the two disagree about which file a
+      // project plugin's guide belongs to.
       const match = [...new Set([
-        `${place.scope === 'project' ? PROJECT_DIRECTORY + '/' : ''}${place.prefix}/${stem}.js`,
+        `${place.scope === 'project' ? PROJECT_PREFIX + '/' : ''}${place.prefix}/${stem}.js`,
         ...extra
       ])]
       found.push({
@@ -179,6 +205,43 @@ async function agentPlugins() {
     }
   }
   return found
+}
+
+/**
+ * Serve the open project at `/project/`, wherever it is on disk.
+ *
+ * The browser imports type and behaviour files as modules and fetches textures,
+ * models and sounds by URL, and both spell the project `project/`. A directory
+ * outside the Vite root is reachable only as `/@fs/<absolute path>`, so this
+ * rewrites the one prefix onto the other and lets Vite's own transform and
+ * static middlewares answer. `server.fs.allow` below opens the directory to
+ * them.
+ *
+ * Registered before the API plugin and outside `configureServer`'s returned
+ * hook, because the rewrite has to happen ahead of Vite's own middlewares
+ * rather than after them.
+ */
+function serveProject() {
+  const mount = `/${PROJECT_PREFIX}/`
+  return {
+    name: 'engine-project-mount',
+    configureServer(server) {
+      // Created if it is not there. Opening the editor with nothing on disk is
+      // the blank-project case, and it has to leave a project behind.
+      ensureProject(PROJECT).then(() => buildIndex()).catch(error => {
+        console.error(`[engine] cannot open ${PROJECT}: ${error.message}`)
+      })
+      // Vite watches its own root. A project outside it is watched only if the
+      // watcher is told, and without that no project edit reaches the editor.
+      if (!PROJECT.startsWith(ROOT + path.sep)) server.watcher.add(PROJECT)
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith(mount)) return next()
+        const rest = req.url.slice(mount.length)
+        req.url = '/@fs' + slash(path.join(PROJECT, rest)).replace(/^(?![/])/, '/')
+        next()
+      })
+    }
+  }
 }
 
 function api() {
@@ -213,7 +276,58 @@ function api() {
           // baked in, so a server restarted onto a different project leaves a
           // live tab reading one project's index and fetching another project's
           // textures — and nothing on screen says so. This is how the tab asks.
-          if (url.pathname === '/api/project') return send(res, 200, { project: PROJECT_DIRECTORY })
+          if (url.pathname === '/api/project') {
+            return send(res, 200, { project: PROJECT_NAME, directory: PROJECT, projects: projectsRoot(ROOT) })
+          }
+
+          // Every project directory beside the open one. The untitled project
+          // is skipped: it is a working directory, not a project you pick.
+          if (url.pathname === '/api/project/list') {
+            const home = projectsRoot(ROOT)
+            const entries = await fs.readdir(home, { withFileTypes: true }).catch(() => [])
+            return send(res, 200, {
+              projects: home,
+              names: entries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name).sort()
+            })
+          }
+
+          // Repoint this server. A page cannot restart the server that serves
+          // it, so the server does it and the page reloads.
+          if (url.pathname === '/api/project/open' && req.method === 'POST') {
+            const refused = refusedFileWrite(req)
+            if (refused) return send(res, 423, refused)
+            const said = String((await readBody(req)).path || '').trim()
+            if (!said) return send(res, 400, { error: 'which project? a directory path' })
+            const wanted = path.resolve(ROOT, said)
+            const there = await fs.stat(wanted).then(s => s.isDirectory(), () => false)
+            if (!there) return send(res, 404, { error: `no project directory at ${wanted}` })
+            const opened = openProject(server, wanted)
+            await buildIndex()
+            return send(res, 200, { ...opened, opened: true })
+          }
+
+          // Give the untitled project a name. A rename, not a copy: the files
+          // are already the project, so naming it is moving the directory.
+          if (url.pathname === '/api/project/save-as' && req.method === 'POST') {
+            const refused = refusedFileWrite(req)
+            if (refused) return send(res, 423, refused)
+            const name = String((await readBody(req)).name || '').trim()
+            if (!/^[A-Za-z0-9._-]+$/.test(name) || name.startsWith('.')) {
+              return send(res, 400, { error: `"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot` })
+            }
+            const target = path.join(projectsRoot(ROOT), name)
+            if (await fs.stat(target).then(() => true, () => false)) {
+              return send(res, 409, { error: `${target} already exists — pick another name` })
+            }
+            await fs.mkdir(path.dirname(target), { recursive: true })
+            await fs.rename(PROJECT, target)
+            const opened = openProject(server, target)
+            // The title is the project's own, so it travels with the files.
+            const game = JSON.parse(await fs.readFile(path.join(target, 'game.json'), 'utf8').catch(() => '{}'))
+            await fs.writeFile(path.join(target, 'game.json'), JSON.stringify({ ...game, title: name }, null, 2) + '\n', 'utf8')
+            await buildIndex()
+            return send(res, 200, { ...opened, saved: true })
+          }
 
           if (url.pathname === '/api/file' && req.method === 'GET') {
             const abs = safe(url.searchParams.get('path') || '')
@@ -318,7 +432,7 @@ function bridge() {
       // Which project this server is serving, said once at start. Silence here
       // means an editor pointed at the wrong game looks exactly like an editor
       // pointed at the right one.
-      console.log(`[engine] serving project: ${PROJECT_DIRECTORY}`)
+      console.log(`[engine] serving project: ${PROJECT_NAME} (${PROJECT})`)
 
       /**
        * A watcher error must not end the session.
@@ -510,7 +624,7 @@ if (hot) {
   // The editor names the tab; this only marks it offline. Setting a title here
   // as well would race the editor's own, which boots after this script.
   const OFFLINE = 'OFFLINE · '
-  const WHAT = ${JSON.stringify(PROJECT_DIRECTORY)} + ' :' + location.port
+  const WHAT = ${JSON.stringify(PROJECT_NAME)} + ' :' + location.port
 
   /**
    * Say that this page's server has gone.
@@ -599,7 +713,7 @@ function serverRegistry() {
         // Which checkout and project this is comes from the server, last, so a
         // page cannot report a project it is not being served.
         const merged = mergeClient(clients, socket, client,
-          { ...said, project: PROJECT_DIRECTORY, serves: ROOT })
+          { ...said, project: PROJECT_NAME, serves: ROOT })
         if (merged.error) {
           if (!warned.has(socket)) {
             warned.add(socket)
@@ -617,7 +731,7 @@ function serverRegistry() {
         const url = new URL(req.url, 'http://x')
         if (url.pathname === '/api/server') {
           return send(res, 200, {
-            ...(record || { serves: ROOT, project: PROJECT_DIRECTORY }),
+            ...(record || { serves: ROOT, project: PROJECT_NAME }),
             pid: process.pid,
             tabs: attached(),
             // The lane records as written. Proving one means asking its
@@ -653,7 +767,7 @@ function serverRegistry() {
           port,
           pid: process.pid,
           serves: ROOT,
-          project: PROJECT_DIRECTORY,
+          project: PROJECT_NAME,
           url: `http://localhost:${port}`,
           startedAt: new Date().toISOString()
         }
@@ -684,7 +798,7 @@ function serverRegistry() {
 // Returns nothing on purpose: Vite treats whatever `configureServer` resolves
 // to as a hook to call after its middlewares, and the writer answers the list
 // of paths it wrote.
-const writeAgentDoc = async () => { await writeGeneratedAgentFiles(ROOT, PROJECT_DIRECTORY) }
+const writeAgentDoc = async () => { await writeGeneratedAgentFiles(ROOT, PROJECT) }
 
 export default defineConfig({
   plugins: [
@@ -692,28 +806,32 @@ export default defineConfig({
     // sharing that prefix has to register ahead of it.
     bridge(),
     serverRegistry(),
+    serveProject(),
     api(),
     { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() }
   ],
   /**
-   * Tell the browser half the same directory name.
+   * Tell the browser half what to call the open project.
    *
-   * The browser cannot read an env var, and the two halves have to agree or the
-   * editor reads its levels from one project and fetches its textures from
-   * another. `engine/asset-path.js` is the single reader.
+   * The name only, for the tab title. Where the project is on disk never
+   * reaches the page: it fetches everything under `/project/`.
    *
    * It has to go through `import.meta.env`. A bare defined identifier is only
    * substituted by a production build — Vite's define plugin returns without
    * doing anything in dev — so the editor, which is the only thing anyone runs,
-   * would quietly keep using `project`.
+   * would quietly keep the default.
    */
-  define: { 'import.meta.env.ENGINE_PROJECT': JSON.stringify(PROJECT_DIRECTORY) },
+  define: { 'import.meta.env.ENGINE_PROJECT': JSON.stringify(PROJECT_NAME) },
   // ENGINE_NO_OPEN keeps a headless or CI run from launching a visible browser.
   // ENGINE_PORT is the same variable `bin/engine.mjs` reads, so naming a port
   // once puts the server and the commands that drive it on the same one.
   server: {
     port: Number(process.env.ENGINE_PORT) || 5180,
     open: !process.env.ENGINE_NO_OPEN,
-    watch: { ignored: file => !watched(file) }
+    watch: { ignored: file => !watched(file) },
+    // The project may be outside the checkout, and `/@fs` refuses anything not
+    // named here. The projects root is listed too, so opening another project
+    // without restarting does not have to reopen this door.
+    fs: { allow: [ROOT, projectsRoot(ROOT), PROJECT] }
   }
 })

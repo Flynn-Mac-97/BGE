@@ -154,7 +154,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         // Which project answered. A command that omits `--project` opens the
         // default one and says nothing, so a reply about the wrong game reads
         // exactly like a reply about the right one.
-        project: editor.projectDirectory,
+        project: editor.projectName,
         level: editor.levelName,
         // Engine time and seed, because "what happened" is only reproducible
         // if you know where the clock and the random stream were.

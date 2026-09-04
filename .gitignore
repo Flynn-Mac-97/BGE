@@ -27,3 +27,8 @@ project/.engine/lane-browsers.json
 # project/assets/motion/; the generator's own files are regenerable working
 # files, and 1.5M of them in every diff is not a record of anything.
 agent-runs/rig-clips/
+
+# The checkout's own coordination state: the work lock, the agent run
+# registry, the server registry and the lane browsers. Live files about what is
+# running here, never a record of anything.
+/.engine/

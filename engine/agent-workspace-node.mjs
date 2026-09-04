@@ -18,7 +18,7 @@ export function mainWorktree(root) {
   return path.resolve(line.slice('worktree '.length))
 }
 
-const registryFile = root => path.join(mainWorktree(root), 'project/.engine/agents.json')
+const registryFile = root => path.join(mainWorktree(root), '.engine/agents.json')
 
 /** A registry edit is one read and one rename; a lock older than this is a corpse. */
 const STALE_LOCK_MILLISECONDS = 60_000
@@ -142,9 +142,9 @@ const validateId = id => {
   }
 }
 
-export async function contextFromDisk(root, request, projectDirectory = 'project') {
+export async function contextFromDisk(root, request, projectPath = 'project') {
   root = path.resolve(root)
-  const project = path.join(root, projectDirectory)
+  const project = path.resolve(root, projectPath)
   const read = (scope, file) => {
     const base = scope === 'engine' ? root : project
     const target = path.resolve(base, file)
@@ -153,17 +153,17 @@ export async function contextFromDisk(root, request, projectDirectory = 'project
     }
     return fs.promises.readFile(target, 'utf8')
   }
-  return resolveAgentContext(read, request, await onDisk(project).agentPlugins(), projectDirectory)
+  return resolveAgentContext(read, request, await onDisk(project, root).agentPlugins(), project)
 }
 
-export async function prepareAgent(root, id, request = {}, projectDirectory = 'project') {
+export async function prepareAgent(root, id, request = {}, projectPath = 'project') {
   validateId(id)
   const main = mainWorktree(root)
   const files = [].concat(request.files || []).map(normal).filter(Boolean)
   const parallel = request.parallel === true || request.mode === 'parallel'
   if (parallel && !files.length) throw new Error('parallel tasks must claim at least one file')
 
-  const packet = await contextFromDisk(main, { ...request, files, parallel }, projectDirectory)
+  const packet = await contextFromDisk(main, { ...request, files, parallel }, projectPath)
   assertAvailable(main, readAgentRegistry(main).runs, id, files, parallel)
 
   let workspace = main
@@ -218,9 +218,10 @@ export async function prepareAgent(root, id, request = {}, projectDirectory = 'p
     throw error
   }
 
-  // Beside the game the lane works on, so a run never writes into another
-  // project's directory.
-  const taskFile = path.join(workspace, projectDirectory, '.engine/agent-task.json')
+  // In the lane's own workspace, not in a project: the project may be any
+  // directory on disk and is shared by every lane, so a packet written there
+  // would be overwritten by the next run.
+  const taskFile = path.join(workspace, '.engine/agent-task.json')
   fs.mkdirSync(path.dirname(taskFile), { recursive: true })
   fs.writeFileSync(taskFile, JSON.stringify({ run, context: packet }, null, 2) + '\n', 'utf8')
 

@@ -197,7 +197,7 @@ export function captureWorld({ world, loop, editor, view }, cause = {}) {
       file: cause.file || null,
       at: cause.at || new Date().toISOString()
     },
-    project: editor.projectDirectory,
+    project: editor.projectName,
     level: editor.levelName,
     playing: !!loop.running,
     simulated: !!world.simulated,
@@ -639,7 +639,7 @@ function armCapture(parts, store) {
       // smallest thing that can announce it.
       try {
         store.setItem(STORAGE_KEY, JSON.stringify({
-          version: CAPTURE_VERSION, cause, project: parts.editor.projectDirectory,
+          version: CAPTURE_VERSION, cause, project: parts.editor.projectName,
           level: parts.editor.levelName, entityCount: parts.world.entities.length,
           simulated: !!parts.world.simulated,
           time: round(parts.loop.time), seed: parts.loop.random.seed,

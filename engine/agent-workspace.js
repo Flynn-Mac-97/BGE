@@ -1,5 +1,7 @@
 /** Resolve the smallest instruction packet for one task. */
 
+import { PROJECT_PREFIX } from './asset-path.js'
+
 export const ENGINE_AGENT_MANIFEST = 'agents/manifest.json'
 export const PROJECT_AGENT_MANIFEST = 'agents/manifest.json'
 export const AGENT_SETTINGS = 'agents/settings.json'
@@ -128,19 +130,29 @@ export async function readAgentWorkspace(read, pluginNodes = []) {
 }
 
 /**
- * A file as a `match:` pattern spells it — with the project directory called
- * `project`, whatever it is really called.
+ * A file as a `match:` pattern spells it — under `project/`, wherever the
+ * project really is.
  *
- * Every guide in the tree writes `match: project/**`, and the project directory
- * is a start-up parameter. So a game opened as `kitten-survivors` matched none
- * of them: the project's own code style, its game lane and Plugin Master all
- * silently went missing, and the packet still looked like a packet. The
- * substitution goes here, once, rather than teaching every guide a token.
+ * Every guide in the tree writes `match: project/**`, and the open project is a
+ * directory anywhere on disk. Without this a game opened as anything else
+ * matches none of them: its own code style, its game lane and Plugin Master all
+ * go missing and the packet still looks complete. The substitution goes here,
+ * once, rather than teaching every guide a token.
+ *
+ * Three spellings reach the same file and an agent may hold any of them: the
+ * full path, the directory's own name, and `project/` itself.
  */
-const asProjectPattern = (file, projectDirectory) =>
-  projectDirectory && projectDirectory !== 'project'
-    ? cleanPath(file).replace(new RegExp(`^${projectDirectory}/`), 'project/')
-    : cleanPath(file)
+const asProjectPattern = (file, projectPath) => {
+  const clean = cleanPath(file)
+  if (clean.startsWith(PROJECT_PREFIX + '/')) return clean
+  const project = cleanPath(projectPath).replace(/\/+$/, '')
+  for (const prefix of [project, project.split('/').pop()]) {
+    if (prefix && clean.startsWith(prefix + '/')) {
+      return PROJECT_PREFIX + '/' + clean.slice(prefix.length + 1)
+    }
+  }
+  return clean
+}
 
 const selectableKind = node => ['instruction', 'skill'].includes(node.kind)
 
@@ -161,14 +173,14 @@ function withheldReason(node, replaced) {
   return 'selected only by name'
 }
 
-export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectDirectory = 'project') {
+export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectPath = PROJECT_PREFIX) {
   const request = normaliseAgentRequest(requestValue)
   const workspace = await loadAgentGraph(read, pluginNodes)
   if (workspace.problems.length) throw new Error(`bad agent tree: ${workspace.problems.join('; ')}`)
 
   // Matched against the spelling the patterns use; claimed and reported under
   // the real one, because that is the path the agent has to open.
-  const matchable = request.files.map(file => asProjectPattern(file, projectDirectory))
+  const matchable = request.files.map(file => asProjectPattern(file, projectPath))
 
   const wanted = new Set(request.nodes)
   const task = request.task.toLowerCase()
@@ -214,7 +226,7 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // manifest writes `<project>` and the packet says which one, so the command a
   // lane is handed is the command that proves the lane's own work.
   const tests = [...new Set(entries.flatMap(node => node.tests || []))]
-    .map(test => test.replaceAll('<project>', projectDirectory))
+    .map(test => test.replaceAll('<project>', projectPath))
   // Both notices go in the text, not only in a field: most agents read the text
   // and never parse the JSON.
   const noFilesNotice = request.files.length || !skippedByFile ? null

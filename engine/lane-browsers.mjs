@@ -65,7 +65,7 @@ function mainCheckout(root) {
   return mainCheckouts.get(root)
 }
 
-const registryFile = root => path.join(mainCheckout(root), 'project/.engine/lane-browsers.json')
+const registryFile = root => path.join(mainCheckout(root), '.engine/lane-browsers.json')
 
 export function readLaneBrowsers(root) {
   try {

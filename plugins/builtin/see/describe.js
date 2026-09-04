@@ -268,7 +268,7 @@ export function describe(context, options = {}) {
     // Which game this is a frame of. A command that omits `--project` opens the
     // default one and says nothing, so a reply about the wrong game reads
     // exactly like a reply about the right one.
-    project: context.editor?.projectDirectory,
+    project: context.editor?.projectName,
     level: context.editor?.levelName,
     camera: {
       mode: projector.mode, x: round(view.x), y: round(view.y), z: round(view.z || 0),

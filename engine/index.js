@@ -9,7 +9,13 @@
  * Keeping this file thin is the point. Anything added here is something a
  * headless world cannot do, and headless is how several agents work at once.
  */
-import { PROJECT_DIRECTORY } from './asset-path.js'
+import { PROJECT_PREFIX } from './asset-path.js'
+
+/**
+ * What the dev server calls the open project, for the tab title only. Where it
+ * is on disk never reaches the page.
+ */
+const PROJECT_NAME = (import.meta.env || {}).ENGINE_PROJECT || PROJECT_PREFIX
 import { makeFiles, overHTTP } from './files.js'
 import { importPlugin, reportImportFailure } from './plugin-import.js'
 import { makeRenderer } from './render.js'
@@ -31,7 +37,7 @@ import { startWorld } from './start-world.js'
  */
 let fileVersion = 0
 const importProjectFile = async file =>
-  (await import(/* @vite-ignore */ `/${PROJECT_DIRECTORY}/${file}?hot=${++fileVersion}`)).default || {}
+  (await import(/* @vite-ignore */ `/${PROJECT_PREFIX}/${file}?hot=${++fileVersion}`)).default || {}
 
 /** A plugin the project supplies: one `.js` file directly in its `plugins/`. */
 const PROJECT_PLUGIN = /^plugins\/[^/]+\.js$/
@@ -70,13 +76,13 @@ async function findPlugins(loader) {
     // A project whose file list cannot be read has no plugins as far as this is
     // concerned, and an editor quietly missing eight of them is the worst way to
     // find that out.
-    reportImportFailure(loader, `${PROJECT_DIRECTORY}/plugins/`, e)
+    reportImportFailure(loader, `${PROJECT_PREFIX}/plugins/`, e)
   }
 
   for (const file of listing.map(entry => entry.path).filter(f => PROJECT_PLUGIN.test(f)).sort()) {
     const definition = await importPlugin({
-      file: `${PROJECT_DIRECTORY}/${file}`,
-      load: () => import(/* @vite-ignore */ `/${PROJECT_DIRECTORY}/${file}`),
+      file: `${PROJECT_PREFIX}/${file}`,
+      load: () => import(/* @vite-ignore */ `/${PROJECT_PREFIX}/${file}`),
       loader
     })
     if (definition) found.push({ definition, builtin: false })
@@ -91,13 +97,14 @@ async function boot() {
   // Say which project and which server this tab is, where a person looks
   // first. Several editors can be open at once, on several ports, and two tabs
   // naming only the project are told apart by nothing.
-  document.title = `${PROJECT_DIRECTORY} :${location.port} — engine`
+  document.title = `${PROJECT_NAME} :${location.port} — engine`
 
   const { context, engine, world, loop } = await startWorld({
     openFiles: bus => makeFiles(bus),
     loadPlugins: findPlugins,
     importProjectFile,
-    projectDirectory: PROJECT_DIRECTORY,
+    projectDirectory: PROJECT_PREFIX,
+    projectName: PROJECT_NAME,
 
     // The shell builds the canvas the renderer draws into, so the shell comes
     // first and context.renderer is filled in immediately after. Both are put

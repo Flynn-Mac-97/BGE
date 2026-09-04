@@ -21,6 +21,8 @@ import { makeWorld } from './world.js'
 import { makeLoop } from './loop.js'
 import { makeLoader } from './loader.js'
 import { makeInspect, makeLog } from './inspect.js'
+import { PROJECT_PREFIX } from './asset-path.js'
+import { makeProjector } from './camera-project.js'
 
 /**
  * The screen a game is drawn for, when the game declares none.
@@ -84,13 +86,13 @@ export async function startWorld({
   /**
    * Which directory under the checkout holds the project.
    *
-   * A parameter, and one a plugin has to be able to read: the browser learns it
-   * from the dev server and node is told it with `--project`, and before this
-   * was passed through, anything asking reached for `process.env.ENGINE_PROJECT`
-   * — which `--project` never sets. `plugin.sizes` measured the default
-   * project's plugins while reading another project's title, and said nothing.
+   * The constant `project`, not the directory on disk. It is the one name a
+   * project file is known by in both halves — a URL, a match pattern, a claim —
+   * and the dev server maps it onto whatever directory it serves.
    */
-  projectDirectory = 'project',
+  projectDirectory = PROJECT_PREFIX,
+  /** What the editor shows. `game.json`'s title overrides it below. */
+  projectName: openProjectName = PROJECT_PREFIX,
   /** The browser mounts its shell and renderer here. Headless does nothing. */
   attachScreen = async () => {},
   /** A measured screen. Overrides the game's declared device when given. */
@@ -114,11 +116,11 @@ export async function startWorld({
   const viewport = measuredViewport || { width: device.width, height: device.height }
 
   const editor = {
-    // The directory, which is a parameter; and the title, which the project's
-    // own game.json sets below. Two different questions — a panel showing the
-    // title and a plugin reading `<project>/plugins` need different answers.
+    // The name a file is known by, and the name a person is shown. Two
+    // different questions — a panel showing the title and a plugin naming
+    // `project/plugins` need different answers.
     projectDirectory,
-    projectName: 'project',
+    projectName: openProjectName,
     levelName: '—',
     selection: new Set(),
     tool: 'select',
@@ -374,6 +376,11 @@ export async function startWorld({
     importProjectFile,
     // A world with no shell has nothing to redraw, and that is not an error.
     redraw: () => context.shell?.draw(),
+
+    // Where a world point lands on screen, the same answer the renderer draws
+    // by. Offered here because a project is a directory anywhere on disk, so
+    // game code cannot reach an engine module by a relative path.
+    projector: () => makeProjector(context.view, context.viewport),
 
     // The deterministic runtime. Game code uses these instead of the wall clock,
     // Math.random and setTimeout — which is what makes simulate() repeatable.

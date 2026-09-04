@@ -18,9 +18,10 @@
  * renderer SURFACE with nothing behind it, so the draw-time commands run
  * instead of refusing; see `nullRenderer`.
  *
- * Which project it opens is a parameter, defaulting to `project`. It must be a
- * directory inside the checkout — see `startWorldInNode` at the bottom for why
- * a second root would be worse than one rule.
+ * Which project it opens is a parameter: a directory path anywhere, or nothing
+ * for the untitled project. The checkout is a separate parameter, because the
+ * engine's own plugins and instructions are read from it whatever project is
+ * open.
  */
 import path from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
@@ -31,6 +32,8 @@ import { importPlugin } from './plugin-import.js'
 import { startWorld } from './start-world.js'
 import { buildIndex, walk } from './project-index.mjs'
 import { workLock } from './work-lock.mjs'
+import { PROJECT_PREFIX } from './asset-path.js'
+import { ensureProject, projectName, resolveProject } from './project-path.mjs'
 
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -43,8 +46,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
  * Skipping that is how a world ends up acting on a project that no longer
  * exists.
  */
-export function onDisk(projectDirectory) {
-  const root = path.dirname(projectDirectory)
+export function onDisk(projectDirectory, checkout = ROOT) {
+  // The checkout is passed in, not taken from the project's parent: the project
+  // may be anywhere, and the engine's own instructions are read from here.
+  const root = path.resolve(checkout)
   const inside = rel => {
     const abs = path.resolve(projectDirectory, rel)
     // Same guard the dev server applies. A path that climbs out of the project
@@ -93,11 +98,11 @@ export function onDisk(projectDirectory) {
         // same reading the dev server makes, or the two twins route
         // differently.
         const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
-        // Named from the project directory in use, not the literal `project`.
-        // A guide whose match path points into the other project attaches to
-        // tasks about a file that is not there, and never to the real one.
+        // `project/` is the one name for a file in the open project, whatever
+        // the directory is called on disk. Guides declare `match: project/**`
+        // and are right for every project.
         const match = [...new Set([
-          `${place.scope === 'project' ? path.basename(projectDirectory) + '/' : ''}${place.prefix}/${stem}.js`,
+          `${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`,
           ...extra
         ])]
         found.push({
@@ -113,7 +118,7 @@ export function onDisk(projectDirectory) {
   }
 
   return {
-    index: () => buildIndex(projectDirectory),
+    index: () => buildIndex(projectDirectory, root),
     tree: async () => (await walk(projectDirectory))
       .filter(f => !f.startsWith('.engine'))
       .map(f => ({ path: f })),
@@ -124,13 +129,13 @@ export function onDisk(projectDirectory) {
       const abs = inside(rel)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, text, 'utf8')
-      await buildIndex(projectDirectory)
+      await buildIndex(projectDirectory, root)
     },
     async writeAgent(scope, rel, text) {
       const abs = insideAgent(scope, rel)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, text, 'utf8')
-      if (scope === 'project') await buildIndex(projectDirectory)
+      if (scope === 'project') await buildIndex(projectDirectory, root)
     }
   }
 }
@@ -340,39 +345,35 @@ export function nullRenderer(view, viewport, shape) {
 
 /**
  * @param root     the checkout. The engine's own plugins and guides live here.
- * @param project  which directory inside it holds the game. `project` by
- *                 default, so a call that names nothing starts the world it
- *                 always started.
+ * @param project  the game's directory, as a path resolved against the
+ *                 checkout. A bare name reaches a directory inside it; `../x`
+ *                 or an absolute path reaches one anywhere else. Nothing given
+ *                 opens the untitled project.
  * @param renderer `'null'` attaches the drawing surface described above.
  *                 Anything else leaves the world with no renderer, so the
  *                 draw-time commands refuse and name the headless verb that
  *                 answers instead — the right answer for an agent at a
  *                 terminal, and the wrong one for a test of the restore path.
  */
-export async function startWorldInNode({ root = ROOT, project = 'project', viewport, renderer } = {}) {
+export async function startWorldInNode({ root = ROOT, project, viewport, renderer } = {}) {
   const checkout = path.resolve(root)
-  const projectDirectory = path.resolve(checkout, project)
-
-  // The project has to be a child of the checkout, and this says so out loud.
-  // `onDisk` finds the engine root back from the project by taking its parent,
-  // and every agent-file path is resolved against that — so a project anywhere
-  // else would give two roots that can disagree, and the world would read its
-  // own instructions out of the wrong tree while reading its levels from here.
-  if (path.dirname(projectDirectory) !== checkout) {
-    throw new Error(`project must be a directory directly inside ${checkout} — got ${projectDirectory}`)
-  }
+  const projectDirectory = resolveProject(checkout, project)
+  await ensureProject(projectDirectory)
 
   return startWorld({
     openFiles: bus => {
-      const files = makeFiles(bus, onDisk(projectDirectory))
+      const files = makeFiles(bus, onDisk(projectDirectory, checkout))
       files.guardWrites(refuseWritesWhileLanesWork(checkout))
       return files
     },
     loadPlugins: loader => findPlugins(checkout, projectDirectory, loader),
     importProjectFile: importProjectFileFrom(projectDirectory),
-    // The name, not the absolute path: a plugin builds `<project>/plugins` from
-    // it, and the browser half only ever knows the name.
-    projectDirectory: path.basename(projectDirectory),
+    // The canonical prefix, not the disk path. A plugin builds
+    // `project/plugins` from it to name a file, and that name has to be the
+    // same in both halves — the browser reaches the project only through the
+    // `/project/` mount and never learns where it is on disk.
+    projectDirectory: PROJECT_PREFIX,
+    projectName: projectName(projectDirectory),
     ...(viewport ? { viewport } : {}),
     // The same hook the browser mounts its shell and renderer through, so the
     // two halves attach a renderer at one point in the start-up order.

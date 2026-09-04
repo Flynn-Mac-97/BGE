@@ -20,7 +20,7 @@ import { workLock, permits, roleOfClient } from '../engine/work-lock.mjs'
 function checkout(t, { runs = [], browsers = [] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-work-lock-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  const engine = path.join(root, 'project/.engine')
+  const engine = path.join(root, '.engine')
   fs.mkdirSync(engine, { recursive: true })
   fs.writeFileSync(path.join(engine, 'agents.json'), JSON.stringify({ runs }))
   fs.writeFileSync(path.join(engine, 'lane-browsers.json'), JSON.stringify({ browsers }))

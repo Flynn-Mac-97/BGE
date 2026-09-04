@@ -15,6 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { resolveProject } from '../engine/project-path.mjs'
 
 const PORT = process.env.ENGINE_PORT || 5180
 const HOST = process.env.ENGINE_HOST || `http://localhost:${PORT}`
@@ -101,10 +102,12 @@ Flags (--foo) collect into a trailing options object.
                  no browser, no port. Many of these run at once without ever
                  seeing each other, which is how several agents work in parallel.
   --level NAME   headless only: open this level first
-  --project NAME open this project directory instead of \`project\`. Must be a
-                 directory inside the checkout. index, tree, check and --headless
-                 read it; a live editor serves whatever its dev server started
-                 with, so switch that one with ENGINE_PROJECT=NAME npm run dev
+  --project PATH open this project directory. A path resolved against the
+                 checkout, so a bare name is a directory inside it and \`../x\` or
+                 an absolute path reaches one anywhere. index, tree, check and
+                 --headless read it; a live editor serves whatever its dev
+                 server started with, so switch that one with
+                 ENGINE_PROJECT=PATH npm run dev
   --port N       default ${PORT}, or set ENGINE_PORT
   --timeout MS   default 8000
   --raw          force one-line JSON      --pretty  force indented
@@ -631,22 +634,15 @@ if (op === 'insight.list') {
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 
 /**
- * Which checkout, and which project inside it.
+ * Which checkout, and which project.
  *
- * `--root` moves the checkout and `--project NAME` names a directory inside it.
- * Neither given is the whole default case: this checkout, and `project` —
- * exactly what these ops read before either flag existed.
+ * `--root` moves the checkout. `--project` takes a path resolved against it, so
+ * a bare name still reaches a directory inside the checkout and `../name` or an
+ * absolute path reaches one anywhere else. Neither given opens the untitled
+ * project, the same blank game the editor opens with.
  */
 const CHECKOUT = path.resolve(typeof flags.root === 'string' ? flags.root : REPO)
-const PROJECT = path.resolve(CHECKOUT, typeof flags.project === 'string' ? flags.project : 'project')
-// The same rule the dev server and the headless runner already enforce, said
-// here too. `path.resolve` accepts an absolute path, so without this `index`
-// wrote its generated files into any directory on the machine and exited 0 —
-// and a project further away would read its instructions out of one tree while
-// reading its levels from another.
-if (path.dirname(PROJECT) !== CHECKOUT) {
-  die(1, `--project must name a directory directly inside ${CHECKOUT} — got ${JSON.stringify(flags.project)}`)
-}
+const PROJECT = resolveProject(CHECKOUT, typeof flags.project === 'string' ? flags.project : '')
 const readProject = async () => import('../engine/project-index.mjs')
 
 // Agent context and worktree setup are file/git operations, not world
@@ -658,7 +654,7 @@ if (op.startsWith('agent.')) {
       const request = args[0] && typeof args[0] === 'object'
         ? args[0]
         : args.length ? { files: args.map(String) } : {}
-      out(await agents.contextFromDisk(REPO, request, path.basename(PROJECT)))
+      out(await agents.contextFromDisk(REPO, request, PROJECT))
       process.exit(0)
     }
 
@@ -671,7 +667,7 @@ if (op.startsWith('agent.')) {
      */
     if (op === 'agent.skills') {
       const registration = await import('../engine/agent-registration.mjs')
-      const written = await registration.writeGeneratedAgentFiles(CHECKOUT, path.basename(PROJECT))
+      const written = await registration.writeGeneratedAgentFiles(CHECKOUT, PROJECT)
       out(written ?? { ok: true })
       process.exit(0)
     }
@@ -684,7 +680,7 @@ if (op.startsWith('agent.')) {
         ? { ...supplied }
         : { task: id, files: args.slice(1).map(String) }
       if (flags.parallel) request.parallel = true
-      out(await agents.prepareAgent(REPO, id, request, path.basename(PROJECT)))
+      out(await agents.prepareAgent(REPO, id, request, PROJECT))
       process.exit(0)
     }
 
@@ -800,7 +796,7 @@ if (op === 'check') {
   const problems = [
     ...pluginProblems(failed),
     ...problemsIn(await buildIndex(PROJECT)),
-    ...await agentRegistrationProblems(CHECKOUT, path.basename(PROJECT))
+    ...await agentRegistrationProblems(CHECKOUT, PROJECT)
   ]
   // Warnings are reported and never fail the run. A warning that broke the
   // chain would be turned off, and then it reports nothing at all.

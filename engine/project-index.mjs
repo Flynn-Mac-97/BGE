@@ -14,8 +14,11 @@ import fs from 'node:fs/promises'
 import { mkdirSync, openSync, closeSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { assetPath } from './asset-path.js'
+
+/** The checkout this module was loaded from. The engine's own plugins are here. */
+const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 // Where a named asset lives is the one rule this file shares with the browser,
 // so it is imported from the pure module both halves may import rather than
@@ -143,10 +146,10 @@ const importFresh = async abs => (await import(pathToFileURL(abs).href + '?read=
  * missed and the old false report comes back, which is exactly today's
  * behaviour, and nothing is ever wrongly called present.
  */
-async function typesRegisteredByPlugins(projectDirectory) {
+async function typesRegisteredByPlugins(projectDirectory, checkout) {
   const found = new Set()
   const folders = [
-    path.resolve(projectDirectory, '../plugins/builtin'),
+    path.join(checkout, 'plugins/builtin'),
     path.join(projectDirectory, 'plugins')
   ]
   for (const folder of folders) {
@@ -165,14 +168,14 @@ async function typesRegisteredByPlugins(projectDirectory) {
  * Types are imported rather than parsed so `properties` and asset references
  * are exact.
  */
-export async function buildIndex(projectDirectory) {
+export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
   const files = await walk(projectDirectory)
   // Every file in the project, by its path from `project/`. `assets` is keyed by
   // basename and so cannot answer "is this exact file there" — two folders may
   // hold a `jump.wav` — and that question is the one the asset check asks.
   const index = {
     types: {}, behaviours: {}, levels: {}, tests: {}, assets: {}, files, config: [], warnings: [],
-    pluginTypes: await typesRegisteredByPlugins(projectDirectory)
+    pluginTypes: await typesRegisteredByPlugins(projectDirectory, checkout)
   }
   const inside = f => path.join(projectDirectory, f)
 
@@ -902,11 +905,11 @@ export const fatal = problems => problems.filter(problem => !problem.warning)
  * Anchored to the MAIN worktree, exactly as the agent run registry is. A lane
  * runs in `.agent-worktrees/<id>`, so a record written there is deleted with the
  * worktree — and the servers most in need of stopping would be the ones nothing
- * remembered. `project/.engine/` is already ignored by git, so the record is
- * never committed either.
+ * remembered. The checkout's own `.engine/`, not a project's: a server belongs
+ * to the checkout that started it, and the project may be any directory.
  */
 export function serverRegistryFile(checkout) {
-  return path.join(mainWorktreeOf(checkout), 'project/.engine/servers.json')
+  return path.join(mainWorktreeOf(checkout), '.engine/servers.json')
 }
 
 function mainWorktreeOf(checkout) {

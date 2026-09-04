@@ -205,7 +205,7 @@ test('small tasks stay put and parallel tasks receive worktrees', async t => {
   fs.copyFileSync(path.join(ROOT, 'AGENTS.md'), path.join(root, 'AGENTS.md'))
   fs.copyFileSync(path.join(ROOT, 'ARCHITECTURE.md'), path.join(root, 'ARCHITECTURE.md'))
   fs.writeFileSync(path.join(root, 'engine/world.js'), 'export const world = true\n')
-  fs.writeFileSync(path.join(root, '.gitignore'), '.agent-worktrees/\nproject/.engine/\n')
+  fs.writeFileSync(path.join(root, '.gitignore'), '.agent-worktrees/\n.engine/\n')
 
   const git = args => execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' })
   git(['init']); git(['config', 'user.email', 'agent-test@example.invalid']); git(['config', 'user.name', 'Agent Test'])
@@ -227,13 +227,14 @@ test('small tasks stay put and parallel tasks receive worktrees', async t => {
 
   const parallel = await prepareAgent(root, 'parallel-fix', { files: ['engine/world.js'], parallel: true })
   assert.equal(parallel.mode, 'worktree')
-  assert.equal(parallel.packet, path.join(parallel.workspace, 'project', '.engine/agent-task.json'))
+  assert.equal(parallel.packet, path.join(parallel.workspace, '.engine/agent-task.json'))
   assert.ok(fs.existsSync(parallel.packet))
 
-  // The packet is written beside the game the lane works on, so a run under one
-  // project never writes into another's directory.
+  // The packet is written in the lane's own workspace, never in a project: the
+  // project is shared by every lane, so a packet there is overwritten by the
+  // next run.
   const named = await prepareAgent(root, 'named-project', { files: ['engine/render.js'], parallel: true }, 'kitten-survivors')
-  assert.equal(named.packet, path.join(named.workspace, 'kitten-survivors', '.engine/agent-task.json'))
+  assert.equal(named.packet, path.join(named.workspace, '.engine/agent-task.json'))
   assert.ok(fs.existsSync(named.packet))
   releaseAgent(root, 'named-project', { status: 'blocked', note: 'no engine in the fixture' })
   mergeAgent(root, 'named-project')
@@ -270,7 +271,7 @@ function laneFixture(t) {
   fs.copyFileSync(path.join(ROOT, 'ARCHITECTURE.md'), path.join(root, 'ARCHITECTURE.md'))
   fs.writeFileSync(path.join(root, 'engine/world.js'), 'export const world = true\n')
   fs.writeFileSync(path.join(root, 'engine/render.js'), 'export const render = true\n')
-  fs.writeFileSync(path.join(root, '.gitignore'), '.agent-worktrees/\nproject/.engine/\n')
+  fs.writeFileSync(path.join(root, '.gitignore'), '.agent-worktrees/\n.engine/\n')
 
   const git = args => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   git(['init']); git(['config', 'user.email', 'agent-test@example.invalid']); git(['config', 'user.name', 'Agent Test'])
