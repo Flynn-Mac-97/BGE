@@ -1,3 +1,6 @@
+---
+description: Read the keyboard and mouse as named actions, so a test drives the same actions a player does. Use when adding controls, rebinding a key, or making a test press something.
+---
 # Input
 
 - Read named actions through `context.input`.

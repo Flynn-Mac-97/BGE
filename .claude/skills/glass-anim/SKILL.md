@@ -1,6 +1,6 @@
 ---
 name: glass-anim
-description: Sprite Animation — Owns one job: on every fixed step it reads `entity.animation`, finds that clip on the type, and writes `entity.frame`. It draws nothing — `render.js` maps `frame` onto `sprite.sh...
+description: Sprite Animation — Owns one job: on every fixed step it reads `entity.animation`, finds that clip on the type, and writes `entity.frame`.
 ---
 <!-- generated from plugins/builtin/anim.agent.md at server start; edits are lost -->
 

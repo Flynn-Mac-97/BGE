@@ -1,6 +1,6 @@
 ---
 name: glass-cli-surface
-description: CLI Surface — `cli.surface` lists every CLI access point and its purpose: the kernel surface, the offline ops, the flags, the work lock's refusals, and every plugin command. The kernel, offline, fl...
+description: CLI Surface — `cli.surface` lists every CLI access point and its purpose: the kernel surface, the offline ops, the flags, the work lock's refusals, and every plugin command.
 ---
 <!-- generated from plugins/builtin/cli-surface.agent.md at server start; edits are lost -->
 

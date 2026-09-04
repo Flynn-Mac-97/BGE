@@ -1,5 +1,6 @@
 ---
 match: plugins/** project/plugins/**
+description: How to write a plugin, and which folder it belongs in. Read this before adding any new capability: it decides whether the code is an engine builtin or a game's own plugin, and it sets the size, guide and naming rules every plugin is checked against.
 ---
 
 # Plugin Master

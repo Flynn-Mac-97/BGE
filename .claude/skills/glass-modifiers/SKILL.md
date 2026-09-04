@@ -1,6 +1,6 @@
 ---
 name: glass-modifiers
-description: Modifiers — Stacks named stat changes onto an entity's `properties` and recomputes from the base every time, so any of them can be taken back off. `context.modifiers.add(entity, source, { speed: '+...
+description: Modifiers — Stacks named stat changes onto an entity's `properties` and recomputes from the base every time, so any of them can be taken back off.
 ---
 <!-- generated from plugins/builtin/modifiers.agent.md at server start; edits are lost -->
 

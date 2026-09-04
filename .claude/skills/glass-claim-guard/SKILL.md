@@ -1,6 +1,6 @@
 ---
 name: glass-claim-guard
-description: Claim Guard — Refuses a write to a file another **active** agent run claimed with `agent.prepare`. Without it the run registry is advice nothing reads. Node only. In the browser it guards nothing a...
+description: Claim Guard — Refuses a write to a file another **active** agent run claimed with `agent.prepare`. Without it the run registry is advice nothing reads. Node only.
 ---
 <!-- generated from plugins/builtin/claim-guard.agent.md at server start; edits are lost -->
 

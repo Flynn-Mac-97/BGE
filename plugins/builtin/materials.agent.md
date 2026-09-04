@@ -1,3 +1,6 @@
+---
+description: The look of a surface — colour, roughness, metal, texture, transparency, emission. Use when something is the wrong colour or finish, when adding a new surface to the library, or when a texture is not appearing on a mesh.
+---
 # Materials
 
 - The library of surfaces, and the door a game adds its own through. A material is named on a `mesh`, on a type or on a placement.

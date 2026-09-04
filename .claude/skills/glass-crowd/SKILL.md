@@ -1,6 +1,6 @@
 ---
 name: glass-crowd
-description: Crowd — Moves many entities as one mass and stops them stacking. `context.crowd`. The "who is near whom" half is Spatial Hash; this is the pass that moves them. `context.crowd.group(name, { cellSiz...
+description: Crowd — Moves many entities as one mass and stops them stacking. `context.crowd`. The "who is near whom" half is Spatial Hash; this is the pass that moves them.
 ---
 <!-- generated from plugins/builtin/crowd.agent.md at server start; edits are lost -->
 

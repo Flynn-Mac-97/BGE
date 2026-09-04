@@ -1,9 +1,14 @@
+---
+description: Which game the editor has open, and how to open, name or leave one. Use when starting a new game, switching between games, saving the untitled project under a name, or working out where a project lives on disk.
+---
+
 # Project Switcher
 
 - A project is a directory anywhere on disk. `ENGINE_PROJECT=path npm run dev`
-  for the editor, `--project path` for the CLI and `--headless`. A bare name is
-  a directory inside the checkout; `../x` or an absolute path reaches one
-  anywhere.
+  for the editor, `--project path` for the CLI and `--headless`. The value is
+  resolved against the checkout, so a bare name reaches a directory inside it —
+  and no game lives there any more — while `../x` or an absolute path reaches
+  one anywhere.
 - Neither given opens the **untitled** project, at
   `<projects root>/.untitled`. The projects root is `../engine-projects` beside
   the checkout, or `ENGINE_PROJECTS_ROOT`.

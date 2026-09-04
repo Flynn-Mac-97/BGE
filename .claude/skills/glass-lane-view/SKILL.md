@@ -1,6 +1,6 @@
 ---
 name: glass-lane-view
-description: Lane View — Watches one lane from the person's tab. Read only: it sends `snapshot` and `see.describe` and nothing else, so it works while the work lock holds. Two labelled halves, each dated. **Sch...
+description: Lane View — Watches one lane from the person's tab. Read only: it sends `snapshot` and `see.describe` and nothing else, so it works while the work lock holds.
 ---
 <!-- generated from plugins/builtin/lane-view.agent.md at server start; edits are lost -->
 

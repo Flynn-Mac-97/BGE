@@ -1,6 +1,6 @@
 ---
 name: glass-particles
-description: Particles — Owns `context.particles`: the deterministic particle field — one-shot bursts, trails that follow an entity, and clouds that block sight. Simulation only. **Particle Painter draws it, Co...
+description: Sparks, smoke, dust, trails and clouds — the deterministic particle field. Use for anything made of many small moving points. For an effect with a shape rather than a cloud, such as a beam, use VFX; to fire one on a game event, use Combat Effects.
 ---
 <!-- generated from plugins/builtin/particles.agent.md at server start; edits are lost -->
 

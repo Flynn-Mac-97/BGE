@@ -1,6 +1,6 @@
 ---
 name: glass-auto-weapons
-description: Auto Weapons — Weapons that fire themselves on a cooldown. Nothing here reads input. `context.autoWeapons.define(name, { stats, fire(context, owner, weapon), ready, start, stop, upgraded, warmUp })...
+description: Auto Weapons — Weapons that fire themselves on a cooldown. Nothing here reads input.
 ---
 <!-- generated from plugins/builtin/auto-weapons.agent.md at server start; edits are lost -->
 

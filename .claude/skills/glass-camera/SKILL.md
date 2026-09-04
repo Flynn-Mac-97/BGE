@@ -1,6 +1,6 @@
 ---
 name: glass-camera
-description: Camera — Put camera rules in the level's `camera` block; the editor's viewport is saved on play and put back on stop. `mode` picks which camera runs: `ortho` (flat follow), `first-person` (eye on t...
+description: What the player sees and how it follows — orthographic follow, first person, third person, framing and bounds. Use when the view is wrong, the camera does not follow, or the game needs a different viewpoint.
 ---
 <!-- generated from plugins/builtin/camera.agent.md at server start; edits are lost -->
 

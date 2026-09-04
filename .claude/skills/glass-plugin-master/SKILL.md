@@ -1,6 +1,6 @@
 ---
 name: glass-plugin-master
-description: Plugin Master — A plugin is one file: `export default {}`, no manifest, no registration. `name` is the one display name — the browser lists it, `plugins.enable` takes it, errors report against it. ...
+description: How to write a plugin, and which folder it belongs in. Read this before adding any new capability: it decides whether the code is an engine builtin or a game's own plugin, and it sets the size, guide and naming rules every plugin is checked against.
 ---
 <!-- generated from plugins/builtin/plugin-master.agent.md at server start; edits are lost -->
 

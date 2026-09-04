@@ -1,6 +1,6 @@
 ---
 name: glass-audio
-description: Sound — Plugin name is **Sound**; the file is `audio.js` and the context key is `context.audio`. A type declares what it can make a noise with; game code plays one by name:
+description: Play sound — effects a type declares and the game triggers by name. Use when adding a sound effect, music, a footstep or a weapon noise, or when something should be audible and is not.
 ---
 <!-- generated from plugins/builtin/audio.agent.md at server start; edits are lost -->
 

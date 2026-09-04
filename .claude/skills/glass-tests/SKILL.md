@@ -1,6 +1,6 @@
 ---
 name: glass-tests
-description: Tests — Runs lasting checks from `project/tests/`. One file, `export default { name, level, run(test) }`. Arrange, simulate fixed time, then assert. Never write to a level — a test run marks the wo...
+description: Lasting checks for a game, run headless and repeatably: arrange a small world, simulate a fixed time, assert what happened. Use when proving a behaviour, guarding a fix, or asked to test game logic.
 ---
 <!-- generated from plugins/builtin/tests.agent.md at server start; edits are lost -->
 
@@ -21,3 +21,8 @@ description: Tests — Runs lasting checks from `project/tests/`. One file, `exp
 - **Events:** `test.on(event, handler)` — dropped for you when the test ends.
 
 Never import a plugin module to reach its live state. Everything is on `test.context`; a module handle is a second copy waiting to disagree.
+
+## Commands
+
+- `tests.run [name]` — run them all, or one by name.
+- `tests.results` — the last run's results without running it again.

@@ -1,3 +1,6 @@
+---
+description: Fire a shot that travels — bullets, arrows, fireballs — with speed, damage, lifetime, piercing and homing. Use for anything that leaves a weapon and flies, rather than hitting instantly.
+---
 # Projectiles
 
 - Fires shots that fly, pierce, home and expire: `context.projectiles.fire(shot)` returns the entity.

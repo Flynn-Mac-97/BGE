@@ -1,6 +1,6 @@
 ---
 name: glass-lights
-description: Lights — A light is an **entity**, `type: "light"`, placed in the level like anything else. The type is registered here, not by a file in `types/`, so it never appears in the Project panel and cann...
+description: Light a scene: point, spot, directional, area and hemisphere lights, placed as entities in a level. Use when a scene is too dark or flat, when adding a lamp, sun or torch, or when shadows and light falloff are wrong.
 ---
 <!-- generated from plugins/builtin/lights.agent.md at server start; edits are lost -->
 

@@ -53,24 +53,64 @@ const skillNameFor = guide => `${ENGINE}-${guide.frontmatter.skill || guide.stem
 const listedForAgents = guide => !['none', 'false'].includes((guide.frontmatter.skill || '').toLowerCase())
 
 /**
- * How long a derived description may run.
+ * How long a description may run.
  *
- * Every agent reads every description at session start, so the listing's whole
- * cost is this number times the number of plugins. Enough for a title and two
- * clauses.
+ * A declared one may be long, because it is the only thing that decides whether
+ * a skill is found: it has to say what the plugin does AND when to reach for it,
+ * and both together do not fit in a line.
+ *
+ * A derived one is held much shorter. It is a fallback, and no length of
+ * generated prose says when to use anything — the extra characters would be
+ * paid by every agent at session start and buy no trigger.
  */
-const DESCRIPTION_LIMIT = 200
+const DESCRIPTION_LIMIT = 1024
+const DERIVED_LIMIT = 180
+
+/**
+ * A whole sentence, or as many as fit.
+ *
+ * Cutting mid-word leaves a description that reads as broken text, and cutting
+ * inside a code span or an options object leaves a fragment that names nothing.
+ * So a derived description ends where a sentence ends, and only falls back to a
+ * word boundary when the very first sentence is already too long.
+ */
+function firstSentences(text, limit) {
+  const whole = text.trim()
+  if (whole.length <= limit) return whole
+  // A code span holds dots that end no sentence — `context.crowd`,
+  // `world.toLevel()` — so they are hidden from the split and put back after.
+  const spans = []
+  const masked = whole.replace(/`[^`]*`/g, span => {
+    spans.push(span)
+    return `@@${spans.length - 1}@@`
+  })
+  const restore = value => value.replace(/@@(\d+)@@/g, (_, index) => spans[index])
+  const sentences = masked.match(/[^.!?]+[.!?]+(\s|$)/g) || []
+  let out = ''
+  for (const sentence of sentences) {
+    if (restore((out + sentence).trim()).length > limit) break
+    out += sentence
+  }
+  if (out.trim()) return restore(out.trim())
+  // One long opening sentence. Keep whole words, and never cut inside a span.
+  const kept = masked.slice(0, limit - 1).replace(/\s+\S*$/, '')
+  return restore(kept.replace(/@@\d*$/, '').trim()) + '…'
+}
 
 /**
  * What a guide is listed as, from the guide itself.
  *
  * The listing is read before any tool call, so a plugin with no description is
- * one nothing finds. A declared `description:` always wins; otherwise the
- * heading names the subject and the opening lines say what it does, which is
- * what these guides already hold.
+ * one nothing finds. A declared `description:` always wins, and every guide
+ * worth finding should declare one. The fallback below only keeps a plugin from
+ * being invisible; it names the subject and says what it does, and it cannot
+ * say when to use it.
  */
 function describedBy(guide) {
-  if (guide.frontmatter.description) return guide.frontmatter.description
+  if (guide.frontmatter.description) {
+    const declared = guide.frontmatter.description.trim()
+    return declared.length > DESCRIPTION_LIMIT ? firstSentences(declared, DESCRIPTION_LIMIT) : declared
+  }
   const title = guide.body.match(/^#\s+(.+)$/m)?.[1]?.trim()
   const opening = guide.body
     .replace(/^#[^\n]*\n+/, '')
@@ -84,8 +124,11 @@ function describedBy(guide) {
     .filter(Boolean)
     .join(' ')
     .replace(/\s+/g, ' ')
-  const full = [title, sentences].filter(Boolean).join(' — ')
-  return full.length > DESCRIPTION_LIMIT ? `${full.slice(0, DESCRIPTION_LIMIT - 3)}...` : full
+  const room = title ? DERIVED_LIMIT - title.length - 3 : DERIVED_LIMIT
+  // A sentence ending in a colon introduces a block that is not here, so the
+  // colon would promise something the description never delivers.
+  const body = room > 40 ? firstSentences(sentences, room).replace(/:$/, '.') : ''
+  return [title, body].filter(Boolean).join(' — ')
 }
 
 /**
@@ -229,6 +272,45 @@ export async function generatedAgentFiles(root, projectPath) {
       text: `---\nname: ${skill}\ndescription: ${description}\n---\n${GENERATED_MARKER}${guide.file} at server start; edits are lost -->\n\n${guide.body}`
     })
   }
+  files.push(...await manifestSkillFiles(root, new Set(files.map(file => file.path))))
+  return files
+}
+
+/**
+ * Skills written by hand rather than derived from a plugin guide.
+ *
+ * `agents/manifest.json` has a `skill` node kind whose file a person writes.
+ * Without this they reach only an agent that already ran `agent.context`, so a
+ * skill the manifest lists is one no session sees. Registered under the same
+ * prefix as the rest, and read from the same file the manifest names.
+ */
+async function manifestSkillFiles(root, taken = new Set()) {
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(root, 'agents/manifest.json'), 'utf8').catch(() => '{"nodes":[]}'))
+  const files = []
+  for (const node of manifest.nodes || []) {
+    if (node.kind !== 'skill' || !node.file) continue
+    const skill = `${ENGINE}-${node.id}`
+    if (!SKILL_NAME.test(skill)) continue
+    // A plugin's own guide owns the name. It is the live plugin, and two
+    // sources writing one file would leave whichever ran last on disk.
+    if (taken.has(`${SKILL_DIRECTORY}/${skill}/SKILL.md`)) continue
+    const source = await fs.readFile(path.join(root, node.file), 'utf8').catch(() => null)
+    if (source === null) continue
+    const description = frontmatterOf(source).description || node.title
+    if (!description) continue
+    files.push({
+      path: `${SKILL_DIRECTORY}/${skill}/SKILL.md`,
+      source: node.file,
+      text: `---
+name: ${skill}
+description: ${description}
+---
+${GENERATED_MARKER}${node.file} at server start; edits are lost -->
+
+${bodyOf(source)}`
+    })
+  }
   return files
 }
 
@@ -334,29 +416,26 @@ export async function skillRegistrationProblems(root, projectPath) {
         file: guide.fileFromRoot,
         why: `skill name ${JSON.stringify(skill)} is not a directory name, so no skill is registered. Use lower-case letters, digits and hyphens`
       })
-    } else if (skill && !description) {
-      problems.push({
-        file: guide.fileFromRoot,
-        why: `declares skill "${skill}" with no description, so the generator skips it and the guide is registered nowhere. Add a description line`
-      })
     }
 
-    if (description && !skill) {
+    // A guide is registered under its own stem unless it says `skill: none`, so
+    // a description or a trigger word on one that opted out is dead text.
+    if (!listedForAgents(guide) && (description || triggers)) {
       problems.push({
         warning: true,
         file: guide.fileFromRoot,
-        why: 'declares a description with no skill, so nothing is registered. Add a skill name, or drop the description'
+        why: `declares ${description ? 'a description' : 'trigger words'} and \`skill: none\`, so it is in no listing and the words reach nothing. Drop one of the two`
       })
     }
 
-    // Trigger words claim that a task using them should reach this guide.
-    // Without a skill the claim holds only for an agent that already asked for
-    // a packet, and that call comes after the first move is chosen.
-    if (triggers && !skill) {
+    // The description is the only thing that decides whether a skill is found,
+    // and a derived one can only say what the plugin is. A guide worth reaching
+    // for says when to reach for it, in its own words.
+    if (listedForAgents(guide) && !description) {
       problems.push({
         warning: true,
         file: guide.fileFromRoot,
-        why: 'declares trigger words but no skill, so it reaches only an agent that already ran agent.context — after the first move is chosen. Add skill and description frontmatter, or expect the words to change nothing'
+        why: 'declares no description, so its listing is derived from the guide body and says what the plugin is but never when to use it. Add a description line saying what it does and when to reach for it'
       })
     }
 
@@ -395,7 +474,7 @@ async function manifestSkillProblems(root) {
     await fs.readFile(path.join(root, 'agents/manifest.json'), 'utf8').catch(() => '{"nodes":[]}'))
   const registered = new Set((await generatedSkillsOnDisk(root)).map(skill => skill.name))
   return (manifest.nodes || [])
-    .filter(node => node.kind === 'skill' && !registered.has(node.id))
+    .filter(node => node.kind === 'skill' && !registered.has(`${ENGINE}-${node.id}`))
     .map(node => ({
       warning: true,
       file: node.file || 'agents/manifest.json',

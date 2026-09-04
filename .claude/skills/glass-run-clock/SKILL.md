@@ -1,6 +1,6 @@
 ---
 name: glass-run-clock
-description: Run Clock — A run starts, is timed, and ends. Engine time, so a paused level-up does not count as time survived. Starts itself on the first fixed step, so `simulate()` times a run exactly as pressi...
+description: Run Clock — A run starts, is timed, and ends. Engine time, so a paused level-up does not count as time survived.
 ---
 <!-- generated from plugins/builtin/run-clock.agent.md at server start; edits are lost -->
 

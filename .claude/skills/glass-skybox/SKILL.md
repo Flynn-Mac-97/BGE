@@ -1,6 +1,6 @@
 ---
 name: glass-skybox
-description: Skybox — Owns `sky` and `skyTexture` in a level's `world` block: a flat colour, or a panorama mapped over a sphere. Nothing here feeds the simulation. The other three keys of that block are World L...
+description: Skybox — Owns `sky` and `skyTexture` in a level's `world` block: a flat colour, or a panorama mapped over a sphere. Nothing here feeds the simulation.
 ---
 <!-- generated from plugins/builtin/skybox.agent.md at server start; edits are lost -->
 

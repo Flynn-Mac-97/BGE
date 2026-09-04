@@ -1,6 +1,6 @@
 ---
 name: glass-projectiles
-description: Projectiles — Fires shots that fly, pierce, home and expire: `context.projectiles.fire(shot)` returns the entity. `shot`: `from` (entity or point), `direction`, `speed`, `damage`, `life`, `radius`,...
+description: Fire a shot that travels — bullets, arrows, fireballs — with speed, damage, lifetime, piercing and homing. Use for anything that leaves a weapon and flies, rather than hitting instantly.
 ---
 <!-- generated from plugins/builtin/projectiles.agent.md at server start; edits are lost -->
 

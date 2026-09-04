@@ -1,6 +1,6 @@
 ---
 name: glass-health
-description: Health — Owns the one damage verb: `context.damage(target, amount, how)` → `{ dealt, remaining, killed, blocked }`. `how` carries `from`, `source`, `every` (seconds this source must wait before hit...
+description: Hurt, kill or heal something, and decide how much damage it takes. Use when adding damage, hit points, armour, resistances, invulnerability windows, damage-over-time, or anything that reduces or restores health. `context.damage()` is the one verb every source of harm goes through.
 ---
 <!-- generated from plugins/builtin/health.agent.md at server start; edits are lost -->
 

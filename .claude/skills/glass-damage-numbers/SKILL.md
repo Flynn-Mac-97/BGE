@@ -1,6 +1,6 @@
 ---
 name: glass-damage-numbers
-description: Damage Numbers — The figure that lifts off a hit, drifts, and fades. Automatic: it listens to `entity:hurt` and shows `dealt`, rounded. `context.damageNumbers.show({ at, text, colour, size, life, r...
+description: Damage Numbers — The figure that lifts off a hit, drifts, and fades. Automatic: it listens to `entity:hurt` and shows `dealt`, rounded.
 ---
 <!-- generated from plugins/builtin/damage-numbers.agent.md at server start; edits are lost -->
 

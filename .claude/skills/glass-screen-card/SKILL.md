@@ -1,6 +1,6 @@
 ---
 name: glass-screen-card
-description: Screen Card — Adds the `card` item to **Screen**: a number you can press, a glyph, a name, a rank and one line saying what it does. `{ card: { number, title, line, glyph, rank, tag, color }, at, si...
+description: Screen Card — Adds the `card` item to **Screen**: a number you can press, a glyph, a name, a rank and one line saying what it does.
 ---
 <!-- generated from plugins/builtin/screen-card.agent.md at server start; edits are lost -->
 

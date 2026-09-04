@@ -1,6 +1,6 @@
 ---
 name: glass-experience
-description: Experience — Counts experience points against a curve and announces every level gained. `context.experience.gain(amount, source)` is the only way points go in. `configure({ base, growth, maxLevel, ...
+description: Experience — Counts experience points against a curve and announces every level gained. `context.experience.gain(amount, source)` is the only way points go in.
 ---
 <!-- generated from plugins/builtin/experience.agent.md at server start; edits are lost -->
 

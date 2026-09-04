@@ -1,6 +1,6 @@
 ---
 name: glass-behaviours
-description: Behaviours — This plugin owns the **verbs only** — attach, detach, list. The runtime is the kernel, `engine/world.js`, because the world is what runs hooks. A behaviour is one file, `project/behavi...
+description: Attach a shared trait to an entity — a behaviour file that runs alongside its type. Use when several types need the same movement, patrol, floating or reaction, and when deciding whether logic belongs in a type or in a behaviour.
 ---
 <!-- generated from plugins/builtin/behaviours.agent.md at server start; edits are lost -->
 

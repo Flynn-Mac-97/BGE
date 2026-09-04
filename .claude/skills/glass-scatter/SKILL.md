@@ -1,6 +1,6 @@
 ---
 name: glass-scatter
-description: Scatter — Bulk placement, declared in the level: **this many of these types, over this area, this far apart, out of these circles and corridors**. Use it instead of writing a build script that emit...
+description: Scatter — Bulk placement, declared in the level: **this many of these types, over this area, this far apart, out of these circles and corridors**.
 ---
 <!-- generated from plugins/builtin/scatter.agent.md at server start; edits are lost -->
 

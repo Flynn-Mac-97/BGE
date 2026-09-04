@@ -1,6 +1,6 @@
 ---
 name: glass-impact
-description: Impact — The punch of a hit: the frames the world freezes on, and the shake after it. `context.impact.hit({ weight, at, sound, hold, shake })`. `weight` is 0 to 1 and decides everything else — how ...
+description: Impact — The punch of a hit: the frames the world freezes on, and the shake after it. `context.impact.hit({ weight, at, sound, hold, shake })`.
 ---
 <!-- generated from plugins/builtin/impact.agent.md at server start; edits are lost -->
 

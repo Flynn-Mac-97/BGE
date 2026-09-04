@@ -1,6 +1,6 @@
 ---
 name: glass-hit-reaction
-description: Hit Reaction — The visible half of being hit: a white flash, a shove, and a death that collapses. It changes no number anyone else reads, so a game can turn it off and play identically. Listens to ...
+description: Hit Reaction — The visible half of being hit: a white flash, a shove, and a death that collapses.
 ---
 <!-- generated from plugins/builtin/hit-reaction.agent.md at server start; edits are lost -->
 

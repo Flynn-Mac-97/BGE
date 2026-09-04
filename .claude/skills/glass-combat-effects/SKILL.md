@@ -1,6 +1,6 @@
 ---
 name: glass-combat-effects
-description: Combat Effects — Wires the engine's combat events to named particle effects and decals: `weapon:fired` → muzzle-flash and brass, `weapon:hit` → tracer plus blood or surface dust and a bullet-hole d...
+description: Combat Effects — Wires the engine's combat events to named particle effects and decals: `weapon:fired` → muzzle-flash and brass, `weapon:hit` → tracer plus blood or surface dust and a…
 ---
 <!-- generated from plugins/builtin/combat-effects.agent.md at server start; edits are lost -->
 

@@ -1,6 +1,6 @@
 ---
 name: glass-spawn-ring
-description: Spawn Ring — Answers "where is just off screen, in metres". `context.spawnRing`. `visibleRadius()` — centre of the screen to a corner, on the ground. Exact for an orthographic view; a flat estimate...
+description: Spawn Ring — Answers "where is just off screen, in metres". `context.spawnRing`. `visibleRadius()` — centre of the screen to a corner, on the ground.
 ---
 <!-- generated from plugins/builtin/spawn-ring.agent.md at server start; edits are lost -->
 

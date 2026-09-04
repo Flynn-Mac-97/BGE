@@ -1,6 +1,6 @@
 ---
 name: glass-decals
-description: Decals — Owns `context.decals`: one capped wall of marks stuck to world surfaces — bullet holes, blood, scorch. A decal is **not an entity**: it is not in `world.entities`, has no collider, and not...
+description: Decals — Owns `context.decals`: one capped wall of marks stuck to world surfaces — bullet holes, blood, scorch.
 ---
 <!-- generated from plugins/builtin/decals.agent.md at server start; edits are lost -->
 

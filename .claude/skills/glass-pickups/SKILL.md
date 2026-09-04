@@ -1,6 +1,6 @@
 ---
 name: glass-pickups
-description: Pickups — A pickup is any entity with `properties.pickup` set. The value is the kind — a plain word this plugin never interprets — and `properties.value` is the amount. `context.pickups.drop(type, ...
+description: Pickups — A pickup is any entity with `properties.pickup` set. The value is the kind — a plain word this plugin never interprets — and `properties.value` is the amount.
 ---
 <!-- generated from plugins/builtin/pickups.agent.md at server start; edits are lost -->
 

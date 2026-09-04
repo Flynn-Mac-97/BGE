@@ -10,3 +10,5 @@ skill: none
 - Drag a gizmo part, or drag a selected entity directly (free move in the plane facing the camera).
 - Shift snaps rotation to 15 degrees; control/command turns snapping off.
 - In the ortho view the 2D transform tool owns the viewport instead.
+- `gizmo3d.mode <move|rotate|scale>` — which handle set is showing.
+- `gizmo3d.state` — the handle, the axis held, and what is selected.

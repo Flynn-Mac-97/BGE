@@ -1,6 +1,6 @@
 ---
 name: glass-place
-description: Place And Attach — Owns the two drop gestures on the viewport and the one command behind them. It adds an entity to the **open level**; it does not spawn anything for a run. One command, `place.at`:
+description: Place And Attach — Owns the two drop gestures on the viewport and the one command behind them. It adds an entity to the **open level**; it does not spawn anything for a run.
 ---
 <!-- generated from plugins/builtin/place.agent.md at server start; edits are lost -->
 

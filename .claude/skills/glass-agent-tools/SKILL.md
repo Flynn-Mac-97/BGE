@@ -1,6 +1,6 @@
 ---
 name: glass-agent-tools
-description: Agent Tools — `tools/` is the shelf: one file per job, run with `node tools/<file>`. `tools/lib/` is the machinery they share — import it, and **add to it**. **Run `tools.list` before writing a gen...
+description: Agent Tools — `tools/` is the shelf: one file per job, run with `node tools/<file>`. `tools/lib/` is the machinery they share — import it, and **add to it**.
 ---
 <!-- generated from plugins/builtin/agent-tools.agent.md at server start; edits are lost -->
 

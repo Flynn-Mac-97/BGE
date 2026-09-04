@@ -1,3 +1,6 @@
+---
+description: Hurt, kill or heal something, and decide how much damage it takes. Use when adding damage, hit points, armour, resistances, invulnerability windows, damage-over-time, or anything that reduces or restores health. `context.damage()` is the one verb every source of harm goes through.
+---
 # Health
 
 - Owns the one damage verb: `context.damage(target, amount, how)` → `{ dealt, remaining, killed, blocked }`.

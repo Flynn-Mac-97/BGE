@@ -1,6 +1,6 @@
 ---
 name: glass-screen
-description: Screen — Draws **game** screens — a title card, a pause menu, a level-up choice, a result card. `ui.*` builds editor panels and cannot do any of this. `context.screen.show(id, () => items)` puts on...
+description: Draw a full game screen — a title card, pause menu, level-up choice, game-over card. Use for anything the player reads that is not the HUD and not an editor panel. Use HUD for values that sit over live play, and Choice Screen for a row of cards to pick from.
 ---
 <!-- generated from plugins/builtin/screen.agent.md at server start; edits are lost -->
 
@@ -26,3 +26,4 @@ description: Screen — Draws **game** screens — a title card, a pause menu, a
   screen says, in words. That is how a headless run checks a screen came up.
 - Needs no document. With no canvas every item is still built and still readable.
 - Screens are cleared on `level:loaded` and `play:stopped`. It refuses nothing else.
+- `screen.list` — every screen registered, and which one is showing.

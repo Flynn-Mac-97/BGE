@@ -1,6 +1,6 @@
 ---
 name: glass-choice-screen
-description: Choice Screen — Stops the world and offers a row of cards to pick from. `context.choiceScreen.offer({ title, subtitle, options, onPick })`. An option is `{ id, title, line, glyph, rank, tag, color ...
+description: Choice Screen — Stops the world and offers a row of cards to pick from. `context.choiceScreen.offer({ title, subtitle, options, onPick })`.
 ---
 <!-- generated from plugins/builtin/choice-screen.agent.md at server start; edits are lost -->
 

@@ -1,6 +1,6 @@
 ---
 name: glass-claude-code
-description: Claude Code — What this project needs to drive `claude`, so no vendor name is in engine code. Checked against **v2.1.220**, 2026-08-29. Run `claude --help` before trusting an old line.
+description: Claude Code — What this project needs to drive `claude`, so no vendor name is in engine code. 220**, 2026-08-29. Run `claude --help` before trusting an old line.
 ---
 <!-- generated from plugins/builtin/claude-code.agent.md at server start; edits are lost -->
 
