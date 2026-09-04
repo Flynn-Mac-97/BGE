@@ -1,0 +1,57 @@
+diff --git a/src/denoiser.cpp b/src/denoiser.cpp
+index 91dbbc4..1666681 100644
+--- a/src/denoiser.cpp
++++ b/src/denoiser.cpp
+@@ -5,6 +5,7 @@
+ 
+ #include <cmath>
+ #include <cstring>
++#include <stdexcept>
+ #include <ggml.h>
+ #include <ggml-alloc.h>
+ #include <ggml-backend.h>
+diff --git a/src/llm_text_encoder.cpp b/src/llm_text_encoder.cpp
+index b67c059..29b7994 100644
+--- a/src/llm_text_encoder.cpp
++++ b/src/llm_text_encoder.cpp
+@@ -8,7 +8,9 @@
+ #include <ggml-alloc.h>
+ #include <ggml-backend.h>
+ #include <ggml-cpu.h>
++#if defined(KIMODO_HAVE_GGML_VULKAN)
+ #include <ggml-vulkan.h>
++#endif
+ #include <gguf.h>
+ 
+ #include <algorithm>
+@@ -60,7 +62,7 @@ struct component {
+ std::unique_ptr<component> open_component(const std::filesystem::path &path, ggml_backend_t backend) {
+     auto result = std::make_unique<component>();
+     gguf_init_params params{true, &result->ctx};
+-    result->file = gguf_init_from_file(path.c_str(), params);
++    result->file = gguf_init_from_file(path.string().c_str(), params);
+     if (!result->file || !result->ctx)
+         throw std::runtime_error("cannot load text component " + path.string());
+     result->weights = ggml_backend_alloc_ctx_tensors(result->ctx, backend);
+@@ -216,7 +218,9 @@ std::expected<std::unique_ptr<llm_text_encoder>, std::string> llm_text_encoder::
+     for (int i = 0; i < 32; ++i) { char name[32]; std::snprintf(name, sizeof(name), "layer-%02d.gguf", i); if (!std::filesystem::is_regular_file(path / name)) return std::unexpected("text bundle missing " + std::string(name)); }
+     auto result = std::unique_ptr<llm_text_encoder>(new llm_text_encoder);
+     result->impl_ = std::make_unique<impl>();
++#if defined(KIMODO_HAVE_GGML_VULKAN)
+     if (use_vulkan() && ggml_backend_vk_get_device_count()) result->impl_->backend = ggml_backend_vk_init(0);
++#endif
+     if (!result->impl_->backend) {
+         result->impl_->backend = ggml_backend_cpu_init();
+         if (!result->impl_->backend) return std::unexpected("cannot initialize text backend");
+diff --git a/src/llm_tokenizer.cpp b/src/llm_tokenizer.cpp
+index e502229..978637e 100644
+--- a/src/llm_tokenizer.cpp
++++ b/src/llm_tokenizer.cpp
+@@ -11,6 +11,7 @@
+ #include <cctype>
+ #include <cstdint>
+ #include <limits>
++#include <stdexcept>
+ #include <unordered_map>
+ 
+ namespace kimodo::detail {

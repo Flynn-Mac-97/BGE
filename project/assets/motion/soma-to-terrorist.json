@@ -1,0 +1,13 @@
+{
+  "_comment": "SOMA-30 joints -> terrorist.glb nodes. Read by tools/make-rig-clip.mjs --map, never at runtime. This rig is hips > legLeft, legRight, torso > armLeft, armRight, head, so most of the thirty joints have nowhere to go.",
+  "_chains": "Each target composes the whole chain the rig collapses into one bone. Spine1 alone is a 5 cm segment; the visible lean is Spine1 through Chest, so all three compose.",
+  "_bindPose": "SOMA rests in a T-pose — LeftArm's bind offset is +X, straight out. This rig's arms hang down -Y. The arm offsets are the quarter turn about Z that reconciles the two. Legs, spine and head already point the same way and need none.",
+  "_noHips": "Hips is deliberately absent. Its rotation carries the captured body's facing, and entity.yaw decides facing here.",
+
+  "torso":    { "node": "torso",    "from": ["Spine1", "Spine2", "Chest"] },
+  "head":     { "node": "head",     "from": ["Neck1", "Neck2", "Head"] },
+  "armLeft":  { "node": "armLeft",  "from": ["LeftShoulder", "LeftArm"],   "offset": [0, 0, 0.7071068, 0.7071068] },
+  "armRight": { "node": "armRight", "from": ["RightShoulder", "RightArm"], "offset": [0, 0, -0.7071068, 0.7071068] },
+  "legLeft":  { "node": "legLeft",  "from": ["LeftLeg"] },
+  "legRight": { "node": "legRight", "from": ["RightLeg"] }
+}

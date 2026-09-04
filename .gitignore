@@ -22,3 +22,8 @@ agent-runs/see-marks/*seed*.json
 agent-runs/see/**/*.png
 agent-runs/see/**/*.json
 project/.engine/lane-browsers.json
+
+# Raw kimodo output. The clip a game plays is baked from these into
+# project/assets/motion/; the generator's own files are regenerable working
+# files, and 1.5M of them in every diff is not a record of anything.
+agent-runs/rig-clips/

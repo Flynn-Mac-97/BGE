@@ -45,10 +45,33 @@ export default {
 
   collider: { box: [WIDTH, STANDING_HEIGHT, WIDTH] },
 
+  /**
+   * Two captured clips, played by Rig Animation onto the GLB's named nodes.
+   *
+   * Generated from text with `tools/make-rig-clip.mjs` and retargeted through
+   * `assets/motion/soma-to-terrorist.json`, which drops the captured Hips: its
+   * rotation carries the captured body's facing, and `entity.yaw` decides
+   * facing here. `rootMotion` stays off for the same reason — the body is moved
+   * by counter-strike-movement, not by the clip.
+   */
+  rig: {
+    clips: {
+      idle: 'motion/idle.json',
+      walk: 'motion/walk.json',
+      run: 'motion/run.json',
+      crouchIdle: 'motion/crouch-idle.json',
+      crouchWalk: 'motion/crouch-walk.json',
+      jump: 'motion/jump.json',
+      death: 'motion/death.json'
+    },
+    default: 'idle',
+    rootMotion: false
+  },
+
   // Order is the order they run in. Movement first, so anything reading
   // velocity or `crouched` afterwards sees this step's answer rather than last
-  // step's.
-  behaviours: ['counter-strike-movement', 'carries-weapons', 'damageable'],
+  // step's — and chooses-motion-clip reads all of them, so it runs last.
+  behaviours: ['counter-strike-movement', 'carries-weapons', 'damageable', 'chooses-motion-clip'],
 
   properties: {
     body: 'dynamic',

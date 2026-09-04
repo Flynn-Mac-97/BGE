@@ -1672,14 +1672,28 @@ export function makeRenderer(canvas, view, viewport) {
   /**
    * Rotate the named children of a model.
    *
-   * The characters are exported with named nodes — hips, torso, head, arms,
-   * legs, weaponMount — no skeleton and no clips, so a walk cycle is game code
-   * writing `entity.pose = { legLeft: -0.4, legRight: 0.4 }` and this turning it
-   * into an X-axis rotation on the node of that name. The trade is deliberate:
-   * a skinned mesh would cost a rig, an exporter contract, a clip mixer and a
-   * state machine to blend between clips, and would buy nothing this game needs.
-   * The poses are half a dozen angles a behaviour already computes from speed,
-   * and a hinge per limb is the whole feature.
+   * `entity.pose` names nodes and says how each one turns. A value may be
+   * written two ways, and the two answer different needs:
+   *
+   *   entity.pose = {
+   *     legLeft: -0.4,                  // radians about X — a hinge
+   *     LeftArm: [0.1, 0, 0.3, 0.94]    // a quaternion x,y,z,w — the whole turn
+   *   }
+   *
+   * A number is the cheap half: a walk cycle a behaviour computes from speed is
+   * half a dozen angles, and a hinge per limb is all it needs. It adds to where
+   * the part was declared to rest, so a `parts` body keeps its declared angle.
+   *
+   * A quaternion is what a captured clip carries — three axes per joint, which
+   * a hinge cannot hold. It REPLACES the node's rotation rather than adding to
+   * a rest angle, because a clip's value is already the joint's full local
+   * rotation; anything the target rig needs on top of that is retargeting, and
+   * is baked into the clip before it gets here.
+   *
+   * `indexNodes` traverses everything, so a skinned GLB's bones are named nodes
+   * like any other. Turning bones by name is therefore how a rig plays — no
+   * separate skinning path, and the mesh follows because three reads the bone
+   * matrices it already has.
    */
   function applyPose(object, pose) {
     const nodes = namedNodes.get(object)
@@ -1691,12 +1705,20 @@ export function makeRenderer(canvas, view, viewport) {
         report(`[render] ${object.userData.model || object.userData.entity}: no node named "${name}" to pose`)
         continue
       }
-      const angle = pose[name]
-      // The fast path first: this runs for every limb of every character every
-      // frame, and naming the failure costs a string whether or not there is one.
-      const wanted = Number.isFinite(angle) ? angle : number(angle, 0, `pose.${name}`)
-      // Added to where the part was declared to rest. A model's nodes rest at
-      // zero, so this is the same line it always was for them.
+      const turn = pose[name]
+      if (Array.isArray(turn)) {
+        if (turn.length !== 4) {
+          report(`[render] pose.${name}: a rotation is 4 numbers x,y,z,w, got ${turn.length}`)
+          continue
+        }
+        // Normalised because a clip stores rounded numbers, and an unnormalised
+        // quaternion scales the node it is set on.
+        node.quaternion.set(turn[0], turn[1], turn[2], turn[3]).normalize()
+        continue
+      }
+      // The fast path: this runs for every limb of every character every frame,
+      // and naming the failure costs a string whether or not there is one.
+      const wanted = Number.isFinite(turn) ? turn : number(turn, 0, `pose.${name}`)
       node.rotation.x = (node.userData.restRotationX || 0) + wanted
     }
   }

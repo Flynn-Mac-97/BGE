@@ -67,6 +67,11 @@ camera faces at yaw 0. A **named** part is swung by `entity.pose`, exactly as a
 named node of a loaded model is — `pose: { legFrontLeft: 0.4 }` is a run cycle
 whether the body came out of a file or out of this list.
 
+A pose value is a number of radians about X, or a quaternion `[x, y, z, w]` for
+the whole turn. A number adds to the part's declared `rotation`; a quaternion
+replaces it, which is what a captured clip carries. A skinned GLB's bones are
+named nodes like any other, so Rig Animation poses them by name.
+
 ## Types and placements
 
 A type says what a thing *is*. A level says where things *are*. Overrides stay

@@ -44,6 +44,9 @@ Three things have come off this list. Check the code before putting one back:
 - **3D model loading.** `mesh: { model: '<file>.glb' }` loads a GLB and
   `entity.pose` swings its named nodes. GLB crowds do not instance yet, which is
   the current cost of using them for enemies.
+- **Rig animation.** `Rig Animation` plays a baked clip of rotations onto those
+  named nodes, bones included. `tools/make-rig-clip.mjs` bakes one from text
+  through kimodo.cpp. There is no blending between clips.
 - **Raycasts.** `context.raycast(origin, direction, maxDistance, { ignore, hit })`
   returns the nearest entity with a 3D collider box, plus the point, the face
   normal and the distance. Physics 3D registers it, and `run physics3d.raycast`

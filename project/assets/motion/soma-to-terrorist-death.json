@@ -1,0 +1,13 @@
+{
+  "_comment": "The walk map plus Hips. Only death uses this one.",
+  "_whyHips": "A collapse is mostly the hips pitching over; the limbs alone leave a corpse standing. Every other clip drops Hips because its rotation carries the captured body's facing and entity.yaw decides that — but a dead body has no facing to protect, so here the capture wins.",
+  "_whyNotRoot": "The fall to the floor is in the captured root, which the engine does not apply. project/plugins/damage.js already sinks entity.y to corpse height, which covers it.",
+
+  "hips":     { "node": "hips",     "from": ["Hips"] },
+  "torso":    { "node": "torso",    "from": ["Spine1", "Spine2", "Chest"] },
+  "head":     { "node": "head",     "from": ["Neck1", "Neck2", "Head"] },
+  "armLeft":  { "node": "armLeft",  "from": ["LeftShoulder", "LeftArm"],   "offset": [0, 0, 0.7071068, 0.7071068] },
+  "armRight": { "node": "armRight", "from": ["RightShoulder", "RightArm"], "offset": [0, 0, -0.7071068, 0.7071068] },
+  "legLeft":  { "node": "legLeft",  "from": ["LeftLeg"] },
+  "legRight": { "node": "legRight", "from": ["RightLeg"] }
+}
