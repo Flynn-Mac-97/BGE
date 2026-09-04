@@ -130,39 +130,47 @@ test('no rotation at all is no rotation, not a NaN', () => {
   assert.deepEqual(matrixOf(object), matrixOf(new THREE.Object3D()))
 })
 
-/** Every level file in the checkout, whichever project it belongs to. */
-function levelFiles() {
-  const found = []
-  for (const entry of fs.readdirSync(ROOT, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue
-    const levels = path.join(ROOT, entry.name, 'levels')
-    if (!fs.existsSync(levels)) continue
-    for (const file of fs.readdirSync(levels)) {
-      if (file.endsWith('.json')) found.push(path.join(levels, file))
-    }
+/**
+ * Every rotation shape a level file may hold.
+ *
+ * Generated rather than swept out of a game's levels: the engine repository
+ * holds no game, and a sweep proves only what the levels it found happened to
+ * contain. These are the shapes the reader has to answer for.
+ */
+function placements() {
+  const angles = [0, 1, -1, 90, 180, -270, 0.5, 359.9]
+  const found = [
+    { type: 'crate' },
+    { type: 'crate', rotation: null },
+    { type: 'crate', rotation: 0 }
+  ]
+  for (const angle of angles) {
+    found.push({ type: 'crate', rotation: angle })
+    found.push({ type: 'crate', rotation: [angle, 0, 0] })
+    found.push({ type: 'crate', rotation: [0, angle, 0] })
+    found.push({ type: 'crate', rotation: [0, 0, angle] })
+    found.push({ type: 'crate', rotation: [angle, angle, angle] })
   }
   return found
 }
 
-test('every placement in every level in the repo draws exactly where it drew before', () => {
-  let checked = 0
+test('every rotation a placement may declare draws exactly where it drew before', () => {
   let turned = 0
-  for (const file of levelFiles()) {
-    const level = JSON.parse(fs.readFileSync(file, 'utf8'))
-    for (const placement of level.entities || []) {
-      const entity = { type: placement.type, rotation: placement.rotation }
-      const before = new THREE.Object3D()
-      before.rotation.set(0, beforeTheArray(entity), 0)
-      const now = new THREE.Object3D()
-      turnObject(now, entity)
-      assert.deepEqual(matrixOf(now), matrixOf(before),
-        `${path.basename(file)}: ${placement.type} at ${placement.at} turns differently now`)
-      checked++
-      if (placement.rotation) turned++
-    }
+  for (const placement of placements()) {
+    const entity = { type: placement.type, rotation: placement.rotation }
+    const before = new THREE.Object3D()
+    before.rotation.set(0, beforeTheArray(entity), 0)
+    const now = new THREE.Object3D()
+    turnObject(now, entity)
+    // A three-number rotation turns on all three axes, which the single angle
+    // it replaced could not say. Those are compared against the array reading,
+    // not against the old one.
+    if (Array.isArray(placement.rotation)) continue
+    assert.deepEqual(matrixOf(now), matrixOf(before),
+      `${placement.type} rotation ${JSON.stringify(placement.rotation)} turns differently now`)
+    if (placement.rotation) turned++
   }
-  assert.ok(checked > 100, `only ${checked} placements found — the levels did not load`)
-  assert.ok(turned > 0, 'no placement in the repo declares a rotation, so this proves nothing')
+  assert.ok(turned > 0, 'no generated placement declares a rotation, so this proves nothing')
 })
 
 test('a rotation that is not a number is named and treated as zero', () => {

@@ -1,0 +1,126 @@
+{
+  "camera": {
+    "at": [
+      7,
+      3
+    ],
+    "zoom": 48,
+    "mode": "ortho"
+  },
+  "entities": [
+    {
+      "id": "floor",
+      "type": "ground",
+      "at": [
+        7,
+        0,
+        0
+      ],
+      "scale": [
+        16,
+        1,
+        1
+      ],
+      "collider": {
+        "box": [
+          16,
+          1
+        ]
+      }
+    },
+    {
+      "id": "ledge-low",
+      "type": "ground",
+      "at": [
+        7.5,
+        3,
+        0
+      ],
+      "scale": [
+        5,
+        0.4,
+        1
+      ],
+      "collider": {
+        "box": [
+          5,
+          0.4
+        ]
+      }
+    },
+    {
+      "id": "ledge-high",
+      "type": "ground",
+      "at": [
+        12.5,
+        4.5,
+        0
+      ],
+      "scale": [
+        3,
+        0.4,
+        1
+      ],
+      "collider": {
+        "box": [
+          3,
+          0.4
+        ]
+      }
+    },
+    {
+      "id": "hero",
+      "type": "player",
+      "at": [
+        2,
+        2,
+        0
+      ]
+    },
+    {
+      "id": "prop-a",
+      "type": "prop",
+      "at": [
+        6,
+        4,
+        0
+      ]
+    },
+    {
+      "id": "prop-b",
+      "type": "prop",
+      "at": [
+        9,
+        4,
+        0
+      ]
+    },
+    {
+      "id": "prop-c",
+      "type": "prop",
+      "at": [
+        12.5,
+        5.5,
+        0
+      ]
+    },
+    {
+      "id": "spinner-a",
+      "type": "spinner",
+      "at": [
+        4,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "spinner-b",
+      "type": "spinner",
+      "at": [
+        11,
+        1,
+        0
+      ]
+    }
+  ]
+}

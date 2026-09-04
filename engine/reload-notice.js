@@ -721,9 +721,9 @@ export async function carryWorldThroughReload(parts) {
     announce(notice)
     return notice
   }
-  if (capture.project && capture.project !== parts.editor.projectDirectory) {
+  if (capture.project && capture.project !== parts.editor.projectName) {
     const notice = describeReload(capture, {
-      why: `the moment belonged to project "${capture.project}" and this page serves "${parts.editor.projectDirectory}"`
+      why: `the moment belonged to project "${capture.project}" and this page serves "${parts.editor.projectName}"`
     })
     announce(notice)
     return notice

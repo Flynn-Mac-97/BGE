@@ -47,13 +47,15 @@ the better route.
 
 ## Which project
 
-The project directory is a start-up parameter, so a `match:` pattern writes
-`project/**` and the resolver rewrites a claimed file's real directory to
-`project/` before matching. Without the rewrite, a game in any other directory
-matches no project rule and the packet still returns successfully.
+A project is a directory anywhere on disk, so a `match:` pattern writes
+`project/**` and the resolver rewrites a claimed file to `project/…` before
+matching. Three spellings reach the same file and an agent may hold any of
+them: the full path, the directory's own name, and `project/` itself. Without
+the rewrite a game in any other directory matches no project rule and the
+packet still returns successfully.
 
-A `tests:` entry writes `<project>`, replaced with the directory in use, so a
-lane is handed the check that proves its own game rather than the default one.
+A `tests:` entry writes `<project>`, replaced with the path in use, so a lane is
+handed the check that proves its own game rather than the default one.
 
 `engine/agent-workspace.js` is the shared resolver. It receives a file reader,
 so the Agent Workspace plugin and the offline CLI return the same packet.
@@ -83,7 +85,7 @@ safety rules do not expose a key and cannot be replaced.
 
 Git stays on the Node side. `engine/agent-workspace-node.mjs` backs
 `agent.prepare` and `agent.release`, keeps the run registry in
-`project/.engine/agents.json`, rejects overlapping claims, and creates a git
+`.engine/agents.json`, rejects overlapping claims, and creates a git
 worktree only for a parallel writer. A small single-writer task stays in the
 current workspace. The browser can inspect this state but cannot execute git.
 

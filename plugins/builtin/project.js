@@ -291,8 +291,7 @@ export default {
         if (!context.shell) {
           return { screen: false, note: 'a headless world ends with its process — there is nothing to close' }
         }
-        const projects = state.projects || (await askServer(context), state.projects)
-        return reopen(await ask('/api/project/open', { path: `${projects}/.untitled` }))
+        return reopen(await ask('/api/project/close', {}))
       }
     }
   ]

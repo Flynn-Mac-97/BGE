@@ -11,14 +11,14 @@ import {
   agentState, sweepAgents
 } from '../engine/agent-workspace-node.mjs'
 import { onDisk } from '../engine/start-world-node.mjs'
+import { FIXTURE } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Every node this checkout really offers, manifests and plugin guides alike. */
 async function everyRealNode() {
-  const project = path.join(ROOT, 'project')
-  const read = (scope, file) => fs.promises.readFile(path.join(scope === 'engine' ? ROOT : project, file), 'utf8')
-  const workspace = await readAgentWorkspace(read, await onDisk(project).agentPlugins())
+  const read = (scope, file) => fs.promises.readFile(path.join(scope === 'engine' ? ROOT : FIXTURE, file), 'utf8')
+  const workspace = await readAgentWorkspace(read, await onDisk(FIXTURE, ROOT).agentPlugins())
   return workspace.nodes.filter(node => ['instruction', 'skill'].includes(node.kind))
 }
 
@@ -201,7 +201,7 @@ test('small tasks stay put and parallel tasks receive worktrees', async t => {
   fs.mkdirSync(path.join(root, 'project'), { recursive: true })
   fs.mkdirSync(path.join(root, 'engine'), { recursive: true })
   fs.cpSync(path.join(ROOT, 'agents'), path.join(root, 'agents'), { recursive: true })
-  fs.cpSync(path.join(ROOT, 'project/agents'), path.join(root, 'project/agents'), { recursive: true })
+  fs.cpSync(path.join(FIXTURE, 'agents'), path.join(root, 'project/agents'), { recursive: true })
   fs.copyFileSync(path.join(ROOT, 'AGENTS.md'), path.join(root, 'AGENTS.md'))
   fs.copyFileSync(path.join(ROOT, 'ARCHITECTURE.md'), path.join(root, 'ARCHITECTURE.md'))
   fs.writeFileSync(path.join(root, 'engine/world.js'), 'export const world = true\n')
@@ -266,7 +266,7 @@ function laneFixture(t) {
   fs.mkdirSync(path.join(root, 'project'), { recursive: true })
   fs.mkdirSync(path.join(root, 'engine'), { recursive: true })
   fs.cpSync(path.join(ROOT, 'agents'), path.join(root, 'agents'), { recursive: true })
-  fs.cpSync(path.join(ROOT, 'project/agents'), path.join(root, 'project/agents'), { recursive: true })
+  fs.cpSync(path.join(FIXTURE, 'agents'), path.join(root, 'project/agents'), { recursive: true })
   fs.copyFileSync(path.join(ROOT, 'AGENTS.md'), path.join(root, 'AGENTS.md'))
   fs.copyFileSync(path.join(ROOT, 'ARCHITECTURE.md'), path.join(root, 'ARCHITECTURE.md'))
   fs.writeFileSync(path.join(root, 'engine/world.js'), 'export const world = true\n')

@@ -13,6 +13,18 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { startWorldInNode } from '../engine/start-world-node.mjs'
+import { FIXTURE, temporaryProject } from './fixture-project.mjs'
+
+/**
+ * A project that declares a portrait screen.
+ *
+ * Written here rather than read from a game: the engine repository holds no
+ * game, and what is under test is that a declaration is honoured — not what any
+ * one game declares.
+ */
+const PORTRAIT = await temporaryProject({
+  'game.json': { title: 'portrait', startLevel: 'main', device: { width: 540, height: 960 } }
+}, 'engine-device-')
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -37,7 +49,7 @@ async function sketchFrame(t, engine) {
 }
 
 test('a declared device sets the viewport and reaches context', async () => {
-  const { context } = await startWorldInNode({ root: ROOT, project: 'kitten-survivors' })
+  const { context } = await startWorldInNode({ root: ROOT, project: PORTRAIT })
   assert.equal(context.device.width, 540)
   assert.equal(context.device.height, 960)
   // Not declared. The engine derives it from the shape, so declaring it would
@@ -47,17 +59,19 @@ test('a declared device sets the viewport and reaches context', async () => {
   assert.equal(context.viewport.height, 960)
 })
 
-test('the game declares no field the engine cannot honour', async () => {
-  const game = JSON.parse(fs.readFileSync(path.join(ROOT, 'kitten-survivors/game.json'), 'utf8'))
+test('a declared pixel ratio is not read, so a game declaring one is told', async () => {
   // No renderer draws at a declared ratio: the PNG is the viewport times the
   // page's own device pixel ratio, which see.capture measures into the sidecar.
-  assert.equal(game.device.pixelRatio, undefined,
-    'nothing renders at a declared pixel ratio, so declaring one states a falsehood')
-  assert.deepEqual(Object.keys(game.device).sort(), ['comment', 'height', 'width'])
+  const project = await temporaryProject({
+    'game.json': { title: 'ratio', startLevel: 'main', device: { width: 540, height: 960, pixelRatio: 3 } }
+  }, 'engine-device-ratio-')
+  const { context } = await startWorldInNode({ root: ROOT, project })
+  assert.equal(context.device.pixelRatio, 3, 'it is carried')
+  assert.equal(context.viewport.width, 540, 'and it does not scale the viewport')
 })
 
 test('a game that declares no device still gets a viewport', async () => {
-  const { context } = await startWorldInNode({ root: ROOT, project: 'project' })
+  const { context } = await startWorldInNode({ root: ROOT, project: FIXTURE })
   assert.equal(context.device.width, 1280)
   assert.equal(context.device.height, 720)
   assert.equal(context.device.orientation, 'landscape')
@@ -67,7 +81,7 @@ test('a game that declares no device still gets a viewport', async () => {
 
 test('a measured screen beats the declaration', async () => {
   const { context } = await startWorldInNode({
-    root: ROOT, project: 'kitten-survivors', viewport: { width: 800, height: 600 }
+    root: ROOT, project: PORTRAIT, viewport: { width: 800, height: 600 }
   })
   assert.equal(context.viewport.width, 800)
   assert.equal(context.device.width, 540)
@@ -75,7 +89,7 @@ test('a measured screen beats the declaration', async () => {
 
 test('the frame is written at the declared screen, not at the agent window', async t => {
   const { engine, context } = await startWorldInNode({
-    root: ROOT, project: 'kitten-survivors', viewport: { width: 800, height: 600 }
+    root: ROOT, project: PORTRAIT, viewport: { width: 800, height: 600 }
   })
   const frame = await sketchFrame(t, engine)
   // 540x960 at the sketch's fixed quarter scale. The window would give 200x150,
@@ -87,13 +101,13 @@ test('the frame is written at the declared screen, not at the agent window', asy
 })
 
 test('a game with no declaration writes its frame at the default screen', async t => {
-  const { engine } = await startWorldInNode({ root: ROOT, project: 'project' })
+  const { engine } = await startWorldInNode({ root: ROOT, project: FIXTURE })
   // 1280x720 at the same quarter scale.
   assert.deepEqual(pngPixels((await sketchFrame(t, engine)).png), [320, 180])
 })
 
 test('two frames of one world are two files on disk, named without a client', async t => {
-  const { engine, context } = await startWorldInNode({ root: ROOT, project: 'kitten-survivors' })
+  const { engine, context } = await startWorldInNode({ root: ROOT, project: PORTRAIT })
   const first = await sketchFrame(t, engine)
   const second = await sketchFrame(t, engine)
   const level = context.editor.levelName

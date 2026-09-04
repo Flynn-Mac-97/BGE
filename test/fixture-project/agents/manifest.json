@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "nodes": [
+    { "id": "project-code-style", "title": "Project Code Style", "kind": "instruction", "parent": "project", "file": "agents/overrides/code-style.md", "override": "code-style", "match": ["project/**/*.js"] }
+  ]
+}

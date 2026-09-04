@@ -86,7 +86,8 @@ compare it against the sidecar; absence is a query, not a look.
 
 - With the editor open, plain `node bin/engine.mjs run see.<verb> '{...}'`
   drives it over the bridge. `--project` is only for `--headless` runs, and it
-  takes the project DIRECTORY NAME (`kitten-survivors`), never `.`.
+  takes a path to the project directory — a bare name is one inside the
+  checkout, `../x` or an absolute path is one anywhere. Never `.`.
 - `script '[...]'` is headless-only. Over the bridge, run one verb per call —
   the browser world keeps its state between calls.
 - Add `"brief": true` in a busy scene: only marked entities are listed, with

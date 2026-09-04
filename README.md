@@ -15,6 +15,11 @@ npm run dev          # http://localhost:5180
 
 Depth 1 everywhere. One file per thing.
 
+A project is a directory anywhere on disk, and this repository holds none: the
+engine opens with a blank one. `ENGINE_PROJECT=path npm run dev` opens another,
+and the editor always calls the open project `project/` whatever it is really
+called — in a URL, in a `match:` pattern, and in every path below.
+
 ```
 project/
   game.json          entry point: title, startLevel, device, plugins off

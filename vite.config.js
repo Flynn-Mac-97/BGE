@@ -10,7 +10,7 @@ import { chooseClient, describeClient, explainClientError, isLive, mergeClient, 
 import { readLaneBrowsers } from './engine/lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
 import { PROJECT_PREFIX } from './engine/asset-path.js'
-import { ensureProject, projectName, projectsRoot, resolveProject } from './engine/project-path.mjs'
+import { ensureProject, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './engine/project-path.mjs'
 
 const ROOT = process.cwd()
 
@@ -29,8 +29,39 @@ const ROOT = process.cwd()
  */
 let PROJECT = resolveProject(ROOT, process.env.ENGINE_PROJECT)
 
-/** What a person is shown. `game.json`'s title is read by the page, not here. */
+/**
+ * What a person is shown: the project's own title, else its directory.
+ *
+ * Read here as well as in the page, and from the same file, so the two agree.
+ * A server naming a project one thing while the page names it another reads as
+ * drift, and the page would report a move that never happened.
+ */
 let PROJECT_NAME = projectName(PROJECT)
+const readProjectName = async () => {
+  const game = JSON.parse(
+    await fs.readFile(path.join(PROJECT, 'game.json'), 'utf8').catch(() => '{}'))
+  PROJECT_NAME = projectName(PROJECT, game.title)
+  return PROJECT_NAME
+}
+
+/**
+ * Watch the open project for edits, unless it is the untitled one.
+ *
+ * Vite watches its own root, so a project outside the checkout is watched only
+ * if the watcher is told. The untitled project is never watched: naming it is a
+ * rename, Windows refuses to rename a directory anything holds open, and the
+ * watcher's handle is not released in time to do it. The cost is that an edit
+ * to an unnamed project does not hot reload; naming it starts the watch.
+ */
+function watchProject(server) {
+  const outside = !PROJECT.startsWith(ROOT + path.sep)
+  if (outside && path.basename(PROJECT) !== UNTITLED) server.watcher.add(PROJECT)
+}
+
+/** Let go of the open project, so the next one may be watched instead. */
+function stopWatchingProject(server) {
+  if (!PROJECT.startsWith(ROOT + path.sep)) server.watcher.unwatch(PROJECT)
+}
 
 /**
  * Point this server at another project, without restarting it.
@@ -40,13 +71,14 @@ let PROJECT_NAME = projectName(PROJECT)
  * request, so the change is this assignment plus two things the server holds
  * open: the watcher, and the list of directories `/@fs` will serve.
  */
-function openProject(server, next) {
+async function openProject(server, next) {
   const wanted = path.resolve(ROOT, next)
+  stopWatchingProject(server)
   PROJECT = wanted
-  PROJECT_NAME = projectName(wanted)
+  await readProjectName()
   const allow = server.config.server.fs.allow
   if (!allow.includes(wanted)) allow.push(wanted)
-  if (!wanted.startsWith(ROOT + path.sep)) server.watcher.add(wanted)
+  watchProject(server)
   return { project: PROJECT_NAME, directory: PROJECT }
 }
 
@@ -99,6 +131,23 @@ const watched = file => {
   // own directories are then read as dot-directories.
   const base = full.startsWith(projectURL() + '/') ? projectURL() : PROJECT_ROOT_URL
   return !/(^|\/)\.[^/]/.test(full.slice(base.length))
+}
+
+/**
+ * Rename, waiting for whatever still holds the directory to let go.
+ *
+ * A watcher releases its handles asynchronously, so the first attempt after
+ * unwatching can still fail on Windows. Reported rather than retried forever:
+ * a directory something else has open is a real answer.
+ */
+async function renameWhenFree(from, to, attempts = 20) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await fs.rename(from, to) } catch (error) {
+      const busy = ['EPERM', 'EBUSY', 'EACCES', 'ENOTEMPTY'].includes(error.code)
+      if (!busy || attempt >= attempts) throw error
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+  }
 }
 
 const send = (res, code, body) => {
@@ -228,12 +277,12 @@ function serveProject() {
     configureServer(server) {
       // Created if it is not there. Opening the editor with nothing on disk is
       // the blank-project case, and it has to leave a project behind.
-      ensureProject(PROJECT).then(() => buildIndex()).catch(error => {
+      ensureProject(PROJECT).then(readProjectName).then(() => buildIndex()).catch(error => {
         console.error(`[engine] cannot open ${PROJECT}: ${error.message}`)
       })
       // Vite watches its own root. A project outside it is watched only if the
       // watcher is told, and without that no project edit reaches the editor.
-      if (!PROJECT.startsWith(ROOT + path.sep)) server.watcher.add(PROJECT)
+      watchProject(server)
       server.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith(mount)) return next()
         const rest = req.url.slice(mount.length)
@@ -301,9 +350,20 @@ function api() {
             const wanted = path.resolve(ROOT, said)
             const there = await fs.stat(wanted).then(s => s.isDirectory(), () => false)
             if (!there) return send(res, 404, { error: `no project directory at ${wanted}` })
-            const opened = openProject(server, wanted)
+            const opened = await openProject(server, wanted)
             await buildIndex()
             return send(res, 200, { ...opened, opened: true })
+          }
+
+          // Leave the open project for a blank one. Closing has to leave you
+          // somewhere, so the untitled project is created if it is not there.
+          if (url.pathname === '/api/project/close' && req.method === 'POST') {
+            const refused = refusedFileWrite(req)
+            if (refused) return send(res, 423, refused)
+            const blank = await ensureProject(untitledProject(ROOT))
+            const opened = await openProject(server, blank)
+            await buildIndex()
+            return send(res, 200, { ...opened, closed: true })
           }
 
           // Give the untitled project a name. A rename, not a copy: the files
@@ -320,11 +380,12 @@ function api() {
               return send(res, 409, { error: `${target} already exists — pick another name` })
             }
             await fs.mkdir(path.dirname(target), { recursive: true })
-            await fs.rename(PROJECT, target)
-            const opened = openProject(server, target)
-            // The title is the project's own, so it travels with the files.
+            await renameWhenFree(PROJECT, target)
+            // The title is the project's own, so it travels with the files. It
+            // is written before the server reads the name back.
             const game = JSON.parse(await fs.readFile(path.join(target, 'game.json'), 'utf8').catch(() => '{}'))
             await fs.writeFile(path.join(target, 'game.json'), JSON.stringify({ ...game, title: name }, null, 2) + '\n', 'utf8')
+            const opened = await openProject(server, target)
             await buildIndex()
             return send(res, 200, { ...opened, saved: true })
           }
@@ -810,18 +871,9 @@ export default defineConfig({
     api(),
     { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() }
   ],
-  /**
-   * Tell the browser half what to call the open project.
-   *
-   * The name only, for the tab title. Where the project is on disk never
-   * reaches the page: it fetches everything under `/project/`.
-   *
-   * It has to go through `import.meta.env`. A bare defined identifier is only
-   * substituted by a production build — Vite's define plugin returns without
-   * doing anything in dev — so the editor, which is the only thing anyone runs,
-   * would quietly keep the default.
-   */
-  define: { 'import.meta.env.ENGINE_PROJECT': JSON.stringify(PROJECT_NAME) },
+  // Nothing about the project is baked into the page. It asks `/api/project`
+  // for the name and fetches everything else under `/project/`, so a server
+  // that repoints itself is followed rather than remembered.
   // ENGINE_NO_OPEN keeps a headless or CI run from launching a visible browser.
   // ENGINE_PORT is the same variable `bin/engine.mjs` reads, so naming a port
   // once puts the server and the commands that drive it on the same one.

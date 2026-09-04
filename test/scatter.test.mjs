@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 import { makeLoop } from '../engine/loop.js'
 import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { growField, readRule, distanceToPath, areaSize, SCATTER_TYPE } from '../plugins/builtin/scatter.js'
+import { FIXTURE, FIXTURE_LEVEL } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -261,15 +262,15 @@ test('an entry carries its own mesh and properties onto every placement of it', 
 
 // -------------------------------------------------------- in a real world
 test('a scatter in a live world grows on the clock, the same way twice', async () => {
-  const { context, engine, world } = await startWorldInNode({ root: ROOT, project: 'project' })
+  const { context, engine, world } = await startWorldInNode({ root: ROOT, project: FIXTURE })
 
   const place = async () => {
     // The level load reseeds the stream, so both runs start from the same place.
-    await context.editor.loadLevel('level1')
+    await context.editor.loadLevel(FIXTURE_LEVEL)
     assert.ok(world.types.has('scatter'), 'the plugin registered the type on level:loaded')
     context.spawn('scatter', {
       id: 'tufts', at: [0, 0, 0],
-      properties: { of: 'coin', count: 40, width: 24, depth: 24, apart: 1.2 }
+      properties: { of: 'prop', count: 40, width: 24, depth: 24, apart: 1.2 }
     })
     engine.simulate(0.1)
     return world.entities.filter(entity => entity.id.startsWith('tufts-'))
@@ -280,15 +281,15 @@ test('a scatter in a live world grows on the clock, the same way twice', async (
   assert.ok(first.length > 10, `the field grew ${first.length} placements`)
   assert.deepEqual(await place(), first, 'the same level and seed grew the same field')
 
-  await context.editor.loadLevel('level1')
+  await context.editor.loadLevel(FIXTURE_LEVEL)
 })
 
 test('the marker hides on the clock, and takes its field with it when destroyed', async () => {
-  const { context, engine, world } = await startWorldInNode({ root: ROOT, project: 'project' })
-  await context.editor.loadLevel('level1')
+  const { context, engine, world } = await startWorldInNode({ root: ROOT, project: FIXTURE })
+  await context.editor.loadLevel(FIXTURE_LEVEL)
 
   const scatter = context.spawn('scatter', {
-    id: 'tufts', at: [0, 0, 0], properties: { of: 'coin', count: 12, width: 20, depth: 20 }
+    id: 'tufts', at: [0, 0, 0], properties: { of: 'prop', count: 12, width: 20, depth: 20 }
   })
   assert.equal(scatter.hidden, false, 'visible in the editor, so it can be dragged')
   engine.simulate(0.1)
@@ -300,11 +301,11 @@ test('the marker hides on the clock, and takes its field with it when destroyed'
 })
 
 test('expand leaves real placements and no scatter, and a save would write them', async () => {
-  const { context, world } = await startWorldInNode({ root: ROOT, project: 'project' })
-  await context.editor.loadLevel('level1')
+  const { context, world } = await startWorldInNode({ root: ROOT, project: FIXTURE })
+  await context.editor.loadLevel(FIXTURE_LEVEL)
 
   const scatter = context.spawn('scatter', {
-    id: 'tufts', at: [2, 0, -3], properties: { of: 'coin', count: 9, width: 20, depth: 20 }
+    id: 'tufts', at: [2, 0, -3], properties: { of: 'prop', count: 9, width: 20, depth: 20 }
   })
   const previewed = context.scatter.preview('tufts')
   assert.equal(previewed[0].standing, 9)
@@ -313,22 +314,22 @@ test('expand leaves real placements and no scatter, and a save would write them'
   const expanded = context.scatter.expand(scatter)
   assert.equal(expanded.placed, 9)
   assert.equal(world.all('scatter').length, 0, 'the marker is gone')
-  assert.equal(world.byId('tufts-1').type, 'coin')
+  assert.equal(world.byId('tufts-1').type, 'prop')
 
   // The whole point of expanding: what toLevel writes is ordinary placements,
   // each keeping the id the field gave it, so one can be nudged by hand.
   const level = world.toLevel(null)
   const written = level.entities.filter(entity => String(entity.id || '').startsWith('tufts-'))
   assert.equal(written.length, 9)
-  assert.equal(written[0].type, 'coin')
+  assert.equal(written[0].type, 'prop')
   assert.ok(Array.isArray(written[0].at))
 })
 
 test('scatter.list answers "why is my field empty" from a terminal', async () => {
-  const { context, engine } = await startWorldInNode({ root: ROOT, project: 'project' })
-  await context.editor.loadLevel('level1')
+  const { context, engine } = await startWorldInNode({ root: ROOT, project: FIXTURE })
+  await context.editor.loadLevel(FIXTURE_LEVEL)
   context.spawn('scatter', {
-    id: 'tufts', at: [0, 0, 0], properties: { of: 'coin', count: 300, width: 8, depth: 8, apart: 3 }
+    id: 'tufts', at: [0, 0, 0], properties: { of: 'prop', count: 300, width: 8, depth: 8, apart: 3 }
   })
   engine.simulate(0.1)
 

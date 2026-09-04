@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { widenClip, applyClip } from '../plugins/builtin/rig-animation.js'
 import { buildClip, writeClip, multiply, skeletonFor, SKELETONS } from '../tools/lib/motion-clip.mjs'
+import { FIXTURE } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -202,7 +203,7 @@ test('a written clip reads back as the same clip', () => {
 
 // --------------------------------------------------------------- in a world
 test('the plugin loads headless and contributes its verbs', async () => {
-  const { context, engine } = await startWorldInNode({ root: ROOT, project: 'project' })
+  const { context, engine } = await startWorldInNode({ root: ROOT, project: FIXTURE })
   assert.equal(typeof context.rigAnimation.load, 'function')
   assert.equal(typeof context.rigAnimation.clip, 'function')
   const clips = await engine.run('rig.clips')
@@ -210,7 +211,7 @@ test('the plugin loads headless and contributes its verbs', async () => {
 })
 
 test('a clip file that is not there fails by name', async () => {
-  const { context } = await startWorldInNode({ root: ROOT, project: 'project' })
+  const { context } = await startWorldInNode({ root: ROOT, project: FIXTURE })
   await assert.rejects(context.rigAnimation.load('motion/nothing-here.json'), /nothing-here\.json/)
 })
 

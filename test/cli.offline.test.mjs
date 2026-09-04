@@ -17,6 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { lint, invariantProblems } from '../engine/project-index.mjs'
+import { FIXTURE, temporaryProject } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(ROOT, 'bin/engine.mjs')
@@ -47,7 +48,7 @@ test('help exits 0 and names the verb groups', () => {
 })
 
 test('exit codes: 0 ok, 1 bad argument, 2 nothing to talk to', () => {
-  assert.equal(run(['check']).code, 0, 'an offline op succeeds')
+  assert.equal(run(['check', '--project', FIXTURE]).code, 0, 'an offline op succeeds')
   const badKind = run(['pain', 'x', '--kind', 'nonsense'])
   assert.equal(badKind.code, 1, 'a bad argument is 1')
   assert.ok(badKind.stderr.includes('--kind must be one of'), 'and says which rule')
@@ -80,7 +81,7 @@ test('the determinism lint names each banned source with a line', () => {
 })
 
 test('check passes clean with nothing running, and a warning never fails it', () => {
-  const r = run(['check'])
+  const r = run(['check', '--project', FIXTURE])
   const reply = JSON.parse(r.stdout)
   assert.equal(r.code, 0)
   assert.equal(reply.ok, true)
@@ -90,13 +91,24 @@ test('check passes clean with nothing running, and a warning never fails it', ()
   assert.ok(reply.problems.every(p => p.warning), 'anything left is a warning')
 })
 
-test('the meadow floor satisfies the invariant its type declares', () => {
-  // A real level against a real declaration, so re-breaking the placement turns
-  // this red. The machinery itself is proven below, on fixtures — this only
-  // asks whether the shipped level keeps the rule.
-  const reply = JSON.parse(run(['check', '--project', 'kitten-survivors']).stdout)
+test('a placement that keeps the invariant its type declares passes check', async () => {
+  // The whole path, not the pure function below: a type declares a rule, a
+  // level places it correctly, and `check` says nothing.
+  const project = await temporaryProject({
+    'game.json': { title: 'invariant', startLevel: 'main' },
+    'types/slab.js': `export default {
+  about: 'a floor whose top face is the ground line',
+  appearance: 'A wide flat slab.',
+  looksWrongWhen: 'anything stands inside it.',
+  mesh: { box: [40, 1, 40] },
+  invariant: { rule: 'topFaceAtY', value: 0, about: 'top face at y = 0' }
+}
+`,
+    'levels/main.json': { entities: [{ id: 'floor', type: 'slab', at: [0, -0.5, 0] }] }
+  }, 'engine-invariant-')
+  const reply = JSON.parse(run(['check', '--project', project]).stdout)
   const broken = reply.problems.filter(problem => /invariant/.test(problem.why))
-  assert.deepEqual(broken, [], 'the meadow breaks an invariant it declares')
+  assert.deepEqual(broken, [], 'a correct placement reports no invariant problem')
 })
 
 test('invariantProblems: a placement that satisfies its type is silent', () => {

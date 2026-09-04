@@ -14,8 +14,17 @@ import { PROJECT_PREFIX } from './asset-path.js'
 /**
  * What the dev server calls the open project, for the tab title only. Where it
  * is on disk never reaches the page.
+ *
+ * Asked for rather than baked in: the server can repoint itself at another
+ * project, and a title fixed at start-up would name the one it left.
  */
-const PROJECT_NAME = (import.meta.env || {}).ENGINE_PROJECT || PROJECT_PREFIX
+async function openProjectName() {
+  try {
+    const body = await (await fetch('/api/project')).json()
+    if (typeof body.project === 'string') return body.project
+  } catch { /* no dev server: the built page carries no name */ }
+  return PROJECT_PREFIX
+}
 import { makeFiles, overHTTP } from './files.js'
 import { importPlugin, reportImportFailure } from './plugin-import.js'
 import { makeRenderer } from './render.js'
@@ -97,14 +106,15 @@ async function boot() {
   // Say which project and which server this tab is, where a person looks
   // first. Several editors can be open at once, on several ports, and two tabs
   // naming only the project are told apart by nothing.
-  document.title = `${PROJECT_NAME} :${location.port} — engine`
+  const projectName = await openProjectName()
+  document.title = `${projectName} :${location.port} — engine`
 
   const { context, engine, world, loop } = await startWorld({
     openFiles: bus => makeFiles(bus),
     loadPlugins: findPlugins,
     importProjectFile,
     projectDirectory: PROJECT_PREFIX,
-    projectName: PROJECT_NAME,
+    projectName,
 
     // The shell builds the canvas the renderer draws into, so the shell comes
     // first and context.renderer is filled in immediately after. Both are put

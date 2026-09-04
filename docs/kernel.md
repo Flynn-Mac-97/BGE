@@ -111,11 +111,16 @@ a static literal only, so a glob could never have named a directory chosen at
 run time.
 
 Which project is one parameter: `ENGINE_PROJECT` for the dev server, `--project`
-for the CLI and headless, defaulting to `project` and required to be a directory
-directly inside the checkout. It reaches the browser through `import.meta.env` —
-the only `define` channel that survives dev, because Vite's define plugin
-returns early when not building, so a bare identifier is replaced in a
-production build and silently left alone in development.
+for the CLI and headless. It is a path resolved against the checkout, so a bare
+name reaches a directory inside it and `../x` or an absolute path reaches one
+anywhere. Neither given opens the untitled project.
+
+The browser is never told that path. It fetches every project module and asset
+under the fixed URL `/project/`, and a middleware maps that prefix onto the
+served directory through `/@fs`. So the URL, a `match:` pattern and a claim all
+spell a project file `project/…` whatever its directory is called, and the page
+asks `GET /api/project` for the name to show. The server can repoint itself,
+which is what makes `project.open` a page reload rather than a restart.
 
 Step 7: the dev server builds `.engine/index.json` by
 *importing* each type file and reading its actual `properties`, hooks and asset

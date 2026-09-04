@@ -14,6 +14,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { findSizeOutliers, findStackedEntities } from '../plugins/builtin/see/describe.js'
+import { FIXTURE_LEVEL, temporaryFixture } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(ROOT, 'bin/engine.mjs')
@@ -75,54 +76,46 @@ test('a hidden duplicate is not reported unless includeHidden is asked for', () 
 })
 
 /**
- * Real findings from the real engine: drop two gems at the kitten with
- * nothing simulated in between (the fixed +3 offset `kitten.drop` uses lands
- * both at one point), then give one gem's mesh a 10m box by hand. Both are
- * how these faults actually happen — a double-drop on one tick, a bad
- * override — not fabricated JSON.
+ * The same two faults through the whole engine, not through the pure functions
+ * above: spawned into a live world, read back by `see.describe`.
+ *
+ * Built here rather than borrowed from a game's own command. The engine
+ * repository holds no game, and what is under test is the fault detection, so
+ * the fault is made directly and the assertion says what made it.
  */
-test('a live double-drop is caught as two entities on one point', () => {
-  const stdout = execFileSync(process.execPath, [
-    CLI, 'script',
-    '[["play"],["simulate",30],["run","kitten.drop",5],["run","kitten.drop",5],["run","see.describe"]]',
-    '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
-  ], { encoding: 'utf8' })
-  const steps = JSON.parse(stdout)
-  const dropped = [steps[2].id, steps[3].id]
-  const description = steps[4]
-  assert.ok(description.stackedEntities?.length >= 1, 'the double-drop is reported')
-  const found = description.stackedEntities.find(entry => dropped.every(id => entry.ids.includes(id)))
-  assert.ok(found, 'the two dropped gems are named together')
+// One copy per run, because spawning and setting save the level: two runs
+// sharing a project means the second reads what the first wrote.
+const script = async steps => JSON.parse(execFileSync(process.execPath, [
+  CLI, 'script', JSON.stringify(steps),
+  '--headless', '--project', await temporaryFixture('engine-see-faults-'), '--level', FIXTURE_LEVEL
+], { encoding: 'utf8' }))
+
+test('two entities spawned on one point are caught as stacked', async () => {
+  const steps = await script([
+    ['spawn', 'prop', { id: 'stack-a', at: [3, 3, 0] }],
+    ['spawn', 'prop', { id: 'stack-b', at: [3, 3, 0] }],
+    ['run', 'see.describe']
+  ])
+  const description = steps[2]
+  const found = description.stackedEntities?.find(entry =>
+    entry.ids.includes('stack-a') && entry.ids.includes('stack-b'))
+  assert.ok(found, `the two spawned props are named together: ${JSON.stringify(description.stackedEntities)}`)
 })
 
-test('a live mesh override is caught as a size outlier', () => {
-  // The gem is the one this run dropped, read back from the drop. An id
-  // written into the test names an entity that any change to the schedule or
-  // the level moves.
-  const dropped = JSON.parse(execFileSync(process.execPath, [
-    CLI, 'script', '[["play"],["simulate",30],["run","kitten.drop",5]]',
-    '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
-  ], { encoding: 'utf8' }))[2].id
-  assert.ok(dropped, 'the drop names the gem it made')
-
-  const stdout = execFileSync(process.execPath, [
-    CLI, 'script',
-    '[["play"],["simulate",30],["run","kitten.drop",5],'
-      + `["set",${JSON.stringify(dropped)},"mesh",{"box":[10,10,10]}],["run","see.describe"]]`,
-    '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
-  ], { encoding: 'utf8' })
-  const description = JSON.parse(stdout)[4]
-  const found = description.sizeOutliers?.find(entry => entry.id === dropped)
-  assert.ok(found, 'the oversized gem is named')
+test('one instance boxed ten times its type is caught as a size outlier', async () => {
+  const steps = await script([
+    ['spawn', 'prop', { id: 'huge', at: [3, 3, 0] }],
+    ['set', 'huge', 'mesh', { box: [10, 10, 10] }],
+    ['run', 'see.describe']
+  ])
+  const description = steps[2]
+  const found = description.sizeOutliers?.find(entry => entry.id === 'huge')
+  assert.ok(found, `the oversized prop is named: ${JSON.stringify(description.sizeOutliers)}`)
   assert.ok(found.factor > 10, `expected a large factor, got ${found.factor}`)
 })
 
-test('the unmodified meadow, at the scene the verify command reaches, has neither fault', () => {
-  const stdout = execFileSync(process.execPath, [
-    CLI, 'script', '[["play"],["simulate",30],["run","see.describe"]]',
-    '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
-  ], { encoding: 'utf8' })
-  const description = JSON.parse(stdout)[2]
-  assert.equal(description.sizeOutliers, undefined, 'a shipped level names no size fault')
-  assert.equal(description.stackedEntities, undefined, 'a shipped level names no stacking fault')
+test('the fixture level as it stands has neither fault', async () => {
+  const description = (await script([['play'], ['simulate', 1], ['run', 'see.describe']]))[2]
+  assert.equal(description.sizeOutliers, undefined, 'a level as written names no size fault')
+  assert.equal(description.stackedEntities, undefined, 'a level as written names no stacking fault')
 })

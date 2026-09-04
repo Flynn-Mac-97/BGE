@@ -17,7 +17,25 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(ROOT, 'bin/engine.mjs')
-const LEVEL = path.join(ROOT, 'project/levels/level1.json')
+
+/**
+ * The project the editor under test has open.
+ *
+ * Asked for rather than assumed: a project is a directory anywhere on disk, and
+ * this suite reads and restores real project files. Guessing a path inside the
+ * checkout would edit a directory the editor is not serving.
+ */
+const PORT = process.env.ENGINE_PORT || 5180
+const served = await fetch(`http://localhost:${PORT}/api/project`)
+  .then(response => response.json())
+  .catch(() => null)
+if (!served?.directory) {
+  console.error(`no dev server on ${PORT} — start one with npm run dev`)
+  process.exit(2)
+}
+const PROJECT = served.directory
+const inProject = (...parts) => path.join(PROJECT, ...parts)
+const LEVEL = inProject('levels/level1.json')
 
 // ------------------------------------------------------------------ harness
 const results = []
@@ -93,7 +111,7 @@ const original = fs.readFileSync(LEVEL, 'utf8')
 let openLevelPath = null
 let openOriginal = null
 try {
-  openLevelPath = path.join(ROOT, `project/levels/${JSON.parse(probe.stdout).level}.json`)
+  openLevelPath = inProject(`levels/${JSON.parse(probe.stdout).level}.json`)
   openOriginal = fs.readFileSync(openLevelPath, 'utf8')
 } catch { /* no open level — nothing to restore */ }
 
@@ -246,7 +264,7 @@ await test('check passes clean and fails on nondeterminism', () => {
   eq(clean.code, 0, 'the project is clean')
   eq(JSON.parse(clean.stdout).problems, [], 'and says so with no problems')
 
-  const scratch = path.join(ROOT, `project/types/${uniq()}.js`)
+  const scratch = inProject(`types/${uniq()}.js`)
   fs.writeFileSync(scratch, [
     'export default {',
     '  update(e) {',
@@ -305,10 +323,13 @@ await test('set persists to the level file', () => {
 })
 
 await test('index and tree answer without an editor attached', () => {
-  const index = json(['index'])
-  ok(index.types.coin, 'the index knows the coin type')
-  eq(index.types.coin.properties, ['value', 'spin'], 'and its exact properties')
-  ok(json(['tree']).some(f => f.path === 'types/coin.js'), 'the tree lists files')
+  // Named, because these read the project off disk and the default is the
+  // untitled one — not whatever the editor under test has open.
+  const index = json(['index', '--project', PROJECT])
+  const [name, type] = Object.entries(index.types)[0] || []
+  ok(name, 'the index knows the types the project has')
+  ok(Array.isArray(type.properties), `${name} carries its properties`)
+  ok(json(['tree', '--project', PROJECT]).some(f => f.path === `types/${name}.js`), 'the tree lists files')
 })
 
 await test('eval reaches the page and awaits', () => {
@@ -340,7 +361,7 @@ await test('a dev server with no editor attached exits 2, not 1', async () => {
  * server and failed on every run after — testing the server's history rather
  * than the engine.
  */
-const typePath = name => path.join(ROOT, `project/types/${name}.js`)
+const typePath = name => inProject(`types/${name}.js`)
 const body = mass => `export default {\n  collider: { box: [0.8, 0.8] },\n  properties: { body: 'solid', mass: ${mass} }\n}\n`
 
 const alive = () => json(['eval', 'return globalThis.__alive ?? "RELOADED"'])
@@ -445,7 +466,7 @@ await test('a level edited on disk reloads, and the editor\'s own save does not 
 
 await test('a test file written while the editor runs is runnable at once', () => {
   const name = uniq()
-  const probe = path.join(ROOT, `project/tests/${name}.js`)
+  const probe = inProject(`tests/${name}.js`)
   try {
     fs.writeFileSync(probe, `export default {
       name: 'written while running',
@@ -469,7 +490,10 @@ await test('a test file written while the editor runs is runnable at once', () =
  * proves the world really did start in this process rather than quietly finding
  * the editor that the tests above are using.
  */
-const NOWHERE = ['--headless', '--port', '5999']
+// The same project the editor serves, so the two halves are compared on one
+// game. Without it a headless world opens the untitled project and the
+// comparison is between two different projects.
+const NOWHERE = ['--headless', '--project', PROJECT, '--port', '5999']
 
 const headless = args => {
   const r = cli([...args, ...NOWHERE])
@@ -547,7 +571,7 @@ await test('what a headless world changes in memory stays there', () => {
 })
 
 await test('index, tree and check need no server at all', () => {
-  const port = ['--port', '5999']
+  const port = ['--project', PROJECT, '--port', '5999']
   ok(Object.keys(json(['index', ...port]).types).length > 0, 'index lists types')
   ok(json(['tree', ...port]).some(f => f.path.endsWith('.json')), 'tree lists files')
   eq(cli(['check', ...port]).code, 0, 'check passes with nothing running')

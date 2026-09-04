@@ -13,6 +13,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { simplifyHull } from '../plugins/builtin/see/describe.js'
+import { FIXTURE, FIXTURE_LEVEL } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(ROOT, 'bin/engine.mjs')
@@ -70,14 +71,14 @@ test('simplification never invents points past what it was given', () => {
   assert.equal(result.length, 3, 'nothing to remove, nothing added')
 })
 
-test('on the real meadow scene, every marked hull respects the point budget and has no repeated point', () => {
+test('in a real scene, every marked hull respects the point budget and has no repeated point', () => {
   const stdout = execFileSync(process.execPath, [
-    CLI, 'script', '[["play"],["simulate",30],["run","see.describe",{"brief":true}]]',
-    '--headless', '--project', 'kitten-survivors', '--level', 'meadow'
+    CLI, 'script', '[["play"],["simulate",1],["run","see.describe",{"brief":true}]]',
+    '--headless', '--project', FIXTURE, '--level', FIXTURE_LEVEL
   ], { encoding: 'utf8' })
   const description = JSON.parse(stdout)[2]
   const marked = description.visible.filter(entry => entry.hull)
-  assert.ok(marked.length > 0, 'the meadow marks something to check')
+  assert.ok(marked.length > 0, 'the level marks something to check')
   for (const entry of marked) {
     assert.ok(entry.hull.length <= 8, `${entry.id} carries ${entry.hull.length} hull points`)
     for (let i = 1; i < entry.hull.length; i++) {

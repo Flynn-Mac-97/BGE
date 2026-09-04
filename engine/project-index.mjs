@@ -15,7 +15,7 @@ import { mkdirSync, openSync, closeSync, readFileSync, renameSync, statSync, unl
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL, fileURLToPath } from 'node:url'
-import { assetPath } from './asset-path.js'
+import { assetPath, PROJECT_PREFIX } from './asset-path.js'
 
 /** The checkout this module was loaded from. The engine's own plugins are here. */
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -465,11 +465,6 @@ export function missingAttachments(index) {
 export function missingAssets(index) {
   const onDisk = new Set(index.files || [])
   const out = []
-  // Nothing to compare against is not the same as nothing missing, and quietly
-  // passing would be exactly the silence this check exists to break.
-  if (!onDisk.size) {
-    return [{ file: 'project/.engine/index.json', why: 'the index carries no file list, so no asset reference could be checked — rebuild it with `node bin/engine.mjs index`' }]
-  }
 
   // `references` is how many times the file names it, so the summary can say
   // "4 missing assets, named 231 times" rather than leaving the two confused.
@@ -491,6 +486,16 @@ export function missingAssets(index) {
       const times = use.count === 1 ? 'once' : `${use.count} times`
       missing(reference, l.file, use.count, `level "${name}" names "${reference}" ${times}, first at ${use.first}`)
     }
+  }
+
+  // A file list that is empty because the project is empty is a true answer;
+  // one that is empty while something names an asset means the index was never
+  // built, and every reference would be reported as absent.
+  if (!onDisk.size && out.length) {
+    return [{
+      file: `${PROJECT_PREFIX}/.engine/index.json`,
+      why: 'the index carries no file list, so no asset reference could be checked — rebuild it with `node bin/engine.mjs index`'
+    }]
   }
   return out
 }

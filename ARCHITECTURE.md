@@ -16,6 +16,14 @@ Two consequences that everything else follows from:
   up. There is no engine-specific write API to learn.
 - If it is not in a file, it is not happening. A behaviour you cannot find by
   reading `project/` does not exist.
+- An unsaved project is unnamed, not held in memory. The editor opens the
+  untitled project, a real directory, and naming it moves the directory. There
+  is still nothing to save.
+
+The game is not in this repository. A project is a directory anywhere on disk,
+named by `ENGINE_PROJECT` or `--project`, and the engine calls whichever one is
+open `project/` — in a URL, in a `match:` pattern, and in every path in these
+docs. `docs/kernel.md` says how that one name reaches a directory anywhere.
 
 ## Shape
 

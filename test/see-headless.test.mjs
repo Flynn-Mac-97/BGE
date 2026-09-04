@@ -17,15 +17,16 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { startWorldInNode } from '../engine/start-world-node.mjs'
+import { FIXTURE, FIXTURE_LEVEL } from './fixture-project.mjs'
 
 /** The demo level: nine entities, a fixed camera, no plugin's own scenery. */
 const LEVEL = 'level1'
 
-const started = await startWorldInNode({ project: 'project', renderer: 'null' })
+const started = await startWorldInNode({ project: FIXTURE, renderer: 'null' })
 const { context, engine } = started
 await context.editor.loadLevel(LEVEL)
 
-const bare = await startWorldInNode({ project: 'project' })
+const bare = await startWorldInNode({ project: FIXTURE })
 
 /** A sentinel of every piece a studio capture borrows, put into the live scene. */
 function loadTheScene() {

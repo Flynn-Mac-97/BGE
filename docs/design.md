@@ -32,6 +32,9 @@
   every step writes it.
 - No CSS in game code. The editor is styled by `engine/style.css`; a game draws
   into the canvas.
+- No unsaved document. An unsaved project is a real directory, `.untitled`, and
+  `project.saveAs` renames it. Files on disk stay the truth, so nothing has to
+  be flushed and nothing can be lost by not saving.
 
 ## Known gaps
 
@@ -44,6 +47,10 @@ Three things have come off this list. Check the code before putting one back:
 - **3D model loading.** `mesh: { model: '<file>.glb' }` loads a GLB and
   `entity.pose` swings its named nodes. GLB crowds do not instance yet, which is
   the current cost of using them for enemies.
+- **Projects outside the checkout.** A project is a directory path anywhere, and
+  the engine repository holds no game. The dev server serves the open one at the
+  fixed URL `/project/` and can repoint itself, so opening a project is a page
+  reload rather than a restart.
 - **Rig animation.** `Rig Animation` plays a baked clip of rotations onto those
   named nodes, bones included. `tools/make-rig-clip.mjs` bakes one from text
   through kimodo.cpp. There is no blending between clips.
