@@ -1,6 +1,6 @@
 ---
 name: glass-see-the-game
-description: What the running game actually shows a player, and what each thing on screen is — answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, when something is hidden or in the wrong place, or instead of reading type files to work out what an object is. To produce an actual image, see the See Frames guide.
+description: Use when a question is about what is actually there in the running game world or on screen — and the answer must come from live engine data, not from reading source, type files, or a screenshot. Trigger it for: "what is that thing on screen / in my level", something missing or not appearing (is it hidden, blocked, off-screen, or absent?), something drawn wrong (grey box, flat colour, wrong shape), things overlapping, stacking, floating, or piling up at one spot, and checking positions, counts, sizes, or what blocks what after simulating steps. Also use when a debugging question would otherwise be answered by guessing from code or by eyeballing a picture — query the scene graph instead. Covers identify, describe, find, isolate, occlusion, diff, camera. Do not use for writing gameplay or rendering features, camera or effect authoring, renames, or for capturing/prompting on an image — that is the See Frames guide.
 ---
 <!-- generated from plugins/builtin/see.agent.md at server start; edits are lost -->
 
@@ -49,11 +49,6 @@ the verb is exact where a look is at or near chance:
 | where on screen, which region, which third | `see.describe` — read `at`, never estimate it |
 | is the frame too dark | the sidecar's `light` block |
 | what does the HUD say | `hud.read`, `screen.read` |
-
-Never phrase a question to a vision model as a negative — "which of these
-is NOT a rat", "is anything missing". Models answer negation at chance and
-say yes to almost any "is there an X" question. Ask the positive form and
-compare it against the sidecar; absence is a query, not a look.
 
 ## Troubleshooting — route the symptom
 

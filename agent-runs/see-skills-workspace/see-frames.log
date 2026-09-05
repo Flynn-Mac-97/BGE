@@ -1,0 +1,855 @@
+Split: 11 train, 7 test (holdout=0.4)
+
+============================================================
+Iteration 1/3
+Description: Produce an actual image of the running game and read it — sketches, marked captures, saved moments, the size a frame comes out at, and how to prompt a vision model on one. Use only after the data verbs in See cannot answer, because a picture costs about fifty times a query and answers less. Also covers getting a frame from a terminal with no tab of your own.
+============================================================
+Train: 18/33 correct, precision=100% recall=0% accuracy=55% (143.9s)
+  [FAIL] rate=0/3 expected=True: sketch the current level quickly, i just want to eyeball the
+  [FAIL] rate=0/3 expected=True: run the game headless and give me an image at 30 seconds in 
+  [FAIL] rate=0/3 expected=True: save the current simulated moment so i can re-render the sam
+  [FAIL] rate=0/3 expected=True: i need a png of the de_dust2 spawn area to paste into a desi
+  [FAIL] rate=0/3 expected=True: grab me a marked capture of just the terrorist entity so i c
+  [PASS] rate=0/3 expected=False: which entities are currently visible in level1 and where are
+  [PASS] rate=0/3 expected=False: add a bloom pass to the post processing chain
+  [PASS] rate=0/3 expected=False: the level is too dark - raise the ambient light
+  [PASS] rate=0/3 expected=False: my glb model imports but the materials are all default grey
+  [PASS] rate=0/3 expected=False: set the game device to 540x960 portrait in game.json
+  [PASS] rate=0/3 expected=False: is the player occluded by the wall or is it just off camera
+Test : 15/21 correct, precision=100% recall=33% accuracy=71% (0.0s)
+  [PASS] rate=2/3 expected=True: my art bible says the game is judged at 540x960 but the pngs
+  [FAIL] rate=1/3 expected=True: i dont have an editor tab open on this machine and i still n
+  [FAIL] rate=0/3 expected=True: im about to hand this frame to a cheap vision model to judge
+  [PASS] rate=0/3 expected=False: the muzzle flash particles look wrong - too few and they fad
+  [PASS] rate=0/3 expected=False: theres a grey object around 12,0,4 and i dont know what it i
+  [PASS] rate=0/3 expected=False: generate a sprite sheet for the coin with image generation a
+  [PASS] rate=0/3 expected=False: convert all the pngs under assets to webp for a smaller web 
+
+Improving description...
+Proposed (9.2s): Use this skill whenever someone wants to SEE the game — any request for a picture, image, screenshot, PNG, render, sketch, or capture of a scene, level, entity, or moment. Covers: quick flat-colour sketches to eyeball composition or layout; rendered captures of the canvas, with or without HUD; framing one entity alone in a studio shot to judge its model, pose, or silhouette; saving or replaying a simulated moment so the same frame can be re-rendered later; getting an image at a chosen time (e.g. "30 seconds in"), including headless; contact sheets across several steps; naming cameras and views; the pixel size and shape a frame comes out at; producing an image to paste into a doc or share with a person; and getting a rendered frame from a terminal with no tab of your own. Also covers how to ask a vision model about a frame. Prefer engine-data queries first when the question is factual, not visual.
+
+============================================================
+Iteration 2/3
+Description: Use this skill whenever someone wants to SEE the game — any request for a picture, image, screenshot, PNG, render, sketch, or capture of a scene, level, entity, or moment. Covers: quick flat-colour sketches to eyeball composition or layout; rendered captures of the canvas, with or without HUD; framing one entity alone in a studio shot to judge its model, pose, or silhouette; saving or replaying a simulated moment so the same frame can be re-rendered later; getting an image at a chosen time (e.g. "30 seconds in"), including headless; contact sheets across several steps; naming cameras and views; the pixel size and shape a frame comes out at; producing an image to paste into a doc or share with a person; and getting a rendered frame from a terminal with no tab of your own. Also covers how to ask a vision model about a frame. Prefer engine-data queries first when the question is factual, not visual.
+============================================================
+Train: 19/33 correct, precision=100% recall=7% accuracy=58% (135.5s)
+  [FAIL] rate=0/3 expected=True: sketch the current level quickly, i just want to eyeball the
+  [FAIL] rate=0/3 expected=True: run the game headless and give me an image at 30 seconds in 
+  [FAIL] rate=1/3 expected=True: save the current simulated moment so i can re-render the sam
+  [FAIL] rate=0/3 expected=True: i need a png of the de_dust2 spawn area to paste into a desi
+  [FAIL] rate=0/3 expected=True: grab me a marked capture of just the terrorist entity so i c
+  [PASS] rate=0/3 expected=False: which entities are currently visible in level1 and where are
+  [PASS] rate=0/3 expected=False: add a bloom pass to the post processing chain
+  [PASS] rate=0/3 expected=False: the level is too dark - raise the ambient light
+  [PASS] rate=0/3 expected=False: my glb model imports but the materials are all default grey
+  [PASS] rate=0/3 expected=False: set the game device to 540x960 portrait in game.json
+  [PASS] rate=0/3 expected=False: is the player occluded by the wall or is it just off camera
+Test : 13/21 correct, precision=100% recall=11% accuracy=62% (0.0s)
+  [FAIL] rate=0/3 expected=True: my art bible says the game is judged at 540x960 but the pngs
+  [FAIL] rate=1/3 expected=True: i dont have an editor tab open on this machine and i still n
+  [FAIL] rate=0/3 expected=True: im about to hand this frame to a cheap vision model to judge
+  [PASS] rate=0/3 expected=False: the muzzle flash particles look wrong - too few and they fad
+  [PASS] rate=0/3 expected=False: theres a grey object around 12,0,4 and i dont know what it i
+  [PASS] rate=0/3 expected=False: generate a sprite sheet for the coin with image generation a
+  [PASS] rate=0/3 expected=False: convert all the pngs under assets to webp for a smaller web 
+
+Improving description...
+Proposed (8.1s): Use when the user asks to actually SEE something in the running game — "show me", "sketch", "screenshot", "grab a capture", "give me a PNG", "render it", "what does it look like". Trigger on: quick flat-colour sketches to eyeball layout or composition; rendered captures of the canvas with or without HUD; a studio shot of one entity alone to judge its model, pose, rig or silhouette; saving a simulated moment to re-render later; an image at a chosen time ("30 seconds in"), headless or in-browser; contact sheets over several steps; frame size and shape; an image to drop in a doc or hand to a person; a frame from a terminal with no tab. Also covers prompting a vision model on a frame. Do NOT trigger for factual queries answerable from engine data (positions, occlusion, entity lists), for editing lights, materials, post-processing, or for changing device size in game.json.
+
+============================================================
+Iteration 3/3
+Description: Use when the user asks to actually SEE something in the running game — "show me", "sketch", "screenshot", "grab a capture", "give me a PNG", "render it", "what does it look like". Trigger on: quick flat-colour sketches to eyeball layout or composition; rendered captures of the canvas with or without HUD; a studio shot of one entity alone to judge its model, pose, rig or silhouette; saving a simulated moment to re-render later; an image at a chosen time ("30 seconds in"), headless or in-browser; contact sheets over several steps; frame size and shape; an image to drop in a doc or hand to a person; a frame from a terminal with no tab. Also covers prompting a vision model on a frame. Do NOT trigger for factual queries answerable from engine data (positions, occlusion, entity lists), for editing lights, materials, post-processing, or for changing device size in game.json.
+============================================================
+Train: 19/33 correct, precision=100% recall=7% accuracy=58% (177.3s)
+  [FAIL] rate=0/3 expected=True: sketch the current level quickly, i just want to eyeball the
+  [FAIL] rate=0/3 expected=True: run the game headless and give me an image at 30 seconds in 
+  [FAIL] rate=1/3 expected=True: save the current simulated moment so i can re-render the sam
+  [FAIL] rate=0/3 expected=True: i need a png of the de_dust2 spawn area to paste into a desi
+  [FAIL] rate=0/3 expected=True: grab me a marked capture of just the terrorist entity so i c
+  [PASS] rate=0/3 expected=False: which entities are currently visible in level1 and where are
+  [PASS] rate=0/3 expected=False: add a bloom pass to the post processing chain
+  [PASS] rate=0/3 expected=False: the level is too dark - raise the ambient light
+  [PASS] rate=0/3 expected=False: my glb model imports but the materials are all default grey
+  [PASS] rate=0/3 expected=False: set the game device to 540x960 portrait in game.json
+  [PASS] rate=0/3 expected=False: is the player occluded by the wall or is it just off camera
+Test : 12/21 correct, precision=100% recall=0% accuracy=57% (0.0s)
+  [FAIL] rate=0/3 expected=True: my art bible says the game is judged at 540x960 but the pngs
+  [FAIL] rate=0/3 expected=True: i dont have an editor tab open on this machine and i still n
+  [FAIL] rate=0/3 expected=True: im about to hand this frame to a cheap vision model to judge
+  [PASS] rate=0/3 expected=False: the muzzle flash particles look wrong - too few and they fad
+  [PASS] rate=0/3 expected=False: theres a grey object around 12,0,4 and i dont know what it i
+  [PASS] rate=0/3 expected=False: generate a sprite sheet for the coin with image generation a
+  [PASS] rate=0/3 expected=False: convert all the pngs under assets to webp for a smaller web 
+
+Max iterations reached (3).
+
+Exit reason: max_iterations (3)
+Best score: 5/7 (iteration 1)
+{
+  "exit_reason": "max_iterations (3)",
+  "original_description": "Produce an actual image of the running game and read it \u00e2\u20ac\u201d sketches, marked captures, saved moments, the size a frame comes out at, and how to prompt a vision model on one. Use only after the data verbs in See cannot answer, because a picture costs about fifty times a query and answers less. Also covers getting a frame from a terminal with no tab of your own.",
+  "best_description": "Produce an actual image of the running game and read it \u00e2\u20ac\u201d sketches, marked captures, saved moments, the size a frame comes out at, and how to prompt a vision model on one. Use only after the data verbs in See cannot answer, because a picture costs about fifty times a query and answers less. Also covers getting a frame from a terminal with no tab of your own.",
+  "best_score": "5/7",
+  "best_train_score": "6/11",
+  "best_test_score": "5/7",
+  "final_description": "Use when the user asks to actually SEE something in the running game \u00e2\u20ac\u201d \"show me\", \"sketch\", \"screenshot\", \"grab a capture\", \"give me a PNG\", \"render it\", \"what does it look like\". Trigger on: quick flat-colour sketches to eyeball layout or composition; rendered captures of the canvas with or without HUD; a studio shot of one entity alone to judge its model, pose, rig or silhouette; saving a simulated moment to re-render later; an image at a chosen time (\"30 seconds in\"), headless or in-browser; contact sheets over several steps; frame size and shape; an image to drop in a doc or hand to a person; a frame from a terminal with no tab. Also covers prompting a vision model on a frame. Do NOT trigger for factual queries answerable from engine data (positions, occlusion, entity lists), for editing lights, materials, post-processing, or for changing device size in game.json.",
+  "iterations_run": 3,
+  "holdout": 0.4,
+  "train_size": 11,
+  "test_size": 7,
+  "history": [
+    {
+      "iteration": 1,
+      "description": "Produce an actual image of the running game and read it \u00e2\u20ac\u201d sketches, marked captures, saved moments, the size a frame comes out at, and how to prompt a vision model on one. Use only after the data verbs in See cannot answer, because a picture costs about fifty times a query and answers less. Also covers getting a frame from a terminal with no tab of your own.",
+      "train_passed": 6,
+      "train_failed": 5,
+      "train_total": 11,
+      "train_results": [
+        {
+          "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "which entities are currently visible in level1 and where are they",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a bloom pass to the post processing chain",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the level is too dark - raise the ambient light",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my glb model imports but the materials are all default grey",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set the game device to 540x960 portrait in game.json",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "is the player occluded by the wall or is it just off camera",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 5,
+      "test_failed": 2,
+      "test_total": 7,
+      "test_results": [
+        {
+          "query": "my art bible says the game is judged at 540x960 but the pngs coming out look like a different shape. what size does a capture actually come out at",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "i dont have an editor tab open on this machine and i still need a frame of the level. whats the procedure",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "im about to hand this frame to a cheap vision model to judge the composition. how should i word the prompt so it doesnt hallucinate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the muzzle flash particles look wrong - too few and they fade too fast",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "theres a grey object around 12,0,4 and i dont know what it is meant to be",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "generate a sprite sheet for the coin with image generation and save it under assets",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "convert all the pngs under assets to webp for a smaller web build",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 6,
+      "failed": 5,
+      "total": 11,
+      "results": [
+        {
+          "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "which entities are currently visible in level1 and where are they",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a bloom pass to the post processing chain",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the level is too dark - raise the ambient light",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my glb model imports but the materials are all default grey",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set the game device to 540x960 portrait in game.json",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "is the player occluded by the wall or is it just off camera",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "description": "Use this skill whenever someone wants to SEE the game \u00e2\u20ac\u201d any request for a picture, image, screenshot, PNG, render, sketch, or capture of a scene, level, entity, or moment. Covers: quick flat-colour sketches to eyeball composition or layout; rendered captures of the canvas, with or without HUD; framing one entity alone in a studio shot to judge its model, pose, or silhouette; saving or replaying a simulated moment so the same frame can be re-rendered later; getting an image at a chosen time (e.g. \"30 seconds in\"), including headless; contact sheets across several steps; naming cameras and views; the pixel size and shape a frame comes out at; producing an image to paste into a doc or share with a person; and getting a rendered frame from a terminal with no tab of your own. Also covers how to ask a vision model about a frame. Prefer engine-data queries first when the question is factual, not visual.",
+      "train_passed": 6,
+      "train_failed": 5,
+      "train_total": 11,
+      "train_results": [
+        {
+          "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "which entities are currently visible in level1 and where are they",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a bloom pass to the post processing chain",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the level is too dark - raise the ambient light",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my glb model imports but the materials are all default grey",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set the game device to 540x960 portrait in game.json",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "is the player occluded by the wall or is it just off camera",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 3,
+      "test_total": 7,
+      "test_results": [
+        {
+          "query": "my art bible says the game is judged at 540x960 but the pngs coming out look like a different shape. what size does a capture actually come out at",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i dont have an editor tab open on this machine and i still need a frame of the level. whats the procedure",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "im about to hand this frame to a cheap vision model to judge the composition. how should i word the prompt so it doesnt hallucinate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the muzzle flash particles look wrong - too few and they fade too fast",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "theres a grey object around 12,0,4 and i dont know what it is meant to be",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "generate a sprite sheet for the coin with image generation and save it under assets",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "convert all the pngs under assets to webp for a smaller web build",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 6,
+      "failed": 5,
+      "total": 11,
+      "results": [
+        {
+          "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "which entities are currently visible in level1 and where are they",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a bloom pass to the post processing chain",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the level is too dark - raise the ambient light",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my glb model imports but the materials are all default grey",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set the game device to 540x960 portrait in game.json",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "is the player occluded by the wall or is it just off camera",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 3,
+      "description": "Use when the user asks to actually SEE something in the running game \u00e2\u20ac\u201d \"show me\", \"sketch\", \"screenshot\", \"grab a capture\", \"give me a PNG\", \"render it\", \"what does it look like\". Trigger on: quick flat-colour sketches to eyeball layout or composition; rendered captures of the canvas with or without HUD; a studio shot of one entity alone to judge its model, pose, rig or silhouette; saving a simulated moment to re-render later; an image at a chosen time (\"30 seconds in\"), headless or in-browser; contact sheets over several steps; frame size and shape; an image to drop in a doc or hand to a person; a frame from a terminal with no tab. Also covers prompting a vision model on a frame. Do NOT trigger for factual queries answerable from engine data (positions, occlusion, entity lists), for editing lights, materials, post-processing, or for changing device size in game.json.",
+      "train_passed": 6,
+      "train_failed": 5,
+      "train_total": 11,
+      "train_results": [
+        {
+          "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "which entities are currently visible in level1 and where are they",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a bloom pass to the post processing chain",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the level is too dark - raise the ambient light",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my glb model imports but the materials are all default grey",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set the game device to 540x960 portrait in game.json",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "is the player occluded by the wall or is it just off camera",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 3,
+      "test_total": 7,
+      "test_results": [
+        {
+          "query": "my art bible says the game is judged at 540x960 but the pngs coming out look like a different shape. what size does a capture actually come out at",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i dont have an editor tab open on this machine and i still need a frame of the level. whats the procedure",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "im about to hand this frame to a cheap vision model to judge the composition. how should i word the prompt so it doesnt hallucinate",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the muzzle flash particles look wrong - too few and they fade too fast",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "theres a grey object around 12,0,4 and i dont know what it is meant to be",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "generate a sprite sheet for the coin with image generation and save it under assets",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "convert all the pngs under assets to webp for a smaller web build",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 6,
+      "failed": 5,
+      "total": 11,
+      "results": [
+        {
+          "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "which entities are currently visible in level1 and where are they",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a bloom pass to the post processing chain",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the level is too dark - raise the ambient light",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my glb model imports but the materials are all default grey",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "set the game device to 540x960 portrait in game.json",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "is the player occluded by the wall or is it just off camera",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

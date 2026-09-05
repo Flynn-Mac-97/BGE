@@ -1,0 +1,74 @@
+[
+  {
+    "query": "i need a png of the de_dust2 spawn area to paste into a design doc for my team",
+    "should_trigger": true
+  },
+  {
+    "query": "grab me a marked capture of just the terrorist entity so i can see whether the rig pose is right",
+    "should_trigger": true
+  },
+  {
+    "query": "run the game headless and give me an image at 30 seconds in - i want to see what the horde density actually looks like by then",
+    "should_trigger": true
+  },
+  {
+    "query": "my art bible says the game is judged at 540x960 but the pngs coming out look like a different shape. what size does a capture actually come out at",
+    "should_trigger": true
+  },
+  {
+    "query": "i dont have an editor tab open on this machine and i still need a frame of the level. whats the procedure",
+    "should_trigger": true
+  },
+  {
+    "query": "save the current simulated moment so i can re-render the same frame later after i change the lighting",
+    "should_trigger": true
+  },
+  {
+    "query": "im about to hand this frame to a cheap vision model to judge the composition. how should i word the prompt so it doesnt hallucinate",
+    "should_trigger": true
+  },
+  {
+    "query": "sketch the current level quickly, i just want to eyeball the composition before i commit the scatter",
+    "should_trigger": true
+  },
+  {
+    "query": "which entities are currently visible in level1 and where are they",
+    "should_trigger": false
+  },
+  {
+    "query": "is the player occluded by the wall or is it just off camera",
+    "should_trigger": false
+  },
+  {
+    "query": "theres a grey object around 12,0,4 and i dont know what it is meant to be",
+    "should_trigger": false
+  },
+  {
+    "query": "add a bloom pass to the post processing chain",
+    "should_trigger": false
+  },
+  {
+    "query": "the level is too dark - raise the ambient light",
+    "should_trigger": false
+  },
+  {
+    "query": "generate a sprite sheet for the coin with image generation and save it under assets",
+    "should_trigger": false
+  },
+  {
+    "query": "convert all the pngs under assets to webp for a smaller web build",
+    "should_trigger": false
+  },
+  {
+    "query": "the muzzle flash particles look wrong - too few and they fade too fast",
+    "should_trigger": false
+  },
+  {
+    "query": "set the game device to 540x960 portrait in game.json",
+    "should_trigger": false
+  },
+  {
+    "query": "my glb model imports but the materials are all default grey",
+    "should_trigger": false
+  }
+]

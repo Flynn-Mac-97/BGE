@@ -1,0 +1,867 @@
+Split: 11 train, 7 test (holdout=0.4)
+
+============================================================
+Iteration 1/3
+Description: What the running game actually shows a player, and what each thing on screen is — answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, when something is hidden or in the wrong place, or instead of reading type files to work out what an object is. To produce an actual image, see the See Frames guide.
+============================================================
+Train: 22/33 correct, precision=100% recall=27% accuracy=67% (130.1s)
+  [FAIL] rate=0/3 expected=True: i simulated 30 seconds of the horde and something is stackin
+  [PASS] rate=2/3 expected=True: my player is meant to be standing behind the crate at 7,0,0 
+  [FAIL] rate=0/3 expected=True: the bombsite marker isnt appearing in de_dust2. is it hidden
+  [FAIL] rate=1/3 expected=True: the terrorist in de_dust2 renders as a plain grey box instea
+  [FAIL] rate=1/3 expected=True: theres some flat brown thing sitting in the middle of my mea
+  [PASS] rate=0/3 expected=False: take a screenshot of the editor window and send it to me
+  [PASS] rate=0/3 expected=False: how do i make the camera follow the player in third person i
+  [PASS] rate=0/3 expected=False: add a beam effect that fires from the rifle when the player 
+  [PASS] rate=0/3 expected=False: whats the right way to prompt a vision model on a frame i al
+  [PASS] rate=0/3 expected=False: rename the coin type to gem everywhere it is referenced
+  [PASS] rate=0/3 expected=False: capture a png of the muzzle flash effect so i can drop it in
+Test : 12/21 correct, precision=100% recall=0% accuracy=57% (0.0s)
+  [FAIL] rate=0/3 expected=True: i scattered 40 coins across a 24x24 area and only about a do
+  [FAIL] rate=0/3 expected=True: before i change the camera zoom, tell me exactly what is vis
+  [FAIL] rate=0/3 expected=True: the crate looks about the same height as the player and it s
+  [PASS] rate=0/3 expected=False: the whole meadow is too dark, i want to raise the ambient an
+  [PASS] rate=0/3 expected=False: the crate is drawing plain grey - is brick.png actually pres
+  [PASS] rate=0/3 expected=False: my levels/main.json wont parse, i think theres a trailing co
+  [PASS] rate=0/3 expected=False: write a test that proves the coin disappears and the score g
+
+Improving description...
+Proposed (9.5s): Use when a question is about what is actually there in the running game world or on screen — and the answer must come from live engine data, not from reading source, type files, or a screenshot. Trigger it for: "what is that thing on screen / in my level", something missing or not appearing (is it hidden, blocked, off-screen, or absent?), something drawn wrong (grey box, flat colour, wrong shape), things overlapping, stacking, floating, or piling up at one spot, and checking positions, counts, sizes, or what blocks what after simulating steps. Also use when a debugging question would otherwise be answered by guessing from code or by eyeballing a picture — query the scene graph instead. Covers identify, describe, find, isolate, occlusion, diff, camera. Do not use for writing gameplay or rendering features, camera or effect authoring, renames, or for capturing/prompting on an image — that is the See Frames guide.
+
+============================================================
+Iteration 2/3
+Description: Use when a question is about what is actually there in the running game world or on screen — and the answer must come from live engine data, not from reading source, type files, or a screenshot. Trigger it for: "what is that thing on screen / in my level", something missing or not appearing (is it hidden, blocked, off-screen, or absent?), something drawn wrong (grey box, flat colour, wrong shape), things overlapping, stacking, floating, or piling up at one spot, and checking positions, counts, sizes, or what blocks what after simulating steps. Also use when a debugging question would otherwise be answered by guessing from code or by eyeballing a picture — query the scene graph instead. Covers identify, describe, find, isolate, occlusion, diff, camera. Do not use for writing gameplay or rendering features, camera or effect authoring, renames, or for capturing/prompting on an image — that is the See Frames guide.
+============================================================
+Train: 22/33 correct, precision=100% recall=27% accuracy=67% (122.6s)
+  [FAIL] rate=1/3 expected=True: i simulated 30 seconds of the horde and something is stackin
+  [FAIL] rate=1/3 expected=True: my player is meant to be standing behind the crate at 7,0,0 
+  [FAIL] rate=0/3 expected=True: the bombsite marker isnt appearing in de_dust2. is it hidden
+  [FAIL] rate=1/3 expected=True: the terrorist in de_dust2 renders as a plain grey box instea
+  [FAIL] rate=1/3 expected=True: theres some flat brown thing sitting in the middle of my mea
+  [PASS] rate=0/3 expected=False: take a screenshot of the editor window and send it to me
+  [PASS] rate=0/3 expected=False: how do i make the camera follow the player in third person i
+  [PASS] rate=0/3 expected=False: add a beam effect that fires from the rifle when the player 
+  [PASS] rate=0/3 expected=False: whats the right way to prompt a vision model on a frame i al
+  [PASS] rate=0/3 expected=False: rename the coin type to gem everywhere it is referenced
+  [PASS] rate=0/3 expected=False: capture a png of the muzzle flash effect so i can drop it in
+Test : 15/21 correct, precision=100% recall=33% accuracy=71% (0.0s)
+  [FAIL] rate=1/3 expected=True: i scattered 40 coins across a 24x24 area and only about a do
+  [PASS] rate=2/3 expected=True: before i change the camera zoom, tell me exactly what is vis
+  [FAIL] rate=0/3 expected=True: the crate looks about the same height as the player and it s
+  [PASS] rate=0/3 expected=False: the whole meadow is too dark, i want to raise the ambient an
+  [PASS] rate=0/3 expected=False: the crate is drawing plain grey - is brick.png actually pres
+  [PASS] rate=0/3 expected=False: my levels/main.json wont parse, i think theres a trailing co
+  [PASS] rate=0/3 expected=False: write a test that proves the coin disappears and the score g
+
+Improving description...
+Proposed (9.4s): Use when debugging the running game: something on screen or in a level looks wrong, is unidentified, is missing, is in the wrong place, is drawn as a plain box or flat colour, or is piling up, overlapping, or stacking after simulation. Use when the user asks "what is that thing", "why isn't X showing", "is it hidden or blocked or just not there", "what is on top of what", or wants positions, counts, sizes, distances, or occlusion checked for real. Answer these by querying the live engine scene graph — identify, describe, find, isolate, occlusion, diff, camera — never by reading type files, guessing from source, or looking at a screenshot. Do not use for authoring gameplay, camera, or effect features, for renames, or for capturing an image or prompting a vision model on one — that is the See Frames guide.
+
+============================================================
+Iteration 3/3
+Description: Use when debugging the running game: something on screen or in a level looks wrong, is unidentified, is missing, is in the wrong place, is drawn as a plain box or flat colour, or is piling up, overlapping, or stacking after simulation. Use when the user asks "what is that thing", "why isn't X showing", "is it hidden or blocked or just not there", "what is on top of what", or wants positions, counts, sizes, distances, or occlusion checked for real. Answer these by querying the live engine scene graph — identify, describe, find, isolate, occlusion, diff, camera — never by reading type files, guessing from source, or looking at a screenshot. Do not use for authoring gameplay, camera, or effect features, for renames, or for capturing an image or prompting a vision model on one — that is the See Frames guide.
+============================================================
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Warning: query failed: [Errno 28] No space left on device
+Train: 24/33 correct, precision=100% recall=40% accuracy=73% (100.7s)
+  [FAIL] rate=1/3 expected=True: i simulated 30 seconds of the horde and something is stackin
+  [FAIL] rate=1/3 expected=True: my player is meant to be standing behind the crate at 7,0,0 
+  [FAIL] rate=1/3 expected=True: the bombsite marker isnt appearing in de_dust2. is it hidden
+  [PASS] rate=2/3 expected=True: the terrorist in de_dust2 renders as a plain grey box instea
+  [FAIL] rate=1/3 expected=True: theres some flat brown thing sitting in the middle of my mea
+  [PASS] rate=0/3 expected=False: take a screenshot of the editor window and send it to me
+  [PASS] rate=0/3 expected=False: how do i make the camera follow the player in third person i
+  [PASS] rate=0/3 expected=False: add a beam effect that fires from the rifle when the player 
+  [PASS] rate=0/3 expected=False: whats the right way to prompt a vision model on a frame i al
+  [PASS] rate=0/3 expected=False: rename the coin type to gem everywhere it is referenced
+  [PASS] rate=0/3 expected=False: capture a png of the muzzle flash effect so i can drop it in
+Test : 14/21 correct, precision=100% recall=22% accuracy=67% (0.0s)
+  [FAIL] rate=1/3 expected=True: i scattered 40 coins across a 24x24 area and only about a do
+  [FAIL] rate=1/3 expected=True: before i change the camera zoom, tell me exactly what is vis
+  [FAIL] rate=0/3 expected=True: the crate looks about the same height as the player and it s
+  [PASS] rate=0/3 expected=False: the whole meadow is too dark, i want to raise the ambient an
+  [PASS] rate=0/3 expected=False: the crate is drawing plain grey - is brick.png actually pres
+  [PASS] rate=0/3 expected=False: my levels/main.json wont parse, i think theres a trailing co
+  [PASS] rate=0/3 expected=False: write a test that proves the coin disappears and the score g
+
+Max iterations reached (3).
+
+Exit reason: max_iterations (3)
+Best score: 5/7 (iteration 2)
+{
+  "exit_reason": "max_iterations (3)",
+  "original_description": "What the running game actually shows a player, and what each thing on screen is \u00e2\u20ac\u201d answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, when something is hidden or in the wrong place, or instead of reading type files to work out what an object is. To produce an actual image, see the See Frames guide.",
+  "best_description": "Use when a question is about what is actually there in the running game world or on screen \u00e2\u20ac\u201d and the answer must come from live engine data, not from reading source, type files, or a screenshot. Trigger it for: \"what is that thing on screen / in my level\", something missing or not appearing (is it hidden, blocked, off-screen, or absent?), something drawn wrong (grey box, flat colour, wrong shape), things overlapping, stacking, floating, or piling up at one spot, and checking positions, counts, sizes, or what blocks what after simulating steps. Also use when a debugging question would otherwise be answered by guessing from code or by eyeballing a picture \u00e2\u20ac\u201d query the scene graph instead. Covers identify, describe, find, isolate, occlusion, diff, camera. Do not use for writing gameplay or rendering features, camera or effect authoring, renames, or for capturing/prompting on an image \u00e2\u20ac\u201d that is the See Frames guide.",
+  "best_score": "5/7",
+  "best_train_score": "6/11",
+  "best_test_score": "5/7",
+  "final_description": "Use when debugging the running game: something on screen or in a level looks wrong, is unidentified, is missing, is in the wrong place, is drawn as a plain box or flat colour, or is piling up, overlapping, or stacking after simulation. Use when the user asks \"what is that thing\", \"why isn't X showing\", \"is it hidden or blocked or just not there\", \"what is on top of what\", or wants positions, counts, sizes, distances, or occlusion checked for real. Answer these by querying the live engine scene graph \u00e2\u20ac\u201d identify, describe, find, isolate, occlusion, diff, camera \u00e2\u20ac\u201d never by reading type files, guessing from source, or looking at a screenshot. Do not use for authoring gameplay, camera, or effect features, for renames, or for capturing an image or prompting a vision model on one \u00e2\u20ac\u201d that is the See Frames guide.",
+  "iterations_run": 3,
+  "holdout": 0.4,
+  "train_size": 11,
+  "test_size": 7,
+  "history": [
+    {
+      "iteration": 1,
+      "description": "What the running game actually shows a player, and what each thing on screen is \u00e2\u20ac\u201d answered from engine data, never a screenshot. Use when the code says one thing and the screen may say another, when something on screen is unidentified, when something is hidden or in the wrong place, or instead of reading type files to work out what an object is. To produce an actual image, see the See Frames guide.",
+      "train_passed": 7,
+      "train_failed": 4,
+      "train_total": 11,
+      "train_results": [
+        {
+          "query": "i simulated 30 seconds of the horde and something is stacking up in one spot. can you find out what is on top of what",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "my player is meant to be standing behind the crate at 7,0,0 but i cant tell if its actually occluded or just off camera. is there a way to check that properly",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the bombsite marker isnt appearing in de_dust2. is it hidden behind the wall geometry or is it just not in the level at all",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the terrorist in de_dust2 renders as a plain grey box instead of the glb. i havent changed the model file. how do i work out what is actually being drawn there",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "theres some flat brown thing sitting in the middle of my meadow level and i genuinely dont know what object it is. can you tell me what that is without me opening every type file",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "take a screenshot of the editor window and send it to me",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "how do i make the camera follow the player in third person instead of the flat ortho follow",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a beam effect that fires from the rifle when the player shoots",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "whats the right way to prompt a vision model on a frame i already captured",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "rename the coin type to gem everywhere it is referenced",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "capture a png of the muzzle flash effect so i can drop it in the readme",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 3,
+      "test_total": 7,
+      "test_results": [
+        {
+          "query": "i scattered 40 coins across a 24x24 area and only about a dozen show up on screen. are the rest off camera or did they never spawn",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "before i change the camera zoom, tell me exactly what is visible in level1 right now - ids, positions, sizes",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the crate looks about the same height as the player and it shouldnt. whats the actual drawn size of each of them",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the whole meadow is too dark, i want to raise the ambient and add a sun",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the crate is drawing plain grey - is brick.png actually present under assets or is the reference wrong",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my levels/main.json wont parse, i think theres a trailing comma somewhere near the entities array",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a test that proves the coin disappears and the score goes up when the player touches it",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 7,
+      "failed": 4,
+      "total": 11,
+      "results": [
+        {
+          "query": "i simulated 30 seconds of the horde and something is stacking up in one spot. can you find out what is on top of what",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "my player is meant to be standing behind the crate at 7,0,0 but i cant tell if its actually occluded or just off camera. is there a way to check that properly",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the bombsite marker isnt appearing in de_dust2. is it hidden behind the wall geometry or is it just not in the level at all",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the terrorist in de_dust2 renders as a plain grey box instead of the glb. i havent changed the model file. how do i work out what is actually being drawn there",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "theres some flat brown thing sitting in the middle of my meadow level and i genuinely dont know what object it is. can you tell me what that is without me opening every type file",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "take a screenshot of the editor window and send it to me",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "how do i make the camera follow the player in third person instead of the flat ortho follow",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a beam effect that fires from the rifle when the player shoots",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "whats the right way to prompt a vision model on a frame i already captured",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "rename the coin type to gem everywhere it is referenced",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "capture a png of the muzzle flash effect so i can drop it in the readme",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "description": "Use when a question is about what is actually there in the running game world or on screen \u00e2\u20ac\u201d and the answer must come from live engine data, not from reading source, type files, or a screenshot. Trigger it for: \"what is that thing on screen / in my level\", something missing or not appearing (is it hidden, blocked, off-screen, or absent?), something drawn wrong (grey box, flat colour, wrong shape), things overlapping, stacking, floating, or piling up at one spot, and checking positions, counts, sizes, or what blocks what after simulating steps. Also use when a debugging question would otherwise be answered by guessing from code or by eyeballing a picture \u00e2\u20ac\u201d query the scene graph instead. Covers identify, describe, find, isolate, occlusion, diff, camera. Do not use for writing gameplay or rendering features, camera or effect authoring, renames, or for capturing/prompting on an image \u00e2\u20ac\u201d that is the See Frames guide.",
+      "train_passed": 6,
+      "train_failed": 5,
+      "train_total": 11,
+      "train_results": [
+        {
+          "query": "i simulated 30 seconds of the horde and something is stacking up in one spot. can you find out what is on top of what",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "my player is meant to be standing behind the crate at 7,0,0 but i cant tell if its actually occluded or just off camera. is there a way to check that properly",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the bombsite marker isnt appearing in de_dust2. is it hidden behind the wall geometry or is it just not in the level at all",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the terrorist in de_dust2 renders as a plain grey box instead of the glb. i havent changed the model file. how do i work out what is actually being drawn there",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "theres some flat brown thing sitting in the middle of my meadow level and i genuinely dont know what object it is. can you tell me what that is without me opening every type file",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "take a screenshot of the editor window and send it to me",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "how do i make the camera follow the player in third person instead of the flat ortho follow",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a beam effect that fires from the rifle when the player shoots",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "whats the right way to prompt a vision model on a frame i already captured",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "rename the coin type to gem everywhere it is referenced",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "capture a png of the muzzle flash effect so i can drop it in the readme",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 5,
+      "test_failed": 2,
+      "test_total": 7,
+      "test_results": [
+        {
+          "query": "i scattered 40 coins across a 24x24 area and only about a dozen show up on screen. are the rest off camera or did they never spawn",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "before i change the camera zoom, tell me exactly what is visible in level1 right now - ids, positions, sizes",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the crate looks about the same height as the player and it shouldnt. whats the actual drawn size of each of them",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the whole meadow is too dark, i want to raise the ambient and add a sun",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the crate is drawing plain grey - is brick.png actually present under assets or is the reference wrong",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my levels/main.json wont parse, i think theres a trailing comma somewhere near the entities array",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a test that proves the coin disappears and the score goes up when the player touches it",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 6,
+      "failed": 5,
+      "total": 11,
+      "results": [
+        {
+          "query": "i simulated 30 seconds of the horde and something is stacking up in one spot. can you find out what is on top of what",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "my player is meant to be standing behind the crate at 7,0,0 but i cant tell if its actually occluded or just off camera. is there a way to check that properly",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the bombsite marker isnt appearing in de_dust2. is it hidden behind the wall geometry or is it just not in the level at all",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the terrorist in de_dust2 renders as a plain grey box instead of the glb. i havent changed the model file. how do i work out what is actually being drawn there",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "theres some flat brown thing sitting in the middle of my meadow level and i genuinely dont know what object it is. can you tell me what that is without me opening every type file",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "take a screenshot of the editor window and send it to me",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "how do i make the camera follow the player in third person instead of the flat ortho follow",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a beam effect that fires from the rifle when the player shoots",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "whats the right way to prompt a vision model on a frame i already captured",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "rename the coin type to gem everywhere it is referenced",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "capture a png of the muzzle flash effect so i can drop it in the readme",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 3,
+      "description": "Use when debugging the running game: something on screen or in a level looks wrong, is unidentified, is missing, is in the wrong place, is drawn as a plain box or flat colour, or is piling up, overlapping, or stacking after simulation. Use when the user asks \"what is that thing\", \"why isn't X showing\", \"is it hidden or blocked or just not there\", \"what is on top of what\", or wants positions, counts, sizes, distances, or occlusion checked for real. Answer these by querying the live engine scene graph \u00e2\u20ac\u201d identify, describe, find, isolate, occlusion, diff, camera \u00e2\u20ac\u201d never by reading type files, guessing from source, or looking at a screenshot. Do not use for authoring gameplay, camera, or effect features, for renames, or for capturing an image or prompting a vision model on one \u00e2\u20ac\u201d that is the See Frames guide.",
+      "train_passed": 7,
+      "train_failed": 4,
+      "train_total": 11,
+      "train_results": [
+        {
+          "query": "i simulated 30 seconds of the horde and something is stacking up in one spot. can you find out what is on top of what",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "my player is meant to be standing behind the crate at 7,0,0 but i cant tell if its actually occluded or just off camera. is there a way to check that properly",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the bombsite marker isnt appearing in de_dust2. is it hidden behind the wall geometry or is it just not in the level at all",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the terrorist in de_dust2 renders as a plain grey box instead of the glb. i havent changed the model file. how do i work out what is actually being drawn there",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "theres some flat brown thing sitting in the middle of my meadow level and i genuinely dont know what object it is. can you tell me what that is without me opening every type file",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "take a screenshot of the editor window and send it to me",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "how do i make the camera follow the player in third person instead of the flat ortho follow",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a beam effect that fires from the rifle when the player shoots",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "whats the right way to prompt a vision model on a frame i already captured",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "rename the coin type to gem everywhere it is referenced",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "capture a png of the muzzle flash effect so i can drop it in the readme",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 3,
+      "test_total": 7,
+      "test_results": [
+        {
+          "query": "i scattered 40 coins across a 24x24 area and only about a dozen show up on screen. are the rest off camera or did they never spawn",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "before i change the camera zoom, tell me exactly what is visible in level1 right now - ids, positions, sizes",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the crate looks about the same height as the player and it shouldnt. whats the actual drawn size of each of them",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the whole meadow is too dark, i want to raise the ambient and add a sun",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "the crate is drawing plain grey - is brick.png actually present under assets or is the reference wrong",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "my levels/main.json wont parse, i think theres a trailing comma somewhere near the entities array",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "write a test that proves the coin disappears and the score goes up when the player touches it",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ],
+      "passed": 7,
+      "failed": 4,
+      "total": 11,
+      "results": [
+        {
+          "query": "i simulated 30 seconds of the horde and something is stacking up in one spot. can you find out what is on top of what",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "my player is meant to be standing behind the crate at 7,0,0 but i cant tell if its actually occluded or just off camera. is there a way to check that properly",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the bombsite marker isnt appearing in de_dust2. is it hidden behind the wall geometry or is it just not in the level at all",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "the terrorist in de_dust2 renders as a plain grey box instead of the glb. i havent changed the model file. how do i work out what is actually being drawn there",
+          "should_trigger": true,
+          "trigger_rate": 0.6666666666666666,
+          "triggers": 2,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "theres some flat brown thing sitting in the middle of my meadow level and i genuinely dont know what object it is. can you tell me what that is without me opening every type file",
+          "should_trigger": true,
+          "trigger_rate": 0.3333333333333333,
+          "triggers": 1,
+          "runs": 3,
+          "pass": false
+        },
+        {
+          "query": "take a screenshot of the editor window and send it to me",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "how do i make the camera follow the player in third person instead of the flat ortho follow",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "add a beam effect that fires from the rifle when the player shoots",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "whats the right way to prompt a vision model on a frame i already captured",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "rename the coin type to gem everywhere it is referenced",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        },
+        {
+          "query": "capture a png of the muzzle flash effect so i can drop it in the readme",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 3,
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

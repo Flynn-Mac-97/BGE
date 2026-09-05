@@ -184,11 +184,6 @@ not for looking at a game. To look at a game headless, use `see.sketch`.
 
 ## Reading a frame with a vision model
 
-Never phrase a question to a vision model as a negative — "which of these
-is NOT a rat", "is anything missing". Models answer negation at chance and
-say yes to almost any "is there an X" question. Ask the positive form and
-compare it against the sidecar; absence is a query, not a look.
-
 - Send the PNG and its `.json` sidecar together. The sidecar is ground truth
   for the fields it lists and silent on everything else. Where the sidecar
   and the picture disagree about something the sidecar measures, the sidecar
