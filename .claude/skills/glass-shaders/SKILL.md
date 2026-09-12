@@ -29,15 +29,15 @@ description: The sample shelf of node shaders — fresnel, aura, waves, hologram
 
 ## What they need to read properly
 
-- **`fresnel` needs curved geometry.** A box has one normal per face, so it
+- **`fresnel` needs `sphere` or a model.** A box has one normal per face, so it
   takes one flat shade per face rather than a rim. It is not an outline and
   will not draw one.
 - **`aura` is softest at the middle of each face**, so on a box it reads as one
   glow per face rather than one shell around the whole thing.
 - **`aura` and `hologram` add their light** to what is behind them. Over an
   empty background they add to nothing and disappear. Give the level a `sky`.
-- **`waves` moves vertices**, so it needs a mesh with some to move. A flat slab
-  works; a two-triangle quad does not.
+- **`waves` moves vertices**, so the mesh needs some: `"segments": 64` on a
+  quad. The default of 1 gives four corners and nothing to displace.
 
 ## Determinism
 

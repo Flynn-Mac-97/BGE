@@ -11,11 +11,16 @@ game made of boxes.
 | a character, creature, weapon, vehicle | **Blender** — model, export GLB to `<project>/assets/`, then `mesh: { model: '...' }` | high, and the only thing that reads as a model |
 | a prop with a real silhouette | **Blender**, or search a free library first | medium |
 | a composite of a few solids — a fence, a crate stack | `mesh: { parts: [...] }`, boxes with local `at` and `rotation` | low |
+| a ball, a dome, a planet, anything that curves | `mesh: { sphere: r }` or `sphere: [x, y, z]` | none |
 | a wall, floor, slab, blockout | `mesh: { box: [...] }` | none |
 
 Blender needs the GUI open and **BlenderMCP → Connect** pressed. If it is not
 connected, say so and ask — do not silently fall back to boxes. Boxes cost more
 tokens than a model and read worse.
+
+**`segments` subdivides a shape.** One by default, which is all a wall needs.
+Raise it only for a material that moves vertices — a 4-vertex quad has nothing
+to displace, so a wave shader on one does nothing at all.
 
 `rotation` in a level is in degrees. A bare number is yaw; `[x, y, z]` is pitch,
 yaw and roll, the same form `mesh.parts` takes.

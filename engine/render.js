@@ -599,6 +599,17 @@ function partsOf(declared, where = 'mesh') {
  * how big it is. A metre cube is the last resort, and it is deliberately a size
  * you can see rather than nothing at all.
  */
+/**
+ * How finely a shape is divided, from the declaration.
+ *
+ * One by default, because a wall wants four vertices and not four hundred. It
+ * is only worth raising for a material that moves them.
+ */
+function subdivisionOf(declared, entity) {
+  if (declared.segments === undefined) return 1
+  return number(declared.segments, 1, `${entity.type}.mesh.segments`)
+}
+
 function meshShape(entity) {
   const declared = meshOf(entity)
   if (!declared) return null
@@ -620,14 +631,25 @@ function meshShape(entity) {
   // went wrong when something did. This runs for every mesh entity every frame,
   // and a template string per dimension per frame is a hundred thousand
   // throwaway strings a second on a real map.
+  // A ball, or an ellipsoid when given three numbers. The engine had a box, a
+  // quad and a model, so nothing in a level could curve — and a material that
+  // shades by viewing angle has nothing to shade.
+  if (declared.sphere !== undefined) {
+    const said = Array.isArray(declared.sphere) ? declared.sphere : [declared.sphere, declared.sphere, declared.sphere]
+    const r = index => number(said[index], 0.5, `${entity.type}.mesh.sphere[${index}]`) * 2
+    return { kind: 'sphere', w: r(0), h: r(1), d: r(2), segments: subdivisionOf(declared, entity) }
+  }
+
   if (Array.isArray(declared.quad)) {
     const w = declared.quad[0], h = declared.quad[1]
-    if (Number.isFinite(w) && Number.isFinite(h)) return { kind: 'quad', w, h, d: 0 }
+    const segments = subdivisionOf(declared, entity)
+    if (Number.isFinite(w) && Number.isFinite(h)) return { kind: 'quad', w, h, d: 0, segments }
     return {
       kind: 'quad',
       w: number(w, 1, `${entity.type}.mesh.quad[0]`),
       h: number(h, 1, `${entity.type}.mesh.quad[1]`),
-      d: 0
+      d: 0,
+      segments
     }
   }
 
@@ -648,7 +670,7 @@ function meshShape(entity) {
     return { kind: 'box', w: 1, h: 1, d: 1 }
   }
   const w = box[0], h = box[1], d = box[2]
-  if (Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(d)) return { kind: 'box', w, h, d }
+  if (Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(d)) return { kind: 'box', w, h, d, segments: subdivisionOf(declared, entity) }
   const where = declaredBox ? `${entity.type}.mesh.box` : `${entity.type}.collider.box`
   return {
     kind: 'box',
@@ -732,11 +754,20 @@ const PLANE = new THREE.PlaneGeometry(1, 1)
  */
 const geometryCache = new Map()
 
-function solid(kind, w, h, d) {
-  const key = `${kind}:${w},${h},${d}`
+function solid(kind, w, h, d, segments = 1) {
+  const parts = Math.max(1, Math.min(96, Math.round(segments) || 1))
+  const key = `${kind}:${w},${h},${d}:${parts}`
   const cached = geometryCache.get(key)
   if (cached) return cached
-  const geometry = kind === 'quad' ? new THREE.PlaneGeometry(w, h) : new THREE.BoxGeometry(w, h, d)
+  // A vertex shader can only move vertices that exist, so `segments` is what
+  // makes a displacing material possible at all. Capped: past a point the
+  // triangles cost more than the shape is worth, and an author who types a
+  // thousand meant a hundred.
+  const geometry =
+    kind === 'sphere' ? new THREE.SphereGeometry(0.5, Math.max(8, parts * 2), Math.max(6, parts))
+      .scale(w, h, d)
+    : kind === 'quad' ? new THREE.PlaneGeometry(w, h, parts, parts)
+    : new THREE.BoxGeometry(w, h, d, parts, parts, parts)
   // The second UV set is copied off the first BEFORE it is rewritten in metres,
   // so it is still the 0..1 parameterisation a baked lightmap wants. Two floats
   // per vertex on geometry that is already shared by every wall of this size is
@@ -760,6 +791,9 @@ function solid(kind, w, h, d) {
 function measureUVsInMetres(geometry, kind, w, h, d) {
   const uv = geometry.attributes.uv
   // Face order is the order BoxGeometry builds them in: +X, -X, +Y, -Y, +Z, -Z.
+  // A sphere is one continuous surface with one UV wrap; measuring it in metres
+  // per "face" would tear it at the seam.
+  if (kind === 'sphere') return
   const faces = kind === 'quad' ? [[w, h]] : [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]
   const perFace = uv.count / faces.length
   for (let i = 0; i < uv.count; i++) {
@@ -1333,7 +1367,7 @@ export async function makeRenderer(canvas, view, viewport) {
 
   /** Keys that describe the shape or choose the material, rather than tune it. */
   const SHAPE_KEYS = new Set([
-    'box', 'quad', 'model', 'scale', 'material', 'unlit', 'tiling',
+    'box', 'quad', 'sphere', 'segments', 'model', 'scale', 'material', 'unlit', 'tiling',
     // A part says where it is and which way it is turned. Both describe shape,
     // and a key left out of this set is stringified into the material key on
     // every part of every frame — which would also give twelve identically
@@ -1528,7 +1562,8 @@ export async function makeRenderer(canvas, view, viewport) {
   const geometryFor = entity => {
     const shape = meshShape(entity)
     if (!shape) return PLANE
-    return solid(shape.kind === 'quad' ? 'quad' : 'box', shape.w, shape.h, shape.d)
+    const kind = shape.kind === 'quad' || shape.kind === 'sphere' ? shape.kind : 'box'
+    return solid(kind, shape.w, shape.h, shape.d, shape.segments)
   }
 
   // --------------------------------------------------------- building objects
