@@ -181,6 +181,24 @@ function frontmatterOf(guide) {
 const bodyOf = guide => guide.replace(/^---\s*\n[\s\S]*?\n---\s*/, '')
 
 /**
+ * Every detail file beside a guide, joined.
+ *
+ * A guide keeps its interface and puts the rest in `<stem>.agent/`, so a check
+ * that read only the guide would call a verb documented there undocumented.
+ * Not part of the skill — the whole point is that an agent opens one of these
+ * only when its task needs it.
+ */
+async function detailOf(directory, stem) {
+  const detailDirectory = path.join(directory, `${stem}.agent`)
+  const names = await fs.readdir(detailDirectory).catch(() => [])
+  const parts = []
+  for (const name of names.filter(name => name.endsWith('.md')).sort()) {
+    parts.push(await fs.readFile(path.join(detailDirectory, name), 'utf8').catch(() => ''))
+  }
+  return parts.join('\n')
+}
+
+/**
  * Every plugin guide on disk, with what it declares and whether its plugin runs.
  *
  * `file` is named from the plugin's own scope, which is how the manifest node
@@ -212,7 +230,8 @@ export async function pluginGuides(root, projectPath) {
         plugin: pluginName,
         enabled: !disabled.has(pluginName),
         frontmatter: frontmatterOf(text),
-        body: bodyOf(text)
+        body: bodyOf(text),
+        detail: await detailOf(place.directory, stem)
       })
     }
   }
@@ -504,10 +523,11 @@ function commandIds(source) {
 }
 
 /**
- * Commands a plugin registers that its own guide never names.
+ * Commands a plugin registers that neither its guide nor its detail files name.
  *
  * The guide is what an agent reads before its first call, so a verb missing
- * from it is a verb nothing will use.
+ * from it is a verb nothing will use. Detail counts: the guide's index points
+ * at it, so a verb documented there is still reachable.
  *
  * A warning, not a failure: a plugin may register something deliberately
  * internal, and a guide is prose that cannot be generated from an id.
@@ -518,7 +538,8 @@ export async function undocumentedCommandProblems(root, projectPath) {
     if (!guide.enabled || !guide.hasSource) continue
     const source = await fs.readFile(path.join(root, guide.sourceFromRoot), 'utf8').catch(() => null)
     if (source === null) continue
-    const missing = [...new Set(commandIds(source))].filter(id => !guide.body.includes(id)).sort()
+    const documented = `${guide.body}\n${guide.detail}`
+    const missing = [...new Set(commandIds(source))].filter(id => !documented.includes(id)).sort()
     if (!missing.length) continue
     problems.push({
       warning: true,

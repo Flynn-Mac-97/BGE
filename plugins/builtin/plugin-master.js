@@ -15,9 +15,21 @@
 /** Past this, split it. Roughly twice the median builtin, so it flags the tail. */
 const BIG = 400
 
+/**
+ * Past this, a guide moves its detail into `<stem>.agent/` and keeps only the
+ * interface.
+ *
+ * Measured in characters of the body, not lines: a table packs several times
+ * the text of a bullet into one line, so a line count ranks a dense guide as
+ * small. 3000 characters is about 750 tokens, and a skill file is the whole
+ * body — every agent that opens it pays for detail its task may not need.
+ */
+const GUIDE_BIG = 3000
+
 const info = () => ({
-  measures: 'lines of each plugin and its guide, in plugins/builtin and <project>/plugins',
+  measures: 'lines of each plugin, characters of each guide, in plugins/builtin and <project>/plugins',
   big: BIG,
+  guideBig: GUIDE_BIG,
   run: 'node bin/engine.mjs --headless run plugin.sizes'
 })
 
@@ -29,6 +41,10 @@ const info = () => ({
  * game can use it. The title is the cheapest handle on "this game's nouns" that
  * does not need a list nobody maintains.
  */
+
+/** A guide without its frontmatter. The body is what a skill and a packet carry. */
+const guideBody = guide => guide.replace(/^---[\s\S]*?^---\s*/m, '').trim()
+
 async function gameWords(root, directory, join, readFile) {
   try {
     const game = JSON.parse(await readFile(join(root, directory, 'game.json'), 'utf8'))
@@ -67,6 +83,40 @@ async function measure(directory) {
   return out
 }
 
+/**
+ * Every text a skill is generated from, measured on its own.
+ *
+ * Walked by guide rather than by plugin, because a guide need not have a plugin
+ * file beside it: See Frames documents part of See, and Kimodo documents an
+ * external tool. Measuring through the plugin list would skip exactly those.
+ *
+ * `agents/skills/` is included: those are hand-written skills the manifest
+ * registers, and an agent pays for their body on the same terms.
+ */
+async function measureGuides(directory) {
+  const { readdir, readFile } = await import('node:fs/promises')
+  const { join, dirname } = await import('node:path')
+  const { fileURLToPath } = await import('node:url')
+
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
+  const out = []
+  for (const place of ['plugins/builtin', `${directory}/plugins`]) {
+    const full = join(root, place)
+    for (const name of (await readdir(full).catch(() => [])).sort()) {
+      if (!name.endsWith('.agent.md')) continue
+      const text = await readFile(join(full, name), 'utf8').catch(() => '')
+      out.push({ guide: `${place}/${name}`, characters: guideBody(text).length })
+    }
+  }
+  for (const name of (await readdir(join(root, 'agents/skills'), { withFileTypes: true }).catch(() => []))) {
+    if (!name.isDirectory()) continue
+    const file = `agents/skills/${name.name}/SKILL.md`
+    const text = await readFile(join(root, file), 'utf8').catch(() => null)
+    if (text !== null) out.push({ guide: file, characters: guideBody(text).length })
+  }
+  return out
+}
+
 /** Lines of real code that mention one of the game's words, with the word. */
 function gameNouns(source, words) {
   if (!words.length) return []
@@ -99,6 +149,11 @@ export default {
       const all = await measure(context.editor.projectDirectory)
       const over = all.filter(entry => entry.lines > BIG).sort((a, b) => b.lines - a.lines)
       const unguided = all.filter(entry => !entry.guide).map(entry => entry.plugin)
+      // A guide past the limit is paid by every agent that opens its skill, whether
+      // or not the task needs the detail. Its overflow belongs in `<stem>.agent/`.
+      const guidesOver = (await measureGuides(context.editor.projectDirectory))
+        .filter(entry => entry.characters > GUIDE_BIG)
+        .sort((first, second) => second.characters - first.characters)
       // The Plugin Browser groups by category, and one that declares none is
       // listed under "uncategorised" — read by a person as a plugin nobody
       // could place rather than as a missing field.
@@ -108,14 +163,17 @@ export default {
         .map(entry => ({ plugin: entry.plugin, at: entry.names }))
       return {
         big: BIG,
+        guideBig: GUIDE_BIG,
         counted: all.length,
         // A guide is how an agent uses a plugin without reading it, so a plugin
         // without one costs its whole length to understand at all.
         unguided,
         uncategorised,
         over: over.map(entry => ({ plugin: entry.plugin, lines: entry.lines })),
+        guidesOver,
         branded,
-        ok: over.length === 0 && unguided.length === 0 && branded.length === 0 && uncategorised.length === 0
+        ok: over.length === 0 && unguided.length === 0 && branded.length === 0 &&
+          uncategorised.length === 0 && guidesOver.length === 0
       }
     }
   }]
