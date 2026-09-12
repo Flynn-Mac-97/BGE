@@ -16,6 +16,8 @@
     "test:agent": "node --test test/agent-workspace.test.mjs"
   },
   "dependencies": {
+    "@dimforge/rapier2d-deterministic-compat": "^0.20.0",
+    "@dimforge/rapier3d-deterministic-compat": "^0.20.0",
     "three": "^0.186.0"
   },
   "devDependencies": {

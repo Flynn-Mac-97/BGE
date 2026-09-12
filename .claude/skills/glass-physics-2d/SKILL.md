@@ -6,13 +6,14 @@ description: Solid bodies, collision and gravity in a 2D side-on or top-down gam
 
 # Physics 2D
 
+- **There is a second solver.** Rapier 2D fills this same contract and adds
+  rotation, mass, friction and sleeping. `run rapier2d.use` switches. Read
+  `plugins/builtin/rapier-2d.agent.md` before choosing.
 - **The collider shape decides who owns an entity.** A `collider.box` of two
   numbers is 2D and belongs here; three numbers is 3D and belongs to Physics
   3D. Two plugins, disjoint sets of entities, nothing to configure.
 - Runs on the fixed step, so `onCollide` fires deterministically and game code
   never has to learn what a fixed step is.
-- Swappable: disable it and enable Rapier or Box2D instead. The collision
-  contract below is the only thing that has to match.
 
 ## What an entity declares
 

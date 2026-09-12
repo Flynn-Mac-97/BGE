@@ -6,11 +6,14 @@ description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use w
 
 # Physics 3D
 
+- **There is a second solver.** Rapier 3D fills this same contract and adds
+  rotation, mass, friction and sleeping. `run rapier3d.use` switches. Read
+  `plugins/builtin/rapier-3d.agent.md` before choosing.
 - **The collider shape decides who owns an entity.** A `collider.box` of three
   numbers is 3D and belongs here; two numbers belongs to Physics 2D. Nothing to
   configure, and no flag anyone can forget to set.
-- Runs on the fixed step, so `onCollide` fires deterministically and a ray fired
-  from an update hook sees the same world on every replay.
+- Runs on the fixed step, so `onCollide` fires deterministically and a ray sees
+  the same world on every replay.
 - Everything is metres, converted once here: gravity is `-20.32`, a step
   is `0.46`.
 
@@ -34,10 +37,10 @@ description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use w
 ## What it writes back
 
 `entity.velocityX`, `velocityY`, `velocityZ`, zeroed on the axis it resolved,
-and `entity.grounded` when the body was pushed out of the top of a solid.
+and `entity.grounded` when pushed out of the top of a solid.
 
-A body only steps up while it is already grounded, so stepping is not a way to
-climb through the air.
+A body only steps up while already grounded, so stepping is not a way to climb
+through the air.
 
 ## Verbs on context
 
@@ -48,18 +51,17 @@ climb through the air.
 ## Contacts
 
 Reported **once, on the step a contact begins**, through `world.hook`, so a
-behaviour can answer `onCollide` and the rule need not be written into every
-type. A level reload forgets them, so the new level gets its own first one.
+behaviour can answer `onCollide` rather than every type carrying the rule. A
+level reload forgets them.
 
 ## What it refuses, and why
 
 - A vector with a component that is not a finite number is **refused, never
-  repaired**. There is no safe default for where a shot came from; a zeroed
-  coordinate returns a confident, precise, wrong answer at the world origin.
-- `canStand` with a height that is not a positive number refuses, rather than
-  standing a player inside a ceiling on room nobody measured.
-- `ignore` takes an entity, an id, or a list of either. A bare id string is the
-  shape everyone types first and it works.
+  repaired**. A zeroed coordinate returns a confident, precise, wrong answer at
+  the world origin.
+- `canStand` with a height that is not positive refuses, rather than standing a
+  player inside a ceiling on room nobody measured.
+- `ignore` takes an entity, an id, or a list of either.
 - A ray fired from an entity id skips it, so a shooter never hits itself.
 
 ## Commands
@@ -72,7 +74,7 @@ type. A level reload forgets them, so the new level gets its own first one.
 
 0.5 ms for 200 dynamic bodies, 6.4 ms for 2000, over budget past that. Solids
 and triggers are near free. A raycast scans every 3D collider, so cast for a
-shot, not for every bot every step. `run profile.steps` measures it.
+shot, not for every bot every step. Measure with `run profile.steps`.
 
 ## Detail
 
