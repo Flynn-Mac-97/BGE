@@ -102,7 +102,7 @@ function attach(context) {
 
   // Three loads on demand, like the other viewport plugins: a world with
   // nothing drawing must not pay to parse a renderer library.
-  import('three').then(THREEModule => {
+  import('three/webgpu').then(THREEModule => {
     THREE = THREEModule
     gizmo = buildGizmo(THREE, renderer.scene)
     renderer.scene.add(gizmo.group)

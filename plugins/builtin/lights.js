@@ -643,7 +643,7 @@ function syncLights(state) {
 function threeModule(state) {
   if (state.three || state.loadingThree) return state.three
   state.loadingThree = true
-  import('three')
+  import('three/webgpu')
     .then(module => { state.three = module })
     .catch(e => {
       state.loadingThree = false

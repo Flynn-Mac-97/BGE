@@ -281,7 +281,7 @@ function attachDrawing(context) {
   // Loaded on demand rather than imported at the top of the file, because a
   // headless world has no renderer and should not pay to parse a 3D library
   // it will never call. Ten of them start at once; it adds up.
-  import('three')
+  import('three/webgpu')
     .then(THREE => { painter = makePainter(THREE, context.renderer.scene) })
     .catch(e => console.error(`[decals] could not load three, so decals will be recorded but not drawn — ${e.message}`))
 }

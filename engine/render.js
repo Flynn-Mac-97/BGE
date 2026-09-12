@@ -1285,7 +1285,9 @@ export async function makeRenderer(canvas, view, viewport) {
   // on a light and having nothing happen, with no way to find out why, is the
   // failure this avoids.
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // The node renderer dropped the soft variant and falls back to this one with
+  // a warning. Asking for it directly says what is actually drawn.
+  renderer.shadowMap.type = THREE.PCFShadowMap
 
   const scene = new THREE.Scene()
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000)

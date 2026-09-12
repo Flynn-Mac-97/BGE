@@ -191,7 +191,7 @@ function attachDrawing(context) {
   if (painter || !context.renderer?.scene) return
   // On demand, for the same reason Particles does it: a headless world never
   // draws one of these and should not pay to parse a 3D library.
-  import('three')
+  import('three/webgpu')
     .then(THREE => { painter = makePainter(THREE, context.renderer.scene) })
     .catch(error => console.error(`[damage numbers] could not load three, so numbers are recorded but not drawn — ${error.message}`))
 }

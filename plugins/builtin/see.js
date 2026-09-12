@@ -573,7 +573,7 @@ export default {
             other.hidden = true
             concealed.push(other)
           }
-          const THREE = await import('three')
+          const THREE = await import('three/webgpu')
           const scene = context.renderer.scene
           studio = { THREE, scene, background: scene.background, fog: scene.fog, dimmed: [], passes: context.renderer.passes?.list || [] }
           scene.fog = null

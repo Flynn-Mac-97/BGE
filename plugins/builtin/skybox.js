@@ -356,7 +356,7 @@ function syncSkyBox(context, sky) {
  * drawing must not pay to load a renderer library it will never call.
  */
 async function buildSkyBox(file) {
-  const [THREE, { assetURL }] = await Promise.all([import('three'), import('../../engine/ui.js')])
+  const [THREE, { assetURL }] = await Promise.all([import('three/webgpu'), import('../../engine/ui.js')])
 
   const texture = await new Promise((resolve, reject) => {
     // A texture load is a real-time concern that no fixed step reads, so the
