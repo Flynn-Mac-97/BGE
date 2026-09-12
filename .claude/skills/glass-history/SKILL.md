@@ -1,6 +1,6 @@
 ---
 name: glass-history
-description: History — Photoshop's history palette: `history.undo` (ctrl+z), `history.redo` (ctrl+shift+z), `history.jump <index>`, `history.list`, `history.clear`.
+description: Undo and redo of editor edits, as a list of level snapshots. Use for ctrl+z, stepping back through edits, or when an undo does nothing while playing or during a write.
 ---
 <!-- generated from plugins/builtin/history.agent.md at server start; edits are lost -->
 

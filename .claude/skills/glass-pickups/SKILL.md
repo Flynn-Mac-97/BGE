@@ -1,6 +1,6 @@
 ---
 name: glass-pickups
-description: Pickups — A pickup is any entity with `properties.pickup` set. The value is the kind — a plain word this plugin never interprets — and `properties.value` is the amount.
+description: Pickups any entity can drop and a collector magnets in. Use for coins, gems, XP orbs, health drops and anything the player collects by touch or by magnet.
 ---
 <!-- generated from plugins/builtin/pickups.agent.md at server start; edits are lost -->
 

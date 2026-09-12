@@ -1,6 +1,6 @@
 ---
 name: glass-spatial-hash
-description: Spatial Hash — "Who is near whom", over entities that move every step. `context.spatial`. Physics 3D's grid is private and covers only the solids; this covers the movers.
+description: Who is near whom, over entities that move every step. Use for any near or nearest query at scale: targeting, flocking, pickups, area effects. Crowd moves them; this only finds them.
 ---
 <!-- generated from plugins/builtin/spatial-hash.agent.md at server start; edits are lost -->
 

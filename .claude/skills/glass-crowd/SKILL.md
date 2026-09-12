@@ -1,6 +1,6 @@
 ---
 name: glass-crowd
-description: Crowd — Moves many entities as one mass and stops them stacking. `context.crowd`. The "who is near whom" half is Spatial Hash; this is the pass that moves them.
+description: Moves many entities as one mass and stops them stacking. Use for hordes, swarms, flocks and any group that must seek a target without piling up. The near-query half is Spatial Hash.
 ---
 <!-- generated from plugins/builtin/crowd.agent.md at server start; edits are lost -->
 

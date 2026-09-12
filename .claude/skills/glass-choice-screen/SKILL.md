@@ -1,6 +1,6 @@
 ---
 name: glass-choice-screen
-description: Choice Screen — Stops the world and offers a row of cards to pick from. `context.choiceScreen.offer({ title, subtitle, options, onPick })`.
+description: Stops the world and offers a row of cards to pick from. Use for level-up choices, upgrade picks, shop rows, or any paused decision the player must make before play resumes.
 ---
 <!-- generated from plugins/builtin/choice-screen.agent.md at server start; edits are lost -->
 

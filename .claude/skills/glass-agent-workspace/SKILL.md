@@ -1,6 +1,6 @@
 ---
 name: glass-agent-workspace
-description: Agent Workspace — Use this to build the instruction tree and small task packets. Optional skills stay out of context until enabled and matched.
+description: Builds the instruction tree and small task packets, claims files, and opens or merges a parallel lane. Use at the start of any task to get its packet, before fanning work out to several agents, and when a claim or worktree is refused.
 ---
 <!-- generated from plugins/builtin/agent-workspace.agent.md at server start; edits are lost -->
 

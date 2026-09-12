@@ -23,6 +23,7 @@
     { "id": "art", "title": "Art and Assets", "kind": "instruction", "parent": "project", "file": "agents/art.md", "match": ["project/assets/**", "project/types/**", "project/levels/**"], "triggers": ["mesh", "model", "texture", "sprite", "lowpoly", "art", "look", "character", "hud", "screen"] },
     { "id": "plugins", "title": "Plugins", "kind": "group", "parent": "agent-framework" },
     { "id": "skills", "title": "Skills", "kind": "group", "parent": "agent-framework" },
-    { "id": "blender-3d", "title": "Blender 3D", "kind": "skill", "parent": "skills", "file": "agents/skills/blender-3d/SKILL.md", "optional": true, "triggers": ["blender", "3d model", ".blend", "mesh", "lowpoly", "character", "creature", "glb", "gltf", "model a", "sculpt"], "match": ["project/assets/**/*.blend", "project/assets/**/*.glb", "project/assets/**/*.gltf"] }
+    { "id": "blender-3d", "title": "Blender 3D", "kind": "skill", "parent": "skills", "file": "agents/skills/blender-3d/SKILL.md", "optional": true, "triggers": ["blender", "3d model", ".blend", "mesh", "lowpoly", "character", "creature", "glb", "gltf", "model a", "sculpt"], "match": ["project/assets/**/*.blend", "project/assets/**/*.glb", "project/assets/**/*.gltf"] },
+    { "id": "effects", "title": "Effects", "kind": "skill", "parent": "skills", "file": "agents/skills/effects/SKILL.md", "triggers": ["vfx", "effect", "effects", "particle", "particles", "beam", "bolt", "laser", "impact", "explosion", "muzzle flash", "spell", "trail", "aura", "smoke", "sparks", "shader", "decal"], "match": ["plugins/builtin/vfx.js", "plugins/builtin/vfx/**", "plugins/builtin/particles.js", "plugins/builtin/particle-painter.js", "plugins/builtin/combat-effects.js"] }
   ]
 }

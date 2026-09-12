@@ -1,6 +1,6 @@
 ---
 name: glass-spawn-ring
-description: Spawn Ring — Answers "where is just off screen, in metres". `context.spawnRing`. `visibleRadius()` — centre of the screen to a corner, on the ground.
+description: Where just off screen is, in metres. Use to spawn enemies or waves outside the view, to cull what drifted too far, and to place a cluster on one bearing.
 ---
 <!-- generated from plugins/builtin/spawn-ring.agent.md at server start; edits are lost -->
 

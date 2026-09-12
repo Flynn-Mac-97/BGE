@@ -1,6 +1,6 @@
 ---
 name: glass-screen-card
-description: Screen Card — Adds the `card` item to **Screen**: a number you can press, a glyph, a name, a rank and one line saying what it does.
+description: The card item for Screen: a numbered, glyphed, ranked choice with one line. Use when a screen shows a row of options to pick from, such as a level-up or shop.
 ---
 <!-- generated from plugins/builtin/screen-card.agent.md at server start; edits are lost -->
 

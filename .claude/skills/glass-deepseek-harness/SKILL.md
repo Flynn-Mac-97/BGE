@@ -1,6 +1,6 @@
 ---
 name: glass-deepseek-harness
-description: DeepSeek Harness — What this project needs to drive `dsh-agent`, so no vendor name is in engine code. Checked against **v0.1.1-rc.2**, 2026-08-29.
+description: What this project needs to drive dsh-agent, the DeepSeek harness. Use when delegating a task to dsh, writing its wrapper, or checking its version and flags.
 ---
 <!-- generated from plugins/builtin/deepseek-harness.agent.md at server start; edits are lost -->
 

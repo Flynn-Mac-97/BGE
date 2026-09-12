@@ -1,6 +1,6 @@
 ---
 name: glass-impact
-description: Impact — The punch of a hit: the frames the world freezes on, and the shake after it. `context.impact.hit({ weight, at, sound, hold, shake })`.
+description: The punch of a hit: hit stop and camera shake by weight. Use for the freeze and shake on a hit, kill or explosion, and to tune how heavy a blow feels.
 ---
 <!-- generated from plugins/builtin/impact.agent.md at server start; edits are lost -->
 

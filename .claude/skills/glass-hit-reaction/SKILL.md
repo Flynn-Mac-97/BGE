@@ -1,6 +1,6 @@
 ---
 name: glass-hit-reaction
-description: Hit Reaction — The visible half of being hit: a white flash, a shove, and a death that collapses.
+description: The visible half of being hit: a flash, a shove, and a death that collapses. Use when hits feel weightless, when a death should linger or vanish, or to flash or shove an entity without a hit.
 ---
 <!-- generated from plugins/builtin/hit-reaction.agent.md at server start; edits are lost -->
 

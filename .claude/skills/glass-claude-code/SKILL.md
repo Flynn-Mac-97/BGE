@@ -1,6 +1,6 @@
 ---
 name: glass-claude-code
-description: Claude Code — What this project needs to drive `claude`, so no vendor name is in engine code. 220**, 2026-08-29. Run `claude --help` before trusting an old line.
+description: What this project needs to drive the claude CLI: flags, the files it reads, session rules. Use when running claude as a sub-agent, writing a hook, or checking a claude flag before trusting it.
 ---
 <!-- generated from plugins/builtin/claude-code.agent.md at server start; edits are lost -->
 

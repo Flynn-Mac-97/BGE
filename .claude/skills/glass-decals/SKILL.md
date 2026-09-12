@@ -1,6 +1,6 @@
 ---
 name: glass-decals
-description: Decals — Owns `context.decals`: one capped wall of marks stuck to world surfaces — bullet holes, blood, scorch.
+description: Marks stuck to world surfaces: bullet holes, blood, scorch. Use for anything left behind on a wall or floor after a hit, and when decals pile up, float, or do not appear.
 ---
 <!-- generated from plugins/builtin/decals.agent.md at server start; edits are lost -->
 

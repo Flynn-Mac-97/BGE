@@ -1,6 +1,6 @@
 ---
 name: glass-run-clock
-description: Run Clock — A run starts, is timed, and ends. Engine time, so a paused level-up does not count as time survived.
+description: Times a run from first step to end and reports why it ended. Use for survival timers, run summaries, died or survived outcomes, and the numbers a results screen shows.
 ---
 <!-- generated from plugins/builtin/run-clock.agent.md at server start; edits are lost -->
 

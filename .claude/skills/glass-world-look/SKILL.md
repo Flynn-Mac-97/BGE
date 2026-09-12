@@ -1,6 +1,6 @@
 ---
 name: glass-world-look
-description: World Look — Owns the fog and the global light of a level: `fog`, `ambient`, `sun`, declared in the level's `world` block. Keep it as declared data.
+description: The fog and global light of a level: fog, ambient and sun, declared in the level's world block. Use when a scene is too dark, flat, washed out, or the far distance reads wrong.
 ---
 <!-- generated from plugins/builtin/world-look.agent.md at server start; edits are lost -->
 

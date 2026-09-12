@@ -1,6 +1,6 @@
 ---
 name: glass-cli-surface
-description: CLI Surface — `cli.surface` lists every CLI access point and its purpose: the kernel surface, the offline ops, the flags, the work lock's refusals, and every plugin command.
+description: Lists every CLI access point: kernel verbs, offline ops, flags, the work lock's refusals, and every plugin command. Use to discover what node bin/engine.mjs can do, to check a verb exists before calling it, and when adding or changing a verb.
 ---
 <!-- generated from plugins/builtin/cli-surface.agent.md at server start; edits are lost -->
 

@@ -1,6 +1,6 @@
 ---
 name: glass-experience
-description: Experience — Counts experience points against a curve and announces every level gained. `context.experience.gain(amount, source)` is the only way points go in.
+description: Counts experience points against a curve and announces every level gained. Use for XP, levelling, progression thresholds, and anything that must trigger once per level.
 ---
 <!-- generated from plugins/builtin/experience.agent.md at server start; edits are lost -->
 

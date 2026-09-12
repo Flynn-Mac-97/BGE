@@ -1,6 +1,6 @@
 ---
 name: glass-anim
-description: Sprite Animation — Owns one job: on every fixed step it reads `entity.animation`, finds that clip on the type, and writes `entity.frame`.
+description: Frame animation for sprite sheets: clips declared on the type, chosen by assigning entity.animation each step. Use for any 2D sprite that walks, idles, attacks or plays a one-shot clip, and when a clip does not advance or shows the wrong frame.
 ---
 <!-- generated from plugins/builtin/anim.agent.md at server start; edits are lost -->
 

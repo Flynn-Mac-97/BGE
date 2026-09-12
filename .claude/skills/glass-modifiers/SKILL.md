@@ -1,6 +1,6 @@
 ---
 name: glass-modifiers
-description: Modifiers — Stacks named stat changes onto an entity's `properties` and recomputes from the base every time, so any of them can be taken back off.
+description: Stacks named stat changes onto an entity's properties and recomputes from the base. Use for buffs, debuffs, upgrades and passives that must be removable, and when a stat must scale or add without losing its base.
 ---
 <!-- generated from plugins/builtin/modifiers.agent.md at server start; edits are lost -->
 
