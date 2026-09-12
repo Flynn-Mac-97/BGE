@@ -32,8 +32,8 @@ export default {
       if (painter || !context.renderer?.scene) return
       // Loaded on demand, so a world with no renderer never pays to parse a
       // 3D library it will not call.
-      import('three')
-        .then(THREE => { painter = makePainter(THREE, context.renderer.scene) })
+      Promise.all([import('three/webgpu'), import('three/tsl')])
+        .then(([THREE, TSL]) => { painter = makePainter(THREE, TSL, context.renderer.scene) })
         .catch(e => console.error(`[particle-painter] could not load three — particles are recorded but not drawn (${e.message})`))
     })
   },
@@ -43,43 +43,50 @@ export default {
   ]
 }
 
-const VERTEX = `
-attribute vec2 corner;
-attribute float particleSize;
-attribute vec4 particleColour;
-varying vec4 vColour;
-varying vec2 vUV;
-void main() {
-  vColour = particleColour;
-  vUV = corner + 0.5;
-  vec4 view = modelViewMatrix * vec4(position, 1.0);
-  view.xy += corner * particleSize;
-  gl_Position = projectionMatrix * view;
-}
-`
+/**
+ * The look of one particle, as a node graph.
+ *
+ * The quad is built in VIEW space: one centre per particle, pushed out by its
+ * corner, which is what makes it face the camera with nothing rotated on the
+ * CPU. `corner` is also the surface coordinate, so the fragment side reads the
+ * same attribute the vertex side offset by.
+ */
+function particleMaterial(THREE, TSL, map, blend) {
+  const {
+    attribute, cameraProjectionMatrix, modelViewMatrix, oneMinus, positionGeometry,
+    smoothstep, texture, vec4
+  } = TSL
 
-const FRAGMENT = `
-varying vec4 vColour;
-varying vec2 vUV;
-#ifdef TEXTURED
-  uniform sampler2D map;
-#endif
-void main() {
-  vec4 colour = vColour;
-  #ifdef TEXTURED
-    colour *= texture2D(map, vUV);
-  #else
+  const corner = attribute('corner', 'vec2')
+  const size = attribute('particleSize', 'float')
+  const painted = attribute('particleColour', 'vec4')
+
+  const material = new THREE.MeshBasicNodeMaterial({
+    transparent: true,
+    // Depth is tested so smoke behind a wall stays behind it, and not written
+    // so a thousand overlapping quads blend instead of clipping.
+    depthWrite: false,
+    blending: blend === 'add' ? THREE.AdditiveBlending : THREE.NormalBlending,
+    side: THREE.DoubleSide
+  })
+
+  const view = modelViewMatrix.mul(vec4(positionGeometry, 1))
+  material.vertexNode = cameraProjectionMatrix.mul(
+    vec4(view.x.add(corner.x.mul(size)), view.y.add(corner.y.mul(size)), view.z, view.w))
+
+  const surface = corner.add(0.5)
+  material.colorNode = map
+    ? painted.mul(texture(map, surface))
     // A soft round dot, so an untextured particle is a puff rather than a
     // square. Cheaper than a texture and it never fails to load.
-    colour.a *= smoothstep(1.0, 0.55, length(vUV - 0.5) * 2.0);
-  #endif
-  if (colour.a < 0.01) discard;
-  gl_FragColor = colour;
-  #include <colorspace_fragment>
+    : vec4(painted.rgb, painted.a.mul(oneMinus(smoothstep(0.55, 1.0, surface.sub(0.5).length().mul(2)))))
+  // What the GLSL discarded: below this a particle only costs blending.
+  material.alphaTest = 0.01
+  return material
 }
-`
 
-function makePainter(THREE, scene) {
+
+function makePainter(THREE, TSL, scene) {
   const loader = new THREE.TextureLoader()
   const textures = new Map()
   const groups = new Map()      // texture|blend -> { geometry, mesh, capacity }
@@ -119,18 +126,7 @@ function makePainter(THREE, scene) {
     geometry.setAttribute('corner', new THREE.BufferAttribute(corner, 2))
     geometry.setIndex(new THREE.BufferAttribute(index, 1))
 
-    const material = new THREE.ShaderMaterial({
-      uniforms: texture ? { map: { value: textureFor(texture) } } : {},
-      vertexShader: VERTEX,
-      fragmentShader: FRAGMENT,
-      defines: texture ? { TEXTURED: '' } : {},
-      transparent: true,
-      // Depth is tested so smoke behind a wall stays behind it, and not
-      // written so a thousand overlapping quads blend instead of clipping.
-      depthWrite: false,
-      blending: blend === 'add' ? THREE.AdditiveBlending : THREE.NormalBlending,
-      side: THREE.DoubleSide
-    })
+    const material = particleMaterial(THREE, TSL, texture ? textureFor(texture) : null, blend)
 
     const mesh = new THREE.Mesh(geometry, material)
     // Vertices are built in view space every frame, so the bounding sphere

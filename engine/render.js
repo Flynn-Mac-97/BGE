@@ -2702,7 +2702,7 @@ export async function makeRenderer(canvas, view, viewport) {
      * caller's to restore. `region` is in target pixels from the bottom left,
      * because that is the orientation GL reads back in.
      */
-    drawInto(target, buffer, region = null) {
+    async drawInto(target, buffer, region = null) {
       const camera = readyCamera()
       scene.updateMatrixWorld()
       const keptTarget = renderer.getRenderTarget()
@@ -2711,11 +2711,17 @@ export async function makeRenderer(canvas, view, viewport) {
       renderer.setClearColor(0x000000, 0)
       renderer.setRenderTarget(target)
       renderer.clear()
-      renderer.render(scene, camera)
+      await renderer.renderAsync(scene, camera)
       const read = region || { x: 0, y: 0, width: target.width, height: target.height }
-      renderer.readRenderTargetPixels(target, read.x, read.y, read.width, read.height, buffer)
+      // Reading a target back is asynchronous on this renderer. The bytes are
+      // returned rather than filled in, so they are copied into the caller's
+      // buffer here and every caller awaits.
+      const pixels = await renderer.readRenderTargetPixelsAsync(
+        target, read.x, read.y, read.width, read.height)
+      buffer.set(pixels.subarray(0, buffer.length))
       renderer.setRenderTarget(keptTarget)
       renderer.setClearColor(keptColour, keptAlpha)
+      return buffer
     },
 
     // ---- the two hook points ----

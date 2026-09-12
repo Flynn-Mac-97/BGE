@@ -29,38 +29,11 @@ const SOLO_MASK = 1 << 30
 /** Raster edges land within a pixel of the computed box; read a little past it. */
 const EDGE_MARGIN = 2
 
-const FLAT_VERTEX = `
-void main() {
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`
-
-const FLAT_FRAGMENT = `
-uniform vec3 idColour;
-void main() {
-  gl_FragColor = vec4(idColour, 1.0);
-}`
-
-const CUTOUT_VERTEX = `
-uniform mat3 mapMatrix;
-varying vec2 cutoutUv;
-void main() {
-  cutoutUv = (mapMatrix * vec3(uv, 1.0)).xy;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`
-
-const CUTOUT_FRAGMENT = `
-uniform vec3 idColour;
-uniform sampler2D map;
-uniform float cutoff;
-varying vec2 cutoutUv;
-void main() {
-  if (texture2D(map, cutoutUv).a < cutoff) discard;
-  gl_FragColor = vec4(idColour, 1.0);
-}`
-
 /**
- * Index to unit-range RGB. A ShaderMaterial writes its output with no colour
- * management, so k/255 lands in the byte buffer as exactly k.
+ * Index to unit-range RGB.
+ *
+ * The pass draws into a render target with no colour space and the renderer
+ * does no tone mapping, so k/255 lands in the byte buffer as exactly k.
  */
 const colourOf = index =>
   [((index >> 16) & 255) / 255, ((index >> 8) & 255) / 255, (index & 255) / 255]
@@ -90,7 +63,7 @@ export async function idMap(context) {
   if (missing) return missing
   const mounted = await mount(context)
   try {
-    const map = decode(mounted, mounted.fullPass())
+    const map = decode(mounted, await mounted.fullPass())
     map.hidden = typeof document !== 'undefined' && document.hidden === true
     return map
   } finally {
@@ -116,9 +89,13 @@ export async function visibility(context, ids) {
     : description.visible.map(entry => entry.id)
   const mounted = await mount(context)
   try {
-    const pixels = mounted.fullPass()
+    const pixels = await mounted.fullPass()
     const map = decode(mounted, pixels)
-    return queried.map(id => measure(mounted, pixels, map, id, entryOf.get(id)))
+    // One at a time, not in parallel: a solo pass moves the camera's layer
+    // mask and two of them at once would read each other's frame.
+    const measured = []
+    for (const id of queried) measured.push(await measure(mounted, pixels, map, id, entryOf.get(id)))
+    return measured
   } finally {
     mounted.unmount()
   }
@@ -136,7 +113,7 @@ export async function silhouettes(context, ids) {
   if (missing) return missing
   const mounted = await mount(context)
   try {
-    const pixels = mounted.fullPass()
+    const pixels = await mounted.fullPass()
     const { width, height } = mounted
     const wanted = new Set(ids)
     const idOfIndex = new Map()
@@ -184,7 +161,7 @@ export async function silhouettes(context, ids) {
  * materials, layers and visibility back.
  */
 async function mount(context) {
-  const THREE = await import('three')
+  const [THREE, TSL] = await Promise.all([import('three/webgpu'), import('three/tsl')])
   const renderer = context.renderer
   // The scene must match the world before it is read; the loop is not
   // guaranteed to have run since the last mutation.
@@ -218,25 +195,17 @@ async function mount(context) {
     // shader keeps that shape while writing the exact id colour — a plain
     // textured material would tint the colour and corrupt the id. 0.5 is the
     // binary reading of a surface that really blends.
-    let material
+    const { texture, uniform, uv, vec3 } = TSL
+    const [red, green, blue] = colourOf(index)
+    const material = new THREE.MeshBasicNodeMaterial()
+    material.colorNode = vec3(red, green, blue)
     if (map && (original.alphaTest > 0 || original.transparent)) {
       map.updateMatrix()
-      material = new THREE.ShaderMaterial({
-        uniforms: {
-          idColour: { value: colourOf(index) },
-          map: { value: map },
-          mapMatrix: { value: map.matrix },
-          cutoff: { value: original.alphaTest || 0.5 }
-        },
-        vertexShader: CUTOUT_VERTEX,
-        fragmentShader: CUTOUT_FRAGMENT
-      })
-    } else {
-      material = new THREE.ShaderMaterial({
-        uniforms: { idColour: { value: colourOf(index) } },
-        vertexShader: FLAT_VERTEX,
-        fragmentShader: FLAT_FRAGMENT
-      })
+      // The map's own repeat and offset, applied by hand. UVs are in metres
+      // here, which is the set the real draw samples too.
+      const point = uniform(map.matrix, 'mat3').mul(vec3(uv(), 1)).xy
+      material.opacityNode = texture(map, point).a
+      material.alphaTest = original.alphaTest || 0.5
     }
     // The silhouette must match the real draw: the same faces culled, the
     // same depth rules — in 2D depth is off and painter's order decides,
@@ -285,19 +254,19 @@ async function mount(context) {
     ids,
     objectOf,
 
-    fullPass() {
+    async fullPass() {
       const pixels = new Uint8Array(width * height * 4)
-      renderer.drawInto(target, pixels)
+      await renderer.drawInto(target, pixels)
       return pixels
     },
 
     /** One entity alone, read back only over `region` (GL bottom-left pixels). */
-    soloPass(object, region) {
+    async soloPass(object, region) {
       const kept = []
       object.traverse(node => { kept.push([node, node.layers.mask]); node.layers.mask = SOLO_MASK })
       camera.layers.mask = SOLO_MASK
       const pixels = new Uint8Array(region.width * region.height * 4)
-      renderer.drawInto(target, pixels, region)
+      await renderer.drawInto(target, pixels, region)
       camera.layers.mask = passMask
       for (const [node, mask] of kept) node.layers.mask = mask
       return pixels
@@ -336,7 +305,7 @@ function decode({ width, height, ids }, pixels) {
   }
 }
 
-function measure(mounted, fullPixels, map, id, entry) {
+async function measure(mounted, fullPixels, map, id, entry) {
   const visiblePixels = map.coverage.get(id) || 0
   if (!entry) {
     // Off screen by projection. Any pixels the map still shows are honest —
@@ -368,7 +337,7 @@ function measure(mounted, fullPixels, map, id, entry) {
   const occluders = new Map()
   const object = mounted.objectOf.get(id)
   if (object && region.width > 0 && region.height > 0) {
-    const solo = mounted.soloPass(object, region)
+    const solo = await mounted.soloPass(object, region)
     for (let row = 0; row < region.height; row++) {
       for (let column = 0; column < region.width; column++) {
         if (!indexAt(solo, (row * region.width + column) * 4)) continue
