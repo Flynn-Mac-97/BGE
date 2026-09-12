@@ -91,9 +91,11 @@ agents    agent.context [file...]
           agent.release <id> [--blocked "<why>"]
           agent.merge <id>     merge the lane, run its deferred checks, remove
                                its worktree and branch
-          agent.sweep [--dry-run]
+          agent.sweep [--dry-run] [--days N]
                                delete worktrees and directories left by lanes
-                               whose work is already in HEAD
+                               whose work is already in HEAD, and rounds of
+                               agent output older than N days (default 7). The
+                               two ledgers and the README are never swept
 
 Args that parse as JSON are sent as JSON, everything else as a string.
 Flags (--foo) collect into a trailing options object.
@@ -728,7 +730,10 @@ if (op.startsWith('agent.')) {
      * `--dry-run` lists without deleting.
      */
     if (op === 'agent.sweep') {
-      out(agents.sweepAgents(REPO, { dryRun: flags['dry-run'] === true || flags.dryRun === true }))
+      out(agents.sweepAgents(REPO, {
+        dryRun: flags['dry-run'] === true || flags.dryRun === true,
+        days: flags.days === undefined ? undefined : Number(flags.days)
+      }))
       process.exit(0)
     }
 

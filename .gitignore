@@ -10,25 +10,18 @@ tools/.dsh-agent.*
 # than no copy — the whole point of the index is that it is never behind.
 **/.engine/
 
-# A dev server log is a live file, not a record of anything.
-agent-runs/dev-*.log
-
-# measure.mjs regenerates these; nineteen thousand lines of run output is
-# not evidence anyone reads.
-agent-runs/see-marks/*seed*.json
-
-# Captures a lane regenerates to prove one claim. The claim is in the report;
-# the frame is a working file, and committing it means every run is a diff.
-agent-runs/see/**/*.png
-agent-runs/see/**/*.json
 project/.engine/lane-browsers.json
-
-# Raw kimodo output. The clip a game plays is baked from these into
-# project/assets/motion/; the generator's own files are regenerable working
-# files, and 1.5M of them in every diff is not a record of anything.
-agent-runs/rig-clips/
 
 # The checkout's own coordination state: the work lock, the agent run
 # registry, the server registry and the lane browsers. Live files about what is
 # running here, never a record of anything.
 /.engine/
+
+# Agent output is working material, not engine content. Only the two ledgers
+# and the README outlive a round; everything else is swept by `agent.sweep`.
+# A finding worth keeping goes in a ledger, a guide, or a test — never a new
+# markdown file left here.
+agent-runs/*
+!agent-runs/README.md
+!agent-runs/painpoints.jsonl
+!agent-runs/insights.jsonl

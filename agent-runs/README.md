@@ -1,21 +1,40 @@
 # Agent output
 
-Everything an agent makes that is not the engine and not the game. All of it is
-a working artifact. All of it can be deleted — no code imports it, no check
-depends on it.
+Everything an agent makes that is not the engine and not the game. Working
+material, not engine content: no code imports it and no check depends on it.
 
 ```
 agent-runs/
+  README.md               this file
   painpoints.jsonl        the friction log, append-only
   insights.jsonl          the solutions log, append-only
-  <date>-<name>/          one round of work and whatever it produced
+  <date>-<name>/          one round of work — never committed, swept after a week
 ```
+
+Only those three files are committed. Everything else is ignored by git and
+deleted by `node bin/engine.mjs agent.sweep` once it is seven days old. Use
+`--dry-run` to see what would go, `--days N` for a different age.
 
 A round is a folder, so the next cannot bury the last. Name it for the day and
 the thing built: `2026-08-29-counter-strike`. Put the briefs, the results, the
 review findings, the cost, and any one-off page inside it.
 
-The two logs are at the top because they outlive every round.
+## What survives a round
+
+Agent output grows faster than anyone reads it, and a directory nobody can sift
+through hides the two ledgers that matter. So a finding only keeps if it goes
+somewhere a future agent already looks:
+
+| the finding | where it goes |
+|---|---|
+| the engine made something hard | `pain` |
+| a method worth reusing | `insight` |
+| a rule for driving one plugin | that plugin's `.agent.md` |
+| a rule for every task | `agents/core.md` |
+| a behaviour that would break silently | a test in `test/` |
+| anything else | here, and it is deleted |
+
+Never leave a finding in a new markdown file. Nothing reads it, and it is swept.
 
 ## The friction log
 

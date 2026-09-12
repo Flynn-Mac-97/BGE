@@ -453,14 +453,16 @@ export function agentState(root) {
 }
 
 /**
- * Remove what finished lanes left in `.agent-worktrees`.
+ * Remove what finished lanes left in `.agent-worktrees`, and old agent output.
  *
- * Two leftovers, from the same cause: a worktree git still lists whose work is
- * already in HEAD, and a directory git does not list at all, left by a removal
- * that deleted some of the files and then failed. Only runs already in HEAD are
+ * Two worktree leftovers, from the same cause: one git still lists whose work
+ * is already in HEAD, and one git does not list at all, left by a removal that
+ * deleted some of the files and then failed. Only runs already in HEAD are
  * touched, so unmerged work is never deleted.
+ *
+ * `days` is passed to `sweepRuns`, which clears rounds of agent output.
  */
-export function sweepAgents(root, { dryRun = false } = {}) {
+export function sweepAgents(root, { dryRun = false, days } = {}) {
   const main = mainWorktree(root)
   const home = path.join(main, '.agent-worktrees')
   const worktrees = new Set(gitWorktrees(main))
@@ -509,7 +511,53 @@ export function sweepAgents(root, { dryRun = false } = {}) {
     if (dryRun) { branches.push({ branch: state.branch, would: true }); continue }
     try { git(main, ['branch', '-d', state.branch]); branches.push({ branch: state.branch }) } catch { /* keep going */ }
   }
-  return { removed, branches, kept, ok: kept.length === 0 }
+  const runs = sweepRuns(root, { days, dryRun })
+  return { removed, branches, kept, runs, ok: kept.length === 0 }
+}
+
+/**
+ * What an agent may leave in `agent-runs/` and never lose.
+ *
+ * The two ledgers outlive every round and the README says what the directory
+ * is. Everything else there is working output and is swept.
+ */
+const KEEP_IN_RUNS = new Set(['README.md', 'painpoints.jsonl', 'insights.jsonl'])
+
+/** Default age before a round is swept. Long enough to finish, short enough to stay clean. */
+const RUN_DAYS = 7
+
+/**
+ * Delete rounds of agent output older than `days`.
+ *
+ * Agent output accumulates faster than anyone reads it, and a directory nobody
+ * can sift through hides the two ledgers that do matter. A finding worth
+ * keeping is already a painpoint, an insight, a rule in a guide, or a test —
+ * so anything still only in `agent-runs/` after a week was working output.
+ *
+ * Age is taken from the entry's own modification time, so a round still being
+ * written is never swept.
+ */
+export function sweepRuns(root, { days = RUN_DAYS, dryRun = false } = {}) {
+  const home = path.join(mainWorktree(root), 'agent-runs')
+  if (!fs.existsSync(home)) return { directory: 'agent-runs', days, removed: [], kept: [] }
+
+  const oldest = Date.now() - days * 24 * 60 * 60 * 1000
+  const removed = []
+  const kept = []
+  for (const name of fs.readdirSync(home)) {
+    if (KEEP_IN_RUNS.has(name)) continue
+    const entry = path.join(home, name)
+    const changed = fs.statSync(entry).mtimeMs
+    if (changed > oldest) { kept.push({ entry: `agent-runs/${name}`, why: 'newer than the age limit' }); continue }
+    if (dryRun) { removed.push({ entry: `agent-runs/${name}`, would: true }); continue }
+    try {
+      fs.rmSync(entry, { recursive: true, force: true })
+      removed.push({ entry: `agent-runs/${name}` })
+    } catch (error) {
+      kept.push({ entry: `agent-runs/${name}`, why: String(error.message).trim() })
+    }
+  }
+  return { directory: 'agent-runs', days, removed, kept }
 }
 
 /**
