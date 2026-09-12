@@ -55,8 +55,9 @@
 // disjoint, so a shader language choice is a renderer choice.
 import * as THREE from 'three/webgpu'
 import {
-  cameraProjectionMatrix, float, max, modelNormalMatrix, modelViewMatrix, normalGeometry,
-  normalize, positionLocal, screenSize, step, uv as uvAttribute, vec4
+  attribute, cameraProjectionMatrix, float, max, modelNormalMatrix, modelViewMatrix,
+  normalGeometry, normalize, oneMinus, positionGeometry, positionLocal, screenSize,
+  smoothstep, step, uv as uvAttribute, vec4
 } from 'three/tsl'
 import { assetURL } from './ui.js'
 
@@ -1061,25 +1062,24 @@ function keylineGrowth(width, flat) {
   return vec4(clip.xy.add(offset), depth, clip.w)
 }
 
-/** The soft ellipse a contact shadow is, and how hard it presses on the ground. */
-const CONTACT_SHADOW_FADE = `
-  float reach = length(vContact);
-  gl_FragColor.a = vContactStrength * (1.0 - smoothstep(0.15, 1.0, reach));
-  if (gl_FragColor.a <= 0.004) discard;
-`
+/**
+ * How far a point on one of the ground quads is from its middle.
+ *
+ * Both quads are a unit plane laid flat, so the position is in XZ and doubling
+ * it gives 0 at the middle and 1 at an edge.
+ */
+const groundReach = () => positionGeometry.xz.mul(2).length()
 
 /**
- * The band a ground ring draws, in ring space where 1.0 is its radius.
+ * The band a ground ring draws, where 1.0 is its radius.
  *
  * Both edges are feathered: a hard edge adds two lines to the frame's edge
  * count, and the ring only has to be found.
  */
-const GROUND_RING_BAND = `
-  float reach = length(vRing);
-  float band = smoothstep(0.70, 0.81, reach) * (1.0 - smoothstep(0.93, 1.0, reach));
-  gl_FragColor.a = vRingStrength * band;
-  if (gl_FragColor.a <= 0.004) discard;
-`
+function groundRingBand() {
+  const reach = groundReach()
+  return smoothstep(0.70, 0.81, reach).mul(oneMinus(smoothstep(0.93, 1.0, reach)))
+}
 
 // ---------------------------------------------------------------- materials
 
@@ -1950,19 +1950,16 @@ export async function makeRenderer(canvas, view, viewport) {
   let contactStrengths = null
 
   function contactShadowMaterial() {
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshBasicNodeMaterial({
       color: readColour(readability.shadowColour, 'readability.shadowColour') || new THREE.Color('#000000'),
       transparent: true, depthWrite: false, fog: false
     })
-    material.onBeforeCompile = shader => {
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float contactStrength;\nvarying float vContactStrength;\nvarying vec2 vContact;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvContactStrength = contactStrength;\nvContact = position.xz * 2.0;')
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vContactStrength;\nvarying vec2 vContact;')
-        .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${CONTACT_SHADOW_FADE}`)
-    }
-    material.customProgramCacheKey = () => 'contact-shadow'
+    // Per instance, so one draw call carries every shadow at its own weight.
+    const strength = attribute('contactStrength', 'float')
+    material.opacityNode = strength.mul(oneMinus(smoothstep(0.15, 1.0, groundReach())))
+    // What the GLSL discarded. Below this the ellipse is invisible and only
+    // costs blending.
+    material.alphaTest = 0.004
     return material
   }
 
@@ -2086,21 +2083,14 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   function groundRingMaterial() {
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshBasicNodeMaterial({
       transparent: true, depthWrite: false, fog: false
     })
-    material.onBeforeCompile = shader => {
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec3 ringTint;\nattribute float ringStrength;\nvarying vec3 vRingTint;\nvarying float vRingStrength;\nvarying vec2 vRing;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRingTint = ringTint;\nvRingStrength = ringStrength;\nvRing = position.xz * 2.0;')
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vRingTint;\nvarying float vRingStrength;\nvarying vec2 vRing;')
-        // Into the diffuse rather than into gl_FragColor, so the ring goes
-        // through the same tone mapping and colour space as the scene it marks.
-        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vRingTint;')
-        .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${GROUND_RING_BAND}`)
-    }
-    material.customProgramCacheKey = () => 'ground-ring'
+    // The tint is the colour rather than a multiply on top of one, because the
+    // material carries no colour of its own for it to multiply into.
+    material.colorNode = attribute('ringTint', 'vec3')
+    material.opacityNode = attribute('ringStrength', 'float').mul(groundRingBand())
+    material.alphaTest = 0.004
     return material
   }
 

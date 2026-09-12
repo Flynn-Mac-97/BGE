@@ -23,7 +23,7 @@ Nine ship. The right-hand column is written **flat on the `mesh`**, beside `text
 | `matcap` | the whole lighting model baked into one sphere image | `matcap` |
 | `water` | scrolling normals on `context.time` | `normal`, `roughness` 0.15, `metalness` 0.1, `normalStrength` 0.6, `speed` 0.06, `direction` `[1, 0.35]` |
 | `additive` | adds its light to what is behind it — flame, muzzle flash, hologram | — |
-| `pulse` | a shader rather than a surface | `speed` 0.6, `bands` 1 |
+| `pulse` | a TSL node graph, the worked example of a custom shader | `speed` 0.6, `bands` 1 |
 
 `opacity` (default 1) applies to all and sets `transparent` below 1. An unknown name is reported and falls back to lambert.
 

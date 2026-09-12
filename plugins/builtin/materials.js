@@ -24,11 +24,12 @@
  *
  * A builder is handed exactly what render.js hands it:
  *
- *   build({ mesh, texture, tint, view }) => a three material
+ *   build({ mesh, texture, tint, view, uv }) => a three material
  *
  * `mesh` is the whole declaration, `texture` is the resolved and already-tiled
- * map or null, `tint` is always a colour and is what `color` should be, and
- * `view` is the session's camera state. A builder called with a bare mesh
+ * map or null, `tint` is always a colour and is what `color` should be, `view`
+ * is the session's camera state, and `uv` names the two coordinate sets —
+ * `uv.face()` is 0 to 1 across a face and `uv.metres()` is one unit per metre. A builder called with a bare mesh
  * declaration instead — which is how a test calls one — reads the same keys and
  * simply has no texture to start from.
  *
@@ -36,7 +37,7 @@
  * `lambert` is the default because a flat, baked, lightmapped look is what the
  * first game on this engine wanted, but `standard`, `toon`, `matcap`, `water`
  * and `additive` are equally first-class, and `pulse` is a whole material
- * written from raw GLSL to prove that path is not an escape hatch. A game adds
+ * written as a TSL node graph to prove that path is not an escape hatch. A game adds
  * its own with one call and never touches a file under engine/:
  *
  *   context.materials.register('hologram', ({ mesh, texture, tint }) => …)
@@ -476,9 +477,9 @@ export default {
     // cost none of them can use. `document` is the honest test for "is anything
     // going to draw", and it is the same guard world-look.js uses for its sky.
     if (typeof document !== 'undefined') {
-      Promise.all([import('three'), import('../../engine/ui.js')])
-        .then(([THREE, { assetURL }]) => {
-          const builders = buildersFor(THREE, assetURL, materials)
+      Promise.all([import('three/webgpu'), import('three/tsl'), import('../../engine/ui.js')])
+        .then(([THREE, TSL, { assetURL }]) => {
+          const builders = buildersFor(THREE, TSL, assetURL, materials)
           for (const [name, build] of Object.entries(builders)) {
             materials.register(name, build, { ...STANDARD_MATERIALS[name], from: 'library' })
           }
@@ -576,7 +577,7 @@ function handOver(context, materials) {
  * builder that breaks the first time somebody changes the renderer is a builder
  * that has quietly made this plugin part of the kernel.
  */
-function buildersFor(THREE, assetURL, materials) {
+function buildersFor(THREE, TSL, assetURL, materials) {
   const say = materials.say
 
   const number = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback)
@@ -705,26 +706,22 @@ function buildersFor(THREE, assetURL, materials) {
    * material builder cannot do, since it returns one material.
    */
   const outline = (material, width, outlineColour) => {
-    material.onBeforeCompile = shader => {
-      shader.uniforms.outlineWidth = { value: Math.min(1, Math.max(0, width)) }
-      shader.uniforms.outlineColour = { value: outlineColour }
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float outlineWidth;\nuniform vec3 outlineColour;')
-        .replace('#include <dithering_fragment>', `#include <dithering_fragment>
-          float rim = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, outlineColour, smoothstep(1.0 - outlineWidth, 1.0, rim));`)
-    }
-    // Two materials whose GLSL differs must not share a compiled program.
-    material.customProgramCacheKey = () => `toon-outline:${width}:${outlineColour.getHexString()}`
+    const { abs, mix, normalView, oneMinus, output, positionViewDirection, smoothstep, vec3, vec4 } = TSL
+    const rim = oneMinus(abs(normalView.normalize().dot(positionViewDirection.normalize())))
+    const band = smoothstep(1 - Math.min(1, Math.max(0, width)), 1, rim)
+    // `output` holds the lit result. Mixing here rather than into the albedo
+    // keeps the rim one flat colour whatever the light is doing.
+    material.outputNode = vec4(
+      mix(output.rgb, vec3(outlineColour.r, outlineColour.g, outlineColour.b), band), output.a)
   }
 
   return {
     basic: request =>
-      common(new THREE.MeshBasicMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surfaceOf(request)),
+      common(new THREE.MeshBasicNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surfaceOf(request)),
 
     lambert: request => {
       const surface = surfaceOf(request)
-      const material = common(new THREE.MeshLambertMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
+      const material = common(new THREE.MeshLambertNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
       const emissive = colour(surface.parameters.emissive, null, 'lambert.emissive')
       if (emissive) material.emissive = emissive
       return material
@@ -733,7 +730,7 @@ function buildersFor(THREE, assetURL, materials) {
     standard: request => {
       const surface = surfaceOf(request)
       const { parameters } = surface
-      const material = common(new THREE.MeshStandardMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
+      const material = common(new THREE.MeshStandardNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
       material.metalness = number(parameters.metalness, 0)
       material.roughness = number(parameters.roughness, 0.8)
 
@@ -759,7 +756,7 @@ function buildersFor(THREE, assetURL, materials) {
     phong: request => {
       const surface = surfaceOf(request)
       const { parameters } = surface
-      const material = common(new THREE.MeshPhongMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
+      const material = common(new THREE.MeshPhongNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
       material.shininess = number(parameters.shininess, 30)
       material.specular = colour(parameters.specular, '#111111', 'phong.specular')
       const normal = extraTexture(parameters.normal, surface.map, { linear: true })
@@ -770,7 +767,7 @@ function buildersFor(THREE, assetURL, materials) {
     toon: request => {
       const surface = surfaceOf(request)
       const { parameters } = surface
-      const material = common(new THREE.MeshToonMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
+      const material = common(new THREE.MeshToonNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
       material.gradientMap = toonGradient(parameters.steps)
       const width = number(parameters.outline, 0)
       if (width > 0) {
@@ -781,7 +778,7 @@ function buildersFor(THREE, assetURL, materials) {
 
     matcap: request => {
       const surface = surfaceOf(request)
-      const material = common(new THREE.MeshMatcapMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
+      const material = common(new THREE.MeshMatcapNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide }), surface)
       const matcap = extraTexture(surface.parameters.matcap, null)
       if (matcap) material.matcap = matcap
       else say('[Materials] a matcap material with no "matcap" image has no lighting model to read — it will draw as a flat colour')
@@ -800,7 +797,7 @@ function buildersFor(THREE, assetURL, materials) {
     water: request => {
       const surface = surfaceOf(request)
       const { parameters } = surface
-      const material = new THREE.MeshStandardMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide })
+      const material = new THREE.MeshStandardNodeMaterial({ depthTest: true, depthWrite: true, side: THREE.FrontSide })
 
       // Only a declared tint is honoured, because the renderer's fallback for an
       // untextured mesh is a stable per-type colour — and water that is a
@@ -839,7 +836,7 @@ function buildersFor(THREE, assetURL, materials) {
     },
 
     additive: request => {
-      const material = common(new THREE.MeshBasicMaterial({ depthTest: true, side: THREE.FrontSide }), surfaceOf(request))
+      const material = common(new THREE.MeshBasicNodeMaterial({ depthTest: true, side: THREE.FrontSide }), surfaceOf(request))
       material.blending = THREE.AdditiveBlending
       material.transparent = true
       // Adding light to what is behind means never hiding it, so depth is tested
@@ -858,46 +855,24 @@ function buildersFor(THREE, assetURL, materials) {
      * shader deterministically: never a wall clock, never an accumulator.
      */
     pulse: request => {
+      const { uniform, sin, uv, vec3, vec4 } = TSL
       const { parameters } = surfaceOf(request)
-      const material = new THREE.ShaderMaterial({
-        uniforms: {
-          tint: { value: colour(parameters.tint ?? parameters.color, '#39e6ff', 'pulse') },
-          time: { value: 0 },
-          speed: { value: number(parameters.speed, 0.6) },
-          bands: { value: number(parameters.bands, 1) }
-        },
-        vertexShader: PULSE_VERTEX,
-        fragmentShader: PULSE_FRAGMENT,
-        side: THREE.FrontSide
-      })
-      animate(material, time => { material.uniforms.time.value = time })
+      const tint = colour(parameters.tint ?? parameters.color, '#39e6ff', 'pulse')
+      const speed = number(parameters.speed, 0.6)
+      const bands = number(parameters.bands, 1)
+      const material = new THREE.MeshBasicNodeMaterial({ side: THREE.FrontSide })
+      // One uniform, fed from `context.time` by the frame system above. That is
+      // how a game animates a shader deterministically: never a wall clock,
+      // never an accumulator.
+      const clock = uniform(0)
+      // Metres, not the 0..1 set, so a band is a metre wide and the wave
+      // travels at `speed` metres per second whatever the mesh's size.
+      const along = request.uv ? request.uv.metres().y : uv().y
+      const wave = sin(clock.mul(speed).sub(along.mul(bands)).mul(Math.PI * 2)).mul(0.5).add(0.5)
+      material.colorNode = vec4(vec3(tint.r, tint.g, tint.b).mul(wave.mul(0.65).add(0.35)), 1)
+      animate(material, time => { clock.value = time })
       return material
     }
   }
 }
 
-/**
- * The whole of the example shader, kept as two strings so there is nothing
- * clever between what is written here and what the card compiles.
- */
-const PULSE_VERTEX = `
-  varying vec2 vSurface;
-  void main() {
-    vSurface = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-const PULSE_FRAGMENT = `
-  uniform vec3 tint;
-  uniform float time;
-  uniform float speed;
-  uniform float bands;
-  varying vec2 vSurface;
-  void main() {
-    // uv is measured in metres by this renderer, so a band is a metre wide and
-    // the wave travels at speed metres per second whatever the mesh's size.
-    float wave = 0.5 + 0.5 * sin((time * speed - vSurface.y * bands) * 6.2831853);
-    gl_FragColor = vec4(tint * (0.35 + 0.65 * wave), 1.0);
-  }
-`
