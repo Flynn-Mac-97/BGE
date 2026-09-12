@@ -335,7 +335,19 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     renderStats() {
       const renderer = editor.context?.renderer
       if (!renderer) return { error: 'nothing is drawing — no renderer in this world' }
-      return renderer.stats
+      const backend = renderer.backend
+      // The optional features, named. A game may take a faster path when one is
+      // there, so a terminal has to be able to see which it got.
+      const optional = ['shader-f16', 'subgroups', 'float32-filterable', 'clip-distances',
+        'dual-source-blending', 'timestamp-query', 'texture-compression-bc']
+      return {
+        ...renderer.stats,
+        backend: backend && {
+          name: backend.name,
+          webgpu: backend.webgpu,
+          features: optional.filter(backend.has)
+        }
+      }
     }
   }
 

@@ -2454,6 +2454,23 @@ export async function makeRenderer(canvas, view, viewport) {
     // the picture came out of rather than whichever was built first.
     get camera() { return activeCamera() },
     get stats() { return { ...stats } },
+    /**
+     * Which backend is drawing, and which optional features it has.
+     *
+     * Both backends render, run node materials and TSL, and run compute — the
+     * WebGL one through transform feedback. What the fallback lacks is optional
+     * speed and quality, so nothing here may be REQUIRED: ask `has(name)` for a
+     * named feature and keep a path that works without it. Never branch on the
+     * backend's name; a feature is the honest question and the name is a guess
+     * about what that feature implies.
+     */
+    get backend() {
+      return {
+        name: renderer.backend?.constructor?.name || 'unknown',
+        webgpu: !renderer.backend?.isWebGLBackend,
+        has: name => { try { return renderer.hasFeature(name) === true } catch { return false } }
+      }
+    },
     /** 'loading' | 'ready' | 'failed' | null — so a capture can wait for a
         declared model instead of shipping the placeholder box. */
     modelState: file => modelCache.get(file)?.status || null,
