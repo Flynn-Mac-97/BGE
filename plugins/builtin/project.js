@@ -5,10 +5,15 @@
  * `ENGINE_PROJECT` and a headless world takes `--project`; neither given opens
  * the untitled project, so the editor always has a game to work in.
  *
- * There is no save button and there is not going to be one. `engine/files.js`
- * writes straight through — the files on disk ARE the project. Unsaved means
- * unnamed, not held in memory, so `saveAs` renames the untitled directory
- * rather than writing a copy of anything.
+ * A NAMED project has no save button and is not going to get one.
+ * `engine/files.js` writes straight through — the files on disk ARE the
+ * project.
+ *
+ * The UNTITLED project is the exception, and the only one. Level edits are
+ * held in the page and never written, so reloading drops them and a try-out
+ * costs nothing to undo. `saveAs` writes the world, then renames the
+ * directory. Everything else an edit touches — a new type, a behaviour, an
+ * asset — is written as it always was, and travels with the rename.
  *
  * What each verb does:
  *
@@ -17,7 +22,7 @@
  *           drops the old project: a plugin cannot be un-loaded once its onLoad
  *           has run, so without it the old project's panels and context verbs
  *           would stay live over the new project's world
- *   saveAs  renames the untitled directory to a name, then opens it
+ *   saveAs  writes the held level, renames the untitled directory, then opens it
  *   close   opens a fresh untitled project, so closing leaves you somewhere
  *
  * The page reaches the project only through the `/project/` URL, so where it is
@@ -278,8 +283,15 @@ export default {
           throw new Error(`"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot`)
         }
         if (!context.shell) return headlessAnswer(context, name)
-        if (context.editor.projectName !== 'untitled') {
+        if (!context.editor.projectUntitled) {
           throw new Error(`"${context.editor.projectName}" already has a name — move its directory to rename it`)
+        }
+        // An untitled project holds its edits instead of writing them, so the
+        // world is the only copy. Write it before the rename, or naming the
+        // project would keep the files as they were when it was opened.
+        const written = await context.editor.saveLevel({ naming: true })
+        if (written?.skipped) {
+          throw new Error(`nothing was named — the level could not be written: ${written.why || written.skipped}`)
         }
         return reopen(await ask('/api/project/save-as', { name }))
       }

@@ -10,7 +10,7 @@ import { chooseClient, describeClient, explainClientError, isLive, mergeClient, 
 import { readLaneBrowsers } from './engine/lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
 import { PROJECT_PREFIX } from './engine/asset-path.js'
-import { ensureProject, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './engine/project-path.mjs'
+import { ensureProject, isUntitled, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './engine/project-path.mjs'
 
 const ROOT = process.cwd()
 
@@ -326,7 +326,13 @@ function api() {
           // live tab reading one project's index and fetching another project's
           // textures — and nothing on screen says so. This is how the tab asks.
           if (url.pathname === '/api/project') {
-            return send(res, 200, { project: PROJECT_NAME, directory: PROJECT, projects: projectsRoot(ROOT) })
+            return send(res, 200, {
+              project: PROJECT_NAME,
+              directory: PROJECT,
+              projects: projectsRoot(ROOT),
+              // The page holds edits instead of writing them while this is true.
+              untitled: isUntitled(PROJECT)
+            })
           }
 
           // Every project directory beside the open one. The untitled project

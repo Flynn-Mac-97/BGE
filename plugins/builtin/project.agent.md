@@ -12,9 +12,20 @@ description: Which game the editor has open, and how to open, name or leave one.
 - Neither given opens the **untitled** project, at
   `<projects root>/.untitled`. The projects root is `../engine-projects` beside
   the checkout, or `ENGINE_PROJECTS_ROOT`.
-- Unsaved means unnamed, not held in memory. The untitled project is a real
-  directory and `project.saveAs <name>` renames it. There is no save button and
-  no save-only copy: `engine/files.js` writes straight through.
+- **A named project has no save step.** `engine/files.js` writes straight
+  through, so the files on disk are the project.
+- **The untitled project is the one exception.** Level edits are held in the
+  page and never written, so an experiment costs nothing to undo. Everything
+  else an edit makes — a type, a behaviour, an asset — is written as usual and
+  travels with the rename.
+- To drop held edits, open the project again or press stop; both reload the
+  level as authored. A page reload keeps them: the engine restores the world
+  across a reload on purpose, and says so in `engine.reloadNotice()`.
+- `project.saveAs <name>` writes the held level first, then renames the
+  directory. If the level cannot be written — the world is playing or has been
+  simulated — it refuses and nothing is renamed.
+- `editor.projectUntitled` is the flag, taken from the directory name, never
+  from the title. A named project may call itself "untitled".
 - `project.list` — the project directories beside the open one.
 - `project.open <name or path>` — repoints the dev server, then reloads the page.
   The reload is what drops the old project: a plugin cannot be un-loaded once

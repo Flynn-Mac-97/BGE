@@ -18,12 +18,18 @@ import { PROJECT_PREFIX } from './asset-path.js'
  * Asked for rather than baked in: the server can repoint itself at another
  * project, and a title fixed at start-up would name the one it left.
  */
-async function openProjectName() {
+/**
+ * What the server says it is serving.
+ *
+ * `untitled` decides whether an edit is written. A built page with no dev
+ * server has no project to save to, so it reads as named and nothing changes.
+ */
+async function openProject() {
   try {
     const body = await (await fetch('/api/project')).json()
-    if (typeof body.project === 'string') return body.project
+    if (typeof body.project === 'string') return { name: body.project, untitled: body.untitled === true }
   } catch { /* no dev server: the built page carries no name */ }
-  return PROJECT_PREFIX
+  return { name: PROJECT_PREFIX, untitled: false }
 }
 import { makeFiles, overHTTP } from './files.js'
 import { importPlugin, reportImportFailure } from './plugin-import.js'
@@ -106,15 +112,16 @@ async function boot() {
   // Say which project and which server this tab is, where a person looks
   // first. Several editors can be open at once, on several ports, and two tabs
   // naming only the project are told apart by nothing.
-  const projectName = await openProjectName()
-  document.title = `${projectName} :${location.port} — engine`
+  const open = await openProject()
+  document.title = `${open.name} :${location.port} — engine`
 
   const { context, engine, world, loop } = await startWorld({
     openFiles: bus => makeFiles(bus),
     loadPlugins: findPlugins,
     importProjectFile,
     projectDirectory: PROJECT_PREFIX,
-    projectName,
+    projectName: open.name,
+    projectUntitled: open.untitled,
 
     // The shell builds the canvas the renderer draws into, so the shell comes
     // first and context.renderer is filled in immediately after. Both are put

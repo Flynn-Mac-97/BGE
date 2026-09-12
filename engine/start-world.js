@@ -93,6 +93,14 @@ export async function startWorld({
   projectDirectory = PROJECT_PREFIX,
   /** What the editor shows. `game.json`'s title overrides it below. */
   projectName: openProjectName = PROJECT_PREFIX,
+  /**
+   * Whether the open project is the untitled one.
+   *
+   * An untitled project is a scratch space: edits are held here and never
+   * written, so reloading the page drops them and nothing has to be undone.
+   * `project.saveAs` writes them out at the moment the project gets a name.
+   */
+  projectUntitled = false,
   /** The browser mounts its shell and renderer here. Headless does nothing. */
   attachScreen = async () => {},
   /** A measured screen. Overrides the game's declared device when given. */
@@ -121,6 +129,7 @@ export async function startWorld({
     // `project/plugins` need different answers.
     projectDirectory,
     projectName: openProjectName,
+    projectUntitled,
     levelName: '—',
     selection: new Set(),
     tool: 'select',
@@ -288,13 +297,19 @@ export async function startWorld({
    * holds where things ended up, so writing it back would quietly replace the
    * level with a freeze-frame of a playthrough. Refuse, and say how to get back.
    */
-  async function saveLevel() {
+  async function saveLevel({ naming = false } = {}) {
     // A page a lane opened to render in is a viewer: its world is its own, and
     // the checkout is shared. Checked before every other reason, because this
     // one is about who is asking rather than about what the world holds.
     if (globalThis.__engineViewer) {
       console.warn('[save] skipped — this page renders for a lane and never writes the checkout.')
       return { skipped: 'viewer' }
+    }
+    // The untitled project is scratch. Edits stay in the page, so a reload
+    // drops them and nothing has to be undone. `project.saveAs` passes
+    // `naming` to write them out as the project takes a name.
+    if (editor.projectUntitled && !naming) {
+      return { skipped: 'untitled', why: 'edits are held until the project is named — run project.saveAs <name> to keep them' }
     }
     if (world.simulated) {
       console.warn('[save] skipped — the world has been simulated, so it no longer holds start positions. Stop play mode (or engine.stop()) to reload the level first.')
@@ -329,6 +344,7 @@ export async function startWorld({
     }
     const level = { ...loadedLevel, ...world.toLevel(camera) }
     await files.writeJSON(`levels/${editor.levelName}.json`, level)
+    return { saved: `levels/${editor.levelName}.json` }
   }
 
   editor.togglePlay = () => {

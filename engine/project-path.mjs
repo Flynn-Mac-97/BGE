@@ -38,6 +38,15 @@ export function projectsRoot(checkout) {
 export const untitledProject = checkout => path.join(projectsRoot(checkout), UNTITLED)
 
 /**
+ * Whether a directory is the untitled project.
+ *
+ * Taken from the directory, never from the title: a named project is free to
+ * call itself "untitled", and a save rule that trusted the title would throw
+ * that project's edits away.
+ */
+export const isUntitled = projectPath => path.basename(String(projectPath || '')) === UNTITLED
+
+/**
  * The project directory a caller asked for.
  *
  * Resolved against the checkout, so `project` still means the directory of that

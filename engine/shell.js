@@ -277,9 +277,14 @@ export function makeShell(root, context) {
   function drawStatus() {
     const s = element('status')
     const sel = [...editor.selection]
+    // An untitled project never writes its level, so claiming "saved to disk"
+    // would be a lie a person only finds out about by losing work.
+    const saved = editor.projectUntitled
+      ? 'untitled · edits held, name it to keep them'
+      : (context.files.pending ? 'saving…' : 'saved to disk')
     s.innerHTML = `<span>${sel.length ? sel.join(', ') : 'nothing selected'}</span>
       <span>AI: run agent.context, not screenshots</span>
-      <span class="end">${context.files.pending ? 'saving…' : 'saved to disk'}</span>`
+      <span class="end">${saved}</span>`
   }
 
   /**

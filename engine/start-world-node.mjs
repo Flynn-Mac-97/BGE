@@ -33,7 +33,7 @@ import { startWorld } from './start-world.js'
 import { buildIndex, walk } from './project-index.mjs'
 import { workLock } from './work-lock.mjs'
 import { PROJECT_PREFIX } from './asset-path.js'
-import { ensureProject, projectName, resolveProject } from './project-path.mjs'
+import { ensureProject, isUntitled, projectName, resolveProject } from './project-path.mjs'
 
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -374,6 +374,7 @@ export async function startWorldInNode({ root = ROOT, project, viewport, rendere
     // `/project/` mount and never learns where it is on disk.
     projectDirectory: PROJECT_PREFIX,
     projectName: projectName(projectDirectory),
+    projectUntitled: isUntitled(projectDirectory),
     ...(viewport ? { viewport } : {}),
     // The same hook the browser mounts its shell and renderer through, so the
     // two halves attach a renderer at one point in the start-up order.
