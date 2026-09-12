@@ -12,14 +12,11 @@
 import { PROJECT_PREFIX } from './asset-path.js'
 
 /**
- * What the dev server calls the open project, for the tab title only. Where it
- * is on disk never reaches the page.
+ * What the server says it is serving. Where the project is on disk never
+ * reaches the page.
  *
  * Asked for rather than baked in: the server can repoint itself at another
- * project, and a title fixed at start-up would name the one it left.
- */
-/**
- * What the server says it is serving.
+ * project, and a name fixed at start-up would be the one it left.
  *
  * `untitled` decides whether an edit is written. A built page with no dev
  * server has no project to save to, so it reads as named and nothing changes.
@@ -134,7 +131,7 @@ async function boot() {
       // The renderer is handed the session's view and viewport rather than
       // owning them, so game code reaches the camera as context.view whether
       // anything is drawing or not.
-      const renderer = makeRenderer(shell.canvas, context.view, context.viewport)
+      const renderer = await makeRenderer(shell.canvas, context.view, context.viewport)
       context.renderer = renderer
       renderer.resize()
     }

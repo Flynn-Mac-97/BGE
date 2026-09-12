@@ -49,7 +49,11 @@
  * no project file, no context. Everything a level wants to say about light, fog
  * and sky arrives through the four setters near the bottom.
  */
-import * as THREE from 'three'
+// The node build, not the classic one. It carries WebGPURenderer and every
+// node material, and it is the only build TSL shaders compile against. The
+// classic build has WebGLRenderer and nothing node-shaped; the two are
+// disjoint, so a shader language choice is a renderer choice.
+import * as THREE from 'three/webgpu'
 import { assetURL } from './ui.js'
 
 /**
@@ -1202,10 +1206,14 @@ function shownInTree(object) {
  * session, which exists whether or not anything is drawing. The renderer reads
  * the same two objects the game does.
  */
-export function makeRenderer(canvas, view, viewport) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
+export async function makeRenderer(canvas, view, viewport) {
+  // WebGPU where the browser has it, WebGL 2 where it does not. The backend
+  // is chosen during init, which is why this function is async and why the
+  // caller awaits a renderer rather than being handed one.
+  const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, alpha: true })
+  await renderer.init()
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
-  maxAnisotropy = renderer.capabilities.getMaxAnisotropy()
+  maxAnisotropy = renderer.getMaxAnisotropy()
   // The world and the viewmodel are two passes over one frame, so clearing is
   // this file's job rather than three's — and the counters have to survive both
   // renders to be worth reading.
@@ -2314,24 +2322,24 @@ export function makeRenderer(canvas, view, viewport) {
   let composerPass = null
   let composerFor = null
 
+  /**
+   * Post-processing is off while the chain is still made of EffectComposer
+   * passes.
+   *
+   * EffectComposer drives a WebGLRenderer. Handed to the node renderer it
+   * builds without throwing and then draws nothing, so the frame goes black
+   * and the chain still reports itself as on — measured as mean brightness 0
+   * against 69 with no chain. Refusing loudly is the only honest state until
+   * the passes are node passes on three's own PostProcessing.
+   */
   function buildComposer() {
-    const wanted = passList
-    composerFor = wanted
-    Promise.all([
-      import('three/examples/jsm/postprocessing/EffectComposer.js'),
-      import('three/examples/jsm/postprocessing/RenderPass.js')
-    ]).then(([composerModule, renderModule]) => {
-      if (composerFor !== wanted) return
-      composer = new composerModule.EffectComposer(renderer)
-      composerPass = new renderModule.RenderPass(scene, activeCamera())
-      composer.addPass(composerPass)
-      for (const pass of wanted) composer.addPass(pass)
-      composer.setSize(viewport.width, viewport.height)
-    }).catch(error => {
-      report(`[render] passes: post-processing could not start (${error?.message}) — drawing straight to the canvas`)
-      composer = null
-      composerPass = null
-    })
+    composerFor = passList
+    composer = null
+    composerPass = null
+    if (!passList.length) return
+    report(
+      `[render] passes: ${passList.length} post-processing pass(es) ignored — EffectComposer cannot drive the node renderer, `
+      + 'and running it anyway draws a black frame. Drawing straight to the canvas until the chain is rebuilt on PostProcessing.')
   }
 
   // ------------------------------------------------------------------- counts
