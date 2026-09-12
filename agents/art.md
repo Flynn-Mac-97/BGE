@@ -9,7 +9,8 @@ game made of boxes.
 | want | use | cost |
 |---|---|---|
 | a character, creature, weapon, vehicle | **Blender** — model, export GLB to `<project>/assets/`, then `mesh: { model: '...' }` | high, and the only thing that reads as a model |
-| a prop with a real silhouette | **Blender**, or search a free library first | medium |
+| a prop with a real silhouette | **Blender**, or search a free library first. Block it out first: `agents/skills/blockout-prop/SKILL.md` | medium |
+| a space to move through — level, map, arena, interior | mostly entities in a level file. Read `agents/skills/blockout-environment/SKILL.md` before choosing | low to high |
 | a composite of a few solids — a fence, a crate stack | `mesh: { parts: [...] }`, boxes with local `at` and `rotation` | low |
 | a ball, a dome, a planet, anything that curves | `mesh: { sphere: r }` or `sphere: [x, y, z]` | none |
 | a wall, floor, slab, blockout | `mesh: { box: [...] }` | none |
