@@ -56,8 +56,8 @@
 import * as THREE from 'three/webgpu'
 import {
   attribute, cameraProjectionMatrix, float, max, modelNormalMatrix, modelViewMatrix,
-  normalGeometry, normalize, oneMinus, positionGeometry, positionLocal, screenSize,
-  smoothstep, step, uv as uvAttribute, vec4
+  mrt, normalGeometry, normalize, normalView, oneMinus, pass, positionGeometry,
+  positionLocal, screenSize, smoothstep, step, uv as uvAttribute, vec4
 } from 'three/tsl'
 import { assetURL } from './ui.js'
 
@@ -2387,31 +2387,62 @@ export async function makeRenderer(canvas, view, viewport) {
    * the game makes and therefore a decision a plugin makes, and putting the list
    * here is the tempting wrong answer that turns one GL context into a framework.
    * All this knows is the order, and that an empty list means draw straight to
-   * the canvas: no composer, no render target, no cost.
+   * the canvas: no chain, no render target, no cost.
    */
   let passList = []
-  let composer = null
-  let composerPass = null
-  let composerFor = null
+  let postProcessing = null
+  let postFor = null
+  let postCamera = null
+  let scenePass = null
 
   /**
-   * Post-processing is off while the chain is still made of EffectComposer
-   * passes.
+   * Build the chain, or take it down.
    *
-   * EffectComposer drives a WebGLRenderer. Handed to the node renderer it
-   * builds without throwing and then draws nothing, so the frame goes black
-   * and the chain still reports itself as on — measured as mean brightness 0
-   * against 69 with no chain. Refusing loudly is the only honest state until
-   * the passes are node passes on three's own PostProcessing.
+   * An effect is `{ name, needsNormals, apply(colour, parts) }` — a function
+   * from the picture so far to a new picture. That is the whole contract: this
+   * file still holds no opinion about what an effect does, only about the order
+   * they run in and about what the scene pass can offer them.
+   *
+   * `parts` carries what an effect cannot make for itself: the scene pass, the
+   * camera, and — when anything asked for one — a normal and depth pre-pass.
+   * The pre-pass is a second full render of the scene, so it is only made when
+   * an effect says `needsNormals`.
    */
-  function buildComposer() {
-    composerFor = passList
-    composer = null
-    composerPass = null
+  function buildPost() {
+    postFor = passList
+    postProcessing?.dispose?.()
+    postProcessing = null
+    scenePass = null
+    postCamera = null
     if (!passList.length) return
-    report(
-      `[render] passes: ${passList.length} post-processing pass(es) ignored — EffectComposer cannot drive the node renderer, `
-      + 'and running it anyway draws a black frame. Drawing straight to the canvas until the chain is rebuilt on PostProcessing.')
+
+    const camera = activeCamera()
+    postCamera = camera
+    scenePass = pass(scene, camera)
+
+    const parts = { scene: scenePass, depth: null, normal: null, camera }
+    if (passList.some(effect => effect.needsNormals)) {
+      const prePass = pass(scene, camera)
+      prePass.setMRT(mrt({ output: normalView }))
+      parts.normal = prePass.getTextureNode()
+      parts.depth = prePass.getTextureNode('depth')
+    }
+
+    let colour = scenePass
+    for (const effect of passList) {
+      try {
+        const next = effect.apply?.(colour, parts)
+        if (next) colour = next
+        else report(`[render] passes: "${effect.name || 'an effect'}" returned nothing — it is skipped and the rest of the chain still runs`)
+      } catch (error) {
+        report(`[render] passes: "${effect.name || 'an effect'}" could not be built — ${error?.message || error}. It is skipped and the rest of the chain still runs.`)
+      }
+    }
+
+    // Renamed in this version of three; the old name still works and warns.
+    const Pipeline = THREE.RenderPipeline || THREE.PostProcessing
+    postProcessing = new Pipeline(renderer)
+    postProcessing.outputNode = colour
   }
 
   // ------------------------------------------------------------------- counts
@@ -2438,7 +2469,6 @@ export async function makeRenderer(canvas, view, viewport) {
     viewport.width = Math.max(1, r.width)
     viewport.height = Math.max(1, r.height)
     renderer.setSize(viewport.width, viewport.height, false)
-    composer?.setSize(viewport.width, viewport.height)
     updateCamera()
   }
 
@@ -2453,7 +2483,6 @@ export async function makeRenderer(canvas, view, viewport) {
     viewport.width = Math.max(1, Math.round(width))
     viewport.height = Math.max(1, Math.round(height))
     renderer.setSize(viewport.width, viewport.height, false)
-    composer?.setSize(viewport.width, viewport.height)
     updateCamera()
   }
 
@@ -2663,12 +2692,13 @@ export async function makeRenderer(canvas, view, viewport) {
       const camera = readyCamera()
       renderer.info.reset()
 
-      if (composer && composerPass) {
-        composerPass.scene = scene
-        composerPass.camera = camera
-        // A fixed step rather than a wall clock: nothing this file does may
-        // depend on how long the last frame took.
-        composer.render(1 / 60)
+      // The editor draws through an orthographic camera and play through a
+      // perspective one. A pass holds the camera it was built with, so the
+      // chain is rebuilt when that camera is swapped rather than sampling the
+      // wrong depth for a frame.
+      if (postProcessing && postCamera !== camera) buildPost()
+      if (postProcessing) {
+        postProcessing.render()
       } else {
         renderer.clear()
         renderer.render(scene, camera)
@@ -2754,15 +2784,14 @@ export async function makeRenderer(canvas, view, viewport) {
       set(list) {
         passList = Array.isArray(list) ? list.filter(Boolean) : []
         if (!passList.length) {
-          composerFor = null
-          composer?.dispose?.()
-          composer = null
-          composerPass = null
+          postFor = null
+          postProcessing?.dispose?.()
+          postProcessing = null
+          scenePass = null
           return
         }
-        buildComposer()
-      },
-      get list() { return [...passList] }
+        buildPost()
+      }
     },
 
     /**

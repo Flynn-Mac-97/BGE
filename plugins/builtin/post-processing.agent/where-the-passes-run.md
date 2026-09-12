@@ -1,19 +1,22 @@
 # Where the passes run
 
-The composer is not in this plugin. `renderer.passes.set(list)` takes an
-ordered list and has no opinion about what the passes do.
+The chain is not in this plugin. `renderer.passes.set(list)` takes an ordered
+list of effects and has no opinion whatever about what they do.
 
-The renderer owns the GL context, the render targets, the resize, and the
-`RenderPass` at the front. It has to: the engine switches between an
-orthographic and a perspective camera and only the renderer knows which is
-drawing.
+An effect is `{ name, needsNormals, apply(colour, parts) }` — a function from
+the picture so far to a new picture. `parts` carries what an effect cannot make
+for itself: the scene pass, the live camera, and a normal and depth pre-pass
+when something asked for one.
 
-Everything after that first pass belongs to this plugin — the effects the level
-asked for, in the order it wrote them, and an `OutputPass` to close the chain.
+The renderer owns the context, the render targets, the resize and the scene pass
+at the front. It has to: this engine draws through an orthographic camera while
+editing and a perspective one while playing, and only the renderer knows which,
+so it rebuilds the chain when that camera is swapped.
 
-That last pass is not optional and is not the renderer's job. A composer works
-in linear light, and without a final tone-map-and-encode step the picture
-reaches the canvas unencoded and every colour comes out wrong.
+Everything after the scene pass is this plugin's: the effects the level asked
+for, in the order it wrote them. **Nothing closes the chain.** Three's
+`PostProcessing` tone-maps and encodes its own output, which is what the old
+`OutputPass` was for.
 
 ## Reading what is actually built
 

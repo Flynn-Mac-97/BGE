@@ -42,13 +42,17 @@ is a fact about the place.
 ## Cost
 
 **An empty chain costs nothing**, and that is enforced rather than assumed. The
-plugin contributes no system, so there is no per-frame work to skip. Every pass
-module sits behind a dynamic `import()`, so a game with no chain never
-downloads them. The renderer is only handed passes when there are some, so it
-never makes a composer and never allocates a render target.
+plugin contributes no system, so there is no per-frame work to skip. Every
+effect module sits behind a dynamic `import()`, so a game with no chain never
+downloads them. The renderer is only handed effects when there are some, so it
+makes no chain and allocates no render target.
 
-Do not add a post-processing dependency. `EffectComposer` and every pass here
-already ship inside the installed `three` package.
+**`ssao` costs a second full render of the scene**, because occlusion is worked
+out from a normal and depth pre-pass. Every other effect is one more read of the
+frame.
+
+Do not add a post-processing dependency. Every effect here already ships inside
+the installed `three` package, under `three/addons/tsl/display/`.
 
 ## From a terminal
 

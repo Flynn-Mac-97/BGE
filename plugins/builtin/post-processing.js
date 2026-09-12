@@ -34,34 +34,34 @@
  *   node bin/engine.mjs run post.chain cinematic
  *   node bin/engine.mjs run post.chain '[{"bloom":{"strength":0.5}},{"vignette":0.4}]'
  *
- * NO NEW DEPENDENCY. EffectComposer and every pass used here already ship inside
- * the installed `three` package, under `three/examples/jsm/postprocessing/` and
- * `three/examples/jsm/shaders/`. The next agent to read this will assume a
- * postprocessing library was added; none was, and none should be.
+ * NO NEW DEPENDENCY. Every effect used here already ships inside the installed
+ * `three` package, under `three/addons/tsl/display/`, and the two written by
+ * hand are node graphs of a dozen lines. The next agent to read this will assume
+ * a post-processing library was added; none was, and none should be.
  *
  * WHAT AN EMPTY CHAIN COSTS: nothing, and that is enforced three ways.
  *   1. This plugin contributes no systems. There is no per-frame work to skip,
  *      because there is none to begin with — it is `onLoad`, one bus listener
  *      and one command.
- *   2. Every pass module, and three itself, sit behind a dynamic `import()`
+ *   2. Every effect module, and three itself, sit behind a dynamic `import()`
  *      inside the build path. A game with no chain never downloads them.
  *   3. `renderer.passes.set` is only called when there is something to set, or
  *      something previously set to tear down. A renderer that has never been
- *      handed a pass never makes a composer and never allocates a render target,
- *      so the frame time is exactly what it was before this file existed.
+ *      handed an effect makes no chain and allocates no render target, so the
+ *      frame time is exactly what it was before this file existed.
  * A post-processing plugin that taxes every game that does not use it is a bad
  * plugin, and "it only costs one branch per frame" is how that starts.
  *
- * WHERE THE COMPOSER LIVES: not here. `renderer.passes.set(list)` takes an
- * ordered list and has, in its own words, no opinion whatever about what the
- * passes do. The renderer owns the GL context, the render targets, the resize
- * and the RenderPass at the front — it has to, because this engine switches
- * between an orthographic and a perspective camera and only the renderer knows
- * which is drawing. Everything after that first pass is this plugin's: the
- * effects the level asked for, in the order it wrote them, and an OutputPass to
- * close the chain. That last one is not optional and is not the renderer's job:
- * a composer works in linear light, and without a final tone-map-and-encode step
- * the picture reaches the canvas unencoded and every colour comes out wrong.
+ * WHERE THE CHAIN LIVES: not here. `renderer.passes.set(list)` takes an ordered
+ * list of effects and has, in its own words, no opinion whatever about what they
+ * do. An effect is `{ name, needsNormals, apply(colour, parts) }` — a function
+ * from the picture so far to a new picture. The renderer owns the context, the
+ * render targets, the resize and the scene pass at the front; it has to, because
+ * this engine switches between an orthographic and a perspective camera and only
+ * the renderer knows which is drawing. Everything after that is this plugin's:
+ * the effects the level asked for, in the order it wrote them. Nothing closes
+ * the chain — three's `PostProcessing` tone-maps and encodes its own output,
+ * which is what the old OutputPass was for.
  */
 
 /** Where a whole look can be named instead of spelled out. */
@@ -354,109 +354,136 @@ async function apply(context, post) {
  * installed `three` package; nothing was added to package.json for this.
  */
 async function buildPasses(context, post) {
-  const [THREE, { ShaderPass }] = await Promise.all([
-    import('three'),
-    import('three/examples/jsm/postprocessing/ShaderPass.js')
-  ])
-
-  const size = context.renderer?.size || { w: 1280, h: 720 }
-  const width = Math.max(1, Math.round(size.w))
-  const height = Math.max(1, Math.round(size.h))
+  const [THREE, TSL] = await Promise.all([import('three/webgpu'), import('three/tsl')])
 
   const built = []
   for (const { effect, options } of post.resolved) {
-    built.push(await buildOne(effect, options, {
-      THREE, ShaderPass, width, height, context, post
-    }))
+    built.push(await buildOne(effect, options, { THREE, TSL, context, post }))
   }
-
-  const passes = built.filter(Boolean)
-  if (!passes.length) return passes
-
-  // Closing the chain. A composer works in linear light and the canvas expects
-  // it encoded, so without this the whole picture arrives washed out — the exact
-  // failure that reads as "post-processing broke the colours" and sends somebody
-  // looking at the grade. It is added here rather than in the renderer because
-  // the renderer only draws through a composer when this plugin gives it one.
-  const { OutputPass } = await import('three/examples/jsm/postprocessing/OutputPass.js')
-  passes.push(new OutputPass())
-  return passes
+  // Nothing closes the chain. `PostProcessing` tone-maps and encodes its own
+  // output, which is what the old OutputPass was for.
+  return built.filter(Boolean)
 }
 
+/**
+ * One effect as a function from the picture so far to a new picture.
+ *
+ * `needsNormals` makes the renderer ask the scene pass for a normal buffer,
+ * which costs a second render target — so only an effect that reads one says
+ * so.
+ */
 async function buildOne(effect, options, tools) {
-  const { THREE, ShaderPass, width, height, context } = tools
+  const { THREE, TSL, context, post } = tools
   const number = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback)
 
   if (effect === 'smaa') {
-    const { SMAAPass } = await import('three/examples/jsm/postprocessing/SMAAPass.js')
-    return new SMAAPass(width, height)
+    const { smaa } = await import('three/addons/tsl/display/SMAANode.js')
+    return { name: 'smaa', apply: colour => smaa(colour) }
   }
 
   if (effect === 'bloom') {
-    const { UnrealBloomPass } = await import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
-    return new UnrealBloomPass(
-      new THREE.Vector2(width, height),
-      number(options.strength, 0.35),
-      number(options.radius, 0.4),
-      number(options.threshold, 0.9)
-    )
+    const { bloom } = await import('three/addons/tsl/display/BloomNode.js')
+    const { convertToTexture } = TSL
+    const strength = number(options.strength, 0.35)
+    const radius = number(options.radius, 0.4)
+    const threshold = number(options.threshold, 0.9)
+    // Bloom is what the bright parts bleed, so it is added to the picture
+    // rather than replacing it. Its input is turned into a texture because it
+    // samples a chain of smaller copies of the frame, which a plain node has no
+    // way to offer.
+    return {
+      name: 'bloom',
+      apply(colour) {
+        const source = convertToTexture(colour)
+        return source.add(bloom(source, strength, radius, threshold))
+      }
+    }
   }
 
   if (effect === 'ssao') {
-    const { SSAOPass } = await import('three/examples/jsm/postprocessing/SSAOPass.js')
-    const renderer = context.renderer
-    const pass = new SSAOPass(renderer.scene, renderer.camera, width, height)
-    pass.kernelRadius = number(options.radius, 0.4)
-    // Below the bias, two surfaces are treated as the same surface; above the
-    // range, they are treated as unrelated. Both are in metres, like everything
-    // else in this engine.
-    pass.minDistance = number(options.bias, 0.005)
-    pass.maxDistance = Math.max(pass.minDistance + 0.001, number(options.range, 0.1))
-    // `renderer.camera` is a getter: this engine draws a level through an
-    // orthographic camera while editing and a perspective one while playing, and
-    // a pass that captured whichever existed at build time would sample the
-    // wrong depth the moment play was pressed. Reading it live costs nothing and
-    // is the only way one pass survives the switch.
-    Object.defineProperty(pass, 'camera', {
-      get: () => renderer.camera,
-      // Nothing sets it, but a silently-swallowed assignment beats a throw from
-      // inside a pass three might one day change.
-      set: () => {},
-      configurable: true
-    })
-    return pass
+    const { ao } = await import('three/addons/tsl/display/GTAONode.js')
+    const { builtinAOContext, screenUV } = TSL
+    const radius = number(options.radius, 0.4)
+    return {
+      name: 'ssao',
+      needsNormals: true,
+      apply(colour, parts) {
+        if (!parts.normal || !parts.depth) {
+          throw new Error('no depth or normal pre-pass, so there is nothing to work the occlusion out from')
+        }
+        const occlusion = ao(parts.depth, parts.normal, parts.camera)
+        occlusion.radius = radius
+        // Fed into the scene pass's own lighting rather than multiplied over
+        // the finished picture. Occlusion belongs on the ambient light: a
+        // multiply at the end darkens things that are lit directly too.
+        parts.scene.contextNode = builtinAOContext(occlusion.getTextureNode().sample(screenUV).r)
+        return colour
+      }
+    }
   }
 
   if (effect === 'grade') {
-    // Three ships a brightness/contrast shader, a hue/saturation shader and a
-    // colorify shader — three passes and three full-screen reads to say one
-    // thing. One shader that does all of it is cheaper and is still no new
-    // dependency: it is a plain uniforms/vertex/fragment object handed to three's
-    // own ShaderPass.
-    const pass = new ShaderPass({
-      uniforms: {
-        tDiffuse: { value: null },
-        contrast: { value: number(options.contrast, 1) },
-        saturation: { value: number(options.saturation, 1) },
-        brightness: { value: number(options.brightness, 0) },
-        tint: { value: readColour(THREE, options.tint, '#ffffff', 'grade.tint', tools.post) }
-      },
-      vertexShader: SCREEN_VERTEX,
-      fragmentShader: GRADE_FRAGMENT
-    })
-    return pass
+    const { clamp, dot, max, mix, vec3, vec4 } = TSL
+    const contrast = number(options.contrast, 1)
+    const saturation = number(options.saturation, 1)
+    const brightness = number(options.brightness, 0)
+    // Read back in sRGB, not linear. A cast is a ratio an author picks by eye
+    // from a hex, and #ffe8c0 is a ninth off blue on a screen but nearly half
+    // off in linear light — the same hex would land as a much heavier cast.
+    const cast = new THREE.Color()
+    readColour(THREE, options.tint, '#ffffff', 'grade.tint', post).getRGB(cast, THREE.SRGBColorSpace)
+    const tint = cast
+    // Brightness, then contrast about mid grey, then saturation about
+    // luminance, then the cast. That order matters: grading after a contrast
+    // curve is what a warm tint is supposed to be, and the other way round
+    // tints the shadows as hard as the highlights.
+    return {
+      name: 'grade',
+      apply(colour) {
+        const lifted = colour.rgb.add(brightness)
+        // Contrast as a power about MID GREY, not as a straight line through
+        // it. A line takes everything below the pivot negative as soon as the
+        // contrast passes 1, which clips the whole shadow end of a dark scene
+        // to pure black. A power darkens the toe in proportion and can never
+        // reach zero.
+        const curved = max(lifted, 0.0001).div(MID_GREY).pow(contrast).mul(MID_GREY)
+        const luminance = dot(curved, vec3(0.2126, 0.7152, 0.0722))
+        const saturated = mix(vec3(luminance), curved, saturation)
+        const cast = saturated.mul(vec3(tint.r, tint.g, tint.b))
+        return vec4(clamp(cast, 0, 1), colour.a)
+      }
+    }
   }
 
   if (effect === 'vignette') {
-    const { VignetteShader } = await import('three/examples/jsm/shaders/VignetteShader.js')
-    const pass = new ShaderPass(VignetteShader)
-    pass.uniforms.darkness.value = number(options.amount, 0.25) * 4
-    pass.uniforms.offset.value = number(options.offset, 1)
-    return pass
+    const { float, screenUV, smoothstep, vec4 } = TSL
+    const amount = number(options.amount, 0.25)
+    const offset = number(options.offset, 1)
+    return {
+      name: 'vignette',
+      apply(colour) {
+        // Distance from the middle of the screen, 0 at the centre and 1 in a
+        // corner, so the falloff means the same at any aspect.
+        const reach = screenUV.sub(0.5).length().mul(1.4142)
+        const darkening = smoothstep(offset * 0.5, 1, reach).mul(amount)
+        return vec4(colour.rgb.mul(float(1).sub(darkening)), colour.a)
+      }
+    }
   }
 
   return null
 }
+
+
+
+// ------------------------------------------------------------------ reporting
+/**
+ * Mid grey in linear light: what 0.5 on a screen actually is once decoded.
+ *
+ * Every effect here runs before the output transform, so a curve that wants to
+ * turn about the middle of the picture has to turn about this.
+ */
+const MID_GREY = 0.2140
 
 /** A colour three will take, or the fallback — reported either way. */
 function readColour(THREE, value, fallback, where, post) {
@@ -468,40 +495,6 @@ function readColour(THREE, value, fallback, where, post) {
   return new THREE.Color(fallback)
 }
 
-// ------------------------------------------------------------------ the shaders
-const SCREEN_VERTEX = `
-  varying vec2 vScreen;
-  void main() {
-    vScreen = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-/**
- * Brightness, then contrast about mid grey, then saturation about luminance,
- * then the cast. That order matters: grading after a contrast curve is what a
- * warm tint is supposed to be, and doing it the other way round tints the
- * shadows as hard as the highlights.
- */
-const GRADE_FRAGMENT = `
-  uniform sampler2D tDiffuse;
-  uniform float contrast;
-  uniform float saturation;
-  uniform float brightness;
-  uniform vec3 tint;
-  varying vec2 vScreen;
-  void main() {
-    vec4 texel = texture2D(tDiffuse, vScreen);
-    vec3 graded = texel.rgb + brightness;
-    graded = (graded - 0.5) * contrast + 0.5;
-    float luminance = dot(graded, vec3(0.2126, 0.7152, 0.0722));
-    graded = mix(vec3(luminance), graded, saturation);
-    graded *= tint;
-    gl_FragColor = vec4(clamp(graded, 0.0, 1.0), texel.a);
-  }
-`
-
-// ------------------------------------------------------------------ reporting
 function sayOnce(post, message) {
   if (post.said.has(message)) return
   post.said.add(message)
@@ -536,7 +529,7 @@ function notes(context, post) {
     out.push('nothing is drawing this world, so the chain is worked out but not built — that is what headless is')
   }
   if (!post.resolved.length) {
-    out.push('no chain, so no composer, no extra render target and no per-frame work — an empty chain costs nothing')
+    out.push('no chain, so no render target and no per-frame work — an empty chain costs nothing')
   }
   if (post.declared === null || post.declared === undefined) {
     out.push('the level declares no "post" in its world block, so this is off unless post.chain sets it')
@@ -545,7 +538,7 @@ function notes(context, post) {
     out.push('post.chain changed this session and nothing was written — the level file still says what it said')
   }
   if (post.built > post.resolved.length) {
-    out.push('one more pass than effect, because the chain is closed with an OutputPass — a composer works in linear light and the canvas expects it encoded')
+    out.push('one effect per entry, and nothing closing the chain — PostProcessing tone-maps and encodes its own output')
   }
   if (post.resolved.some(e => e.effect === 'ssao') && post.resolved.some(e => e.effect === 'smaa')) {
     out.push('ssao before smaa is the right order: antialiasing the ambient occlusion is cheaper than occluding the antialiased edges')
