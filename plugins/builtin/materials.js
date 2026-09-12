@@ -263,6 +263,12 @@ export function makeMaterials({ report = () => {}, fallback = DEFAULT_MATERIAL }
         builder = null
       }
       const previous = records.get(key)
+      // Two plugins claiming one name is decided by load order, so the loser is
+      // silently never drawn. Name both, because the symptom — a surface that
+      // looks like the wrong material — says nothing about the cause.
+      if (previous?.build && builder && details.from && details.from !== previous.from) {
+        say(`[Materials] "${key}" is registered by both ${previous.from} and ${details.from} — ${details.from} wins and ${previous.from}'s is gone. Rename one.`)
+      }
       const record = {
         name: key,
         // Registering with no builder describes a material without being able to
