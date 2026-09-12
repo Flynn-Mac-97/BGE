@@ -290,10 +290,98 @@ export function resolveLightmaps(block, say = () => {}) {
 }
 
 // ------------------------------------------------------------------ the plugin
+/** Which light the panel is showing. Module-level, so it survives a redraw. */
+const panel = { chosen: null }
+
+/**
+ * Write one property of a light and save the level.
+ *
+ * `overrides` is what the inspector marks as set on this placement, so a value
+ * changed here reads the same as one typed into the file.
+ */
+function setLightProperty(context, light, key, value) {
+  light.properties[key] = value
+  if (light.overrides && !light.overrides.includes(key)) light.overrides.push(key)
+  context.bus.emit('world:changed')
+  context.save()
+  context.redraw()
+}
+
 export default {
   name: 'Lights',
 
   category: 'visuals',
+  about: 'Every light in the level, and the few knobs each kind actually reads.',
+
+  panels: [{
+    id: 'lights',
+    title: 'Lights',
+    dock: 'right',
+    order: 41,
+    // The right dock is shared, and every panel in it takes height from the
+    // others. A level with no lights has nothing to show, so it takes none.
+    when: context => context.world.entities.some(entity => entity.type === 'light'),
+
+    render(ui, context) {
+      const lights = context.world.entities.filter(entity => entity.type === 'light')
+      const chosen = lights.find(entity => entity.id === panel.chosen) || lights[0]
+      const kind = chosen.properties.kind || 'point'
+      const set = (key, value) => setLightProperty(context, chosen, key, value)
+
+      // Only the keys this kind reads. Showing `angle` on a hemisphere light
+      // offers a knob that changes nothing.
+      const forKind = [
+        ['range', 0, 120, 0.5, 10, ['point', 'spot', 'directional']],
+        ['decay', 0, 3, 0.1, 1, ['point', 'spot']],
+        ['angle', 1, 90, 1, 45, ['spot']],
+        ['penumbra', 0, 1, 0.05, 0.3, ['spot']],
+        ['width', 0.1, 20, 0.1, 2, ['area']],
+        ['height', 0.1, 20, 0.1, 1, ['area']]
+      ].filter(([, , , , , kinds]) => kinds.includes(kind))
+
+      return ui.stack([
+        ui.pick({
+          options: lights.map(entity => ({ value: entity.id, label: entity.id })),
+          value: chosen.id,
+          onChange: id => { panel.chosen = id }
+        }),
+
+        // Kind, brightness and shadow are what a person reaches for; the rest
+        // is folded, because the right dock is shared and an open section takes
+        // height from the panels beside it.
+        ui.section(chosen.id, [
+          ui.pick({ options: KINDS, value: kind, onChange: value => set('kind', value) }),
+          ui.slider({
+            k: 'intensity', min: 0, max: 12, step: 0.1,
+            value: chosen.properties.intensity ?? 2,
+            onChange: value => set('intensity', value)
+          }),
+          // One shadow at a time, so the count below says who is holding it.
+          ui.toggle({
+            label: `shadow · ${lights.filter(entity => entity.properties.shadow === true).length} of 1 used`,
+            value: chosen.properties.shadow === true,
+            onChange: value => set('shadow', value)
+          })
+        ]),
+
+        ui.fold('Colour and falloff', [
+          ui.field({ k: 'color', v: chosen.properties.color ?? '#ffffff', onChange: value => set('color', value) }),
+          kind === 'hemisphere'
+            ? ui.field({
+                k: 'groundColor', v: chosen.properties.groundColor ?? '#3a3f46',
+                onChange: value => set('groundColor', value)
+              })
+            : null,
+          ...forKind.map(([key, least, most, step, fallback]) => ui.slider({
+            k: key, min: least, max: most, step,
+            value: chosen.properties[key] ?? fallback,
+            onChange: value => set(key, value)
+          }))
+        ].filter(Boolean), { meta: `${kind} keys` })
+      ])
+    }
+  }],
+
   onLoad(context) {
     /** id -> everything this file knows about one live light. */
     const lights = new Map()

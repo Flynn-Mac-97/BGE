@@ -371,10 +371,91 @@ function animate(material, advance) {
   material.addEventListener('dispose', () => animated.delete(material))
 }
 
+/** Which surface the panel is showing. Module-level, so it survives a redraw. */
+const panel = { chosen: null }
+
+/** How many meshes in the open level name each material. Lambert is the default. */
+function usageByMaterial(context) {
+  const used = new Map()
+  for (const entity of context.world.entities) {
+    if (!entity.mesh) continue
+    const name = entity.mesh.material || 'lambert'
+    used.set(name, (used.get(name) || 0) + 1)
+  }
+  return used
+}
+
+/** Name a material on every selected mesh, and write the level. */
+function applyMaterial(context, entities, name) {
+  for (const entity of entities) entity.mesh = { ...entity.mesh, material: name }
+  context.bus.emit('world:changed')
+  context.save()
+  context.redraw()
+}
+
 export default {
   name: 'Materials',
 
   category: 'visuals',
+  about: 'The library of surfaces a mesh can name, what each one is for, and which the open level uses.',
+
+  panels: [{
+    id: 'materials',
+    title: 'Materials',
+    dock: 'right',
+    order: 40,
+
+    render(ui, context) {
+      const library = context.materials?.list() || []
+      if (!library.length) return ui.empty('no materials registered yet')
+
+      const chosen = library.find(record => record.name === panel.chosen)
+      const used = usageByMaterial(context)
+      // Only a mesh takes a material. A sprite has its own path, so offering to
+      // set one on a sprite would write a key nothing reads.
+      const meshes = context.selection.filter(entity => entity.mesh)
+
+      return ui.stack([
+        ui.pick({
+          options: library.map(record => ({ value: record.name, label: record.name })),
+          value: panel.chosen,
+          onChange: name => { panel.chosen = name === panel.chosen ? null : name }
+        }),
+
+        // Folded, because the right dock is shared and every open section takes
+        // height from the panels beside it.
+        chosen
+          ? ui.fold(chosen.name, [
+              ui.text(chosen.about, { dim: true }),
+              // A headless world describes every material and can build none.
+              chosen.buildable ? null : ui.text('described only — nothing is drawing', { dim: true }),
+              ...Object.entries(chosen.parameters).map(([key, value]) =>
+                ui.field({ k: key, v: value === null ? '—' : String(value) }))
+            ].filter(Boolean), { open: true, meta: `${Object.keys(chosen.parameters).length} keys` })
+          : ui.text('pick a surface to see its keys', { dim: true }),
+
+        chosen && meshes.length
+          ? ui.row([ui.button(
+              `Apply to ${meshes.length === 1 ? meshes[0].id : `${meshes.length} meshes`}`,
+              () => applyMaterial(context, meshes, chosen.name),
+              { primary: true })], { pad: true })
+          : null,
+
+        used.size
+          ? ui.fold('In this level', [...used.entries()]
+              .sort((first, second) => second[1] - first[1])
+              .map(([name, count]) => ui.field({ k: name, v: String(count) })),
+              { meta: `${used.size} used` })
+          : null,
+
+        context.materials.problems.length
+          ? ui.fold('Problems', context.materials.problems.map(message => ui.text(message, { dim: true })),
+              { meta: context.materials.problems.length })
+          : null
+      ].filter(Boolean))
+    }
+  }],
+
   onLoad(context) {
     const materials = makeMaterials({ report: message => console.error(message) })
     context.materials = materials
