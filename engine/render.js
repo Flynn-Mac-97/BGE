@@ -1269,7 +1269,15 @@ export async function makeRenderer(canvas, view, viewport) {
   // WebGPU where the browser has it, WebGL 2 where it does not. The backend
   // is chosen during init, which is why this function is async and why the
   // caller awaits a renderer rather than being handed one.
-  const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, alpha: true })
+  // `trackTimestamp` asks the card how long the frame actually took on it.
+  // That is an optional WebGPU feature: three turns it off by itself where it
+  // is missing, and the number is then simply absent rather than wrong. CPU
+  // time measures how long it took to describe a frame, which is a different
+  // question and answers neither "is this shader heavy" nor "how many of these
+  // can I draw".
+  const renderer = new THREE.WebGPURenderer({
+    canvas, antialias: true, alpha: true, trackTimestamp: true
+  })
   await renderer.init()
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
   maxAnisotropy = renderer.getMaxAnisotropy()
@@ -2463,7 +2471,12 @@ export async function makeRenderer(canvas, view, viewport) {
     // One draw call each, and one for every contact shadow together — one more
     // for every ground ring together.
     keylines: 0, contactShadows: 0, groundRings: 0,
-    materials: 0, textures: 0, geometries: 0, programs: 0
+    materials: 0, textures: 0, geometries: 0, programs: 0,
+    // Milliseconds the card spent on the last frame it reported. Null where the
+    // backend cannot time itself, which is every WebGL 2 one.
+    gpuMs: null,
+    // Milliseconds spent describing the last frame, on this thread.
+    cpuMs: 0
   }
 
   function resize() {
@@ -2690,7 +2703,24 @@ export async function makeRenderer(canvas, view, viewport) {
       stats.materials = sharedMaterials.size
     },
 
+    /**
+     * How long the card took on the last frame, in milliseconds.
+     *
+     * Awaited rather than read, because the answer lands a frame or two behind.
+     * Null where the backend cannot time itself.
+     */
+    async gpuTime() {
+      if (!renderer.backend?.trackTimestamp) return null
+      try {
+        await renderer.resolveTimestampsAsync('render')
+        return renderer.info.render.timestamp || null
+      } catch {
+        return null
+      }
+    },
+
     draw() {
+      const startedAt = performance.now()
       const camera = readyCamera()
       renderer.info.reset()
 
@@ -2714,11 +2744,19 @@ export async function makeRenderer(canvas, view, viewport) {
         renderer.render(viewmodelScene, viewmodelCamera)
       }
 
-      stats.drawCalls = renderer.info.render.calls
+      stats.cpuMs = performance.now() - startedAt
+      stats.drawCalls = renderer.info.render.drawCalls
       stats.triangles = renderer.info.render.triangles
       stats.textures = renderer.info.memory.textures
       stats.geometries = renderer.info.memory.geometries
       stats.programs = renderer.info.programs?.length || 0
+      // Resolved without waiting: the answer lands a frame or two later and is
+      // read off `info` then. Awaiting here would stall the thread on the card
+      // every frame, which would change the very thing being measured.
+      if (renderer.backend?.trackTimestamp) {
+        renderer.resolveTimestampsAsync('render').catch(() => {})
+        stats.gpuMs = renderer.info.render.timestamp || null
+      }
     },
 
     /**
