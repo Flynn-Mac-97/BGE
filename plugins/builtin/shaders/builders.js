@@ -34,6 +34,14 @@ function colourOf(THREE, value, fallback) {
   return [colour.r, colour.g, colour.b]
 }
 
+/** A quad's declared width and height, whichever form the level wrote. */
+function quadSize(mesh) {
+  const declared = mesh.quad
+  if (Array.isArray(declared)) return [Number(declared[0]) || 1, Number(declared[1]) || 1]
+  const both = Number(declared)
+  return Number.isFinite(both) && both > 0 ? [both, both] : [1, 1]
+}
+
 /** A direction of unit length, worked out once rather than in the graph. */
 function unit([x, y, z]) {
   const size = Math.hypot(x, y, z) || 1
@@ -70,10 +78,11 @@ const WATER_HALF = unit([-0.35, 0.45, 1.82])
  */
 export function buildersFor(THREE, TSL, SHADERS) {
   const {
-    abs, clamp, cos, dot, exp, float, floor, fract, fwidth, max, min, mix,
-    mx_fractal_noise_float, mx_noise_float, normalize, normalView, oneMinus,
-    positionLocal, positionViewDirection, screenCoordinate, sin, smoothstep,
-    step, time, vec2, vec3, vec4
+    abs, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, clamp, cos, cross,
+    dot, exp, float, floor, fract, fwidth, max, min, mix, mx_fractal_noise_float,
+    mx_noise_float, normalize, normalView, oneMinus, positionLocal,
+    positionViewDirection, positionWorld, screenCoordinate, sin, smoothstep, step,
+    time, vec2, vec3, vec4
   } = TSL
 
   /** Distance to the nearest face border: 0 at the border, 0.5 in the middle. */
@@ -96,8 +105,8 @@ export function buildersFor(THREE, TSL, SHADERS) {
   const silhouette = () => oneMinus(abs(normalView.normalize().dot(positionViewDirection.normalize())))
 
   return {
-    outline: ({ mesh, tint, uv }) => {
-      const defaults = SHADERS.outline.parameters
+    edges: ({ mesh, tint, uv }) => {
+      const defaults = SHADERS.edges.parameters
       const edge = colourOf(THREE, mesh.edge, defaults.edge)
       const width = held(mesh.width, defaults.width, 0.001, 0.45)
       const power = held(mesh.power, defaults.power, 0.1, 16)
@@ -110,6 +119,72 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const inward = oneMinus(smoothstep(0, width * 3, toBorder(uv.face()))).pow(2.2)
       const glow = max(line, max(inward.mul(0.35), silhouette().pow(power).mul(0.9)))
       material.emissiveNode = vec3(...edge).mul(glow.mul(strength))
+      return material
+    },
+
+    grass: ({ mesh, uv }) => {
+      const defaults = SHADERS.grass.parameters
+      const root = colourOf(THREE, mesh.root, defaults.root)
+      const tip = colourOf(THREE, mesh.tip, defaults.tip)
+      const blades = Math.round(held(mesh.blades, defaults.blades, 1, 24))
+      const wind = held(mesh.wind, defaults.wind, 0, 3)
+      const speed = held(mesh.speed, defaults.speed, 0, 8)
+      const lean = held(mesh.lean, defaults.lean, 0, 1)
+      const [wide, tall] = quadSize(mesh)
+      const material = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide })
+      // A hard cut rather than blending: a tuft has to write depth or the one
+      // behind it draws through, and a sorted transparent field never settles.
+      material.alphaTest = 0.3
+
+      const face = uv.face()
+      // The tuft's own centre, taken back out of the vertex. Reading the object
+      // matrix would give the wrong answer the moment the renderer merges a
+      // field of these into one mesh, which it does as soon as they stand still.
+      const centre = positionWorld.sub(
+        vec3(face.x.sub(0.5).mul(wide), face.y.sub(0.5).mul(tall), 0))
+
+      // Turn about Y only, so the tuft faces the camera and still stands up.
+      const up = vec3(0, 1, 0)
+      const toEye = cameraPosition.sub(centre)
+      const facing = normalize(vec3(toEye.x, 0.0001, toEye.z))
+      const across = normalize(cross(up, facing))
+
+      // Two gusts at different rates, offset by where the tuft stands, so a
+      // field never sways in one piece. Squared height holds the roots still.
+      const phase = centre.x.mul(0.7).add(centre.z.mul(0.9))
+      const gust = sin(time.mul(speed).add(phase))
+        .add(sin(time.mul(speed * 2.3).add(phase.mul(1.7))).mul(0.35))
+      const sway = gust.mul(wind * tall * 0.3).mul(face.y.mul(face.y))
+
+      const world = centre
+        .add(across.mul(face.x.sub(0.5).mul(wide).add(sway)))
+        .add(up.mul(face.y.sub(0.5).mul(tall)))
+      material.vertexNode = cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(world, 1))
+
+      // One blade per column of the face, each with its own height, tilt and
+      // shade drawn from the column number. A tuft of identical blades reads as
+      // a comb.
+      const column = floor(face.x.mul(blades))
+      const within = fract(face.x.mul(blades))
+      const drawn = mx_noise_float(vec3(column.mul(12.7), 4.2, 0)).mul(0.5).add(0.5)
+      const top = drawn.mul(0.45).add(0.55)
+      // The spine curves rather than leaning straight: a blade bends more the
+      // further it is from the root.
+      const spine = float(0.5).add(drawn.sub(0.5).mul(lean).mul(face.y.pow(1.6)))
+      // A narrow base tapering steadily to a point. Too wide at the base reads
+      // as a spike, too slow a taper reads as a flat stick. Each blade takes a
+      // width of its own as well as a height.
+      const halfWidth = max(oneMinus(face.y.div(top)), 0).pow(0.7).mul(drawn.mul(0.1).add(0.15))
+      const soften = fwidth(within).add(0.001)
+      const blade = oneMinus(smoothstep(halfWidth.sub(soften), halfWidth.add(soften), abs(within.sub(spine))))
+        .mul(oneMinus(smoothstep(top.sub(0.03), top, face.y)))
+
+      material.opacityNode = blade
+      // Darker where the blades crowd together at the root. Without it a tuft
+      // is a flat green shape rather than something with depth in it.
+      const shade = smoothstep(0, 0.3, face.y).mul(0.35).add(0.65)
+      material.colorNode = vec4(
+        mix(vec3(...root), vec3(...tip), face.y.pow(0.8)).mul(drawn.mul(0.3).add(0.82)).mul(shade), 1)
       return material
     },
 

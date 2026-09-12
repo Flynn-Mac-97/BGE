@@ -54,7 +54,10 @@
 // classic build has WebGLRenderer and nothing node-shaped; the two are
 // disjoint, so a shader language choice is a renderer choice.
 import * as THREE from 'three/webgpu'
-import { uv as uvAttribute } from 'three/tsl'
+import {
+  cameraProjectionMatrix, float, max, modelNormalMatrix, modelViewMatrix, normalGeometry,
+  normalize, positionLocal, screenSize, step, uv as uvAttribute, vec4
+} from 'three/tsl'
 import { assetURL } from './ui.js'
 
 /**
@@ -1022,20 +1025,41 @@ function hullGeometry(object) {
 const hullCache = new Map()
 
 /**
- * Grow the hull by a fixed number of PIXELS, not by a fixed number of metres.
+ * The hull's clip position, grown by a fixed number of PIXELS.
  *
  * A modelled outline is geometry, so its width shrinks with distance and is
  * under a pixel at the zoom this kind of game plays at. Offsetting in clip
  * space and undoing the perspective divide by hand keeps the line the same
  * width wherever the thing is standing, which is the whole point of it.
  */
-const KEYLINE_GROWTH = `
-  vec2 towards = (projectionMatrix * vec4(normalize(normalMatrix * normal), 0.0)).xy * framePixels;
-  float reach = length(towards);
-  // A face turned exactly edge-on has no screen direction to grow along, so it
-  // grows by nothing rather than by NaN.
-  if (reach > 1e-5) gl_Position.xy += (towards / reach) * (2.0 * keylineWidth / framePixels) * gl_Position.w;
-`
+function keylineGrowth(width, flat) {
+  const clip = cameraProjectionMatrix.mul(modelViewMatrix).mul(vec4(positionLocal, 1))
+  const frame = screenSize
+
+  // A solid grows along its vertex normal, which is its silhouette. A quad's
+  // normals all point one way and project to nothing on screen, so it grows
+  // away from its own centre instead — without that a sprite gets no outline.
+  const centre = cameraProjectionMatrix.mul(modelViewMatrix).mul(vec4(0, 0, 0, 1))
+  // The normal is turned into view space here rather than read from
+  // `normalView`, which is empty in a vertex node.
+  const direction = flat
+    ? clip.xy.div(clip.w).sub(centre.xy.div(centre.w)).mul(frame)
+    : cameraProjectionMatrix.mul(vec4(normalize(modelNormalMatrix.mul(normalGeometry)), 0)).xy.mul(frame)
+
+  // A face turned exactly edge-on, or a vertex on the centre, has no screen
+  // direction to grow along. `step` grows it by nothing rather than by NaN.
+  const reach = direction.length()
+  const offset = direction.div(max(reach, 1e-5))
+    .mul(float(2 * width).div(frame))
+    .mul(clip.w)
+    .mul(step(1e-5, reach))
+
+  // A flat hull sits in the plane of the quad it outlines and needs a nudge
+  // away from the eye, or the two fight over every pixel. A solid hull draws
+  // back faces only and needs none.
+  const depth = flat ? clip.z.add(clip.w.mul(0.0004)) : clip.z
+  return vec4(clip.xy.add(offset), depth, clip.w)
+}
 
 /** The soft ellipse a contact shadow is, and how hard it presses on the ground. */
 const CONTACT_SHADOW_FADE = `
@@ -1440,6 +1464,7 @@ export async function makeRenderer(canvas, view, viewport) {
     if (!entity.mesh) {
       return {
         material: null,
+        keyline: 0,
         look: source(entity.sprite)
           ? `${source(entity.sprite)}|${entity.sprite.tile ?? 0}|${entity.sprite.sheet ? 'sheet' : 'one'}`
           : `tint:${entity.type}`
@@ -1451,15 +1476,19 @@ export async function makeRenderer(canvas, view, viewport) {
       // Every part carries its own material, so the entity has no single one —
       // and nothing to be merged into. The signature is what says the shape
       // changed, and it is computed once per declaration rather than per frame.
-      return { material: null, look: `parts|${parts.signature}` }
+      return { material: null, keyline: 0, look: `parts|${parts.signature}` }
     }
     const shape = meshShape(entity)
     const material = materialLook(entity, declared, shape)
     // Geometry is in the key beside the material, because changing a box size in
     // the inspector has to show up without a reload, exactly the way changing a
     // sprite does.
+    // The keyline is reported but deliberately kept OUT of `look`. `look` is
+    // the stillness signature, and a change to it counts as a move — which
+    // would hand the thing a contact shadow the moment it was outlined.
     return {
       material,
+      keyline: Number(declared.keyline) > 0 ? Number(declared.keyline) : 0,
       look: ['mesh', shape.kind, shape.w, shape.h, shape.d,
         declared.model || '', declared.scale ?? 1, material].join('|')
     }
@@ -1830,34 +1859,28 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   // One value, shared by every keyline material, so a resize costs no rebuild.
-  const framePixels = { value: new THREE.Vector2(1, 1) }
   const keylineMaterials = new Map()
 
   /**
    * A back-faced copy grown in screen space: the inverted hull, in pixels.
    *
-   * Basic rather than a raw shader so three still owns fog, tone mapping and
-   * the output colour space — a keyline is a flat colour and needs nothing
-   * else from a material.
+   * Basic rather than a shader of its own so three still owns fog, tone mapping
+   * and the output colour space — a keyline is a flat colour and needs nothing
+   * else from a material. Only the vertex position is replaced.
    */
-  function keylineMaterial(width, colour) {
-    const key = `${width}|${colour}`
+  function keylineMaterial(width, colour, flat) {
+    const key = `${width}|${colour}|${flat ? 'flat' : 'solid'}`
     const cached = keylineMaterials.get(key)
     if (cached) return cached
 
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshBasicNodeMaterial({
       color: readColour(colour, 'mesh.keylineColour') || new THREE.Color('#000000'),
-      side: THREE.BackSide, depthTest: true, depthWrite: true
+      // Back faces only for a solid: the body's own front faces then cover the
+      // middle and leave the grown rim showing. A flat shape has no back face
+      // to show, so it draws both sides and leans on the depth nudge instead.
+      side: flat ? THREE.DoubleSide : THREE.BackSide, depthTest: true, depthWrite: true
     })
-    material.onBeforeCompile = shader => {
-      shader.uniforms.keylineWidth = { value: width }
-      shader.uniforms.framePixels = framePixels
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float keylineWidth;\nuniform vec2 framePixels;')
-        .replace('#include <project_vertex>', `#include <project_vertex>\n${KEYLINE_GROWTH}`)
-    }
-    // Two materials whose GLSL differs must not share a compiled program.
-    material.customProgramCacheKey = () => `keyline:${width}`
+    material.vertexNode = keylineGrowth(width, flat)
     keylineMaterials.set(key, material)
     return material
   }
@@ -1896,6 +1919,7 @@ export async function makeRenderer(canvas, view, viewport) {
       if (drawn) { object.remove(drawn); object.userData.keylineMesh = null }
       return
     }
+    const flat = shape?.kind === 'quad'
     if (drawn && drawn.userData.width === width && drawn.userData.colour === colour) return
     if (drawn) object.remove(drawn)
 
@@ -1904,7 +1928,7 @@ export async function makeRenderer(canvas, view, viewport) {
     // to keep.
     if (!geometry) return
 
-    const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour))
+    const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour, flat))
     // Read by hullGeometry, and by the batcher deciding what to hide.
     hull.userData.keyline = true
     hull.userData.width = width
@@ -1996,8 +2020,10 @@ export async function makeRenderer(canvas, view, viewport) {
     const asks = declared.keyline !== undefined || declared.shadow !== undefined
       || declared.ring !== undefined
     // The ringed actor is named, so it is entitled to a ring on the frame it
-    // appears, before it has moved.
-    if (!moved && !asks && !ringNames(entity)) return false
+    // appears, before it has moved. An object already drawing a keyline is not
+    // scenery either: leaving early would strand the hull when the declaration
+    // that asked for it is taken away.
+    if (!moved && !asks && !ringNames(entity) && !object.userData.keylineMesh) return false
 
     const shape = meshShape(entity)
     updateKeyline(entity, object, declared, shape, moved)
@@ -2257,8 +2283,11 @@ export async function makeRenderer(canvas, view, viewport) {
   function considerForMerging(entity, described, opacity, isModel) {
     // A model is a scene graph rather than one box, so there is nothing here to
     // merge; a dimmed entity has its own material and would take the whole batch
-    // with it; a hidden one has to be able to disappear on its own.
+    // with it; a hidden one has to be able to disappear on its own. An outlined
+    // one keeps its own mesh because the keyline hangs off it, and a merged
+    // entity draws on a layer the camera ignores — the outline would go with it.
     const canMerge = !isModel && opacity >= 1 && !entity.hidden
+      && !(Number(described?.keyline) > 0)
     const turn = turnRadians(entity)
     const signature = `${entity.x},${entity.y},${entity.z || 0},${turn.x},${turn.y},${turn.z},${entity.scale ?? 1}|${described.look}`
 
@@ -2473,9 +2502,6 @@ export async function makeRenderer(canvas, view, viewport) {
    */
   function readyCamera() {
     updateCamera()
-    // The keyline is measured in the pixels the card actually draws, which is
-    // the viewport times the pixel ratio, not the viewport.
-    renderer.getDrawingBufferSize(framePixels.value)
     const camera = activeCamera()
     // A camera's updateMatrixWorld also refreshes matrixWorldInverse, which is
     // the half project() and the raycaster actually read.

@@ -27,10 +27,15 @@ import { buildersFor } from './shaders/builders.js'
  * read their defaults from here, so a default is written once.
  */
 export const SHADERS = {
-  outline: {
-    about: 'a bright line around every face, plus light falling inward from it and a rim at the silhouette. The line is measured in screen pixels, so it holds its width at any distance',
+  edges: {
+    about: 'a bright line around every face, light falling inward from it, and a rim at the silhouette. A lit panel, not a selection outline — the Outline plugin draws those',
     dimension: '3D and 2D',
     parameters: { edge: '#7fe4ff', width: 0.03, power: 3, strength: 2 }
+  },
+  grass: {
+    about: 'a tuft of blades on one quad: turns about Y to face the camera, bends in two gusts of wind, and tapers to a point. Each blade takes its own height, tilt and shade',
+    dimension: '3D, on a quad',
+    parameters: { root: '#2f5a24', tip: '#8fc44a', blades: 7, wind: 0.7, speed: 1.1, lean: 0.5 }
   },
   aura: {
     about: 'a glow that breathes on the engine clock, with drifting noise wisps and a white-hot core, added to whatever is behind it',
@@ -73,7 +78,7 @@ function applyShader(context, entities, name) {
 export default {
   name: 'Shaders',
   category: 'visuals',
-  about: 'Sample node materials — outline, aura, waves, hologram, dissolve, gradient — and the worked example of writing one.',
+  about: 'Sample node materials — edges, grass, aura, waves, hologram, dissolve, gradient — and the worked example of writing one.',
   needs: ['Materials'],
 
   panels: [{
