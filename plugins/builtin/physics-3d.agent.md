@@ -1,10 +1,75 @@
 ---
-description: Solid bodies, collision, gravity and raycasts in 3D. Use when things fall through the floor, walk through walls, need to stand on something, or when you need to know what a line of sight or a shot hits.
+description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use when things fall through the floor, walk through walls, need to stand on something, or when you need to know what a line of sight or a shot hits.
 ---
 # Physics 3D
 
-- Adds 3D bodies, collision, raycasts, and standing checks.
-- Use real three-number positions and directions.
-- Test physics in a fixed headless simulation.
-- `physics3d.bodies` — every body the solver knows, with its box and its kind.
-- `physics3d.raycast '{"origin":[..],"direction":[..]}'` — what a line hits first, and where.
+- **The collider shape decides who owns an entity.** A `collider.box` of three
+  numbers is 3D and belongs here; two numbers is 2D and belongs to Physics 2D.
+  Nothing to configure, and no flag anyone can forget to set.
+- Runs on the fixed step, so `onCollide` fires deterministically and a ray fired
+  from an update hook sees the same world on every replay.
+- Everything is metres. One old unit is 0.0254 m, converted once here, so the
+  rest of the game talks in metres: gravity is `-20.32`, a step is `0.46`.
+
+## What an entity declares
+
+```js
+{ collider: { box: [0.8, 1.8, 0.8] },
+  properties: { body: 'dynamic', stepHeight: 0.46 } }
+```
+
+| `properties.body` | means |
+|---|---|
+| `dynamic` | falls, is pushed out of solids, can step up |
+| `solid` | blocks and never moves |
+| `trigger` | reports contacts and pushes nothing |
+| anything else | a collider that only reports contacts |
+
+`collider.box` is `[width, height, depth]` in metres, multiplied by
+`entity.scale`. `properties.stepHeight` overrides how high this body climbs
+without jumping.
+
+## What it writes back
+
+`entity.velocityX`, `velocityY`, `velocityZ`, zeroed on the axis it resolved,
+and `entity.grounded` when the body was pushed out of the top of a solid.
+
+A body only steps up while it is already grounded, so stepping is not a way to
+climb through the air.
+
+## Verbs on context
+
+- `context.raycast(origin, direction, maxDistance, { ignore })` — the nearest
+  hit, as `{ entity, distance, point, normal }`, or nothing.
+- `context.canStand(entity, height)` — is there room to stand up to that height.
+
+## Contacts
+
+Reported **once, on the step a contact begins**, through `world.hook`, so a
+behaviour can answer `onCollide` and the rule need not be written into every
+type. A level reload forgets the remembered contacts, so the new level gets its
+own first `onCollide`.
+
+## What it refuses, and why
+
+- A vector with a component that is not a finite number is **refused, never
+  repaired**. There is no safe default for where a shot came from; a zeroed
+  coordinate would move the ray to the world origin and return a confident,
+  precise, wrong answer.
+- `canStand` with a height that is not a positive number refuses, rather than
+  reporting room nobody measured and standing a player inside a ceiling.
+- `ignore` takes an entity, an id, or a list of either. A bare id string is the
+  shape everyone types first and it works.
+- A ray fired from an entity id skips that entity, so a shooter never hits
+  itself.
+
+## Commands
+
+- `physics3d.raycast` — a sightline in one call. Takes a point or an entity id
+  at each end.
+- `physics3d.bodies` — what is being simulated right now.
+
+## Detail
+
+- `plugins/builtin/physics-3d.agent/raycast.md` — every raycast argument, and
+  what each command replies
