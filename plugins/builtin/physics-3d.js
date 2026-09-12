@@ -91,13 +91,15 @@ const CELL = 4
 /** A solid spanning more cells than this is kept aside and always tested. Binning a floor that covers the whole map into 300 cells costs more than it saves. */
 const MAX_CELLS = 64
 
+/** Which cell a world coordinate is in, and the key the two indices make. */
+const index = value => Math.floor(value / CELL)
+const cellKey = (ix, iz) => `${ix},${iz}`
+
 function makeGrid() {
   let cells = new Map()
   let oversize = []
   let built = []
 
-  const index = value => Math.floor(value / CELL)
-  const key = (ix, iz) => `${ix},${iz}`
 
   /**
    * A door that opens is a solid that moved, and a grid that has not noticed is
@@ -133,9 +135,9 @@ function makeGrid() {
         if ((x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { oversize.push(solid); continue }
         for (let ix = x0; ix <= x1; ix++) {
           for (let iz = z0; iz <= z1; iz++) {
-            const list = cells.get(key(ix, iz))
+            const list = cells.get(cellKey(ix, iz))
             if (list) list.push(solid)
-            else cells.set(key(ix, iz), [solid])
+            else cells.set(cellKey(ix, iz), [solid])
           }
         }
       }
@@ -146,7 +148,7 @@ function makeGrid() {
       const found = new Set(oversize)
       for (let ix = index(minX); ix <= index(maxX); ix++) {
         for (let iz = index(minZ); iz <= index(maxZ); iz++) {
-          for (const solid of cells.get(key(ix, iz)) || []) found.add(solid)
+          for (const solid of cells.get(cellKey(ix, iz)) || []) found.add(solid)
         }
       }
       return found
@@ -325,20 +327,79 @@ function simulateBody(body, seconds, others) {
 }
 
 /**
+ * How far a body could move this step.
+ *
+ * The gravity term is included because `simulateBody` adds gravity to the
+ * velocity after this is read, so the speed here is one step out of date.
+ */
+const reachOf = (body, seconds) =>
+  Math.hypot(body.velocityX || 0, body.velocityY || 0, body.velocityZ || 0) * seconds +
+  Math.abs(body.properties?.gravity ?? GRAVITY) * seconds * seconds
+
+/**
+ * Bin the dynamic bodies on the ground plane, by the footprint each could
+ * reach this step.
+ *
+ * Rebuilt every step, because they move, and padded on both sides: a body is
+ * binned by where it could get to and asks for where it could get to, so two
+ * bodies that end the step touching always shared a cell at the start of it.
+ *
+ * Without this, every body tests against every other one and the step is
+ * quadratic in the body count — 0.4 ms at fifty bodies and 87 ms at eight
+ * hundred.
+ */
+function binBodies(bodies, seconds) {
+  const cells = new Map()
+  const everywhere = []
+
+  bodies.forEach((body, at) => {
+    const box = boxFor(body)
+    const reach = reachOf(body, seconds)
+    const x0 = index(box.x - box.halfWidth - reach), x1 = index(box.x + box.halfWidth + reach)
+    const z0 = index(box.z - box.halfDepth - reach), z1 = index(box.z + box.halfDepth + reach)
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { everywhere.push(at); return }
+    for (let ix = x0; ix <= x1; ix++) {
+      for (let iz = z0; iz <= z1; iz++) {
+        const list = cells.get(cellKey(ix, iz))
+        if (list) list.push(at)
+        else cells.set(cellKey(ix, iz), [at])
+      }
+    }
+  })
+
+  return {
+    /**
+     * The bodies that could touch this piece of the ground plane, in world
+     * order. Indices are binned rather than bodies so the order is the order
+     * the entity list is in, whatever order the cells are visited: a body
+     * overlapping two others is resolved against them in the same sequence a
+     * full scan would have used.
+     */
+    near(minX, maxX, minZ, maxZ) {
+      const found = new Set(everywhere)
+      for (let ix = index(minX); ix <= index(maxX); ix++) {
+        for (let iz = index(minZ); iz <= index(maxZ); iz++) {
+          for (const at of cells.get(cellKey(ix, iz)) || []) found.add(at)
+        }
+      }
+      return [...found].sort((first, second) => first - second).map(at => bodies[at])
+    }
+  }
+}
+
+/**
  * What this body could reach this step: the solids near the whole swept path,
- * plus the other bodies.
+ * plus the bodies near it.
  *
  * Two dynamic bodies block each other but never push each other — deciding who
  * yields needs a mass model this does not have, and standing on another player
- * is a deliberate move rather than a bug. There are a dozen bodies at most,
- * so they are tested directly instead of binned.
+ * is a deliberate move rather than a bug.
  */
 function blockersAround(body, box, travel, others) {
-  const found = [...grid.near(
-    box.x - box.halfWidth - travel, box.x + box.halfWidth + travel,
-    box.z - box.halfDepth - travel, box.z + box.halfDepth + travel
-  )]
-  for (const other of others) if (other !== body) found.push(other)
+  const minX = box.x - box.halfWidth - travel, maxX = box.x + box.halfWidth + travel
+  const minZ = box.z - box.halfDepth - travel, maxZ = box.z + box.halfDepth + travel
+  const found = [...grid.near(minX, maxX, minZ, maxZ)]
+  for (const other of others.near(minX, maxX, minZ, maxZ)) if (other !== body) found.push(other)
   return found
 }
 
@@ -484,7 +545,7 @@ function reportContacts(world, context) {
     if ((x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { everywhere.push(i); continue }
     for (let ix = x0; ix <= x1; ix++) {
       for (let iz = z0; iz <= z1; iz++) {
-        const key = `${ix},${iz}`
+        const key = cellKey(ix, iz)
         const list = bins.get(key)
         if (list) list.push(i)
         else bins.set(key, [i])
@@ -562,7 +623,8 @@ export default {
     run(world, seconds, context) {
       grid.ensure(world)
       const bodies = world.entities.filter(isBody)
-      for (const body of bodies) simulateBody(body, seconds, bodies)
+      const moving = binBodies(bodies, seconds)
+      for (const body of bodies) simulateBody(body, seconds, moving)
       reportContacts(world, context)
     }
   }],

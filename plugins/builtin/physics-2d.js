@@ -35,6 +35,95 @@ function overlap(a, b) {
   return Math.abs(a.x - b.x) < (aw + bw) / 2 && Math.abs(a.y - b.y) < (ah + bh) / 2
 }
 
+/** Width and height of an entity's collider in metres, circle or box. */
+function extent(entity) {
+  const s = shape(entity)
+  return s.kind === 'circle' ? { width: s.r * 2, height: s.r * 2 } : { width: s.w, height: s.h }
+}
+
+/**
+ * A coarse grid over the X/Y plane, so neither loop below is quadratic in the
+ * entity count. Rebuilt every step, because a body moves and a level may have
+ * changed.
+ *
+ * Binned by footprint, and indices are binned rather than entities: `near`
+ * then answers in world order whatever order the cells are visited, so a body
+ * overlapping two solids is pushed out of them in the same sequence a full
+ * scan would have used.
+ */
+const CELL = 4
+
+/** An entity spanning more cells than this is kept aside and always tested. */
+const MAX_CELLS = 64
+
+const cellOf = value => Math.floor(value / CELL)
+const cellKey = (ix, iy) => `${ix},${iy}`
+
+function bin(entities) {
+  const cells = new Map()
+  const everywhere = []
+
+  entities.forEach((entity, at) => {
+    const { width, height } = extent(entity)
+    const x0 = cellOf(entity.x - width / 2), x1 = cellOf(entity.x + width / 2)
+    const y0 = cellOf(entity.y - height / 2), y1 = cellOf(entity.y + height / 2)
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) { everywhere.push(at); return }
+    for (let ix = x0; ix <= x1; ix++) {
+      for (let iy = y0; iy <= y1; iy++) {
+        const list = cells.get(cellKey(ix, iy))
+        if (list) list.push(at)
+        else cells.set(cellKey(ix, iy), [at])
+      }
+    }
+  })
+
+  return {
+    cells,
+    everywhere,
+    /**
+     * Everything that could touch this entity, in world order. Padded by the
+     * caller's own size, because being pushed out of one solid can move it far
+     * enough to reach a cell it was not in when the step began.
+     */
+    near(entity) {
+      const { width, height } = extent(entity)
+      const pad = Math.max(width, height)
+      const found = new Set(everywhere)
+      for (let ix = cellOf(entity.x - width / 2 - pad); ix <= cellOf(entity.x + width / 2 + pad); ix++) {
+        for (let iy = cellOf(entity.y - height / 2 - pad); iy <= cellOf(entity.y + height / 2 + pad); iy++) {
+          for (const at of cells.get(cellKey(ix, iy)) || []) found.add(at)
+        }
+      }
+      return [...found].sort((first, second) => first - second).map(at => entities[at])
+    }
+  }
+}
+
+/**
+ * Every pair of binned entities that shares a cell, each pair once, in the
+ * order a full double loop would have produced them.
+ */
+function pairsIn(binned, count) {
+  const pairs = new Set()
+  for (const list of binned.cells.values()) {
+    for (let a = 0; a < list.length; a++) {
+      for (let b = a + 1; b < list.length; b++) {
+        const [low, high] = list[a] < list[b] ? [list[a], list[b]] : [list[b], list[a]]
+        pairs.add(low * count + high)
+      }
+    }
+  }
+  for (const at of binned.everywhere) {
+    for (let other = 0; other < count; other++) {
+      if (other === at) continue
+      const [low, high] = at < other ? [at, other] : [other, at]
+      pairs.add(low * count + high)
+    }
+  }
+  return [...pairs].sort((first, second) => first - second)
+    .map(packed => [Math.floor(packed / count), packed % count])
+}
+
 /**
  * Push `e` out of `solid` along the shallowest axis, and report which side of
  * the solid `e` ended up on — 'above' means e is on top, which is what being
@@ -69,14 +158,19 @@ export default {
       const solids = world.entities.filter(e => flat(e) && e.properties?.body === 'solid')
       const colliders = world.entities.filter(e => e.collider && flat(e))
 
+      // Built after the bodies have moved, so a body is tested against the
+      // solids it could reach from where it arrived.
       for (const e of bodies) {
         e.velocityX = e.velocityX ?? 0
         e.velocityY = (e.velocityY ?? 0) + (e.properties.gravity ?? GRAVITY) * seconds
         e.x += e.velocityX * seconds
         e.y += e.velocityY * seconds
         e.grounded = false
+      }
 
-        for (const s of solids) {
+      const standing = bin(solids)
+      for (const e of bodies) {
+        for (const s of standing.near(e)) {
           if (!overlap(e, s)) continue
           if (resolve(e, s) === 'above') e.grounded = true
         }
@@ -84,20 +178,20 @@ export default {
 
       // report contacts once, on the frame they begin
       const seen = new Set()
-      for (let i = 0; i < colliders.length; i++) {
-        for (let j = i + 1; j < colliders.length; j++) {
-          const a = colliders[i], b = colliders[j]
-          if (a.properties?.body === 'solid' && b.properties?.body === 'solid') continue
-          if (!overlap(a, b)) continue
-          const key = a.id + '|' + b.id
-          seen.add(key)
-          if (world._contacts?.has(key)) continue
-          // Through world.hook, so a behaviour can answer a collision too — a
-          // `breakable` should not have to be written into every type that
-          // wants it.
-          world.hook(a, 'onCollide', b, context)
-          world.hook(b, 'onCollide', a, context)
-        }
+      const touching = bin(colliders)
+      for (const [i, j] of pairsIn(touching, colliders.length)) {
+        const a = colliders[i], b = colliders[j]
+        if (a.properties?.body === 'solid' && b.properties?.body === 'solid') continue
+        if (!overlap(a, b)) continue
+        const key = a.id + '|' + b.id
+        if (seen.has(key)) continue
+        seen.add(key)
+        if (world._contacts?.has(key)) continue
+        // Through world.hook, so a behaviour can answer a collision too — a
+        // `breakable` should not have to be written into every type that
+        // wants it.
+        world.hook(a, 'onCollide', b, context)
+        world.hook(b, 'onCollide', a, context)
       }
       world._contacts = seen
     }

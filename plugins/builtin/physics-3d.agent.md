@@ -4,12 +4,12 @@ description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use w
 # Physics 3D
 
 - **The collider shape decides who owns an entity.** A `collider.box` of three
-  numbers is 3D and belongs here; two numbers is 2D and belongs to Physics 2D.
-  Nothing to configure, and no flag anyone can forget to set.
+  numbers is 3D and belongs here; two numbers belongs to Physics 2D. Nothing to
+  configure, and no flag anyone can forget to set.
 - Runs on the fixed step, so `onCollide` fires deterministically and a ray fired
   from an update hook sees the same world on every replay.
-- Everything is metres. One old unit is 0.0254 m, converted once here, so the
-  rest of the game talks in metres: gravity is `-20.32`, a step is `0.46`.
+- Everything is metres, converted once here: gravity is `-20.32`, a step
+  is `0.46`.
 
 ## What an entity declares
 
@@ -25,9 +25,8 @@ description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use w
 | `trigger` | reports contacts and pushes nothing |
 | anything else | a collider that only reports contacts |
 
-`collider.box` is `[width, height, depth]` in metres, multiplied by
-`entity.scale`. `properties.stepHeight` overrides how high this body climbs
-without jumping.
+`collider.box` is `[width, height, depth]` in metres, times `entity.scale`.
+`properties.stepHeight` overrides how high this body climbs without jumping.
 
 ## What it writes back
 
@@ -41,27 +40,24 @@ climb through the air.
 
 - `context.raycast(origin, direction, maxDistance, { ignore })` — the nearest
   hit, as `{ entity, distance, point, normal }`, or nothing.
-- `context.canStand(entity, height)` — is there room to stand up to that height.
+- `context.canStand(entity, height)` — is there room to stand that tall.
 
 ## Contacts
 
 Reported **once, on the step a contact begins**, through `world.hook`, so a
 behaviour can answer `onCollide` and the rule need not be written into every
-type. A level reload forgets the remembered contacts, so the new level gets its
-own first `onCollide`.
+type. A level reload forgets them, so the new level gets its own first one.
 
 ## What it refuses, and why
 
 - A vector with a component that is not a finite number is **refused, never
   repaired**. There is no safe default for where a shot came from; a zeroed
-  coordinate would move the ray to the world origin and return a confident,
-  precise, wrong answer.
+  coordinate returns a confident, precise, wrong answer at the world origin.
 - `canStand` with a height that is not a positive number refuses, rather than
-  reporting room nobody measured and standing a player inside a ceiling.
+  standing a player inside a ceiling on room nobody measured.
 - `ignore` takes an entity, an id, or a list of either. A bare id string is the
   shape everyone types first and it works.
-- A ray fired from an entity id skips that entity, so a shooter never hits
-  itself.
+- A ray fired from an entity id skips it, so a shooter never hits itself.
 
 ## Commands
 
@@ -69,7 +65,15 @@ own first `onCollide`.
   at each end.
 - `physics3d.bodies` — what is being simulated right now.
 
+## What it costs
+
+0.5 ms for 200 dynamic bodies, 6.4 ms for 2000, over budget past that. Solids
+and triggers are near free. A raycast scans every 3D collider, so cast for a
+shot, not for every bot every step. `run profile.steps` measures it.
+
 ## Detail
 
 - `plugins/builtin/physics-3d.agent/raycast.md` — every raycast argument, and
   what each command replies
+- `plugins/builtin/physics-3d.agent/cost.md` — the measured cost of bodies,
+  solids, triggers and rays, and where the time goes

@@ -49,3 +49,17 @@ description: Solid bodies, collision and gravity in a 2D side-on or top-down gam
   so it cannot quietly reset a map Physics 3D owns. A value that is not a
   finite number is **refused and nothing is changed**, because a NaN velocity
   stops a body being simulated at all.
+
+## What it costs
+
+Both passes bin entities on a 4 m grid, so neither is quadratic in the entity
+count. `run profile.steps` measures it, headless, and names the system.
+
+| dynamic bodies | step ms |
+|---|---|
+| 50 | 0.12 |
+| 200 | 0.47 |
+| 800 | 1.9 |
+
+Bodies crowded into one cell cost most: they really do all touch, so the count
+in one place is the number to keep down.

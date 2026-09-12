@@ -1,5 +1,5 @@
 ---
-description: Measures what a frame costs, on the thread and on the card, over frames drawn back to back rather than at the screen refresh. Use before and after a rendering change, to find what a material or an effect costs, and to answer how many of a thing the engine can draw.
+description: Measures what a frame costs, on the thread and on the card, and what a fixed step costs system by system. Use before and after a rendering or simulation change, to find what a material, an effect or a physics load costs, and to answer how many of a thing the engine can draw or simulate.
 ---
 
 # Profiler
@@ -8,6 +8,14 @@ description: Measures what a frame costs, on the thread and on the card, over fr
   cost. Not on the animation frame: that is capped to the screen's refresh, so a
   scene with four hundred frames a second of headroom and one with none both
   measure the same.
+- `profile.steps` simulates many fixed steps and reports what each **system**
+  cost, so a slow step names the plugin responsible. It runs headless, which is
+  the cheapest way to measure physics. It advances the world; reload the level
+  to put it back.
+
+```sh
+node bin/engine.mjs --headless --project <path> --level <name> run profile.steps
+```
 - **Two numbers, two questions.** `cpu` is how long this thread spent describing
   the frame — draw calls, and the work `sync` does per entity. `gpu` is how long
   the card spent on it — pixels, and how heavy a shader is.

@@ -28,6 +28,15 @@ const FRAMES = 120
 /** Frames drawn and thrown away first, so a compile is not counted as a frame. */
 const WARM = 12
 
+/** Fixed steps a simulation run advances when the caller does not say. */
+const STEPS = 600
+
+/** Steps run and thrown away first, so a grid being built once is not a step cost. */
+const STEP_WARM = 60
+
+/** A fixed step is 1/60 s, so this is the whole budget one step may spend. */
+const BUDGET_MS = 1000 / 60
+
 const sorted = list => [...list].sort((a, b) => a - b)
 
 /** Mean, middle and worst-in-twenty of a list of milliseconds. */
@@ -118,13 +127,107 @@ async function measure(context, options = {}) {
   }
 }
 
+/** Total of a list, and the same rounded to microseconds. */
+const total = list => list.reduce((sum, value) => sum + value, 0)
+
+/**
+ * Wrap every system's `run` with a timer, and return how to put them back.
+ *
+ * The loop calls the systems directly, so wrapping is the only place their
+ * time is visible. One list per plugin and phase, because a plugin may
+ * contribute to both.
+ */
+function timeSystems(systems) {
+  const times = new Map()
+  const original = systems.map(system => system.run)
+  for (const system of systems) {
+    const key = `${system.plugin} (${system.phase})`
+    const run = system.run
+    system.run = (world, seconds, context) => {
+      const at = performance.now()
+      try { return run(world, seconds, context) } finally {
+        const took = performance.now() - at
+        const list = times.get(key)
+        if (list) list.push(took)
+        else times.set(key, [took])
+      }
+    }
+  }
+  return {
+    times,
+    restore() { systems.forEach((system, index) => { system.run = original[index] }) }
+  }
+}
+
+/**
+ * Advance the world `steps` fixed steps and report what each system cost.
+ *
+ * The loop's own `step` drives it, so the clock advances exactly as in a real
+ * run and a system that reads the clock measures what it really costs. One
+ * call to `step(1)` is one fixed step and one frame, which is the 60 Hz case.
+ *
+ * This simulates. The world is somewhere else afterwards, and a level reload
+ * is how to put it back.
+ */
+function measureSteps(context, options = {}) {
+  const loop = context.loop
+  if (!loop?.step) return { error: 'no loop in this world' }
+
+  const steps = Math.min(20000, Math.max(1, Math.round(Number(options.steps) || STEPS)))
+  const warm = Math.min(steps, Math.max(0, Math.round(Number(options.warm) ?? STEP_WARM)))
+  const systems = context.loader.contrib.systems
+  const timed = timeSystems(systems)
+
+  const whole = []
+  try {
+    for (let i = 0; i < warm; i++) loop.step(1)
+    timed.times.clear()
+    for (let i = 0; i < steps; i++) {
+      const at = performance.now()
+      loop.step(1)
+      whole.push(performance.now() - at)
+    }
+  } finally {
+    timed.restore()
+  }
+
+  const each = [...timed.times].map(([system, list]) => ({
+    system,
+    ranPerStep: round(list.length / steps),
+    meanMs: round(total(list) / steps),
+    worst20Ms: spread(list).worst20,
+    mostMs: spread(list).most
+  })).sort((first, second) => second.meanMs - first.meanMs)
+
+  const step = spread(whole)
+  return {
+    steps,
+    // A paused world still runs every system, with zero seconds, so nothing
+    // moves and every number reads low for a reason nothing else would show.
+    paused: loop.paused ? loop.holds : undefined,
+    stepMs: step,
+    budgetMs: round(BUDGET_MS),
+    // The honest headline: how many fixed steps a second this world can do,
+    // against the 60 a real-time game needs.
+    stepsPerSecond: Math.round(1000 / Math.max(step.mean, 0.0001)),
+    systems: each,
+    // Update hooks, loop bookkeeping and, in a drawing world, the renderer's
+    // own sync and draw. None of them is a system, so none can be wrapped.
+    unattributedMs: round(step.mean - total(each.map(entry => entry.meanMs))),
+    entities: context.world.entities.length
+  }
+}
+
 export default {
   name: 'Profiler',
   category: 'agents',
-  about: 'Measures what a frame costs on the thread and on the card, over many frames drawn back to back rather than at the screen refresh.',
+  about: 'Measures what a frame costs on the thread and on the card, over many frames drawn back to back rather than at the screen refresh, and what a fixed step costs system by system.',
 
   onLoad(context) {
-    context.profiler = { measure: options => measure(context, options) }
+    context.profiler = {
+      measure: options => measure(context, options),
+      steps: options => measureSteps(context, options)
+    }
   },
 
   commands: [{
@@ -133,5 +236,11 @@ export default {
     // run profile.frames
     // run profile.frames '{"frames": 400, "warm": 30}'
     run: (context, options) => measure(context, options || {})
+  }, {
+    id: 'profile.steps',
+    label: 'Simulate many fixed steps and report what each system cost',
+    // run profile.steps
+    // run profile.steps '{"steps": 1200, "warm": 120}'
+    run: (context, options) => measureSteps(context, options || {})
   }]
 }
