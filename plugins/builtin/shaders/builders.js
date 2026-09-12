@@ -73,25 +73,8 @@ export function buildersFor(THREE, TSL, SHADERS) {
     abs, clamp, cos, dot, exp, float, floor, fract, fwidth, max, min, mix,
     mx_fractal_noise_float, mx_noise_float, normalize, normalView, oneMinus,
     positionLocal, positionViewDirection, screenCoordinate, sin, smoothstep,
-    step, time, uv, vec2, vec3, vec4
+    step, time, vec2, vec3, vec4
   } = TSL
-
-  /**
-   * The 0..1 parameterisation of a face.
-   *
-   * The renderer rewrites the first UV set into metres so one `tiling` density
-   * suits every face of a box, and keeps the 0..1 numbers in the second set.
-   * A shader that wants "across this face" wants the second.
-   */
-  const faceUV = () => uv(1)
-
-  /**
-   * The face's UV in metres, which is what the renderer leaves in the first set.
-   *
-   * A pattern that must keep one size whatever it is drawn on wants this: the
-   * same wave is two metres long on a two metre quad and on a forty metre floor.
-   */
-  const metreUV = () => uv()
 
   /** Distance to the nearest face border: 0 at the border, 0.5 in the middle. */
   const toBorder = point => min(min(point.x, oneMinus(point.x)), min(point.y, oneMinus(point.y)))
@@ -113,7 +96,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
   const silhouette = () => oneMinus(abs(normalView.normalize().dot(positionViewDirection.normalize())))
 
   return {
-    outline: ({ mesh, tint }) => {
+    outline: ({ mesh, tint, uv }) => {
       const defaults = SHADERS.outline.parameters
       const edge = colourOf(THREE, mesh.edge, defaults.edge)
       const width = held(mesh.width, defaults.width, 0.001, 0.45)
@@ -123,14 +106,14 @@ export function buildersFor(THREE, TSL, SHADERS) {
       // Brightest of three terms: the border line, light falling inward from
       // it, and the silhouette. The first two hold up on a flat face, which a
       // view-angle rim on its own cannot.
-      const line = borderLine(faceUV(), width)
-      const inward = oneMinus(smoothstep(0, width * 3, toBorder(faceUV()))).pow(2.2)
+      const line = borderLine(uv.face(), width)
+      const inward = oneMinus(smoothstep(0, width * 3, toBorder(uv.face()))).pow(2.2)
       const glow = max(line, max(inward.mul(0.35), silhouette().pow(power).mul(0.9)))
       material.emissiveNode = vec3(...edge).mul(glow.mul(strength))
       return material
     },
 
-    aura: ({ mesh }) => {
+    aura: ({ mesh, uv }) => {
       const defaults = SHADERS.aura.parameters
       const glow = colourOf(THREE, mesh.glow, defaults.glow)
       const speed = held(mesh.speed, defaults.speed, 0, 20)
@@ -139,7 +122,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const strength = held(mesh.strength, defaults.strength, 0, 8)
       const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
       material.blending = THREE.AdditiveBlending
-      const middle = faceUV().sub(0.5)
+      const middle = uv.face().sub(0.5)
       // Soft from the middle of the face outward. A silhouette rim is zero
       // across a face pointed at the camera, which is how a sprite is arranged.
       const body = oneMinus(clamp(middle.length().mul(2), 0, 1)).pow(1.7)
@@ -159,7 +142,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       return material
     },
 
-    waves: ({ mesh }) => {
+    waves: ({ mesh, uv }) => {
       const defaults = SHADERS.waves.parameters
       const shallow = colourOf(THREE, mesh.shallow, defaults.shallow)
       const deep = colourOf(THREE, mesh.deep, defaults.deep)
@@ -177,8 +160,8 @@ export function buildersFor(THREE, TSL, SHADERS) {
       let slopeAlong = float(0)
       for (const wave of WAVES) {
         const frequency = (Math.PI * 2 * scale) / wave.length
-        const phase = metreUV().x.mul(wave.across * frequency)
-          .add(metreUV().y.mul(wave.along * frequency))
+        const phase = uv.metres().x.mul(wave.across * frequency)
+          .add(uv.metres().y.mul(wave.along * frequency))
           .add(time.mul(speed * wave.speed))
         height = height.add(sin(phase).mul(wave.size))
         // The slope leaves the frequency out, so raising `scale` adds waves
@@ -206,7 +189,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       return material
     },
 
-    hologram: ({ mesh }) => {
+    hologram: ({ mesh, uv }) => {
       const defaults = SHADERS.hologram.parameters
       const glow = colourOf(THREE, mesh.glow, defaults.glow)
       const lines = held(mesh.lines, defaults.lines, 1, 400)
@@ -218,10 +201,10 @@ export function buildersFor(THREE, TSL, SHADERS) {
 
       // Whole rows jump sideways for a moment. The noise is keyed on the row
       // and on the clock, so the same second always tears the same rows.
-      const row = floor(faceUV().y.mul(26).add(time.mul(5)))
+      const row = floor(uv.face().y.mul(26).add(time.mul(5)))
       const jump = mx_noise_float(vec3(row, floor(time.mul(7)), 0))
       const torn = jump.mul(step(0.62, abs(jump))).mul(glitch)
-      const point = vec2(faceUV().x.add(torn), faceUV().y)
+      const point = vec2(uv.face().x.add(torn), uv.face().y)
 
       // Soft stripes, not hard ones. A hard step turns to moire the moment the
       // face is further away than its line spacing.
@@ -264,7 +247,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       return material
     },
 
-    gradient: ({ mesh }) => {
+    gradient: ({ mesh, uv }) => {
       const defaults = SHADERS.gradient.parameters
       const from = colourOf(THREE, mesh.from, defaults.from)
       const to = colourOf(THREE, mesh.to, defaults.to)
@@ -278,7 +261,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const along = Math.sin(angle)
       const spread = Math.abs(across) + Math.abs(along) || 1
       const start = (Math.max(0, -across) + Math.max(0, -along)) / spread
-      const ramped = clamp(faceUV().x.mul(across / spread).add(faceUV().y.mul(along / spread)).add(start), 0, 1)
+      const ramped = clamp(uv.face().x.mul(across / spread).add(uv.face().y.mul(along / spread)).add(start), 0, 1)
       const eased = smoothstep(0, 1, ramped)
       const colour = middle
         ? mix(mix(vec3(...from), vec3(...middle), clamp(eased.mul(2), 0, 1)),

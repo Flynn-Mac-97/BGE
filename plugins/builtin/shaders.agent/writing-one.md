@@ -2,7 +2,7 @@
 
 Add an entry to `SHADERS` in `shaders.js` with its `about`, its `dimension` and
 its default `parameters`, then a builder of the same name in
-`shaders/builders.js`. Describe it in the first file and draw it in the second,
+`shaders/builders.js`, taking `({ mesh, texture, tint, view, uv })`. Describe it in the first file and draw it in the second,
 so a headless world can still say what it is without loading three.
 
 Read every parameter through `number`, `held` or `colourOf`. A level that writes
@@ -10,11 +10,11 @@ nonsense then gets the default rather than a broken graph.
 
 ## Four engine facts a node graph has to know
 
-- **`uv()` is in metres, not 0 to 1.** The renderer rewrites the first UV set so
-  one `tiling` density suits every face of a box whatever its size. `uv(1)` is
-  the 0..1 parameterisation. Use `faceUV()` for anything measured across a face
-  — a border, a radial falloff, a ramp — and `metreUV()` for a pattern that must
-  keep one size whatever it is drawn on.
+- **Never reach for three's `uv()`.** It is in metres here, not the 0 to 1 every
+  tutorial assumes, and a shader that assumes wrong is silently wrong. The
+  builder is handed `uv` instead: `uv.face()` is 0 to 1 across the face, for a
+  border, a radial falloff or a ramp; `uv.metres()` is one unit per metre of
+  surface, for a pattern that must stay one size whatever it is drawn on.
 - **Additive blending already multiplies by alpha.** Put the shape in the RGB
   and leave alpha at 1. Alpha carrying the shape as well squares every soft
   edge, and a glow shrinks to a dot.

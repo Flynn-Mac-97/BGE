@@ -54,6 +54,7 @@
 // classic build has WebGLRenderer and nothing node-shaped; the two are
 // disjoint, so a shader language choice is a renderer choice.
 import * as THREE from 'three/webgpu'
+import { uv as uvAttribute } from 'three/tsl'
 import { assetURL } from './ui.js'
 
 /**
@@ -1323,17 +1324,34 @@ export async function makeRenderer(canvas, view, viewport) {
   /**
    * What a surface is made of, contributed by plugins.
    *
-   * `build({ mesh, texture, tint, view })` returns a THREE.Material, where
+   * `build({ mesh, texture, tint, view, uv })` returns a THREE.Material, where
    * `mesh` is the whole normalised declaration (so a plugin can read its own
    * keys off it), `texture` is the resolved map or null, `tint` is always a
-   * Colour and is what `color` should be, and `view` is the session's camera
-   * state for a material that needs to know where the eye is.
+   * Colour and is what `color` should be, `view` is the session's camera state
+   * for a material that needs to know where the eye is, and `uv` is the two
+   * coordinate sets below.
    *
    * The two built-ins go through the same door, because a hook point only one
    * side can use is not a hook point. `lambert` is the default and it is what
    * everything drew with before this existed, so nothing breaks when no plugin
    * has registered anything.
    */
+  /**
+   * The two UV sets, named, for a node shader.
+   *
+   * Reaching for three's `uv()` here gets metres, not the 0..1 every shader
+   * tutorial assumes, and the shader is then silently wrong. Ask by what the
+   * number means instead.
+   *
+   * - `face()` — 0 to 1 across this face. Borders, radial falloffs, ramps:
+   *   anything measured against the face rather than against the world.
+   * - `metres()` — one unit is one metre of surface, whatever the face's size.
+   *   A pattern that must stay the same size on a puddle and on a lake.
+   *
+   * See `measureUVsInMetres` for why the metres are in the first set.
+   */
+  const UV = { face: () => uvAttribute(1), metres: () => uvAttribute() }
+
   const materialBuilders = new Map()
   const sharedMaterials = new Map()
 
@@ -1497,7 +1515,7 @@ export async function makeRenderer(canvas, view, viewport) {
     const build = materialBuilders.get(name)
     if (!build) report(`[render] ${where}.material: no material named "${name}" is registered — using lambert`)
     const material = (build || materialBuilders.get('lambert'))({
-      mesh: declared, texture: map, tint: colour, view
+      mesh: declared, texture: map, tint: colour, view, uv: UV
     })
 
     applyLightmap(material, declared, where)
