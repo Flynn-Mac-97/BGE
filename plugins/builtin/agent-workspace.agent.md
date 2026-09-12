@@ -1,3 +1,7 @@
+---
+description: Builds the instruction tree and small task packets, claims files, and opens or merges a parallel lane. Use at the start of any task to get its packet, before fanning work out to several agents, and when a claim or worktree is refused.
+---
+
 # Agent Workspace
 
 - Use this to build the instruction tree and small task packets.

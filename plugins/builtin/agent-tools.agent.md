@@ -1,4 +1,5 @@
 ---
+description: The shelf of generator tools under tools/ and the shared helpers in tools/lib/. Use before writing any script that makes sprites, sounds, textures, motion clips or other assets, and when you need a helper such as seeded random, noise, colour, or PNG and WAV encoding.
 match: tools/**
 ---
 

@@ -1,3 +1,7 @@
+---
+description: Undo and redo of editor edits, as a list of level snapshots. Use for ctrl+z, stepping back through edits, or when an undo does nothing while playing or during a write.
+---
+
 # History
 
 - Photoshop's history palette: `history.undo` (ctrl+z), `history.redo` (ctrl+shift+z), `history.jump <index>`, `history.list`, `history.clear`.

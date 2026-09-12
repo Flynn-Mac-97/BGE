@@ -1,3 +1,7 @@
+---
+description: Moves many entities as one mass and stops them stacking. Use for hordes, swarms, flocks and any group that must seek a target without piling up. The near-query half is Spatial Hash.
+---
+
 # Crowd
 
 - Moves many entities as one mass and stops them stacking. `context.crowd`.

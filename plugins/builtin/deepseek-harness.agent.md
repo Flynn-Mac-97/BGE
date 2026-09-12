@@ -1,4 +1,5 @@
 ---
+description: What this project needs to drive dsh-agent, the DeepSeek harness. Use when delegating a task to dsh, writing its wrapper, or checking its version and flags.
 match: tools/dsh-agent* docs/claude-orchestration/**
 ---
 

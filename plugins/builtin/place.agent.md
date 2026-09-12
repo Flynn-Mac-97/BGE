@@ -1,3 +1,7 @@
+---
+description: Puts an entity of a type into the open level at a point, from a drop gesture or one command. Use to place things while editing, never to spawn during a run.
+---
+
 # Place And Attach
 
 - Owns the two drop gestures on the viewport and the one command behind them. It adds an entity to the **open level**; it does not spawn anything for a run.

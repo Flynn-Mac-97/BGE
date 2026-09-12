@@ -1,4 +1,5 @@
 ---
+description: The card item for Screen: a numbered, glyphed, ranked choice with one line. Use when a screen shows a row of options to pick from, such as a level-up or shop.
 match: plugins/builtin/screen-card.js plugins/builtin/screen.js
 ---
 # Screen Card

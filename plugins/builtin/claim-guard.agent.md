@@ -1,3 +1,7 @@
+---
+description: Refuses a write to a file another active agent run claimed. Use when a write is refused with 'claimed it', when setting up parallel agent runs, or to see which files are claimed right now.
+---
+
 # Claim Guard
 
 - Refuses a write to a file another **active** agent run claimed with `agent.prepare`. Without it the run registry is advice nothing reads.

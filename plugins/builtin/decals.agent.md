@@ -1,3 +1,7 @@
+---
+description: Marks stuck to world surfaces: bullet holes, blood, scorch. Use for anything left behind on a wall or floor after a hit, and when decals pile up, float, or do not appear.
+---
+
 # Decals
 
 - Owns `context.decals`: one capped wall of marks stuck to world surfaces — bullet holes, blood, scorch. A decal is **not an entity**: it is not in `world.entities`, has no collider, and nothing can hit it.

@@ -1,3 +1,7 @@
+---
+description: Weapons that fire themselves on a cooldown, with stats, upgrades and levels. Use for any auto-attacking weapon, survivor-style builds, orbiting or periodic attacks, and when tuning or upgrading weapon numbers at runtime.
+---
+
 # Auto Weapons
 
 - Weapons that fire themselves on a cooldown. Nothing here reads input.

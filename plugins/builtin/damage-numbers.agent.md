@@ -1,3 +1,7 @@
+---
+description: The figure that lifts off a hit, drifts and fades. Use to show damage, heals, misses or any short word over an entity, and to check headless that a hit landed and for how much.
+---
+
 # Damage Numbers
 
 - The figure that lifts off a hit, drifts, and fades. Automatic: it listens to `entity:hurt` and shows `dealt`, rounded.

@@ -1,3 +1,7 @@
+---
+description: The visible half of being hit: a flash, a shove, and a death that collapses. Use when hits feel weightless, when a death should linger or vanish, or to flash or shove an entity without a hit.
+---
+
 # Hit Reaction
 
 - The visible half of being hit: a white flash, a shove, and a death that collapses. It changes no number anyone else reads, so a game can turn it off and play identically.

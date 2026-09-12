@@ -1,4 +1,5 @@
 ---
+description: What this project needs to drive the claude CLI: flags, the files it reads, session rules. Use when running claude as a sub-agent, writing a hook, or checking a claude flag before trusting it.
 match: CLAUDE.md .claude/**
 ---
 

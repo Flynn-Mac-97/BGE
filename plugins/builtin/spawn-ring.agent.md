@@ -1,3 +1,7 @@
+---
+description: Where just off screen is, in metres. Use to spawn enemies or waves outside the view, to cull what drifted too far, and to place a cluster on one bearing.
+---
+
 # Spawn Ring
 
 - Answers "where is just off screen, in metres". `context.spawnRing`.

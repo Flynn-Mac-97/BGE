@@ -1,3 +1,7 @@
+---
+description: Times a run from first step to end and reports why it ended. Use for survival timers, run summaries, died or survived outcomes, and the numbers a results screen shows.
+---
+
 # Run Clock
 
 - A run starts, is timed, and ends. Engine time, so a paused level-up does not
