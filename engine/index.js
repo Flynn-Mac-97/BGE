@@ -148,7 +148,16 @@ async function boot() {
   // Edit mode still needs to draw, just without stepping the simulation.
   // Falls back to a timer when the tab is hidden so a headless agent still
   // gets a rendered canvas to screenshot.
-  const paint = () => { if (!loop.running) { context.renderer.sync(world); context.renderer.draw() } }
+  // `frame:painted` is the edit-mode counterpart of a `frame` system, which
+  // only runs while the loop does. A plugin that has to touch what was drawn —
+  // and a model finishes loading long after the entity using it — has no other
+  // hook while the world is stopped.
+  const paint = () => {
+    if (loop.running) return
+    context.renderer.sync(world)
+    context.renderer.draw()
+    context.bus.emit('frame:painted')
+  }
   const idle = () => { paint(); requestAnimationFrame(idle) }
   idle()
   setInterval(() => { if (document.hidden) paint() }, 100)

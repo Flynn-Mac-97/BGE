@@ -101,6 +101,12 @@ export async function startWorld({
    * `project.saveAs` writes them out at the moment the project gets a name.
    */
   projectUntitled = false,
+  /**
+   * What a plugin can only do in node: the project's real directory, and
+   * running a program. `null` in the browser, and a plugin that needs an
+   * outside tool reads that as "answer with the terminal command instead".
+   */
+  host = null,
   /** The browser mounts its shell and renderer here. Headless does nothing. */
   attachScreen = async () => {},
   /** A measured screen. Overrides the game's declared device when given. */
@@ -152,7 +158,7 @@ export async function startWorld({
   }
 
   const context = {}
-  Object.assign(context, { world, files, bus, loader, editor, view, viewport, device })
+  Object.assign(context, { world, files, bus, loader, editor, view, viewport, device, host })
   editor.context = context
   // world.destroy runs onDestroy and needs a context to hand it. Without this the
   // hook received undefined, which nothing noticed because most onDestroy

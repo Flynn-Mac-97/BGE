@@ -29,6 +29,7 @@ import fs from 'node:fs/promises'
 
 import { makeFiles } from './files.js'
 import { importPlugin } from './plugin-import.js'
+import { makeHost } from './host-node.mjs'
 import { startWorld } from './start-world.js'
 import { buildIndex, walk } from './project-index.mjs'
 import { workLock } from './work-lock.mjs'
@@ -368,6 +369,9 @@ export async function startWorldInNode({ root = ROOT, project, viewport, rendere
     },
     loadPlugins: loader => findPlugins(checkout, projectDirectory, loader),
     importProjectFile: importProjectFileFrom(projectDirectory),
+    // Only a node world has one. A plugin that needs an outside program reads
+    // its absence in the browser and answers with the terminal command.
+    host: makeHost({ project: projectDirectory, checkout }),
     // The canonical prefix, not the disk path. A plugin builds
     // `project/plugins` from it to name a file, and that name has to be the
     // same in both halves — the browser reaches the project only through the
