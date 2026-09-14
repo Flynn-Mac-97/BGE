@@ -2,7 +2,8 @@
  * Hold a headless Chromium on the editor so the CLI can drive it.
  *
  * Proves the real path: a lane's renderer with no window and no shared tab.
- * Exits when killed; prints the renderer string and the debugging port first.
+ * Prints the debugging port first. Exits, deleting its profile, when Chrome
+ * stops.
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -44,7 +45,22 @@ for (let attempt = 0; attempt < 80; attempt++) {
   await sleep(250)
 }
 
-const stop = () => { chrome.kill(); process.exit(0) }
+/**
+ * Delete the throwaway profile once Chrome has gone.
+ *
+ * A profile is hundreds of megabytes of cache, and every run makes a new one.
+ * Windows holds the files for a moment after the process ends, so removal is
+ * retried. Stop this tool by stopping Chrome: a force-killed node process runs
+ * no handler at all, and Chrome's exit is what triggers the clean-up.
+ */
+async function removeProfile() {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try { fs.rmSync(profile, { recursive: true, force: true }); return } catch { await sleep(250) }
+  }
+}
+
+chrome.on('exit', async () => { await removeProfile(); process.exit(0) })
+const stop = () => chrome.kill()
 process.on('SIGTERM', stop)
 process.on('SIGINT', stop)
 await new Promise(() => {})

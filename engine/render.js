@@ -1258,6 +1258,20 @@ function shownInTree(object) {
 }
 
 /**
+ * Whether the project asked for the WebGL backend.
+ *
+ * Off unless stored as 'true': WebGPU is the default, and three falls back to
+ * WebGL by itself where the browser has no WebGPU. A shader written only in
+ * GLSL needs WebGL; one also written in TSL draws on either. Written by
+ * `glsl.forceWebGL` and by the Render plugin's `backend`, and read here because
+ * the backend is chosen during init, before any plugin has loaded.
+ */
+function wantsWebGL() {
+  if (typeof localStorage === 'undefined') return false
+  try { return localStorage.getItem('engine.forceWebGL') === 'true' } catch { return false }
+}
+
+/**
  * `view` and `viewport` are handed in, not owned here.
  *
  * Where the camera looks and how big the picture is are game values — the
@@ -1276,7 +1290,11 @@ export async function makeRenderer(canvas, view, viewport) {
   // question and answers neither "is this shader heavy" nor "how many of these
   // can I draw".
   const renderer = new THREE.WebGPURenderer({
-    canvas, antialias: true, alpha: true, trackTimestamp: true
+    canvas, antialias: true, alpha: true, trackTimestamp: true,
+    // Raw GLSL is inserted into the shader three generates, and the WebGPU
+    // backend generates WGSL, so a project drawing GLSL-only shaders asks for
+    // WebGL. Read here because the backend is chosen once, during init.
+    forceWebGL: wantsWebGL()
   })
   await renderer.init()
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
@@ -2432,7 +2450,10 @@ export async function makeRenderer(canvas, view, viewport) {
 
     const parts = { scene: scenePass, depth: null, normal: null, camera }
     if (passList.some(effect => effect.needsNormals)) {
-      const prePass = pass(scene, camera)
+      // No multisampling: the pass is read as data, and on WebGPU a
+      // multisampled depth texture cannot be sampled by textureGather, which
+      // ambient occlusion needs.
+      const prePass = pass(scene, camera, { samples: 0 })
       prePass.setMRT(mrt({ output: normalView }))
       parts.normal = prePass.getTextureNode()
       parts.depth = prePass.getTextureNode('depth')
@@ -2590,6 +2611,12 @@ export async function makeRenderer(canvas, view, viewport) {
     // Which lights cast is a decision about the level, and the plugin that owns
     // the lights needs somewhere to read the switch and set its quality.
     get shadowMap() { return renderer.shadowMap },
+    /**
+     * three's own renderer, for a plugin that sets how the frame is rendered —
+     * tone mapping, exposure, an environment map it has to build on the GPU.
+     * How the picture looks is a plugin's decision, so this file holds none.
+     */
+    get threeRenderer() { return renderer },
 
     /**
      * Keyline width, contact shadow and ground ring, for everything that does
@@ -2717,6 +2744,43 @@ export async function makeRenderer(canvas, view, viewport) {
       } catch {
         return null
       }
+    },
+
+    /**
+     * Wait until the card has finished everything submitted so far.
+     *
+     * Both backends queue work and return at once, so wall-clock time taken
+     * around a draw measures this thread and not the card — a heavy shader can
+     * read FASTER that way than a cheap one, because the thread does less
+     * waiting per submission. This is the barrier that makes a wall-clock
+     * measurement include the card's own work.
+     *
+     * Asked for by feature, never by backend name: WebGPU has a promise that
+     * settles when the queue drains, WebGL 2 has a blocking finish. False where
+     * neither is reachable, which is the caller's cue not to report a
+     * wall-clock number as a GPU cost.
+     */
+    async waitForGPU() {
+      const backend = renderer.backend
+      try {
+        if (backend?.device?.queue?.onSubmittedWorkDone) {
+          await backend.device.queue.onSubmittedWorkDone()
+          return true
+        }
+        if (backend?.gl) {
+          // One pixel read back, not `finish()`. Chrome runs WebGL in another
+          // process and returns from `finish()` before the card is done, so a
+          // wall-clock measurement built on it reads a heavy shader as cheap.
+          // A synchronous read cannot return until the pixel exists.
+          const gl = backend.gl
+          gl.finish()
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
+          return true
+        }
+      } catch {
+        return false
+      }
+      return false
     },
 
     draw() {

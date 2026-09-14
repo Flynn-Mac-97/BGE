@@ -1,13 +1,14 @@
 ---
-description: The sample shelf of node shaders — edges, grass, aura, waves, hologram, dissolve, gradient — written in TSL and registered into the Materials library. Use when a surface needs to glow, move, scan or burn rather than just sit there, and read it before writing a shader of your own.
+description: The sample shelf of shaders — edges, grass, aura, waves, hologram, dissolve, gradient — described once and implemented in TSL. Use when a surface needs to glow, move, scan or burn rather than just sit there, and read it before writing a shader of your own.
 ---
 
 # Shaders
 
-- Seven TSL node graphs, registered through the door a game's own shader uses —
-  `context.materials.register`.
-- **Every one reads on a flat quad or one box face.** None needs a curved or
-  subdivided mesh.
+- Seven shaders, described once and implemented through the door a game's own
+  uses — `context.shaderLanguages.implement`. **All seven are written in GLSL,
+  which is what draws**, and in TSL as the fallback. Write a new one in GLSL:
+  read `plugins/builtin/glsl.agent.md`.
+- **Every one reads on a flat quad or one box face.** None needs a curved mesh.
 - **The defaults are the demo.** Name one and it looks right.
 - Named on a `mesh`, keys written **flat** beside `texture` and `tint`:
 
@@ -28,26 +29,27 @@ description: The sample shelf of node shaders — edges, grass, aura, waves, hol
 
 ## What they need to read properly
 
-- **`aura` and `hologram` add their light** to what is behind them. Over an
-  empty background they add to nothing: give the level a `sky`.
+- **`aura` and `hologram` add their light** to what is behind. Over an empty
+  background they add to nothing: give the level a `sky`.
 - **`waves` measures in metres.** `scale` is waves per metre, so a pool and a
-  puddle get the same wave. Flat water: nothing moves the mesh. A sphere's UV is
-  one wrap rather than one patch per face, so the size follows the wrap there.
-- **`edges` on a sphere** draws the rim, not a line: a sphere has one UV patch,
-  so its only border is the seam at the back.
+  puddle get the same wave, and nothing moves the mesh. A sphere wraps its UV
+  once, so the size follows the wrap.
+- **`edges` on a sphere** draws the rim, not a line: one UV patch, so its only
+  border is the seam at the back.
 - **`grass` wants a quad and no rotation.** It rebuilds the tuft's centre from
-  the quad's declared size, which is what lets a field merge into one draw call
-  and still turn one tuft at a time. Stand it at half its own height.
+  the quad's declared size, which lets a field merge into one draw call and
+  still turn one tuft at a time. Stand it at half its height.
 
 ## Determinism
 
-Every animated one runs on `time`, the fixed clock. The same second always
-looks the same, and a headless run and a browser agree.
+Every animated one runs on `time`, the fixed clock, so the same second always
+looks the same and a headless run and a browser agree.
 
 ## Commands
 
-- `shaders.list` — every shader, its keys, and whether it can be built now.
-  `buildable` is false for all of them headless: describing needs no renderer.
+- `shaders.list` — every shader, its keys, the languages it is written in, and
+  the one it is built from. Nothing builds headless: describing needs no
+  renderer.
 
 ## Panel
 

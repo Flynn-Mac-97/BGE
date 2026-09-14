@@ -26,7 +26,8 @@ is a fact about the place.
 |---|---|---|
 | `smaa` | subpixel antialiasing, cleans edges without softening the frame | none |
 | `bloom` | light bleeding out of the brightest parts | `strength` |
-| `ssao` | contact shadow in the creases, from depth | `radius`, in metres |
+| `ssao` | contact shadow in the creases, from depth. Also `strength` 0.7, `scale` 0.5 (resolution), `denoise` true | `radius`, in metres |
+| `ssgi` | light bounced off nearby surfaces, from the picture. Also `quality` low/medium/high, `radius` 12, `denoise` true. Switched on by Render's `globalIllumination`, not by the chain | `intensity` |
 | `grade` | contrast, saturation, brightness and a colour cast | `contrast` |
 | `vignette` | darkening towards the corners | `amount` |
 

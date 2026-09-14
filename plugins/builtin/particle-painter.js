@@ -22,7 +22,7 @@ export default {
   name: 'Particle Painter',
   category: 'visuals',
   about: 'Draws the particle field as camera-facing quads on the renderer scene, batched by texture and blend.',
-  needs: ['Particles'],
+  needs: ['Particles', 'Shader Languages'],
 
   onLoad(context) {
     field = context.particles
@@ -33,7 +33,13 @@ export default {
       // Loaded on demand, so a world with no renderer never pays to parse a
       // 3D library it will not call.
       Promise.all([import('three/webgpu'), import('three/tsl')])
-        .then(([THREE, TSL]) => { painter = makePainter(THREE, TSL, context.renderer.scene) })
+        .then(([THREE, TSL]) => {
+          describeLook(TSL, context.shaderLanguages)
+          painter = makePainter(THREE, TSL, context.renderer.scene, context)
+          // A group's material is built once and kept, so a language swap
+          // reaches nothing until the groups are dropped.
+          context.bus.on('shader:swapped', () => painter?.reset())
+        })
         .catch(e => console.error(`[particle-painter] could not load three — particles are recorded but not drawn (${e.message})`))
     })
   },
@@ -44,17 +50,45 @@ export default {
 }
 
 /**
- * The look of one particle, as a node graph.
+ * The look of one particle, named as a program so a second language can write
+ * it.
  *
- * The quad is built in VIEW space: one centre per particle, pushed out by its
- * corner, which is what makes it face the camera with nothing rotated on the
- * CPU. `corner` is also the surface coordinate, so the fragment side reads the
- * same attribute the vertex side offset by.
+ * Only the colour goes through the registry. How the quad faces the camera is
+ * geometry this painter owns — one centre per particle, pushed out by its
+ * corner in view space, so nothing is rotated on the CPU — and a shader
+ * language has no say in it.
  */
-function particleMaterial(THREE, TSL, map, blend) {
+function describeLook(TSL, languages) {
+  if (!languages) {
+    console.error('[particle-painter] Shader Languages did not load, so the particle look cannot be swapped — it is drawn in TSL.')
+    return
+  }
+  const { mix, oneMinus, smoothstep, vec4 } = TSL
+  languages.describe('particle-colour', {
+    kind: 'program',
+    about: 'the look of one particle: the colour it was painted, times its texture, cut to a round edge where it has none',
+    from: 'particle-painter'
+  })
+  languages.implement('particle-colour', 'tsl', ({ surface, painted, sampled, textured }) => {
+    // A soft round dot, so an untextured particle is a puff rather than a
+    // square. A textured one takes its shape from the picture instead, or the
+    // fade would eat the edge of the sprite.
+    const edge = oneMinus(smoothstep(0.55, 1.0, surface.sub(0.5).length().mul(2)))
+    const tinted = painted.mul(sampled)
+    return vec4(tinted.rgb, tinted.a.mul(mix(edge, 1, textured)))
+  })
+}
+
+/**
+ * The material one group of particles is drawn with.
+ *
+ * `corner` is the surface coordinate as well as the vertex offset, so the
+ * fragment side reads the same attribute the vertex side moved by.
+ */
+function particleMaterial(THREE, TSL, map, blend, context) {
   const {
-    attribute, cameraProjectionMatrix, modelViewMatrix, oneMinus, positionGeometry,
-    smoothstep, texture, vec4
+    attribute, cameraProjectionMatrix, float, modelViewMatrix, positionGeometry,
+    texture, vec4
   } = TSL
 
   const corner = attribute('corner', 'vec2')
@@ -75,18 +109,19 @@ function particleMaterial(THREE, TSL, map, blend) {
     vec4(view.x.add(corner.x.mul(size)), view.y.add(corner.y.mul(size)), view.z, view.w))
 
   const surface = corner.add(0.5)
-  material.colorNode = map
-    ? painted.mul(texture(map, surface))
-    // A soft round dot, so an untextured particle is a puff rather than a
-    // square. Cheaper than a texture and it never fails to load.
-    : vec4(painted.rgb, painted.a.mul(oneMinus(smoothstep(0.55, 1.0, surface.sub(0.5).length().mul(2)))))
-  // What the GLSL discarded: below this a particle only costs blending.
+  // Sampled here rather than in the program, so no language needs a sampler
+  // argument and an untextured group gets white.
+  const sampled = map ? texture(map, surface) : vec4(1, 1, 1, 1)
+  material.colorNode = context.shaderLanguages?.build('particle-colour', {
+    surface, painted, sampled, textured: float(map ? 1 : 0)
+  }) || painted.mul(sampled)
+  // What the shader discarded: below this a particle only costs blending.
   material.alphaTest = 0.01
   return material
 }
 
 
-function makePainter(THREE, TSL, scene) {
+function makePainter(THREE, TSL, scene, context) {
   const loader = new THREE.TextureLoader()
   const textures = new Map()
   const groups = new Map()      // texture|blend -> { geometry, mesh, capacity }
@@ -126,7 +161,7 @@ function makePainter(THREE, TSL, scene) {
     geometry.setAttribute('corner', new THREE.BufferAttribute(corner, 2))
     geometry.setIndex(new THREE.BufferAttribute(index, 1))
 
-    const material = particleMaterial(THREE, TSL, texture ? textureFor(texture) : null, blend)
+    const material = particleMaterial(THREE, TSL, texture ? textureFor(texture) : null, blend, context)
 
     const mesh = new THREE.Mesh(geometry, material)
     // Vertices are built in view space every frame, so the bounding sphere
@@ -141,6 +176,21 @@ function makePainter(THREE, TSL, scene) {
   }
 
   return {
+    /**
+     * Drop every group, so the next frame builds its materials again.
+     *
+     * A group's material is built once and kept for the life of the page, so a
+     * shader language swap reaches nothing without this.
+     */
+    reset() {
+      for (const group of groups.values()) {
+        scene.remove(group.mesh)
+        group.geometry.dispose()
+        group.mesh.material.dispose()
+      }
+      groups.clear()
+    },
+
     sync(live) {
       const byGroup = new Map()
       for (const p of live) {

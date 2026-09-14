@@ -197,6 +197,10 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const strength = held(mesh.strength, defaults.strength, 0, 8)
       const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
       material.blending = THREE.AdditiveBlending
+      // Fog is mixed into every fragment, and an additive pass ADDS what it
+      // returns — so in a level with fog the fog colour is added across the
+      // quad's whole square and the square shows wherever the effect does not.
+      material.fog = false
       const middle = uv.face().sub(0.5)
       // Soft from the middle of the face outward. A silhouette rim is zero
       // across a face pointed at the camera, which is how a sprite is arranged.
@@ -273,6 +277,10 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const glitch = held(mesh.glitch, defaults.glitch, 0, 0.5)
       const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
       material.blending = THREE.AdditiveBlending
+      // Fog is mixed into every fragment, and an additive pass ADDS what it
+      // returns — so in a level with fog the fog colour is added across the
+      // quad's whole square and the square shows wherever the effect does not.
+      material.fog = false
 
       // Whole rows jump sideways for a moment. The noise is keyed on the row
       // and on the clock, so the same second always tears the same rows.

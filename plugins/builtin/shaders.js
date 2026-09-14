@@ -1,16 +1,16 @@
 /**
- * Shaders — the sample shelf of node materials, and the worked example of how
- * one is written.
+ * Shaders — the sample shelf, and the worked example of how one is written.
  *
  * Materials owns the registry and the nine plain surfaces. This owns the ones
  * that are a shader rather than a surface: an edge that catches light, a glow
- * that breathes, a surface that moves. They register through the same door a
- * game's own shader goes through — `context.materials.register` — so nothing
- * here is a special case.
+ * that breathes, a surface that moves.
  *
- * Every one is TSL. A TSL shader is a JavaScript node graph rather than a
- * string, so it composes, it carries its own types, and it can be built and
- * checked with no GPU at all.
+ * The shelf is a table of NAMES, not of node graphs. The table below is the one
+ * place every default is written, and it is language-neutral: this file
+ * describes each shader to Shader Languages and registers the TSL
+ * implementation of it. A second language plugin implements the same names in
+ * its own language, and `shader.prefer` swaps which one draws. Nothing here is
+ * a special case — a game's own shader goes through the same two calls.
  *
  * Described here, drawn in `shaders/builders.js`. The names, descriptions and
  * defaults are true with or without a screen, so `shaders.list` answers in a
@@ -78,8 +78,8 @@ function applyShader(context, entities, name) {
 export default {
   name: 'Shaders',
   category: 'visuals',
-  about: 'Sample node materials — edges, grass, aura, waves, hologram, dissolve, gradient — and the worked example of writing one.',
-  needs: ['Materials'],
+  about: 'The sample shader shelf — edges, grass, aura, waves, hologram, dissolve, gradient — described once and implemented in TSL.',
+  needs: ['Materials', 'Shader Languages'],
 
   panels: [{
     id: 'shaders',
@@ -118,16 +118,16 @@ export default {
   }],
 
   onLoad(context) {
-    const materials = context.materials
-    if (!materials) {
-      console.error('[Shaders] Materials did not load, so there is no registry to add to — every sample shader is missing and a mesh naming one draws as lambert.')
+    const languages = context.shaderLanguages
+    if (!languages) {
+      console.error('[Shaders] Shader Languages did not load, so no sample shader has anywhere to be registered — a mesh naming one draws as lambert.')
       return
     }
 
-    // Described with no builder first: a headless world can answer what every
-    // shader is and which keys it reads, and never pays to import a renderer.
+    // Described with no implementation first: a headless world can answer what
+    // every shader is and which keys it reads, and never pays for a renderer.
     for (const [name, details] of Object.entries(SHADERS)) {
-      materials.register(name, null, { ...details, from: 'shaders' })
+      languages.describe(name, { ...details, kind: 'material', from: 'shaders' })
     }
 
     if (typeof document === 'undefined') return
@@ -136,11 +136,11 @@ export default {
       .then(([THREE, TSL]) => {
         const builders = buildersFor(THREE, TSL, SHADERS)
         for (const [name, build] of Object.entries(builders)) {
-          materials.register(name, build, { ...SHADERS[name], from: 'shaders' })
+          languages.implement(name, 'tsl', build)
         }
       })
       .catch(error => {
-        console.error('[Shaders] the node library did not load, so no sample shader can be built —', error?.message || error)
+        console.error('[Shaders] the node library did not load, so no sample shader can be built in TSL —', error?.message || error)
       })
   },
 
@@ -153,9 +153,13 @@ export default {
         about: details.about,
         dimension: details.dimension,
         parameters: details.parameters,
-        // False in a headless world for every one of them, and that is not a
-        // fault: describing a shader needs no renderer.
-        buildable: context.materials?.get(name)?.build !== null
+        // Which language it will be built from. Null in a headless world for
+        // every one of them, and that is not a fault: describing a shader
+        // needs no renderer. `shader.list` says the same for every shader,
+        // including a game's own.
+        building: context.shaderLanguages?.chosen(name)?.language || null,
+        written: context.shaderLanguages?.get(name)?.written
+          ? [...context.shaderLanguages.get(name).written] : []
       }))
     })
   }]

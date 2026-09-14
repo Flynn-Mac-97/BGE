@@ -456,6 +456,14 @@ export default {
     // never does — so a lamp dragged in the viewport would not light anything
     // until you pressed play. Anything that changes the world says so on the bus.
     context.bus.on('world:changed', () => syncLights(state))
+    // A model's meshes load after its entity, and no event says when. While the
+    // world is stopped nothing else runs, so look again a few times a second.
+    let sincePaint = 0
+    context.bus.on('frame:painted', () => {
+      if (++sincePaint < 20 || !context.renderer?.scene) return
+      sincePaint = 0
+      if ([...lights.values()].some(record => record.castsShadow)) markShadowSurfaces(context, context.renderer.scene)
+    })
 
     /**
      * The one-shot light every shot and every explosion reaches for.
@@ -781,8 +789,6 @@ function detach(state, record) {
  */
 function markShadowSurfaces(context, scene) {
   for (const object of scene.children) {
-    if (!object.isMesh || object.userData.lightsShadow) continue
-    object.userData.lightsShadow = true
     // The sky box surrounds everything and a light's marker box is an editing
     // aid; a 3D gizmo is editor furniture, not a map object. Any of those would
     // cast a shadow across the whole map for nothing.
@@ -792,8 +798,15 @@ function markShadowSurfaces(context, scene) {
     // on the ground — a mown patch, a rut, a scorch mark — is a thin box, and a
     // thin box under a low sun throws a hard offset shadow of its own outline
     // across the surface it is meant to be part of.
-    object.castShadow = !excluded && castsShadow(context, entity) !== false
-    object.receiveShadow = !excluded
+    const casts = !excluded && castsShadow(context, entity) !== false
+    // Every mesh inside, not only the object itself: a loaded model is a group
+    // of meshes, and they arrive after the entity does.
+    object.traverse(part => {
+      if (!part.isMesh || part.userData.lightsShadow) return
+      part.userData.lightsShadow = true
+      part.castShadow = casts
+      part.receiveShadow = !excluded
+    })
   }
 }
 

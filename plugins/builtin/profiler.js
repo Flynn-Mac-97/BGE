@@ -7,9 +7,11 @@
  * long the card spent on it: it goes up with pixels and with how heavy a shader
  * is, and it is the only honest answer to "can I afford this material".
  *
- * GPU time needs the `timestamp-query` feature. Three turns the tracking off by
- * itself where the feature is missing, which is every WebGL 2 backend, and the
- * number is then absent rather than wrong.
+ * GPU time is only reported where it can be believed. A WebGL 2 backend with
+ * `EXT_disjoint_timer_query_webgl2` says it can time itself and then returns a
+ * constant around a thousand milliseconds, which is not a frame time and is far
+ * worse than no number at all. Every sample is checked against the wall clock
+ * before it is reported: see `believable`.
  *
  * Drawing in a tight loop rather than on the animation frame is deliberate: the
  * animation frame is capped to the screen's refresh, so a scene that could run
@@ -37,6 +39,8 @@ const STEP_WARM = 60
 /** A fixed step is 1/60 s, so this is the whole budget one step may spend. */
 const BUDGET_MS = 1000 / 60
 
+import { fillWith } from './profiler/fill.js'
+
 const sorted = list => [...list].sort((a, b) => a - b)
 
 /** Mean, middle and worst-in-twenty of a list of milliseconds. */
@@ -54,6 +58,28 @@ function spread(times) {
 }
 
 const round = value => Math.round(value * 1000) / 1000
+
+/**
+ * The GPU samples the wall clock agrees with, or none and the reason.
+ *
+ * A frame cannot have taken the card longer than the whole sampling loop took
+ * on the clock. A backend reporting otherwise is not measuring per-frame time,
+ * and a plausible-looking wrong number is worse than an absent one: it is read
+ * into a table and acted on. The number it gave is named so the reader can see
+ * why it was dropped.
+ */
+export function believable(samples, loopMs, backend) {
+  if (!samples.length) {
+    return { gpu: null, why: `${backend || 'this backend'} reported no GPU time — it cannot time itself` }
+  }
+  const kept = samples.filter(one => one <= loopMs)
+  if (kept.length) return { gpu: spread(kept), why: undefined }
+  const worst = Math.max(...samples)
+  return {
+    gpu: null,
+    why: `${backend || 'this backend'} reported ${round(worst)} ms for one frame, and the whole sampling loop took ${round(loopMs)} ms — the timer is not reporting per-frame time, so nothing is reported`
+  }
+}
 
 /** One frame, drawn now rather than when the screen next refreshes. */
 function drawOnce(renderer, world) {
@@ -98,21 +124,22 @@ async function measure(context, options = {}) {
   // profiler an agent cannot use.
   const gpu = []
   const samples = Math.min(60, Math.max(4, Math.round(Number(options.gpuSamples) || 20)))
+  const gpuStartedAt = performance.now()
   for (let i = 0; i < samples; i++) {
     drawOnce(renderer, context.world)
     const reported = await renderer.gpuTime?.()
     if (reported) gpu.push(reported)
   }
+  const gpuLoopMs = performance.now() - gpuStartedAt
+  const timing = believable(gpu, gpuLoopMs, renderer.backend?.name)
 
   const stats = renderer.stats || {}
   return {
     frames,
     firstFrameMs: first,
     cpu: spread(cpu),
-    gpu: gpu.length ? spread(gpu) : null,
-    gpuTimingWhy: gpu.length
-      ? undefined
-      : 'this backend cannot time itself — `timestamp-query` is a WebGPU feature and no WebGL 2 backend has it',
+    gpu: timing.gpu,
+    gpuTimingWhy: timing.why,
     frame: {
       drawCalls: stats.drawCalls,
       triangles: stats.triangles,
@@ -218,6 +245,9 @@ function measureSteps(context, options = {}) {
   }
 }
 
+/** The fill measurement, given the helpers every profiler number is made with. */
+const measureFill = fillWith({ measure, drawOnce, round })
+
 export default {
   name: 'Profiler',
   category: 'agents',
@@ -226,6 +256,7 @@ export default {
   onLoad(context) {
     context.profiler = {
       measure: options => measure(context, options),
+      fill: options => measureFill(context, options),
       steps: options => measureSteps(context, options)
     }
   },
@@ -236,6 +267,12 @@ export default {
     // run profile.frames
     // run profile.frames '{"frames": 400, "warm": 30}'
     run: (context, options) => measure(context, options || {})
+  }, {
+    id: 'profile.fill',
+    label: 'Stack quads that cover the frame on one material, and report what its pixels cost',
+    // run profile.fill '{"material": "hologram"}'
+    // run profile.fill '{"material": "hologram", "layers": 24, "frames": 300}'
+    run: (context, options) => measureFill(context, options || {})
   }, {
     id: 'profile.steps',
     label: 'Simulate many fixed steps and report what each system cost',

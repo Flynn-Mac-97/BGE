@@ -21,9 +21,10 @@ nonsense then gets the default rather than a broken graph.
 - **A name is claimed once.** Materials owns nine standard surfaces, `water`
   among them. Registering a name that is taken is decided by load order and the
   loser is never drawn; `register` says so in the console. Pick a free name.
-- **Bloom is not on.** Post-processing is off on the node renderer, so a shader
-  gets no bleed for free. Build the falloff into the graph: a hot core, a soft
-  shoulder, and colour that leaves white for the brightest part only.
+- **Bloom is not on unless the level asked for it.** The chain is empty until a
+  level declares `world.post`, so a shader gets no bleed for free. Build the
+  falloff into the graph: a hot core, a soft shoulder, and colour that leaves
+  white for the brightest part only.
 
 ## What makes one read as finished
 

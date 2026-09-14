@@ -1,5 +1,5 @@
 ---
-description: Measures what a frame costs, on the thread and on the card, and what a fixed step costs system by system. Use before and after a rendering or simulation change, to find what a material, an effect or a physics load costs, and to answer how many of a thing the engine can draw or simulate.
+description: Measures what a frame costs, on the thread and on the card, what a material's pixels cost, and what a fixed step costs system by system. Use before and after a rendering or simulation change, to find what a material, a shader or a physics load costs, and to answer how many of a thing the engine can draw or simulate.
 ---
 
 # Profiler
@@ -16,46 +16,47 @@ description: Measures what a frame costs, on the thread and on the card, and wha
 ```sh
 node bin/engine.mjs --headless --project <path> --level <name> run profile.steps
 ```
+- `profile.fill` stacks quads covering the frame on one material and reports
+  what its **pixels** cost. One surface over a twelfth of the screen is too
+  cheap for any timer here to see; this is the only way to price a shader.
 - **Two numbers, two questions.** `cpu` is how long this thread spent describing
   the frame — draw calls, and the work `sync` does per entity. `gpu` is how long
   the card spent on it — pixels, and how heavy a shader is.
-- `gpu` is null on WebGL 2. It needs `timestamp-query`, which is a WebGPU
-  feature; three turns the tracking off by itself where it is missing.
+- **`gpu` is reported only where it can be believed.** A WebGL 2 backend claims
+  it can time itself and then returns a constant near 1000 ms whatever is drawn.
+  Any sample longer than the sampling loop is dropped and `gpuTimingWhy` names
+  it. So WebGL has no per-frame GPU time: use `profile.fill`, read
+  `wallMsPerFrame`, and subtract the `lambert` baseline from the same run.
 
 ```sh
 node bin/engine.mjs --timeout 90000 run profile.frames
 node bin/engine.mjs --timeout 90000 run profile.frames '{"frames":400}'
+node bin/engine.mjs --timeout 180000 run profile.fill '{"material":"aura","layers":64}'
 ```
 
 ## Run it twice
 
 **Nothing is merged for the first 45 frames after anything in the scene moves.**
-A run straight after a level change measures the engine settling and reads two
-to three times high. Run it, throw that away, run it again.
+A run straight after a level change measures the settling and reads two to three
+times high. Run it, throw it away, run it again.
 
 ## What to expect
 
-Measured on one machine at 1280×720 through WebGPU, steady state, boxes on one
-material. Treat the shape as the finding and the numbers as that machine's.
-
-| entities | cpu ms | gpu ms | draw calls |
-|---|---|---|---|
-| 500 | 1.0 | 0.07 | 5 |
-| 2000 | 3.3 | 0.33 | 7 |
-| 6000 | 18.8 | 0.46 | 9 |
-| 12000 | 45.1 | 3.0 | 11 |
+Measured on one machine at 1280×720 through WebGPU. The shape is the finding;
+the numbers are that machine's. The table is in the detail file.
 
 - **The thread is the ceiling, not the card.** CPU grows faster than the entity
-  count; GPU barely moves. A 60 frames a second budget of 16.7 ms runs out at
-  roughly five thousand entities.
+  count; GPU barely moves. A 16.7 ms budget runs out near five thousand
+  entities.
 - **Draw calls stay flat** because merging holds them there. Eleven calls for
   twelve thousand boxes.
-- **A TSL shader is not a cost worth avoiding.** Every sample shader lands
-  within about a third of plain lambert on the thread, and under half a
-  millisecond on the card at two thousand of them.
+- **A shader's cost is its maths, not its language.** At 64 covering layers,
+  `gradient` and `hologram` cost the same in TSL and in GLSL. `aura` does not,
+  and the noise is why: TSL's `mx_fractal_noise` costs 12 ms above lambert on
+  WebGL where a hash noise costs 3.7 ms. Port a shader and re-measure.
 - **An outline breaks merging.** Five hundred outlined entities draw in a
-  thousand calls rather than five, because an outlined entity keeps its own
-  mesh. Outline the few things a player is looking at.
+  thousand calls, not five: an outlined entity keeps its own mesh. Outline the
+  few things a player looks at.
 
 ## Detail
 

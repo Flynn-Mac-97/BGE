@@ -117,11 +117,18 @@ const EFFECTS = {
     defaults: { strength: 0.35, radius: 0.4, threshold: 0.9 }
   },
   ssao: {
-    // Its strength is its radius — there is no separate amount to turn up, which
-    // is why `radius` is the bare number and the other two are rarely touched.
-    about: 'contact shadow in the creases, worked out from depth; radius is how far it reaches, in metres',
+    about: 'contact shadow in the creases, worked out from depth; radius is how far it reaches, in metres, and strength how dark it can go',
     bare: 'radius',
-    defaults: { radius: 0.4, bias: 0.005, range: 0.1 }
+    // Half resolution and a denoise pass: full-resolution occlusion with no
+    // denoise is grainy and costs four times the pixels. Strength below 1 keeps
+    // the deepest crease from reaching black, which ambient light never does.
+    defaults: { radius: 0.4, strength: 0.7, scale: 0.5, denoise: true, bias: 0.005, range: 0.1 }
+  },
+  ssgi: {
+    about: 'light bouncing between nearby surfaces, worked out from the screen; includes its own ambient occlusion, so ssao is not needed beside it',
+    bare: 'intensity',
+    // Quality is samples per pixel, at full resolution: slices × steps × 2.
+    defaults: { intensity: 1, quality: 'low', radius: 12, denoise: true }
   },
   grade: {
     about: 'contrast, saturation, brightness and a colour cast over the whole frame',
@@ -157,6 +164,20 @@ export default {
        */
       set(chain) {
         post.chosen = chain === null || chain === undefined ? null : chain
+        return apply(context, post)
+      },
+
+      /**
+       * Effects another plugin needs, by name, drawn before the level's chain.
+       *
+       * Lighting belongs on the scene before anything grades or sharpens it, so
+       * these always run first. `null` removes one. The Render plugin puts
+       * screen-space global illumination here.
+       */
+      lighting: new Map(),
+      light(name, options) {
+        if (options) post.lighting.set(name, options)
+        else post.lighting.delete(name)
         return apply(context, post)
       },
 
@@ -288,7 +309,11 @@ function readEffect(name, options, say) {
  * down, does not even call the renderer.
  */
 async function apply(context, post) {
-  post.resolved = resolveChain(post.chosen ?? post.declared, message => sayOnce(post, message))
+  const say = message => sayOnce(post, message)
+  const front = resolveChain([...post.lighting].map(([name, options]) => ({ [name]: options })), say)
+  const chain = resolveChain(post.chosen ?? post.declared, say)
+    .filter(({ effect }) => !post.lighting.has(effect))
+  post.resolved = [...front, ...chain]
   // Which build this is. A level can load while the pass modules are still in
   // flight, and the chain that arrives second must be the one that wins.
   const request = ++post.request
@@ -401,9 +426,15 @@ async function buildOne(effect, options, tools) {
   }
 
   if (effect === 'ssao') {
-    const { ao } = await import('three/addons/tsl/display/GTAONode.js')
-    const { builtinAOContext, screenUV } = TSL
+    const [{ ao }, { denoise }] = await Promise.all([
+      import('three/addons/tsl/display/GTAONode.js'),
+      import('three/addons/tsl/display/DenoiseNode.js')
+    ])
+    const { builtinAOContext, convertToTexture, oneMinus, screenUV } = TSL
     const radius = number(options.radius, 0.4)
+    const strength = Math.min(1, Math.max(0, number(options.strength, 0.7)))
+    const scale = Math.min(1, Math.max(0.25, number(options.scale, 0.5)))
+    const smoothed = options.denoise !== false
     return {
       name: 'ssao',
       needsNormals: true,
@@ -412,12 +443,63 @@ async function buildOne(effect, options, tools) {
           throw new Error('no depth or normal pre-pass, so there is nothing to work the occlusion out from')
         }
         const occlusion = ao(parts.depth, parts.normal, parts.camera)
-        occlusion.radius = radius
+        // `.value`, not the property. Every knob on the node is a uniform, and
+        // replacing one with a plain number takes its node methods with it —
+        // the pass then throws while the graph is being built and the whole
+        // chain is lost.
+        occlusion.radius.value = radius
+        occlusion.resolutionScale = scale
+        // Blurred along surfaces, not across edges: the denoise reads depth and
+        // normals, so a crease stays sharp while its grain goes.
+        const source = smoothed
+          ? convertToTexture(denoise(occlusion.getTextureNode(), parts.depth, parts.normal, parts.camera))
+          : occlusion.getTextureNode()
+        const amount = oneMinus(oneMinus(source.sample(screenUV).r).mul(strength))
         // Fed into the scene pass's own lighting rather than multiplied over
         // the finished picture. Occlusion belongs on the ambient light: a
         // multiply at the end darkens things that are lit directly too.
-        parts.scene.contextNode = builtinAOContext(occlusion.getTextureNode().sample(screenUV).r)
+        parts.scene.contextNode = builtinAOContext(amount)
         return colour
+      }
+    }
+  }
+
+  if (effect === 'ssgi') {
+    const [{ ssgi }, { denoise }] = await Promise.all([
+      import('three/addons/tsl/display/SSGINode.js'),
+      import('three/addons/tsl/display/DenoiseNode.js')
+    ])
+    const { convertToTexture, diffuseColor, mrt, output, vec4 } = TSL
+    // Slices and steps per preset, from three's own advice for running without
+    // temporal filtering. A denoise pass follows, so low is usually enough.
+    const QUALITY = { low: [2, 6], medium: [3, 8], high: [4, 12] }
+    const [slices, steps] = QUALITY[options.quality] || QUALITY.low
+    const intensity = Math.max(0, number(options.intensity, 1))
+    const radius = Math.max(1, number(options.radius, 12))
+    return {
+      name: 'ssgi',
+      needsNormals: true,
+      apply(colour, parts) {
+        if (!parts.normal || !parts.depth) {
+          throw new Error('no depth or normal pre-pass, so there is nothing to bounce light from')
+        }
+        // The bounce is tinted by what it lands on, so the scene pass also
+        // writes each surface's own colour.
+        parts.scene.setMRT(mrt({ output, diffuseColor }))
+        const diffuse = parts.scene.getTextureNode('diffuseColor')
+        const light = ssgi(parts.scene.getTextureNode('output'), parts.depth, parts.normal, parts.camera)
+        light.sliceCount.value = slices
+        light.stepCount.value = steps
+        light.radius.value = radius
+        // Three's default brightness is 10; 1 here means that default.
+        light.giIntensity.value = 10 * intensity
+        // Temporal filtering needs a velocity buffer and a temporal
+        // antialiasing pass this chain does not have. Denoise stands in.
+        light.useTemporalFiltering = false
+        const result = options.denoise === false
+          ? light
+          : convertToTexture(denoise(light, parts.depth, parts.normal, parts.camera))
+        return vec4(colour.rgb.mul(result.a).add(diffuse.rgb.mul(result.rgb)), colour.a)
       }
     }
   }
@@ -515,6 +597,7 @@ function report(context, post) {
     status: post.status,
     passes: post.built,
     chain: post.resolved.map(({ effect, options }) => ({ effect, ...options })),
+    lighting: [...post.lighting.keys()],
     declared: post.declared,
     chosenThisSession: post.chosen,
     presets: Object.keys(PRESETS),

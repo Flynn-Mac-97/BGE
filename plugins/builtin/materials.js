@@ -195,7 +195,7 @@ export const STANDARD_MATERIALS = {
     parameters: { texture: null, tint: '#ffffff', opacity: 1 }
   },
   pulse: {
-    about: 'raw GLSL, animated by a context.time uniform — the worked example of a custom shader',
+    about: 'a TSL node graph on a context.time uniform — the worked example of a custom shader',
     parameters: { tint: '#39e6ff', speed: 0.6, bands: 1 }
   }
 }
@@ -846,7 +846,7 @@ function buildersFor(THREE, TSL, assetURL, materials) {
     },
 
     /**
-     * Written from raw GLSL, on purpose.
+     * A node graph rather than a plain surface, on purpose.
      *
      * This is the worked example of the custom-shader path, and it is registered
      * through exactly the call a game would use — `materials.register(name,
