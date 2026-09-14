@@ -56,9 +56,10 @@
 import * as THREE from 'three/webgpu'
 import {
   attribute, cameraProjectionMatrix, float, max, modelNormalMatrix, modelViewMatrix,
-  mrt, normalGeometry, normalize, normalView, oneMinus, pass, positionGeometry,
+  mrt, normalGeometry, normalize, normalView, oneMinus, output, pass, positionGeometry,
   positionLocal, screenSize, smoothstep, step, uv as uvAttribute, vec4
 } from 'three/tsl'
+import * as TSL from 'three/tsl'
 import { assetURL } from './ui.js'
 
 /**
@@ -2435,6 +2436,12 @@ export async function makeRenderer(canvas, view, viewport) {
    * camera, and — when anything asked for one — a normal and depth pre-pass.
    * The pre-pass is a second full render of the scene, so it is only made when
    * an effect says `needsNormals`.
+   *
+   * `parts.sceneOutput(name)` is one more buffer the scene pass writes, named as
+   * three's TSL names it (`diffuseColor`, `velocity`). Every effect's requests
+   * go into one set of outputs, so two effects never replace each other's.
+   * An effect with `singleSample` turns multisampling off on the scene pass,
+   * because its outputs are read per sample, as temporal antialiasing does.
    */
   function buildPost() {
     postFor = passList
@@ -2446,9 +2453,19 @@ export async function makeRenderer(canvas, view, viewport) {
 
     const camera = activeCamera()
     postCamera = camera
-    scenePass = pass(scene, camera)
+    scenePass = passList.some(effect => effect.singleSample)
+      ? pass(scene, camera, { samples: 0 })
+      : pass(scene, camera)
 
-    const parts = { scene: scenePass, depth: null, normal: null, camera }
+    const outputs = { output }
+    const parts = {
+      scene: scenePass, depth: null, normal: null, camera,
+      sceneOutput(name) {
+        if (!TSL[name]) throw new Error(`three has no scene output called "${name}"`)
+        outputs[name] = TSL[name]
+        return scenePass.getTextureNode(name)
+      }
+    }
     if (passList.some(effect => effect.needsNormals)) {
       // No multisampling: the pass is read as data, and on WebGPU a
       // multisampled depth texture cannot be sampled by textureGather, which
@@ -2469,6 +2486,7 @@ export async function makeRenderer(canvas, view, viewport) {
         report(`[render] passes: "${effect.name || 'an effect'}" could not be built — ${error?.message || error}. It is skipped and the rest of the chain still runs.`)
       }
     }
+    if (Object.keys(outputs).length > 1) scenePass.setMRT(mrt(outputs))
 
     // Renamed in this version of three; the old name still works and warns.
     const Pipeline = THREE.RenderPipeline || THREE.PostProcessing

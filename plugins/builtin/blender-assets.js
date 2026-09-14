@@ -128,6 +128,97 @@ async function findBlender(context) {
 
 const CHIP = { fresh: 'fresh', stale: 'stale', never: 'not imported' }
 
+// ------------------------------------------------------------- drawing alpha
+
+/** Where alpha splits the solid pass from the soft pass. */
+const ALPHA_SPLIT = 0.5
+
+/**
+ * Draw a mesh whose material Blender draws dithered in two passes.
+ *
+ * glTF has no dither mode. Blended, hair cards sort wrongly and mostly vanish;
+ * cut out, strands are hard and grainy; a per-pixel random cutout needs many
+ * frames averaged, and temporal antialiasing rejects that noise as motion.
+ *
+ * Pass 1 is the mesh itself: alpha above 0.5 drawn solid, writing depth, so
+ * strands sort correctly against each other and the head. Pass 2 is a copy of
+ * the mesh with a blended material that draws only alpha below 0.5, without
+ * writing depth, so the soft edges Blender averages are blended over pass 1.
+ * The copy is a child with no transform of its own and shares the geometry and
+ * skeleton, so it follows every pose and is removed with the model.
+ */
+function drawMarkedAlpha(THREE, TSL, mesh) {
+  Object.assign(mesh.material, {
+    alphaTest: ALPHA_SPLIT, alphaHash: false, transparent: false, depthWrite: true, needsUpdate: true
+  })
+  mesh.add(softPass(THREE, TSL, mesh))
+}
+
+/** The attribute the export bakes occlusion into, as three names it. */
+const OCCLUSION = '_occlusion'
+
+/**
+ * Dim environment light by the occlusion Blender baked into the mesh.
+ *
+ * `aoNode` reaches only indirect light, diffuse and reflected, so direct light
+ * and shadows are unchanged. Screen-space AO, when on, multiplies on top.
+ */
+function useBakedOcclusion(TSL, mesh) {
+  mesh.material.aoNode = TSL.attribute(OCCLUSION, 'float')
+  mesh.material.needsUpdate = true
+}
+
+/** Finish every imported mesh not looked at yet: baked occlusion, then alpha. */
+async function finishImportedMeshes(context) {
+  const found = []
+  context.renderer?.scene?.traverse(object => {
+    if (!object.isMesh || object.userData.blenderAlphaSeen) return
+    object.userData.blenderAlphaSeen = true
+    const occluded = !!object.geometry?.attributes?.[OCCLUSION]
+    const dithered = object.material?.userData?.blenderAlpha === 'dithered'
+    if (occluded || dithered) found.push({ mesh: object, occluded, dithered })
+  })
+  if (!found.length) return
+  const [THREE, TSL] = await Promise.all([import('three/webgpu'), import('three/tsl')])
+  // Occlusion first: the soft alpha pass copies the material as it stands.
+  for (const { mesh, occluded } of found) if (occluded) useBakedOcclusion(TSL, mesh)
+  for (const { mesh, dithered } of found) if (dithered) drawMarkedAlpha(THREE, TSL, mesh)
+  context.renderer?.invalidate?.()
+}
+
+/** The blended copy of one mesh, drawing only alpha below the split. */
+function softPass(THREE, TSL, mesh) {
+  const copy = mesh.isSkinnedMesh
+    ? new THREE.SkinnedMesh(mesh.geometry, softMaterial(TSL, mesh.material))
+    : new THREE.Mesh(mesh.geometry, softMaterial(TSL, mesh.material))
+  if (mesh.isSkinnedMesh) copy.bind(mesh.skeleton, mesh.bindMatrix)
+  Object.assign(copy, { castShadow: false, receiveShadow: mesh.receiveShadow, renderOrder: 1 })
+  copy.userData.blenderAlphaSeen = true
+  copy.userData.blenderAlphaSoftPass = true
+  // Lights marks every new mesh to cast; the solid pass already casts this shape.
+  copy.userData.lightsShadow = true
+  return copy
+}
+
+/** One soft material per solid material, so meshes that shared one still share one. */
+const softMaterials = new WeakMap()
+function softMaterial(TSL, solid) {
+  if (!softMaterials.has(solid)) {
+    const soft = solid.clone()
+    // `clone` copies material values, not node inputs.
+    Object.assign(soft, { alphaTest: 0, transparent: true, depthWrite: false, aoNode: solid.aoNode })
+    const alpha = solid.map ? TSL.texture(solid.map, TSL.uv(solid.map.channel || 0)).a.mul(solid.opacity) : TSL.float(solid.opacity)
+    soft.maskNode = alpha.lessThan(ALPHA_SPLIT)
+    softMaterials.set(solid, soft)
+  }
+  return softMaterials.get(solid)
+}
+
+/** How many frames pass between looks for newly loaded models. */
+const LOOK_EVERY = 15
+let sinceLook = 0
+const everyFewFrames = context => { if (++sinceLook >= LOOK_EVERY) { sinceLook = 0; finishImportedMeshes(context) } }
+
 function panelRows(ui, context) {
   if (state.error) return [ui.text(state.error, { dim: true })]
   if (!state.rows.length) {
@@ -161,6 +252,13 @@ export default {
       ['can import here', context.host ? 'yes' : 'no — headless only']
     ]
   }],
+
+  // A `frame` system runs only while the loop does; the editor repaints stopped.
+  onLoad(context) {
+    context.bus.on('frame:painted', () => everyFewFrames(context))
+  },
+
+  systems: [{ phase: 'frame', run: (world, seconds, context) => everyFewFrames(context) }],
 
   panels: [{
     id: 'blender-assets',

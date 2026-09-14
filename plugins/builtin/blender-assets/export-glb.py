@@ -61,6 +61,196 @@ def select_collection(name):
     return True
 
 
+def limit_textures(largest):
+    """Scale every image wider or taller than `largest` down, keeping its shape.
+
+    Scaled in memory only; the .blend on disk keeps full size. Answers the
+    names of the images that were scaled.
+    """
+    if not largest:
+        return []
+    scaled = []
+    for image in bpy.data.images:
+        width, height = image.size
+        if max(width, height) <= largest:
+            continue
+        factor = largest / max(width, height)
+        image.scale(max(1, round(width * factor)), max(1, round(height * factor)))
+        scaled.append(image.name)
+    return scaled
+
+
+IMAGE_FORMATS = {"auto": "AUTO", "jpeg": "JPEG", "webp": "WEBP"}
+
+
+def mark_alpha_method(material):
+    """Store how Blender draws this material's alpha, as a glTF extra.
+
+    glTF has blend and mask, not dither. Blender's dithered method exports as
+    blend, and blended cards such as hair then sort wrongly and mostly vanish.
+    The engine reads `blenderAlpha` and draws a cutout instead.
+    """
+    method = getattr(material, "surface_render_method", None) or getattr(material, "blend_method", None)
+    if method in ("DITHERED", "HASHED"):
+        material["blenderAlpha"] = "dithered"
+
+
+def mark_alpha_methods():
+    for material in bpy.data.materials:
+        principled = principled_of(material) if material.use_nodes and material.node_tree else None
+        alpha = principled.inputs.get("Alpha") if principled else None
+        if alpha is not None and (alpha.is_linked or alpha.default_value < 1):
+            mark_alpha_method(material)
+            material.update_tag()
+    # A mesh with modifiers exports through its evaluated copy, which keeps the
+    # custom properties it had when it was made.
+    bpy.context.view_layer.update()
+
+
+# --------------------------------------------------------------- occlusion
+
+OCCLUSION = "_occlusion"
+
+
+def use_gpu(scene):
+    """Render Cycles on a GPU when this machine has one Blender can use."""
+    preferences = bpy.context.preferences.addons["cycles"].preferences
+    for kind in ("OPTIX", "CUDA", "HIP", "METAL", "ONEAPI"):
+        try:
+            preferences.compute_device_type = kind
+        except TypeError:
+            continue
+        preferences.get_devices()
+        if any(device.type == kind for device in preferences.devices):
+            for device in preferences.devices:
+                device.use = device.type == kind
+            scene.cycles.device = "GPU"
+            return kind
+    scene.cycles.device = "CPU"
+    return "CPU"
+
+
+def bake_occlusion(samples):
+    """Store, per vertex, how much sky light reaches it, as the attribute `_occlusion`.
+
+    Baked as diffuse light from a plain white sky, with the surface colour left
+    out: 1 is a point open to the whole sky, 0 a point nothing reaches. That is
+    ambient occlusion with the path tracer's rules, so alpha counts and hair
+    cards block only as much as they cover. Other lights are hidden for the bake.
+
+    Per vertex, not a texture: it needs no free UV space, and one model's
+    meshes often share or overlap UVs. Answers the meshes baked.
+    """
+    scene = bpy.context.scene
+    meshes = [o for o in scene.objects if o.type == "MESH" and len(o.data.polygons) and not o.hide_render]
+    if not meshes:
+        return []
+
+    world = scene.world
+    sky = bpy.data.worlds.new("engine-occlusion-sky")
+    sky.use_nodes = True
+    sky.node_tree.nodes["Background"].inputs["Color"].default_value = (1, 1, 1, 1)
+    sky.node_tree.nodes["Background"].inputs["Strength"].default_value = 1
+    scene.world = sky
+    lights = [o for o in scene.objects if o.type == "LIGHT" and not o.hide_render]
+    for light in lights:
+        light.hide_render = True
+
+    scene.render.engine = "CYCLES"
+    use_gpu(scene)
+    scene.cycles.samples = samples
+    bake = scene.render.bake
+    bake.target = "VERTEX_COLORS"
+    bake.use_pass_direct = True
+    bake.use_pass_indirect = True
+    bake.use_pass_color = False
+
+    for mesh in meshes:
+        colours = mesh.data.color_attributes
+        if "engine-occlusion" not in colours:
+            colours.new("engine-occlusion", "FLOAT_COLOR", "POINT")
+        colours.active_color = colours["engine-occlusion"]
+    bpy.ops.object.select_all(action="DESELECT")
+    for mesh in meshes:
+        mesh.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+
+    materials = {slot.material for mesh in meshes for slot in mesh.material_slots if slot.material and slot.material.use_nodes}
+    swapped = [white_matte(material) for material in materials]
+    try:
+        bpy.ops.object.bake(type="DIFFUSE")
+    finally:
+        for restore in swapped:
+            restore()
+
+    for mesh in meshes:
+        store_occlusion(mesh.data)
+
+    scene.world = world
+    for light in lights:
+        light.hide_render = False
+    bpy.data.worlds.remove(sky)
+    bpy.context.view_layer.update()
+    return sorted(mesh.name for mesh in meshes)
+
+
+def white_matte(material):
+    """Draw a material as white matte with its own alpha, for the occlusion bake.
+
+    Only what blocks light may count. Subsurface leaves the diffuse pass, so
+    skin bakes dark, and a normal map makes neighbouring vertices differ, so
+    surfaces bake blotchy. Alpha stays, so hair blocks only as much as it
+    covers. Answers a function that puts the material back.
+    """
+    tree = material.node_tree
+    outputs = [node for node in tree.nodes if node.type == "OUTPUT_MATERIAL" and node.is_active_output]
+    if not outputs:
+        return lambda: None
+    surface = outputs[0].inputs["Surface"]
+    original = surface.links[0].from_socket if surface.is_linked else None
+
+    matte = tree.nodes.new("ShaderNodeBsdfDiffuse")
+    matte.inputs["Color"].default_value = (1, 1, 1, 1)
+    clear = tree.nodes.new("ShaderNodeBsdfTransparent")
+    mix = tree.nodes.new("ShaderNodeMixShader")
+    added = [matte, clear, mix]
+    tree.links.new(clear.outputs[0], mix.inputs[1])
+    tree.links.new(matte.outputs[0], mix.inputs[2])
+    principled = principled_of(material)
+    alpha = principled.inputs.get("Alpha") if principled else None
+    if alpha is not None and alpha.is_linked:
+        tree.links.new(alpha.links[0].from_socket, mix.inputs[0])
+    else:
+        mix.inputs[0].default_value = alpha.default_value if alpha is not None else 1.0
+    tree.links.new(mix.outputs[0], surface)
+
+    def restore():
+        for node in added:
+            tree.nodes.remove(node)
+        if original is not None:
+            tree.links.new(original, surface)
+    return restore
+
+
+def store_occlusion(data):
+    """Move the baked colour into a one-number point attribute the exporter writes.
+
+    glTF viewers multiply a vertex colour into the base colour, so the bake must
+    not leave as COLOR_0. An attribute whose name starts with an underscore is
+    exported as a custom attribute instead.
+    """
+    # Adding an attribute moves the attribute storage, so every attribute is
+    # looked up by name again after one is added or removed.
+    if OCCLUSION not in data.attributes:
+        data.attributes.new(OCCLUSION, "FLOAT", "POINT")
+    count = len(data.vertices)
+    colours = [0.0] * (count * 4)
+    data.color_attributes["engine-occlusion"].data.foreach_get("color", colours)
+    occlusion = [min(1.0, (colours[i * 4] + colours[i * 4 + 1] + colours[i * 4 + 2]) / 3) for i in range(count)]
+    data.attributes[OCCLUSION].data.foreach_set("value", occlusion)
+    data.color_attributes.remove(data.color_attributes["engine-occlusion"])
+
+
 # --------------------------------------------------------------- materials
 
 def base_colour_link(material):
@@ -405,6 +595,9 @@ def main():
     graphs_out = argv[2] if len(argv) > 2 else None
 
     apply_scale(float(settings.get("scale", 1)))
+    scaled = limit_textures(int(settings.get("textureSize") or 0))
+    mark_alpha_methods()
+    occluded = bake_occlusion(int(settings.get("occlusionSamples", 64))) if settings.get("occlusion") else []
 
     procedural = procedural_materials()
     baked = []
@@ -427,6 +620,9 @@ def main():
         "use_selection": use_selection,
         "export_cameras": False,
         "export_lights": False,
+        "export_extras": True,
+        "export_attributes": bool(occluded),
+        "export_image_format": IMAGE_FORMATS.get(settings.get("imageFormat"), "AUTO"),
     }
     kept, dropped = supported(bpy.ops.export_scene.gltf, wanted)
     bpy.ops.export_scene.gltf(**kept)
@@ -435,6 +631,10 @@ def main():
         print("engine-export-graphs %s" % ",".join(dump_graphs(graphs_out)))
     if dropped:
         print("engine-export-dropped %s" % ",".join(dropped))
+    if scaled:
+        print("engine-export-scaled %s" % ",".join(scaled))
+    if occluded:
+        print("engine-export-occluded %s" % ",".join(occluded))
     if baked:
         print("engine-export-baked %s" % ",".join(baked))
     if procedural:

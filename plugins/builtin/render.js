@@ -24,7 +24,9 @@ const state = {
   resolved: resolve(),
   environment: 'none',
   problems: [],
-  applying: null
+  applying: null,
+  probeIn: null,   // frames until the room probe is captured, or null
+  probe: null      // the last capture, for render.look
 }
 
 /** How many frames between checks that every shadow-casting light has the settings. */
@@ -80,16 +82,31 @@ function applyAll(context) {
     apply.applyToneMapping(context, THREE, values)
     apply.applyShadowType(context, THREE, values)
     apply.applyShadowQuality(context, values)
+    apply.applyReadability(context, values)
     applyGlobalIllumination(context, values)
+    applyAntialiasing(context, values)
     try {
       state.environment = await apply.applyEnvironment(context, THREE, values)
     } catch (error) {
       state.environment = 'none'
       state.resolved.problems.push(`environment "${values.environment}" could not be loaded — ${error?.message || error}`)
     }
+    if (values.reflections === 'room') state.probeIn = PROBE_WAIT
+    else { state.probeIn = null; state.probe = null; apply.dropProbe(context) }
     context.redraw?.()
   }).catch(error => console.error('[Render]', error))
   return state.applying
+}
+
+/** The temporal antialiasing asked for last, so the chain is rebuilt only on a change. */
+let temporalOn = null
+
+/** Temporal antialiasing, as a front effect of the Post Processing chain. */
+function applyAntialiasing(context, values) {
+  const wanted = values.antialiasing === 'temporal'
+  if (wanted === temporalOn || !context.post?.light) return
+  temporalOn = wanted
+  context.post.light('traa', wanted ? {} : null)
 }
 
 /** The global illumination asked for last, so the chain is rebuilt only on a change. */
@@ -110,6 +127,28 @@ function applyGlobalIllumination(context, values) {
   context.post.light('ssgi', wanted)
 }
 
+/**
+ * Frames to wait before capturing the room probe. Lights, models and surfaces
+ * are built by other plugins over the first frames after a level loads, and a
+ * probe captured before them holds a dark, empty room.
+ */
+const PROBE_WAIT = 12
+
+/** Capture the room probe once its wait is over. */
+async function tickProbe(context) {
+  if (state.probeIn === null || --state.probeIn > 0 || !enabled(context) || !context.renderer) return
+  state.probeIn = null
+  const [THREE, apply] = await Promise.all([import('three/webgpu'), import('./render/apply.js')])
+  try {
+    const took = apply.captureProbe(context, THREE)
+    state.probe = took === null ? null : { capturedIn: `${took} ms` }
+  } catch (error) {
+    state.probe = null
+    state.problems = [`room reflections could not be captured — ${error?.message || error}`]
+  }
+  context.redraw?.()
+}
+
 /** Keep new shadow-casting lights at the settings, a few times a second. */
 async function checkShadows(context) {
   if (++sinceCheck < EVERY || !enabled(context) || !context.renderer) return
@@ -124,6 +163,7 @@ async function restore(context) {
   const [THREE, apply] = await Promise.all([import('three/webgpu'), import('./render/apply.js')])
   apply.restoreDefaults(context, THREE)
   applyGlobalIllumination(context, { globalIllumination: 'off' })
+  applyAntialiasing(context, { antialiasing: 'level' })
   state.environment = 'none'
   context.redraw?.()
 }
@@ -179,6 +219,7 @@ async function look(context) {
       about: SETTINGS[key].about
     })),
     environmentDrawing: state.environment,
+    roomProbe: state.probe || (state.probeIn !== null ? 'waiting for the level to build' : 'none'),
     backend: apply.backendReport(context, valuesOf(resolved)),
     enabled: enabled(context),
     problems: resolved.problems,
@@ -260,10 +301,10 @@ export default {
       on ? applyAll(context) : restore(context)
     })
 
-    context.bus.on('frame:painted', () => checkShadows(context))
+    context.bus.on('frame:painted', () => { checkShadows(context); tickProbe(context) })
   },
 
-  systems: [{ phase: 'frame', run: (world, seconds, context) => { checkShadows(context) } }],
+  systems: [{ phase: 'frame', run: (world, seconds, context) => { checkShadows(context); tickProbe(context) } }],
 
   commands: [
     {

@@ -125,10 +125,16 @@ const EFFECTS = {
     defaults: { radius: 0.4, strength: 0.7, scale: 0.5, denoise: true, bias: 0.005, range: 0.1 }
   },
   ssgi: {
-    about: 'light bouncing between nearby surfaces, worked out from the screen; includes its own ambient occlusion, so ssao is not needed beside it',
+    about: 'light bouncing between nearby surfaces, worked out from the screen and added; it darkens nothing, so keep ssao for blocked light',
     bare: 'intensity',
     // Quality is samples per pixel, at full resolution: slices × steps × 2.
-    defaults: { intensity: 1, quality: 'low', radius: 12, denoise: true }
+    // show: 'bounce' or 'occlusion' draws that part alone, for tuning.
+    defaults: { intensity: 1, quality: 'low', radius: 12, denoise: true, show: null }
+  },
+  traa: {
+    about: 'temporal antialiasing — jitters the camera and blends each frame with the last, so edges, dithered hair and grainy screen effects settle smooth; replaces smaa, which is dropped beside it',
+    bare: null,
+    defaults: {}
   },
   grade: {
     about: 'contrast, saturation, brightness and a colour cast over the whole frame',
@@ -308,11 +314,17 @@ function readEffect(name, options, say) {
  * touches no module, allocates no target and, unless it is tearing something
  * down, does not even call the renderer.
  */
+/** The order front effects run in, whatever order they were switched on in. */
+const FRONT_ORDER = ['ssgi', 'traa']
+
 async function apply(context, post) {
   const say = message => sayOnce(post, message)
-  const front = resolveChain([...post.lighting].map(([name, options]) => ({ [name]: options })), say)
+  // Lighting first, then the temporal pass that settles its grain.
+  const byOrder = ([a], [b]) => FRONT_ORDER.indexOf(a) - FRONT_ORDER.indexOf(b)
+  const front = resolveChain([...post.lighting].sort(byOrder).map(([name, options]) => ({ [name]: options })), say)
   const chain = resolveChain(post.chosen ?? post.declared, say)
     .filter(({ effect }) => !post.lighting.has(effect))
+    .filter(({ effect }) => !(effect === 'smaa' && post.lighting.has('traa')))
   post.resolved = [...front, ...chain]
   // Which build this is. A level can load while the pass modules are still in
   // flight, and the chain that arrives second must be the one that wins.
@@ -469,10 +481,14 @@ async function buildOne(effect, options, tools) {
       import('three/addons/tsl/display/SSGINode.js'),
       import('three/addons/tsl/display/DenoiseNode.js')
     ])
-    const { convertToTexture, diffuseColor, mrt, output, vec4 } = TSL
+    const { convertToTexture, vec4 } = TSL
     // Slices and steps per preset, from three's own advice for running without
     // temporal filtering. A denoise pass follows, so low is usually enough.
     const QUALITY = { low: [2, 6], medium: [3, 8], high: [4, 12] }
+    // giIntensity at strength 1. Measured against Cycles in a white room with a
+    // red wall, under the same sun and .exr: 5 matched the bounce on floor, wall
+    // and ball best (error 2.8 of 255, against 12.2 with no bounce at all).
+    const GI_SCALE = 5
     const [slices, steps] = QUALITY[options.quality] || QUALITY.low
     const intensity = Math.max(0, number(options.intensity, 1))
     const radius = Math.max(1, number(options.radius, 12))
@@ -485,21 +501,41 @@ async function buildOne(effect, options, tools) {
         }
         // The bounce is tinted by what it lands on, so the scene pass also
         // writes each surface's own colour.
-        parts.scene.setMRT(mrt({ output, diffuseColor }))
-        const diffuse = parts.scene.getTextureNode('diffuseColor')
-        const light = ssgi(parts.scene.getTextureNode('output'), parts.depth, parts.normal, parts.camera)
-        light.sliceCount.value = slices
-        light.stepCount.value = steps
-        light.radius.value = radius
-        // Three's default brightness is 10; 1 here means that default.
-        light.giIntensity.value = 10 * intensity
-        // Temporal filtering needs a velocity buffer and a temporal
-        // antialiasing pass this chain does not have. Denoise stands in.
-        light.useTemporalFiltering = false
-        const result = options.denoise === false
-          ? light
-          : convertToTexture(denoise(light, parts.depth, parts.normal, parts.camera))
-        return vec4(colour.rgb.mul(result.a).add(diffuse.rgb.mul(result.rgb)), colour.a)
+        const diffuse = parts.sceneOutput('diffuseColor')
+        const pass = ssgi(parts.scene.getTextureNode('output'), parts.depth, parts.normal, parts.camera)
+        pass.sliceCount.value = slices
+        pass.stepCount.value = steps
+        pass.radius.value = radius
+        pass.giIntensity.value = GI_SCALE * intensity
+        // Temporal filtering needs the temporal antialiasing pass to average
+        // it; without that pass, denoise stands in.
+        pass.useTemporalFiltering = parts.temporal === true
+        // Two outputs, read by name: the pass node itself stands for occlusion.
+        const smooth = node => options.denoise === false
+          ? node
+          : convertToTexture(denoise(node, parts.depth, parts.normal, parts.camera))
+        const bounce = smooth(pass.getGINode())
+        // Bounce light only, added. The frame already carries the environment
+        // light with its occlusion (room probe, baked occlusion, ssao), so
+        // multiplying by this pass's occlusion darkens it a second time and
+        // darkens direct sunlight, which nothing blocks.
+        if (options.show === 'bounce') return vec4(diffuse.rgb.mul(bounce.rgb), 1)
+        if (options.show === 'occlusion') return vec4(pass.getAONode().r, pass.getAONode().r, pass.getAONode().r, 1)
+        return vec4(colour.rgb.add(diffuse.rgb.mul(bounce.rgb)), colour.a)
+      }
+    }
+  }
+
+  if (effect === 'traa') {
+    const { traa } = await import('three/addons/tsl/display/TRAANode.js')
+    return {
+      name: 'traa',
+      singleSample: true,
+      apply(colour, parts) {
+        // Motion per pixel, so last frame's picture is read from where each
+        // surface was, not from where the pixel is.
+        const motion = parts.sceneOutput('velocity')
+        return traa(colour, parts.scene.getTextureNode('depth'), motion, parts.camera)
       }
     }
   }

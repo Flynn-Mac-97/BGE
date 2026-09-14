@@ -53,7 +53,12 @@ a texture instead.
 ## Settings
 
 `scale`, `applyModifiers`, `collection`, `bake`, `bakeSize`, `bakeSamples`,
-`shaders`. Changing one makes the model stale, so the next import rebuilds it.
+`textureSize`, `imageFormat`, `occlusion`, `occlusionSamples`, `shaders`.
+
+`"occlusion": true` bakes blocked sky light into the model. The engine cannot
+see what blocks a surface, so without it a hat leaves the face under it lit by
+the whole sky and hair looks grey. The bake is stored in the `_occlusion`
+attribute and dims environment light only. Changing one makes the model stale, so the next import rebuilds it.
 
 ## What it refuses
 

@@ -18,9 +18,14 @@ const [WIDTH, HEIGHT] = (process.argv[4] || '540x960').split('x').map(Number)
 const NAME = process.argv[5] || `headless-${PORT}`
 const URL = BASE + (BASE.includes('?') ? '&' : '?') + `client=${encodeURIComponent(NAME)}`
 
-const profile = fs.mkdtempSync(path.join(process.env.TEMP || '/tmp', 'lane-chrome-'))
+// In agent-runs, not the system temp directory: that is on the system drive,
+// which is the first to fill, and `agent.sweep` clears agent-runs.
+const profiles = path.resolve('agent-runs', 'chrome-profiles')
+fs.mkdirSync(profiles, { recursive: true })
+const profile = fs.mkdtempSync(path.join(profiles, 'lane-'))
 const chrome = spawn(CHROME, [
   '--headless=new',
+  '--disk-cache-size=1',
   `--remote-debugging-port=${PORT}`,
   `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check',

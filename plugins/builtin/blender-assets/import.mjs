@@ -129,6 +129,6 @@ export async function runExport(host, { blender, blend, model, graphs, settings 
   return {
     source: path.basename(blend), ...source, settings, blender: blender.version, model,
     dropped: list('dropped'), baked: list('baked'), procedural: list('procedural'),
-    graphs: list('graphs')
+    scaled: list('scaled'), occluded: list('occluded'), graphs: list('graphs')
   }
 }

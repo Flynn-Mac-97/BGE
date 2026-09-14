@@ -48,6 +48,16 @@ export const SETTINGS = {
     range: [0, 10],
     in2d: 1, in3d: 0.4
   },
+  environmentBlur: {
+    about: 'How blurred environment reflections are on rough surfaces. blender matches Cycles: three alone reflects each roughness about 0.1 too sharply, so rough cloth and skin look glossy. three leaves three\'s own blur.',
+    options: ['blender', 'three'],
+    in2d: 'three', in3d: 'blender'
+  },
+  reflections: {
+    about: 'What shiny and rough surfaces reflect. room captures the level once, after it loads, so walls and floor block the environment light and show in reflections; about 100 ms per capture. sky uses the environment alone, which passes through walls and makes cloth in shade look wet.',
+    options: ['room', 'sky'],
+    in2d: 'sky', in3d: 'room'
+  },
   shadows: {
     about: 'Edge of every shadow. soft is a blurred edge, smooth is wider still, sharp is crisp and cheapest. soft and smooth can let light through very thin objects.',
     options: ['soft', 'smooth', 'sharp'],
@@ -59,19 +69,29 @@ export const SETTINGS = {
     in2d: 1024, in3d: 2048
   },
   globalIllumination: {
-    about: 'Light bouncing off nearby surfaces. screen works it out from the picture each frame: bounced colour and soft darkening in corners, at a real cost per pixel. off is none.',
+    about: 'Light bouncing off nearby surfaces, such as a red wall tinting the floor beside it. screen works it out from the picture each frame and adds it; it only sees what is on screen. About 1 to 3 ms. off is none.',
     options: ['off', 'screen'],
     in2d: 'off', in3d: 'off'
   },
   globalIlluminationStrength: {
-    about: 'How bright the bounced light is. 1 is the SSGI default brightness.',
+    about: 'How bright the bounced light is. 1 matches Cycles, measured in a test room; raise it for a stylised glow.',
     range: [0, 4],
     in2d: 1, in3d: 1
   },
   globalIlluminationQuality: {
-    about: 'Samples per pixel for bounced light. low is 24, medium 48, high 96; each step roughly doubles the cost.',
+    about: 'Samples per pixel for bounced light. low is 24, medium 48, high 96. low matched Cycles as closely as high in the test room.',
     options: ['low', 'medium', 'high'],
     in2d: 'low', in3d: 'low'
+  },
+  readability: {
+    about: 'Arcade aids drawn over the lighting: a dark outline round moving things, a soft dark oval on the ground under them, and a coloured ring round the one the camera follows. off for a realistic look, where the shadow map draws the real shadows. A mesh that sets keyline, shadow or ring itself keeps its own.',
+    options: ['on', 'off'],
+    in2d: 'on', in3d: 'on'
+  },
+  antialiasing: {
+    about: 'How edges are smoothed. temporal blends each frame with the last: dithered hair, SSGI grain and thin edges settle smooth, and fast motion can smear slightly. level keeps whatever the level\'s post chain says, usually smaa.',
+    options: ['level', 'temporal'],
+    in2d: 'level', in3d: 'level'
   },
   backend: {
     about: 'What draws the frame. webgpu is faster and falls back to webgl where a browser has none. webgl is needed only by a shader written in GLSL alone. Takes effect after a page reload.',

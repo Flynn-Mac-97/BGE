@@ -27,6 +27,26 @@ export const DEFAULT_SETTINGS = {
   /** Cycles samples per bake. Colour alone needs few. */
   bakeSamples: 16,
   /**
+   * Largest texture width or height in the export. Null keeps each image's size.
+   *
+   * Film and sculpt files pack 4K and 8K maps. One 8K map takes 256 MB of GPU
+   * memory, so a game model wants these scaled down. The `.blend` is not changed.
+   */
+  textureSize: null,
+  /** Texture file type in the export: auto (PNG or JPEG, as Blender picks), jpeg, or webp. */
+  imageFormat: 'auto',
+  /**
+   * Bake how much sky light reaches each vertex, and dim environment light by it.
+   *
+   * The engine draws each surface without knowing what blocks it, so a hat
+   * leaves the face under it lit by the whole sky. Blender traces it once, per
+   * vertex, at import. Worked out in the pose the file is saved in; it does not
+   * follow animation. Off by default, because it adds a Cycles bake per import.
+   */
+  occlusion: false,
+  /** Cycles samples per vertex for the occlusion bake. */
+  occlusionSamples: 64,
+  /**
    * Write each material's node graph beside the model.
    *
    * A `.glb` cannot hold a node graph. The Blender Shaders plugin rebuilds the

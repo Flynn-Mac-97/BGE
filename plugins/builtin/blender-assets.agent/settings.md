@@ -31,6 +31,11 @@ One file per `.blend`, beside it: `kitten.blend` → `kitten.import.json`.
 | `bake` | bake procedural material colour to a texture first. See `materials.md`. |
 | `bakeSize` | the baked image's width and height in pixels. Default 1024. |
 | `bakeSamples` | Cycles samples per bake. Default 16; colour alone needs few. |
+| `textureSize` | largest texture width or height in the export, e.g. `2048`. `null` keeps full size. Set it for any file with 4K or 8K maps: an 8K map takes 256 MB of GPU memory. |
+| `imageFormat` | `auto`, `jpeg` or `webp`. `webp` makes the smallest `.glb` and keeps alpha. |
+| `occlusion` | bake, per vertex, how much sky light reaches each point, and dim environment light by it in the engine. Use for characters and props with overhangs: a hat over a face, hair over a neck, folds in cloth. Worked out in the saved pose; it does not follow animation. Adds a Cycles bake of about 10–20 s. |
+| `occlusionSamples` | rays per vertex for that bake. Default 64; 128 is smooth on a character. |
+| `shaders` | write `<model>.shaders.json` and a `.textures` folder for Blender Shaders. Set `false` for plain PBR materials, because the folder repeats every texture as PNG. |
 
 Write one with `blender.settings '{"file":"assets/models/kitten.blend","scale":0.01}'`,
 or edit the file. A missing file means the defaults above.

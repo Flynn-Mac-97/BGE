@@ -13,6 +13,19 @@ arrives in full only when it reduces to those values.
 | Noise, Voronoi, Colour Ramp, any node graph into Base Color | **nothing. Flat grey** |
 | Emission colour and strength | emissive, with `emissiveIntensity` |
 | Alpha below 1 | `opacity`, and the material is transparent |
+| Alpha, with Render Method **Dithered** (Blender's default) | two passes: alpha above 0.5 solid, alpha below 0.5 blended on top |
+| Subsurface | nothing. Skin draws without it |
+
+A dithered material is marked `blenderAlpha: "dithered"` in the glTF extras.
+glTF has no dither mode. As one blended surface, hair cards sort wrongly and
+mostly vanish; as a cutout, strands are hard and grainy.
+
+So the plugin draws each marked mesh twice. The mesh itself draws alpha above
+0.5 solid and writes depth, so strands sort correctly. A child copy
+(`userData.blenderAlphaSoftPass`) shares its geometry and skeleton and blends
+the alpha below 0.5 over it without writing depth. The copy casts no shadow.
+Set Render Method to **Blended** in Blender for glass and other see-through
+surfaces.
 
 Object names, node names and UVs all survive.
 

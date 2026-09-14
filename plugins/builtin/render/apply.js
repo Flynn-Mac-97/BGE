@@ -64,9 +64,9 @@ export function applyToneMapping(context, THREE, { toneMapping, exposure }) {
 /**
  * The environment texture for one setting, built once.
  *
- * `room` is three's RoomEnvironment filtered for rough and smooth surfaces. A
- * path is an equirectangular .hdr or .exr from the project's assets, which the
- * node renderer filters itself.
+ * `room` is three's RoomEnvironment. A path is an equirectangular .hdr or .exr
+ * from the project's assets. Both are filtered for rough and smooth surfaces
+ * the same way, so the level probe can draw either as its background.
  */
 async function environmentFor(THREE, renderer, name) {
   if (environments.has(name)) return environments.get(name)
@@ -81,21 +81,110 @@ async function environmentFor(THREE, renderer, name) {
       : await import('three/addons/loaders/HDRLoader.js')
     const Loader = module.EXRLoader || module.HDRLoader
     const path = name.replace(/^\/?project\//, '').replace(/^(?!assets\/)/, 'assets/')
-    texture = await new Loader().loadAsync(`/project/${path}`)
-    texture.mapping = THREE.EquirectangularReflectionMapping
+    const photo = await new Loader().loadAsync(`/project/${path}`)
+    photo.mapping = THREE.EquirectangularReflectionMapping
+    texture = new THREE.PMREMGenerator(renderer).fromEquirectangular(photo).texture
   }
   environments.set(name, texture)
   return texture
 }
 
 /** Environment light and its strength. Leaves the background to the Skybox plugin. */
-export async function applyEnvironment(context, THREE, { environment, environmentIntensity }) {
+export async function applyEnvironment(context, THREE, { environment, environmentIntensity, environmentBlur }) {
   const found = parts(context)
   if (!found) return null
   const texture = environment === 'none' ? null : await environmentFor(THREE, found.renderer, environment)
-  found.scene.environment = texture
+  sky = texture
+  blur = environmentBlur === 'blender' ? { THREE, TSL: await import('three/tsl'), ...(await import('./environment-blur.js')) } : null
+  useEnvironment(found.scene, probe?.texture && texture ? probe.texture : texture)
   found.scene.environmentIntensity = environmentIntensity
   return texture ? environment : 'none'
+}
+
+/** The environment texture before any probe, and the last probe built from it. */
+let sky = null
+let probe = null
+
+/** The Blender blur correction when it is on: three, TSL and environment-blur.js. */
+let blur = null
+const correctedNodes = new WeakMap()
+
+/**
+ * Light the scene from one filtered texture, blurred as `environmentBlur` says.
+ * Every change of environment goes through here, so the correction follows
+ * the sky and the room probe alike.
+ */
+function useEnvironment(scene, texture) {
+  scene.environment = texture
+  if (!texture || !blur) { scene.environmentNode = null; return }
+  if (!correctedNodes.has(texture)) correctedNodes.set(texture, blur.correctedEnvironment(blur.THREE, blur.TSL, texture))
+  scene.environmentNode = correctedNodes.get(texture)
+}
+
+/**
+ * Where the probe is captured: the middle of every loaded model, at 1.5 m, or
+ * the origin when there is none. Models are what a player looks at, so their
+ * reflections matter most.
+ */
+function probePosition(THREE, scene) {
+  const box = new THREE.Box3()
+  scene.traverse(object => { if (object.userData?.model) box.expandByObject(object) })
+  if (box.isEmpty()) return new THREE.Vector3(0, 1.5, 0)
+  const centre = box.getCenter(new THREE.Vector3())
+  return centre.setY(box.min.y + Math.min(1.5, box.max.y - box.min.y))
+}
+
+/**
+ * Capture the level into the environment: walls, floor and lights, with the
+ * sky seen past them.
+ *
+ * Environment light alone comes from every direction, through walls. A cloth
+ * fold facing the floor then reflects bright sky, which reads as wet. Loaded
+ * models are hidden during the capture, so a model never reflects itself.
+ * Answers the capture time in milliseconds, or null when nothing was captured.
+ */
+export function captureProbe(context, THREE) {
+  const found = parts(context)
+  if (!found || !sky) return null
+  const { renderer, scene } = found
+  const started = performance.now()
+  const hidden = []
+  scene.traverse(object => { if (object.userData?.model && object.visible) { hidden.push(object); object.visible = false } })
+  const background = scene.background
+  if (!background?.isTexture) scene.background = sky
+  useEnvironment(scene, sky)
+  try {
+    const next = new THREE.PMREMGenerator(renderer).fromScene(scene, 0, 0.1, 200, { position: probePosition(THREE, scene) })
+    probe?.dispose()
+    probe = next
+  } finally {
+    scene.background = background
+    for (const object of hidden) object.visible = true
+  }
+  useEnvironment(scene, probe.texture)
+  return Math.round(performance.now() - started)
+}
+
+/** Light the level from the sky alone again. */
+export function dropProbe(context) {
+  const found = parts(context)
+  probe?.dispose()
+  probe = null
+  if (found && sky) useEnvironment(found.scene, sky)
+}
+
+/** The renderer's own readability values, kept the first time they are changed. */
+let readabilityDefaults = null
+
+/**
+ * Switch the arcade readability aids: outline, ground oval and follow ring.
+ * `on` puts back the renderer's own values, so a game's changes to them stand.
+ */
+export function applyReadability(context, { readability }) {
+  const aids = context.renderer?.readability
+  if (!aids) return
+  readabilityDefaults ??= { keyline: aids.keyline, shadow: aids.shadow, ring: aids.ring }
+  Object.assign(aids, readability === 'off' ? { keyline: 0, shadow: false, ring: false } : readabilityDefaults)
 }
 
 /** The shadow map type, set once per change. */
@@ -156,7 +245,9 @@ export function restoreDefaults(context, THREE) {
   found.renderer.toneMapping = THREE.NoToneMapping
   found.renderer.toneMappingExposure = 1
   found.renderer.shadowMap.type = THREE.PCFShadowMap
-  found.scene.environment = null
+  dropProbe(context)
+  applyReadability(context, { readability: 'on' })
+  useEnvironment(found.scene, null)
   found.scene.environmentIntensity = 1
   applyShadowQuality(context, { shadows: 'sharp', shadowSize: 1024 })
   recompile(found.scene)
