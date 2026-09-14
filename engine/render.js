@@ -2419,10 +2419,10 @@ export async function makeRenderer(canvas, view, viewport) {
    * the canvas: no chain, no render target, no cost.
    */
   let passList = []
-  let postProcessing = null
-  let postFor = null
-  let postCamera = null
-  let scenePass = null
+  // The chain that draws, and the one whose shaders are still compiling.
+  // Each is `{ list, camera, chain, passes }`.
+  let built = null
+  let warming = null
 
   /**
    * Build the chain, or take it down.
@@ -2443,17 +2443,8 @@ export async function makeRenderer(canvas, view, viewport) {
    * An effect with `singleSample` turns multisampling off on the scene pass,
    * because its outputs are read per sample, as temporal antialiasing does.
    */
-  function buildPost() {
-    postFor = passList
-    postProcessing?.dispose?.()
-    postProcessing = null
-    scenePass = null
-    postCamera = null
-    if (!passList.length) return
-
-    const camera = activeCamera()
-    postCamera = camera
-    scenePass = passList.some(effect => effect.singleSample)
+  function buildPost(list, camera) {
+    const scenePass = list.some(effect => effect.singleSample)
       ? pass(scene, camera, { samples: 0 })
       : pass(scene, camera)
 
@@ -2466,7 +2457,8 @@ export async function makeRenderer(canvas, view, viewport) {
         return scenePass.getTextureNode(name)
       }
     }
-    if (passList.some(effect => effect.needsNormals)) {
+    const passes = [scenePass]
+    if (list.some(effect => effect.needsNormals)) {
       // No multisampling: the pass is read as data, and on WebGPU a
       // multisampled depth texture cannot be sampled by textureGather, which
       // ambient occlusion needs.
@@ -2474,10 +2466,11 @@ export async function makeRenderer(canvas, view, viewport) {
       prePass.setMRT(mrt({ output: normalView }))
       parts.normal = prePass.getTextureNode()
       parts.depth = prePass.getTextureNode('depth')
+      passes.push(prePass)
     }
 
     let colour = scenePass
-    for (const effect of passList) {
+    for (const effect of list) {
       try {
         const next = effect.apply?.(colour, parts)
         if (next) colour = next
@@ -2490,8 +2483,41 @@ export async function makeRenderer(canvas, view, viewport) {
 
     // Renamed in this version of three; the old name still works and warns.
     const Pipeline = THREE.RenderPipeline || THREE.PostProcessing
-    postProcessing = new Pipeline(renderer)
-    postProcessing.outputNode = colour
+    const chain = new Pipeline(renderer)
+    chain.outputNode = colour
+    return { list, camera, chain, passes }
+  }
+
+  /**
+   * Build the chain for this list and camera, and swap it in once its scene
+   * shaders are compiled.
+   *
+   * Compiling on first draw blocks the page: the character scene builds about
+   * 90 GPU pipelines and froze the editor for 9 seconds on the switch to 3D.
+   * `compileAsync` builds them off the page's thread, and the old chain keeps
+   * drawing until they are ready.
+   */
+  function warmPost(camera) {
+    if (warming?.list === passList && warming.camera === camera) return
+    if (warming) warming.chain.dispose?.()
+    const next = buildPost(passList, camera)
+    warming = next
+    // One pass at a time: each keeps its target and outputs set on the
+    // renderer until it finishes, and shaders are built against those.
+    next.passes.reduce((before, one) => before.then(() => one.compileAsync(renderer)), Promise.resolve())
+      .catch(error => report(`[render] passes: shaders could not be compiled ahead — ${error?.message || error}. They compile on first draw instead.`))
+      .finally(() => {
+        if (warming !== next) return
+        warming = null
+        built?.chain.dispose?.()
+        built = next
+      })
+  }
+
+  function dropPost() {
+    warming?.chain.dispose?.()
+    built?.chain.dispose?.()
+    warming = built = null
   }
 
   // ------------------------------------------------------------------- counts
@@ -2514,6 +2540,8 @@ export async function makeRenderer(canvas, view, viewport) {
     // Milliseconds the card spent on the last frame it reported. Null where the
     // backend cannot time itself, which is every WebGL 2 one.
     gpuMs: null,
+    // Whether the post chain draws, or is still compiling its shaders.
+    post: 'none',
     // Milliseconds spent describing the last frame, on this thread.
     cpuMs: 0
   }
@@ -2810,9 +2838,13 @@ export async function makeRenderer(canvas, view, viewport) {
       // perspective one. A pass holds the camera it was built with, so the
       // chain is rebuilt when that camera is swapped rather than sampling the
       // wrong depth for a frame.
-      if (postProcessing && postCamera !== camera) buildPost()
-      if (postProcessing) {
-        postProcessing.render()
+      if (passList.length && (built?.list !== passList || built.camera !== camera)) warmPost(camera)
+      if (warming) {
+        // No draw while a chain compiles: the canvas keeps its last frame.
+        // Compiling keeps a pass's target and outputs set on the renderer, so
+        // a draw now would build pipelines for the wrong outputs.
+      } else if (built) {
+        built.chain.render()
       } else {
         renderer.clear()
         renderer.render(scene, camera)
@@ -2826,6 +2858,7 @@ export async function makeRenderer(canvas, view, viewport) {
         renderer.render(viewmodelScene, viewmodelCamera)
       }
 
+      stats.post = built ? (warming ? 'drawing, next chain compiling' : 'drawing') : warming ? 'compiling' : 'none'
       stats.cpuMs = performance.now() - startedAt
       stats.drawCalls = renderer.info.render.drawCalls
       stats.triangles = renderer.info.render.triangles
@@ -2905,14 +2938,7 @@ export async function makeRenderer(canvas, view, viewport) {
       get list() { return [...passList] },
       set(list) {
         passList = Array.isArray(list) ? list.filter(Boolean) : []
-        if (!passList.length) {
-          postFor = null
-          postProcessing?.dispose?.()
-          postProcessing = null
-          scenePass = null
-          return
-        }
-        buildPost()
+        if (!passList.length) dropPost()
       }
     },
 

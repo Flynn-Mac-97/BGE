@@ -541,7 +541,7 @@ async function buildOne(effect, options, tools) {
   }
 
   if (effect === 'grade') {
-    const { clamp, dot, max, mix, vec3, vec4 } = TSL
+    const { dot, max, mix, vec3, vec4 } = TSL
     const contrast = number(options.contrast, 1)
     const saturation = number(options.saturation, 1)
     const brightness = number(options.brightness, 0)
@@ -568,7 +568,10 @@ async function buildOne(effect, options, tools) {
         const luminance = dot(curved, vec3(0.2126, 0.7152, 0.0722))
         const saturated = mix(vec3(luminance), curved, saturation)
         const cast = saturated.mul(vec3(tint.r, tint.g, tint.b))
-        return vec4(clamp(cast, 0, 1), colour.a)
+        // Floor at zero only. The frame is still linear light before tone
+        // mapping, where a lit wall is above 1; a ceiling of 1 flattens every
+        // bright colour to grey-white before tone mapping can roll it off.
+        return vec4(max(cast, 0), colour.a)
       }
     }
   }
