@@ -27,6 +27,7 @@ const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 export const HOOKS = ['start', 'update', 'onCollide', 'onDestroy']
 
+/** The kind of thing a project file is, from its folder and extension. */
 export const KIND = f =>
   f.startsWith('types/')  ? 'type'
   : f.startsWith('behaviours/') ? 'behaviour'
@@ -37,6 +38,7 @@ export const KIND = f =>
   : /\.(glb|gltf)$/i.test(f) ? 'model'
   : 'config'
 
+/** Every file under a directory, as paths relative to it. A directory that will not read yields nothing. */
 export async function walk(directory, base = '') {
   const out = []
   let items = []
@@ -119,6 +121,8 @@ export const attachedNames = v =>
   : Array.isArray(v) ? v.filter(n => typeof n === 'string')
   : Object.entries(v).filter(([, config]) => config !== false).map(([n]) => n)
 
+let readCount = 0
+
 /**
  * A changing query so a re-import sees the file as it is now.
  *
@@ -126,7 +130,6 @@ export const attachedNames = v =>
  * server and a long-running headless session rebuild the index after a write —
  * without this they would keep reporting the version they first read.
  */
-let readCount = 0
 const importFresh = async abs => (await import(pathToFileURL(abs).href + '?read=' + ++readCount)).default || {}
 
 /**
@@ -153,10 +156,15 @@ async function typesRegisteredByPlugins(projectDirectory, checkout) {
     path.join(projectDirectory, 'plugins')
   ]
   for (const folder of folders) {
-    for (const file of await walk(folder)) {
-      if (!file.endsWith('.js')) continue
-      let text = ''
-      try { text = await fs.readFile(path.join(folder, file), 'utf8') } catch { continue }
+    const names = (await walk(folder)).filter(name => name.endsWith('.js'))
+    // Read together rather than one at a time. This is 127 files and 1.3 MB in
+    // the checkout, no read depends on another, and together they were most of
+    // what one rebuild cost — 26 ms against 5 ms. A file that cannot be read is
+    // skipped, exactly as before.
+    const texts = await Promise.all(names.map(async name => {
+      try { return await fs.readFile(path.join(folder, name), 'utf8') } catch { return '' }
+    }))
+    for (const text of texts) {
       for (const match of text.matchAll(/\bretype\s*\(\s*['"`]([\w-]+)['"`]/g)) found.add(match[1])
     }
   }
@@ -177,6 +185,7 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
     types: {}, behaviours: {}, levels: {}, tests: {}, assets: {}, files, config: [], warnings: [],
     pluginTypes: await typesRegisteredByPlugins(projectDirectory, checkout)
   }
+  /** One project file by its path from the project directory. */
   const inside = f => path.join(projectDirectory, f)
 
   // Raw placements, kept only for the invariant pass below and never written
@@ -324,6 +333,7 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
   // looking it up by the reference found nothing and every subfolder asset read
   // as unused — which reads as "safe to delete".
   const assetByPath = new Map(Object.values(index.assets).map(a => [a.file, a]))
+  /** The asset entry a reference resolves to, or undefined when no file is there. */
   const assetFor = reference => assetByPath.get(assetPath(reference))
 
   for (const [tn, t] of Object.entries(index.types)) {
@@ -383,6 +393,9 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
   return index
 }
 
+/** A counter making each atomic write's temporary name unique within this process. */
+let writeCount = 0
+
 /**
  * Write a whole file, or none of it.
  *
@@ -398,8 +411,6 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
  * last-one-wins is the right answer. The run registry next door does take a
  * lock, because it accumulates rather than derives.
  */
-let writeCount = 0
-
 async function writeAtomic(file, text) {
   // The pid is not enough on its own. One process rebuilds the index on every
   // save, and two of those overlap the moment saves come faster than a write —
@@ -440,6 +451,7 @@ async function renameWhenAllowed(from, to, tries = 5) {
 /** Every attachment, from a type or a level, that names a behaviour file that is not there. */
 export function missingAttachments(index) {
   const out = []
+  /** Push one problem for each name that has no behaviour file. */
   const check = (names, file, where) => {
     for (const n of names || []) {
       if (!index.behaviours[n]) out.push({ file, why: `${where} attaches behaviour "${n}" — no project/behaviours/${n}.js` })
@@ -917,6 +929,7 @@ export function serverRegistryFile(checkout) {
   return path.join(mainWorktreeOf(checkout), '.engine/servers.json')
 }
 
+/** The main worktree of a checkout, so a registry file survives its lane worktree being deleted. */
 function mainWorktreeOf(checkout) {
   try {
     const line = execFileSync('git', ['-C', checkout, 'worktree', 'list', '--porcelain'],
@@ -927,6 +940,7 @@ function mainWorktreeOf(checkout) {
   return path.resolve(checkout)
 }
 
+/** The server records for a checkout, or an empty registry when the file is missing or broken. */
 export function readServerRegistry(checkout) {
   try {
     const value = JSON.parse(readFileSync(serverRegistryFile(checkout), 'utf8'))
@@ -1026,6 +1040,7 @@ function processImage(pid) {
   } catch { return null }
 }
 
+/** Whether a process image name is node, the only program a dev server starts as. */
 const isNodeProcess = image => /^node(\.exe)?$/i.test(path.basename(image || ''))
 
 /**

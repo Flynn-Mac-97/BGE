@@ -62,6 +62,45 @@ test('a JSON argument is sent as JSON, not a string', () => {
   assert.deepEqual(JSON.parse(r.stdout).files, ['engine/world.js'])
 })
 
+/**
+ * A list reply can name its columns instead of repeating them on every row.
+ *
+ * The dump of a level is the one read an agent pays real tokens for: the fixture's
+ * nine entities are 752 characters as rows and 553 as two named columns, and a
+ * four-hundred-entity level is 22 KB against 10 KB. What is checked here is the shape
+ * and the refusal, in the one place both are reachable — the CLI, through its own
+ * argument coercion.
+ */
+test('an entity list can be projected to named columns', () => {
+  const asRows = JSON.parse(run(['--headless', '--project', FIXTURE, 'snapshot', '--entities']).stdout)
+  const projected = JSON.parse(run(['--headless', '--project', FIXTURE, 'snapshot', '{"entities":["id","at"]}']).stdout)
+
+  assert.ok(Array.isArray(asRows.entities), 'the flag on its own still gives rows of objects')
+  assert.ok(asRows.entities.every(row => row.id && row.at), 'and every row carries what it always did')
+  assert.deepEqual(projected.entities.columns, ['id', 'at'])
+  assert.equal(projected.entities.rows.length, asRows.entities.length)
+  assert.deepEqual(projected.entities.rows[0], [asRows.entities[0].id, asRows.entities[0].at],
+    'the same data, with the names written once')
+  assert.ok(JSON.stringify(projected).length < JSON.stringify(asRows).length,
+    'and the point of it: fewer characters for the same answer')
+})
+
+test('a projection naming a field that does not exist is refused, with the ones that do', () => {
+  const r = run(['--headless', '--project', FIXTURE, 'snapshot', '{"entities":["nope"]}'])
+  assert.equal(r.code, 1, 'a bad field is a usage error, not an empty column')
+  assert.match(r.stderr, /no field "nope"/)
+  assert.match(r.stderr, /id, type, at, rotation, note, properties, behaviours/)
+})
+
+test('a projection written as a bare flag is refused, not quietly answered without it', () => {
+  // `--entities` has to stay a bare boolean, so the fields after it arrive as a
+  // string argument. Answering the compact reply would read as the flag doing nothing.
+  const r = run(['--headless', '--project', FIXTURE, 'snapshot', '--entities', 'id,at'])
+  assert.equal(r.code, 1)
+  assert.match(r.stderr, /takes an options object/)
+  assert.match(r.stderr, /\{"entities":\["id","at"\]\}/, 'and shows the form that works')
+})
+
 test('the determinism lint names each banned source with a line', () => {
   const problems = lint('probe.js', [
     'export default {',
@@ -277,6 +316,42 @@ test('a headless world starts with nothing running', () => {
   const r = run(['--headless', 'snapshot'])
   assert.equal(r.code, 0, 'the world started')
   assert.equal(JSON.parse(r.stdout).mode, 'edit')
+})
+
+/**
+ * A headless run that stepped a solver exits 0, with the reply intact.
+ *
+ * The exit is where this went wrong: `process.exit()` under a world that has stepped a
+ * Rapier body asserts inside libuv on Windows, so every run answered completely and then
+ * exited 3221226505 — a crash reported for a run that worked. The project is built here
+ * rather than borrowed, because the fixture's solver stands down and a world that never
+ * stepped never showed the fault.
+ *
+ * One process, one second. The fan-out that found this is a by-hand tool under
+ * `tools/fanout/`, and no test run spawns one.
+ */
+test('a headless run that stepped a solver exits 0', async () => {
+  const project = await temporaryProject({
+    'game.json': { title: 'exit-code', startLevel: 'main', plugins: { disabled: ['Physics 3D', 'Physics 2D'] } },
+    'levels/main.json': {
+      camera: { at: [0, 4] },
+      entities: [{ type: 'floor', at: [0, -1, 0] }, { type: 'crate', at: [0, 3, 0] }]
+    },
+    'types/floor.js': "export default { collider: { box: [8, 0.4, 8] }, properties: { body: 'solid' } }\n",
+    'types/crate.js': "export default { collider: { box: [0.5, 0.5, 0.5] }, properties: { body: 'dynamic' } }\n"
+  }, 'engine-exit-code-')
+
+  try {
+    const r = run(['--headless', '--project', project, 'script', JSON.stringify([['snapshot', {}], ['simulate', 1], ['snapshot', {}]])])
+    assert.equal(r.code, 0, `the run exited ${r.code}: ${r.stderr.trim().split('\n')[0]}`)
+    assert.doesNotMatch(r.stderr, /UV_HANDLE_CLOSING/, 'and it was not an assertion on the way out')
+    const reply = JSON.parse(r.stdout)
+    assert.equal(reply.length, 3, 'every op answered')
+    assert.equal(reply[2].time, 1, 'and the world really stepped')
+    assert.notEqual(reply[2].hash, reply[0].hash, 'a world that moved, so the step was not a no-op')
+  } finally {
+    await fs.promises.rm(project, { recursive: true, force: true })
+  }
 })
 
 /** A read surface over a loader and nothing else. Enough to ask what it says. */

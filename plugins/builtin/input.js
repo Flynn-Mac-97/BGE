@@ -4,6 +4,11 @@
  *
  * Game code says context.input.axis('x') and context.input.pressed('jump'), never a
  * keycode, so rebinding is a config change rather than a code change.
+ *
+ * The keys themselves are the loop's. It records every press against the step it
+ * arrived at, so a run can be played again from its own record and `pressed` means
+ * one step in both halves. This plugin is the keyboard and the naming — the
+ * browser events, the action table — and holds no state of its own.
  */
 const ACTIONS = {
   left:  ['ArrowLeft', 'KeyA'],
@@ -19,40 +24,36 @@ export default {
 
   category: 'engine',
   onLoad(context) {
-    const down = new Set()
-    const justPressed = new Set()
+    const keys = context.loop.input
 
     const editing = element => ['INPUT', 'TEXTAREA'].includes(element?.tagName)
-
-    /**
-     * Holding and releasing a key, with no event in sight.
-     *
-     * The keyboard is one way to reach these, not the only way. A test presses a
-     * key here directly, so the same code runs whether there is a window to
-     * type into or not — and a headless run is not a second, weaker input path.
-     */
-    const press = code => {
-      if (!down.has(code)) justPressed.add(code)
-      down.add(code)
-    }
-    const release = code => down.delete(code)
 
     if (typeof addEventListener === 'function') {
       addEventListener('keydown', event => {
         if (editing(event.target)) return
-        press(event.code)
+        keys.press(event.code)
       })
-      addEventListener('keyup', event => release(event.code))
-      addEventListener('blur', () => down.clear())
+      addEventListener('keyup', event => keys.release(event.code))
+      // A page that loses the window never gets the keyup, so everything held is
+      // let go of here. It is recorded like any other release, because it really
+      // is part of what the run was played with.
+      addEventListener('blur', () => keys.releaseAll())
     }
 
-    const held = action => (ACTIONS[action] || []).some(c => down.has(c))
+    const held = action => (ACTIONS[action] || []).some(code => keys.isDown(code))
 
     context.input = {
       held,
-      press,
-      release,
-      pressed: action => (ACTIONS[action] || []).some(c => justPressed.has(c)),
+      /**
+       * Holding and releasing a key, with no event in sight.
+       *
+       * The keyboard is one way to reach these, not the only way. A test presses a
+       * key here directly, so the same code runs whether there is a window to type
+       * into or not — and a headless run is not a second, weaker input path.
+       */
+      press: code => keys.press(code),
+      release: code => keys.release(code),
+      pressed: action => (ACTIONS[action] || []).some(code => keys.pressed(code)),
       axis: which => which === 'y'
         ? (held('up') ? 1 : 0) - (held('down') ? 1 : 0)
         : (held('right') ? 1 : 0) - (held('left') ? 1 : 0),
@@ -62,10 +63,13 @@ export default {
       // than faking the action, so rebinding is covered by the same test.
       codes: action => [...(ACTIONS[action] || [])]
     }
-
-    // `pressed` must mean "this step only", so clear after every fixed step
-    context.bus.on('step:end', () => justPressed.clear())
   },
 
-  systems: [{ phase: 'frame', run: (world, seconds, context) => context.bus.emit('step:end') }]
+  systems: [{
+    // Frame, not fixed: a frame is one look at the world, and a screen that read a
+    // key twice within one look would pick twice. Choice Screen clears the keys it
+    // has spent on this event.
+    phase: 'frame',
+    run: (world, seconds, context) => context.bus.emit('step:end')
+  }]
 }

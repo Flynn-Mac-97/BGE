@@ -437,7 +437,7 @@ export default {
           for (const step of [...steps].sort((a, b) => a - b)) {
             if (step > advanced) { context.loop.step(step - advanced); advanced = step }
             const description = describe(context, options)
-            if (borrowsCamera) Object.assign(view, description.camera)
+            if (borrowsCamera) Object.assign(view, description.camera, { borrowedBy: 'see.moment' })
             bindMarks(description)
             moments.push({ afterSteps: step, counts: description.counts, palette: description.palette, marks: description.marks, marked: description.visible.filter(v => v.mark) })
             for (const lens of lenses) {
@@ -469,6 +469,7 @@ export default {
         } finally {
           revealOverlays(overlays)
           if (borrowsCamera) Object.assign(view, kept)
+          delete view.borrowedBy
           if (borrowsCamera || options.ui === false) {
             // The editor's own picture is stale after a borrowed camera or a
             // hidden overlay; a repaint that fails must not become the answer.
@@ -547,6 +548,8 @@ export default {
         // a throw mid-draw all hand the editor back the world it lent.
         try {
         if (moved) Object.assign(view, wants, wants.mode ? {} : { mode: 'perspective' })
+        // A camera that runs every frame, such as Live Camera, leaves a borrowed view alone.
+        if (moved) view.borrowedBy = 'see.capture'
         // Before every measurement below, so screen positions belong to the
         // frame delivered rather than to the window.
         if (sized) {
@@ -620,7 +623,7 @@ export default {
         if (studio) {
           const target = new studio.THREE.WebGLRenderTarget(canvas.width, canvas.height)
           const raw = new Uint8Array(canvas.width * canvas.height * 4)
-          context.renderer.drawInto(target, raw)
+          await context.renderer.drawInto(target, raw)
           target.dispose()
 
           // One scan answers both questions the readback holds: where the drawn
@@ -760,6 +763,7 @@ export default {
             context.renderer.passes?.set(studio.passes)
           }
           if (moved) Object.assign(view, kept)
+          delete view.borrowedBy
           if (sized || moved || studio || concealed.length || overlays.length) {
             // The editor's own picture is stale after a borrowed camera or a
             // dimmed scene; a repaint that fails must not become the answer.

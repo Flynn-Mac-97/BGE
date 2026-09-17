@@ -6,8 +6,10 @@ export const ENGINE_AGENT_MANIFEST = 'agents/manifest.json'
 export const PROJECT_AGENT_MANIFEST = 'agents/manifest.json'
 export const AGENT_SETTINGS = 'agents/settings.json'
 
+/** A path in the one spelling the tree uses: forward slashes, no leading `./`. */
 const cleanPath = value => String(value || '').replaceAll('\\', '/').replace(/^\.\//, '')
 
+/** Whether a file path matches one `*`/`**` glob pattern from the agent tree. */
 export function matchesAgentPattern(file, pattern) {
   const input = cleanPath(file)
   const source = cleanPath(pattern)
@@ -18,6 +20,7 @@ export function matchesAgentPattern(file, pattern) {
   return new RegExp(`^${source}$`).test(input)
 }
 
+/** A request in its one shape, from a task string, a file list, or an object. */
 export function normaliseAgentRequest(value) {
   if (value == null) return { task: '', files: [], nodes: [], parallel: false }
   if (typeof value === 'string') return { task: value, files: [], nodes: [], parallel: false }
@@ -30,6 +33,7 @@ export function normaliseAgentRequest(value) {
   }
 }
 
+/** Every structural problem in the node list: ids, kinds, files, and parent loops. */
 function validateGraph(nodes) {
   const problems = []
   const ids = new Set()
@@ -56,6 +60,7 @@ function validateGraph(nodes) {
   return problems
 }
 
+/** Parse one workspace file, or the fallback when it is missing and a fallback was given. */
 async function readJSON(read, scope, file, fallback) {
   try { return JSON.parse(await read(scope, file)) } catch (error) {
     if (fallback !== undefined) return fallback
@@ -63,6 +68,7 @@ async function readJSON(read, scope, file, fallback) {
   }
 }
 
+/** The name and description a skill declares in its frontmatter, or null. */
 function skillDetails(text) {
   const match = String(text).match(/^---\s*\n([\s\S]*?)\n---/)
   if (!match) return null
@@ -73,9 +79,12 @@ function skillDetails(text) {
 // A skill or a plugin guide may open with `---` frontmatter (name, description,
 // or a declared match). It is metadata for the tree, never instruction text, so
 // it must not reach a packet.
+/** The text without its leading metadata block. */
 const withoutFrontmatter = text => String(text).replace(/^---\s*\n[\s\S]*?\n---\s*/, '').trim()
+/** The text without its leading `# title`, which the packet prints as a heading of its own. */
 const withoutFirstHeading = text => withoutFrontmatter(text).replace(/^# [^\n]+\n+/, '').trim()
 
+/** Merge the engine and project manifests and the plugin guides into one node list with per-node enablement. */
 async function loadAgentGraph(read, pluginNodes = []) {
   const engine = await readJSON(read, 'engine', ENGINE_AGENT_MANIFEST)
   // A project need not add rules of its own. A new one has no `agents/` at all,
@@ -154,6 +163,7 @@ const asProjectPattern = (file, projectPath) => {
   return clean
 }
 
+/** Whether a node kind can be selected into a packet. */
 const selectableKind = node => ['instruction', 'skill'].includes(node.kind)
 
 /**
@@ -173,6 +183,13 @@ function withheldReason(node, replaced) {
   return 'selected only by name'
 }
 
+/**
+ * The smallest instruction packet for one task: the rules its files and words
+ * select, plus what was withheld and why.
+ *
+ * A packet that lists only what it holds looks complete, so the withheld list
+ * and the no-files notice are part of the answer, not decoration.
+ */
 export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectPath = PROJECT_PREFIX) {
   const request = normaliseAgentRequest(requestValue)
   const workspace = await loadAgentGraph(read, pluginNodes)

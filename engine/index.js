@@ -34,6 +34,8 @@ import { makeRenderer } from './render.js'
 import { makeShell } from './shell.js'
 import { startWorld } from './start-world.js'
 
+let fileVersion = 0
+
 /**
  * Project files are imported by URL with a changing query, not through
  * `import.meta.glob`.
@@ -47,7 +49,6 @@ import { startWorld } from './start-world.js'
  * passes a runtime-built specifier straight through instead of resolving it at
  * build time.
  */
-let fileVersion = 0
 const importProjectFile = async file =>
   (await import(/* @vite-ignore */ `/${PROJECT_PREFIX}/${file}?hot=${++fileVersion}`)).default || {}
 
@@ -103,6 +104,15 @@ async function findPlugins(loader) {
   return found
 }
 
+/**
+ * Start the world, then the screen: the shell, the renderer, and the edit-mode
+ * paint loop.
+ *
+ * The shell must exist before the renderer because it builds the canvas, so
+ * both are put on `context` in `attachScreen` rather than returned. A failure
+ * here replaces the page with the stack trace, because a half-built editor is
+ * worse to read than a stopped one.
+ */
 async function boot() {
   const root = document.getElementById('app')
 
@@ -152,12 +162,20 @@ async function boot() {
   // only runs while the loop does. A plugin that has to touch what was drawn —
   // and a model finishes loading long after the entity using it — has no other
   // hook while the world is stopped.
+  /**
+   * Draw one edit-mode frame: sync, draw, then announce it.
+   *
+   * `frame:painted` is the stopped-world counterpart of a frame system, which
+   * runs only while the loop does. A model that finishes loading after the
+   * frame that asked for it has no other hook to redraw on.
+   */
   const paint = () => {
     if (loop.running) return
     context.renderer.sync(world)
     context.renderer.draw()
     context.bus.emit('frame:painted')
   }
+  /** Keep asking for the next frame while the world is stopped. */
   const idle = () => { paint(); requestAnimationFrame(idle) }
   idle()
   setInterval(() => { if (document.hidden) paint() }, 100)

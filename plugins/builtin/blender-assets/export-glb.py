@@ -50,15 +50,51 @@ def apply_scale(factor):
             obj.matrix_world = Matrix.Scale(factor, 4) @ obj.matrix_world
 
 
-def select_collection(name):
-    """Select only the objects in one collection. True when it was found."""
-    collection = bpy.data.collections.get(name)
-    if collection is None:
-        return False
-    bpy.ops.object.select_all(action="DESELECT")
-    for obj in collection.all_objects:
-        obj.select_set(True)
-    return True
+def drop_empty_armature_modifiers():
+    """Remove armature modifiers that name no armature. They deform nothing, and the glTF exporter crashes Blender on them."""
+    dropped = []
+    for obj in bpy.data.objects:
+        for modifier in list(getattr(obj, "modifiers", [])):
+            if modifier.type == "ARMATURE" and modifier.object is None:
+                obj.modifiers.remove(modifier)
+                dropped.append(obj.name)
+    return dropped
+
+
+def keep_collections(names):
+    """Remove every object outside these collections. Returns the names not found.
+
+    A list, because a character and its armature are often in two collections,
+    and a skinned mesh exported without its armature has no skeleton. Objects
+    are removed rather than selected: selection ignores hidden objects and does
+    not hold in a background run. The .blend on disk is not saved.
+    """
+    missing = [name for name in names if bpy.data.collections.get(name) is None]
+    if missing:
+        return missing
+    kept = set()
+    for name in names:
+        kept.update(obj.name for obj in bpy.data.collections[name].all_objects)
+    for obj in list(bpy.data.objects):
+        if obj.name not in kept:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    for name in names:
+        show_collection(name)
+    for obj in list(bpy.data.objects):
+        obj.hide_viewport = False
+        obj.hide_render = False
+    return []
+
+
+def show_collection(name, layer=None):
+    """Include a collection in the view layer and show it, wherever it is nested."""
+    layer = layer or bpy.context.view_layer.layer_collection
+    if layer.name == name:
+        layer.exclude = False
+        layer.hide_viewport = False
+        layer.collection.hide_viewport = False
+        return True
+    return any(show_collection(name, child) for child in layer.children)
 
 
 def limit_textures(largest):
@@ -594,7 +630,15 @@ def main():
     settings = json.loads(argv[1]) if len(argv) > 1 else {}
     graphs_out = argv[2] if len(argv) > 2 else None
 
+    # First, so bakes and material reports cover only what is exported.
+    collection = settings.get("collection")
+    if collection:
+        names = collection if isinstance(collection, list) else [collection]
+        missing = keep_collections(names)
+        if missing:
+            raise SystemExit('no collection named "%s" in this file' % '", "'.join(missing))
     apply_scale(float(settings.get("scale", 1)))
+    drop_empty_armature_modifiers()
     scaled = limit_textures(int(settings.get("textureSize") or 0))
     mark_alpha_methods()
     occluded = bake_occlusion(int(settings.get("occlusionSamples", 64))) if settings.get("occlusion") else []
@@ -605,19 +649,11 @@ def main():
         baked = bake_base_colour(int(settings.get("bakeSize", 1024)), int(settings.get("bakeSamples", 16)))
         procedural = procedural_materials()
 
-    use_selection = False
-    collection = settings.get("collection")
-    if collection:
-        if not select_collection(collection):
-            raise SystemExit('no collection named "%s" in this file' % collection)
-        use_selection = True
-
     wanted = {
         "filepath": out,
         "export_format": "GLB",
         "export_apply": bool(settings.get("applyModifiers", True)),
         "export_yup": True,
-        "use_selection": use_selection,
         "export_cameras": False,
         "export_lights": False,
         "export_extras": True,

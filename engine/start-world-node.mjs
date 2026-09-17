@@ -1,5 +1,5 @@
 /**
- * Start a world in node — the same engine, with nothing drawing it.
+ * Kernel: start a world in node — the same engine, with nothing drawing it.
  *
  * This is the parallel story. A world here needs no dev server, no port and no
  * browser tab, so many agents run one each and never touch the same mutable
@@ -23,8 +23,10 @@
  * engine's own plugins and instructions are read from it whatever project is
  * open.
  */
+import { listDocuments, readDocument, writeDocument } from './document-store.mjs'
 import path from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
+import { readSource, sourceCatalog, writeSource } from './source-files.mjs'
 import fs from 'node:fs/promises'
 
 import { makeFiles } from './files.js'
@@ -46,11 +48,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
  * headless session that writes a level sees the new index on the next read.
  * Skipping that is how a world ends up acting on a project that no longer
  * exists.
+ *
+ * @param {string} projectDirectory The project's real directory on disk.
+ * @param {string} [checkout] The repository the engine's files are read from.
+ * @returns {object} The transport: index, tree, read, write and agent files.
  */
 export function onDisk(projectDirectory, checkout = ROOT) {
   // The checkout is passed in, not taken from the project's parent: the project
   // may be anywhere, and the engine's own instructions are read from here.
   const root = path.resolve(checkout)
+  /** Resolve one project file, refusing any path that climbs outside the project. */
   const inside = rel => {
     const abs = path.resolve(projectDirectory, rel)
     // Same guard the dev server applies. A path that climbs out of the project
@@ -62,6 +69,7 @@ export function onDisk(projectDirectory, checkout = ROOT) {
     return abs
   }
 
+  /** Resolve one agent file, from the fixed sets each scope is allowed to read. */
   const insideAgent = (scope, rel) => {
     const base = scope === 'engine' ? root : scope === 'project' ? projectDirectory : null
     const clean = String(rel || '').replaceAll('\\', '/').replace(/^\.\//, '')
@@ -74,6 +82,7 @@ export function onDisk(projectDirectory, checkout = ROOT) {
     return abs
   }
 
+  /** The `.agent.md` guides beside every plugin, in the shape the agent-context builder reads. */
   const pluginSidecars = async () => {
     const game = JSON.parse(await fs.readFile(path.join(projectDirectory, 'game.json'), 'utf8').catch(() => '{}'))
     const disabled = new Set(game.plugins?.disabled || [])
@@ -124,6 +133,12 @@ export function onDisk(projectDirectory, checkout = ROOT) {
       .filter(f => !f.startsWith('.engine'))
       .map(f => ({ path: f })),
     agentPlugins: pluginSidecars,
+    sourceCatalog: selection => sourceCatalog(root, projectDirectory, selection),
+    listDocuments: () => listDocuments(projectDirectory),
+    readDocument: (id, backup) => readDocument(projectDirectory, id, backup),
+    writeDocument: (id, data, revision) => writeDocument(projectDirectory, id, data, revision),
+    writeSource: (scope, file, text, expectedHash) => writeSource(root, projectDirectory, scope, file, text, expectedHash),
+    readSource: (scope, file) => readSource(root, projectDirectory, scope, file),
     read: rel => fs.readFile(inside(rel), 'utf8'),
     readAgent: (scope, rel) => fs.readFile(insideAgent(scope, rel), 'utf8'),
     async write(rel, text) {
@@ -149,7 +164,11 @@ export function onDisk(projectDirectory, checkout = ROOT) {
  */
 const refusedWrites = []
 
-/** What the work lock refused in this process, oldest first. */
+/**
+ * What the work lock refused in this process, oldest first.
+ *
+ * @returns {Array} The refusal records.
+ */
 export function writesRefusedHere() {
   return refusedWrites.slice()
 }
@@ -207,6 +226,9 @@ async function findPlugins(root, projectDirectory, loader) {
   return found
 }
 
+/** Bumped per import, so node reads the file again instead of its cached module. */
+let fileVersion = 0
+
 /**
  * Import one file out of the project.
  *
@@ -214,7 +236,6 @@ async function findPlugins(root, projectDirectory, loader) {
  * by URL forever, so re-importing the same path would hand back the version
  * read at start-up and a live edit would appear to do nothing.
  */
-let fileVersion = 0
 const importProjectFileFrom = projectDirectory => async file =>
   (await import(pathToFileURL(path.join(projectDirectory, file)).href + `?hot=${++fileVersion}`)).default || {}
 
@@ -227,6 +248,7 @@ const importProjectFileFrom = projectDirectory => async file =>
  * hand back an image of nothing.
  */
 function nullCanvas(width = 1, height = 1) {
+  /** A zeroed ImageData of one size, for a readback of a frame nothing drew. */
   const blankPixels = (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(Math.max(0, w * h * 4)) })
   const pen = {
     fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1,
@@ -260,6 +282,11 @@ function nullCanvas(width = 1, height = 1) {
  *
  * `blank` is the flag a caller reads to say the frame is blank. Nothing here
  * may report a frame it did not draw.
+ *
+ * @param {object} view The camera view.
+ * @param {object} viewport The screen size, mutated by `frameSize`.
+ * @param {object} shape The frame size `resize` restores.
+ * @returns {object} The renderer surface, with `blank` true.
  */
 export function nullRenderer(view, viewport, shape) {
   const scene = {
@@ -284,6 +311,7 @@ export function nullRenderer(view, viewport, shape) {
   const stats = { entities: 0, frames: 0, readbacks: 0, drawCalls: 0, triangles: 0 }
   let passList = []
 
+  /** Set the viewport to the frame size a capture asked for. */
   const frameSize = (width, height) => {
     viewport.width = Math.max(1, Math.round(width))
     viewport.height = Math.max(1, Math.round(height))
@@ -345,16 +373,21 @@ export function nullRenderer(view, viewport, shape) {
 }
 
 /**
- * @param root     the checkout. The engine's own plugins and guides live here.
- * @param project  the game's directory, as a path resolved against the
- *                 checkout. A bare name reaches a directory inside it; `../x`
- *                 or an absolute path reaches one anywhere else. Nothing given
- *                 opens the untitled project.
- * @param renderer `'null'` attaches the drawing surface described above.
- *                 Anything else leaves the world with no renderer, so the
+ * Start the same world in node, where files come off disk and nothing draws.
+ *
+ * @param {string} [root] The checkout. The engine's own plugins and guides
+ *                 live here.
+ * @param {string} [project] The game's directory, as a path resolved against
+ *                 the checkout. A bare name reaches a directory inside it;
+ *                 `../x` or an absolute path reaches one anywhere else. Nothing
+ *                 given opens the untitled project.
+ * @param {string} [renderer] `'null'` attaches the drawing surface described
+ *                 above. Anything else leaves the world with no renderer, so the
  *                 draw-time commands refuse and name the headless verb that
  *                 answers instead — the right answer for an agent at a
  *                 terminal, and the wrong one for a test of the restore path.
+ * @param {object} [viewport] A measured screen, overriding the game's device.
+ * @returns {Promise<object>} The started world's surface.
  */
 export async function startWorldInNode({ root = ROOT, project, viewport, renderer } = {}) {
   const checkout = path.resolve(root)

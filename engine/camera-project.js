@@ -16,6 +16,13 @@
 /** Degrees the renderer defaults to when a view declares no field of view. */
 const DEFAULT_FOV = 90
 
+/**
+ * The projection for one view and viewport: `place` puts a world point on
+ * screen and `sizeAt` gives a world size on screen at a depth.
+ *
+ * A factory because the camera plugin moves the view between frames, and every
+ * answer must read the view as it is when asked.
+ */
 export function makeProjector(view, viewport) {
   const width = Math.max(1, viewport.width)
   const height = Math.max(1, viewport.height)

@@ -173,7 +173,7 @@ export default {
     input.locked = false
 
     Object.assign(input, {
-      /** Radians turned since the last call, and clears them. Read once per fixed step. */
+      /** Radians turned since the last call, and clears them. The camera that owns the mouse reads it once per frame or step. */
       look() {
         const turned = { yaw: accumulated.yaw, pitch: accumulated.pitch }
         accumulated.yaw = 0

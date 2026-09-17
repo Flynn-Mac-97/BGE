@@ -10,6 +10,8 @@
  */
 const KERNEL = [
   { op: 'snapshot', purpose: 'the world in one view: mode, level, time, seed, camera, counts' },
+  { op: 'snapshot --entities', purpose: 'every entity, every field this list carries, as rows' },
+  { op: 'snapshot \'{"entities":["id","at"]}\'', purpose: 'the same entities as two columns — a fifth of the reading' },
   { op: 'entity <id>', purpose: 'one entity, complete' },
   { op: 'select <id...>', purpose: 'choose entities' },
   { op: 'set <id> <key> <value>', purpose: 'set a field or property and write it to the level' },
@@ -19,12 +21,16 @@ const KERNEL = [
   { op: 'stop', purpose: 'leave play mode, or reload the level after a simulation' },
   { op: 'simulate <seconds>', purpose: 'advance the fixed clock deterministically' },
   { op: 'seed <n>', purpose: 're-seed the random stream and restart the clock' },
+  { op: 'marks', purpose: 'the step counts this run can be put back to, oldest first' },
+  { op: 'mark', purpose: 'mark this moment, to come back to exactly' },
+  { op: 'stepBack [n]', purpose: 'go back n fixed steps: the clock, the stream, the keys and every solver come with the entities' },
+  { op: 'seek <step>', purpose: 'go back to a step count; forward is refused, and says to use simulate' },
   { op: 'errors', purpose: 'what went wrong' },
   { op: 'log [n]', purpose: 'recent hot-swap and file events' },
   { op: 'watch', purpose: 'tail the log live' },
   { op: 'eval <js>', purpose: 'run code in the editor page' },
   { op: 'run <id> [arg]', purpose: 'any command, any argument' },
-  { op: 'commands', purpose: 'every command id' },
+  { op: 'commands', purpose: 'every command id, and with \'{"fields":["id"]}\' just the ids' },
   { op: 'clearLog', purpose: 'empty the error ring' }
 ]
 
@@ -32,6 +38,7 @@ const OFFLINE = [
   { op: 'index', purpose: 'rebuild the project index and print it' },
   { op: 'tree', purpose: 'every project file, with its kind' },
   { op: 'check', purpose: 'exit 1 with file and line on anything broken or nondeterministic' },
+  { op: 'serve', purpose: 'one private world held open: one JSON request per line on stdin, one JSON reply per line, so many questions cost one boot' },
   { op: 'servers', purpose: 'every dev server this checkout started, each proved by asking its port' },
   { op: 'servers.stop [<port>|all]', purpose: 'stop that one; several running means one must be named' },
   { op: 'lanes', purpose: 'every headless browser started for a lane, each proved against its debugging port' },

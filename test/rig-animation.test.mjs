@@ -17,7 +17,12 @@ import { fileURLToPath } from 'node:url'
 
 import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { widenClip, applyClip } from '../plugins/builtin/rig-animation.js'
-import { buildClip, writeClip, multiply, skeletonFor, SKELETONS } from '../tools/lib/motion-clip.mjs'
+import { buildClip, writeClip, multiply, skeletonFor, loopWindow, SKELETONS } from '../tools/lib/motion-clip.mjs'
+import { withRestWorld, captureWorldTurns, planRetarget, neutralFor } from '../tools/lib/retarget.mjs'
+import { findMap, mapsFor, nodesOf } from '../tools/lib/rig-maps.mjs'
+import { guessMap } from '../tools/lib/rig-map-guess.mjs'
+import { retargetSources } from '../tools/lib/retarget-clips.mjs'
+import { checkClips } from '../tools/lib/rig-check.mjs'
 import { FIXTURE } from './fixture-project.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -82,6 +87,13 @@ test('a clip holds its last frame once, and says it is done', () => {
   const entity = at(9, once)
   assert.deepEqual(entity.pose.hips, [0, 1, 0, 0], 'the last frame')
   assert.equal(entity.rigDone, true)
+})
+
+test('a node with positions gets its local position after its rotation, blended', () => {
+  const clip = widenClip({ ...clipSource(), positions: { head: [[0, 0, 0], [0, 2, 0], [0, 4, 0]] } }, 'moves.json')
+  assert.deepEqual(at(0.15, clip).pose.head.slice(4), [0, 3, 0])
+  assert.equal(at(0.15, clip).pose.hips.length, 4, 'a node without positions stays a rotation')
+  assert.throws(() => widenClip({ ...clipSource(), positions: { tail: [[0, 0, 0]] } }, 'moves.json'), /positions names tail/)
 })
 
 test('opposite signs interpolate the short way round', () => {
@@ -201,6 +213,202 @@ test('a written clip reads back as the same clip', () => {
   fs.rmSync(path.dirname(file), { recursive: true, force: true })
 })
 
+test('retargeting onto a model with other bone axes puts every joint where the capture put it', () => {
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  const map = Object.fromEntries(soma.names.map(name => [name, { node: `bone-${name}` }]))
+  const motion = rawMotion()
+  const clip = buildClip({ ...motion, skeleton: 'soma-30', map, model, standing: false })
+
+  const last = motion.frames - 1
+  const captured = captureWorldTurns(
+    soma.names.map((_, joint) => Array.from(motion.rotations.slice((last * motion.joints + joint) * 4, (last * motion.joints + joint + 1) * 4))),
+    soma, 0
+  )
+  const expected = positionsOf(soma.parents, soma.offsets, captured)
+  const local = clip.nodes.map((_, index) => clip.rotations[last].slice(index * 4, index * 4 + 4))
+  const posed = positionsOf(model.map(node => node.parent), model.map(node => node.translation),
+    worldFromLocal(model.map(node => node.parent), local))
+  for (const joint of ['LeftHand', 'RightToeBase', 'Head']) {
+    const index = soma.names.indexOf(joint)
+    for (let axis = 0; axis < 3; axis++) assert.ok(Math.abs(posed[index][axis] - expected[index][axis]) < 1e-3, `${joint} axis ${axis}`)
+  }
+})
+
+test('a cycle keeps the frames between the two best matching poses', () => {
+  const frames = Array.from({ length: 60 }, (_, frame) => {
+    const angle = frame / 15 * Math.PI
+    return [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)]
+  })
+  // A full turn every 30 frames returns to the same pose at frame 30 as at frame 0.
+  const window = loopWindow(frames)
+  assert.equal(window.last - window.first, 30)
+})
+
+test('a model built facing the other way takes the motion turned to its own facing', () => {
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  const halfTurn = [0, 1, 0, 0]
+  model[0].rotation = multiply(halfTurn, model[0].rotation)
+  withRestWorld(model)
+  const map = Object.fromEntries(soma.names.map(name => [name, { node: `bone-${name}` }]))
+  const motion = rawMotion()
+  const clip = buildClip({ ...motion, root: null, skeleton: 'soma-30', map, model, standing: false })
+  const last = motion.frames - 1
+  const captured = captureWorldTurns(
+    soma.names.map((_, joint) => Array.from(motion.rotations.slice((last * motion.joints + joint) * 4, (last * motion.joints + joint + 1) * 4))),
+    soma, 0
+  )
+  const expected = positionsOf(soma.parents, soma.offsets, captured).map(position => rotateVector(halfTurn, position))
+  const local = clip.nodes.map((_, index) => clip.rotations[last].slice(index * 4, index * 4 + 4))
+  const posed = positionsOf(model.map(node => node.parent), model.map(node => node.translation), worldFromLocal(model.map(node => node.parent), local))
+  const hand = soma.names.indexOf('LeftHand')
+  for (let axis = 0; axis < 3; axis++) assert.ok(Math.abs(posed[hand][axis] - expected[hand][axis]) < 2e-3, `hand axis ${axis}: ${posed[hand][axis]} vs ${expected[hand][axis]}`)
+})
+
+test('an arm hung off a bone the map never names still follows the shoulder that drives it', () => {
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  // Hang the upper arm off Spine1, as Rigify hangs DEF-upper_arm off ORG-shoulder, keeping its rest place.
+  const arm = model.find(node => node.name === 'bone-LeftArm')
+  const holder = model.findIndex(node => node.name === 'bone-Spine1')
+  arm.parent = holder
+  const inverseHolder = [-model[holder].worldRotation[0], -model[holder].worldRotation[1], -model[holder].worldRotation[2], model[holder].worldRotation[3]]
+  arm.translation = rotateVector(inverseHolder, arm.worldPosition.map((value, axis) => value - model[holder].worldPosition[axis]))
+  arm.rotation = multiply(inverseHolder, arm.worldRotation)
+  withRestWorld(model)
+
+  const map = Object.fromEntries(soma.names.map(name => [name, { node: `bone-${name}` }]))
+  const motion = rawMotion()
+  const clip = buildClip({ ...motion, root: null, skeleton: 'soma-30', map, model, standing: false })
+  const last = motion.frames - 1
+  assert.ok(clip.positions?.['bone-LeftArm'], 'the arm carries a position')
+
+  const captured = captureWorldTurns(
+    soma.names.map((_, joint) => Array.from(motion.rotations.slice((last * motion.joints + joint) * 4, (last * motion.joints + joint + 1) * 4))),
+    soma, 0
+  )
+  const expected = positionsOf(soma.parents, soma.offsets, captured)
+  const byNode = new Map(clip.nodes.map((name, index) => [name, index]))
+  const parents = model.map(node => node.parent)
+  const local = model.map(node => byNode.has(node.name) ? clip.rotations[last].slice(byNode.get(node.name) * 4, byNode.get(node.name) * 4 + 4) : node.rotation)
+  const translations = model.map(node => clip.positions?.[node.name]?.[last] || node.translation)
+  const posed = positionsOf(parents, translations, worldFromLocal(parents, local))
+  const hand = soma.names.indexOf('LeftHand')
+  const handNode = model.findIndex(node => node.name === 'bone-LeftHand')
+  for (let axis = 0; axis < 3; axis++) assert.ok(Math.abs(posed[handNode][axis] - expected[hand][axis]) < 2e-3, `hand axis ${axis}`)
+})
+
+test('a capture standing in its usual stance leaves the spine at the model rest', () => {
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  const map = Object.fromEntries(soma.names.map(name => [name, { node: `bone-${name}` }]))
+  const stance = neutralFor('soma-30')
+  const rotations = new Float32Array(soma.names.length * 4 * 2)
+  soma.names.forEach((name, joint) => rotations.set(stance[name] || [0, 0, 0, 1], joint * 4))
+  rotations.copyWithin(soma.names.length * 4, 0, soma.names.length * 4)
+  const clip = buildClip({ rotations, root: null, joints: soma.names.length, frames: 2, skeleton: 'soma-30', map, model })
+  for (const name of ['Chest', 'Neck1', 'Head']) {
+    const turn = clip.rotations[0].slice(clip.nodes.indexOf(`bone-${name}`) * 4, clip.nodes.indexOf(`bone-${name}`) * 4 + 4)
+    const rest = model.find(node => node.name === `bone-${name}`).rotation
+    const dot = Math.abs(turn.reduce((sum, value, axis) => sum + value * rest[axis], 0))
+    assert.ok(dot > 0.9999, `${name} stays at rest, dot ${dot}`)
+  }
+})
+
+test('a tilted pelvis bone keeps its tilt, so the body above it does not lean back', () => {
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  // Move Spine1's bone forward of the hips, as a Rigify pelvis bone rests.
+  const spine = model.find(node => node.name === 'bone-Spine1')
+  spine.translation = [0, spine.translation[1], spine.translation[2] + 0.1]
+  withRestWorld(model)
+  const map = { Hips: { node: 'bone-Hips' }, Spine1: { node: 'bone-Spine1' } }
+  const plan = planRetarget({ map, skeleton: soma, model })
+  assert.deepEqual(plan.find(entry => entry.node === 'bone-Hips').alignment.map(value => value + 0), [0, 0, 0, 1])
+})
+
+test('a bone map is guessed from Mixamo, Unreal and Biped names', () => {
+  const chain = names => names.map((name, index) => ({ name, parent: index ? 0 : -1 }))
+  const mixamo = guessMap(chain(['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+    'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase']
+    .map(name => `mixamorig:${name}`))).map
+  assert.equal(mixamo.LeftLeg.node, 'mixamorig:LeftUpLeg')
+  assert.equal(mixamo.LeftShin.node, 'mixamorig:LeftLeg')
+  assert.equal(mixamo.Chest.node, 'mixamorig:Spine2')
+  const unreal = guessMap(chain(['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01', 'head', 'clavicle_l', 'upperarm_l', 'upperarm_twist_01_l', 'lowerarm_l', 'hand_l',
+    'clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r', 'thigh_l', 'calf_l', 'foot_l', 'ball_l', 'thigh_r', 'calf_r', 'foot_r', 'ball_r'])).map
+  assert.equal(unreal.LeftArm.node, 'upperarm_l', 'a twist bone is not the arm')
+  assert.equal(unreal.RightShin.node, 'calf_r')
+  const biped = guessMap(chain(['Bip01 Pelvis', 'Bip01 Spine', 'Bip01 Spine1', 'Bip01 Neck', 'Bip01 Head', 'Bip01 L UpperArm', 'Bip01 L Forearm', 'Bip01 L Hand',
+    'Bip01 R UpperArm', 'Bip01 R Forearm', 'Bip01 R Hand', 'Bip01 L Thigh', 'Bip01 L Calf', 'Bip01 L Foot', 'Bip01 R Thigh', 'Bip01 R Calf', 'Bip01 R Foot'])).map
+  assert.equal(biped.RightHand.node, 'Bip01 R Hand')
+  assert.throws(() => guessMap(chain(['Bone', 'Bone.001'])), /could not guess a bone map: no node for Hips/)
+})
+
+test('a deforming bone no mapped bone carries follows the nearest one', () => {
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  // A pelvis side bone hung off the root helper, as Rigify's DEF-pelvis.L is.
+  const helper = { name: 'helper', parent: -1, rotation: [0, 0, 0, 1], translation: [0, 0, 0], scale: 1 }
+  model.push(helper)
+  model.push({ name: 'side', parent: model.length - 1, rotation: [0, 0, 0, 1], translation: [0.05, 0, 0], scale: 1, joint: true })
+  model.forEach(node => { if (node.name.startsWith('bone-')) node.joint = true })
+  withRestWorld(model)
+  const map = Object.fromEntries(soma.names.map(name => [name, { node: `bone-${name}` }]))
+  const clip = buildClip({ ...rawMotion(), root: null, skeleton: 'soma-30', map, model, standing: false })
+  assert.ok(clip.nodes.includes('side'), 'the follower is in the clip')
+  assert.ok(!clip.nodes.includes('helper'), 'a bone that does not deform is left alone')
+  assert.ok(clip.positions.side, 'and it moves as well as turns')
+})
+
+test('the bone map is found from the model\'s own node names', () => {
+  const rigify = nodesOf(mapsFor('soma-30').find(one => one.rig === 'rigify').map)
+  const model = rigify.map(name => ({ name }))
+  assert.equal(findMap('soma-30', model).rig, 'rigify')
+  assert.throws(() => findMap('soma-30', [{ name: 'Bone' }, { name: 'Bone.001' }]), /no bone map .* Its nodes start: Bone, Bone\.001/)
+})
+
+test('stored motion goes onto a model in one call, with the map found and the rig block returned', async () => {
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-retarget-'))
+  try {
+    const motion = standingMotion()
+    const source = path.join(project, 'assets/motion/source/walk')
+    fs.mkdirSync(source, { recursive: true })
+    fs.writeFileSync(path.join(source, 'local_rotations_xyzw.f32'), Buffer.from(motion.rotations.buffer))
+    fs.writeFileSync(path.join(source, 'root_positions.f32'), Buffer.from(motion.root.buffer))
+    fs.writeFileSync(path.join(source, 'prompt.txt'), 'a person walks')
+    const rigify = mapsFor('soma-30').find(one => one.rig === 'rigify').map
+    const nodeFor = Object.fromEntries(Object.entries(rigify).filter(([key]) => !key.startsWith('_')).map(([joint, entry]) => [joint, entry.node]))
+    const skeleton = twistedCopyOf(SKELETONS['soma-30'])
+    skeleton.forEach(node => { node.name = nodeFor[node.name.slice('bone-'.length)] || node.name })
+    fs.mkdirSync(path.join(project, 'assets/models'), { recursive: true })
+    fs.writeFileSync(path.join(project, 'assets/models/hero.glb'), glbOf(skeleton))
+
+    const done = retargetSources({ project, model: 'models/hero.glb' })
+    assert.equal(done.rig, 'rigify')
+    assert.deepEqual(done.declare.rig.clips, { walk: 'motion/hero/walk.json' })
+    const clip = JSON.parse(fs.readFileSync(path.join(project, 'assets/motion/hero/walk.json'), 'utf8'))
+    assert.equal(clip.nodes.length, nodesOf(rigify).length)
+    assert.equal(clip.source.prompt, 'a person walks')
+
+    const clean = checkClips({ project, model: 'models/hero.glb' })
+    assert.deepEqual(clean.findings, [], 'a right map has no findings')
+
+    const swapped = JSON.parse(JSON.stringify(rigify))
+    for (const part of ['Shoulder', 'Arm', 'ForeArm', 'Hand']) {
+      [swapped[`Left${part}`].node, swapped[`Right${part}`].node] = [swapped[`Right${part}`].node, swapped[`Left${part}`].node]
+    }
+    fs.mkdirSync(path.join(project, 'assets/motion/maps'), { recursive: true })
+    fs.writeFileSync(path.join(project, 'assets/motion/maps/hero.json'), JSON.stringify(swapped))
+    assert.equal(retargetSources({ project, model: 'models/hero.glb' }).map, 'assets/motion/maps/hero.json', 'a map in the game wins')
+    const wrong = checkClips({ project, model: 'models/hero.glb' })
+    assert.ok(wrong.findings.some(finding => /turn over 100/.test(finding)), `swapped sides are found: ${wrong.findings}`)
+  } finally {
+    fs.rmSync(project, { recursive: true, force: true })
+  }
+})
+
 // --------------------------------------------------------------- in a world
 test('the plugin loads headless and contributes its verbs', async () => {
   const { context, engine } = await startWorldInNode({ root: ROOT, project: FIXTURE })
@@ -230,6 +438,76 @@ function rawMotion() {
   }
   const root = new Float32Array([0, 0, 0, 0, 1, 2, 0, 2, 4])
   return { rotations, root, joints, frames }
+}
+
+/**
+ * The capture's skeleton as a model: same rest positions, but every bone rests
+ * with a different local rotation, as a Blender rig's bones do.
+ */
+function twistedCopyOf(skeleton) {
+  const nodes = []
+  const world = []
+  skeleton.names.forEach((name, index) => {
+    const parent = skeleton.parents[index]
+    const angle = 0.3 + index * 0.2
+    const rotation = [Math.sin(angle / 2) * 0.6, Math.sin(angle / 2) * 0.8, 0, Math.cos(angle / 2)]
+    world[index] = parent < 0 ? rotation : multiply(world[parent], rotation)
+    const parentWorld = parent < 0 ? [0, 0, 0, 1] : world[parent]
+    const translation = rotateVector([-parentWorld[0], -parentWorld[1], -parentWorld[2], parentWorld[3]], skeleton.offsets[index])
+    nodes.push({ name: `bone-${name}`, parent, rotation, translation, scale: 1 })
+  })
+  return withRestWorld(nodes)
+}
+
+/** A .glb holding only a node tree: enough for `readModelSkeleton`. */
+function glbOf(nodes) {
+  const document = {
+    asset: { version: '2.0' },
+    nodes: nodes.map((node, index) => ({
+      name: node.name,
+      rotation: node.rotation,
+      translation: node.translation,
+      children: nodes.map((child, childIndex) => (child.parent === index ? childIndex : -1)).filter(childIndex => childIndex >= 0)
+    }))
+  }
+  let json = Buffer.from(JSON.stringify(document))
+  json = Buffer.concat([json, Buffer.alloc((4 - json.length % 4) % 4, 0x20)])
+  const header = Buffer.alloc(20)
+  header.writeUInt32LE(0x46546c67, 0)
+  header.writeUInt32LE(2, 4)
+  header.writeUInt32LE(20 + json.length, 8)
+  header.writeUInt32LE(json.length, 12)
+  header.writeUInt32LE(0x4e4f534a, 16)
+  return Buffer.concat([header, json])
+}
+
+function worldFromLocal(parents, local) {
+  const world = []
+  parents.forEach((parent, index) => { world[index] = parent < 0 ? local[index] : multiply(world[parent], local[index]) })
+  return world
+}
+
+function positionsOf(parents, translations, world) {
+  const positions = []
+  parents.forEach((parent, index) => {
+    const moved = parent < 0 ? [0, 0, 0] : rotateVector(world[parent], translations[index])
+    positions[index] = parent < 0 ? translations[index] : positions[parent].map((value, axis) => value + moved[axis])
+  })
+  return positions
+}
+
+function rotateVector(turn, vector) {
+  const moved = multiply(multiply(turn, [...vector, 0]), [-turn[0], -turn[1], -turn[2], turn[3]])
+  return [moved[0], moved[1], moved[2]]
+}
+
+/** Three frames of every soma joint at rest, hips at standing height: a body that is plainly right. */
+function standingMotion() {
+  const joints = SKELETONS['soma-30'].names.length
+  const frames = 3
+  const rotations = new Float32Array(frames * joints * 4)
+  for (let at = 3; at < rotations.length; at += 4) rotations[at] = 1
+  return { rotations, root: new Float32Array([0, 0.99, 0, 0, 0.99, 0, 0, 0.99, 0]), joints, frames }
 }
 
 /** The literal CLIP is widened, so a second copy of its source is needed to vary it. */

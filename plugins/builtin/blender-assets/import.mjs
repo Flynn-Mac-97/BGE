@@ -132,3 +132,16 @@ export async function runExport(host, { blender, blend, model, graphs, settings 
     scaled: list('scaled'), occluded: list('occluded'), graphs: list('graphs')
   }
 }
+
+const INSPECT_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'inspect-blend.py')
+
+/**
+ * What a .blend holds, read by Blender itself: each character's armature,
+ * meshes and height, and the `collection` setting that exports only it.
+ */
+export async function inspectBlend(host, blender, blend) {
+  const result = await host.run(blender.command, [path.join(host.project, blend), '--background', '--python', INSPECT_SCRIPT], { timeout: 120000 })
+  const line = /engine-inspect (.+)/.exec(result.out)?.[1]
+  if (!line) throw new Error(`Blender could not read ${blend}:\n${tail(result.error) || tail(result.out) || 'no output'}`)
+  return { file: blend, ...JSON.parse(line) }
+}

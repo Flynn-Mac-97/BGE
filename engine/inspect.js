@@ -9,10 +9,71 @@
  * Exposed as window.engine so an agent driving the browser can inspect state
  * and act without screenshots.
  */
+import { validateCommandInput } from './command-schema.js'
+import { stateHash } from './world.js'
 const RING = 200
 
 /** Half a fixed step. Below this, a simulation ran the time it was asked for. */
 const STEP_TOLERANCE = 1 / 120
+
+/**
+ * Every log in this process, held weakly.
+ *
+ * A world wants what the console would not have caught, and node and the browser
+ * both report an uncaught throw and a rejected promise on one process-wide
+ * channel. Wiring that up per world meant eleven worlds installed eleven pairs of
+ * listeners — which node warns about at eleven — each one collecting every other
+ * world's errors, and each one holding its own world's log reachable for the life
+ * of the process. Weak, because the thing that reports errors must never be the
+ * reason a world cannot be let go of.
+ */
+const LOGS = new Set()
+
+/** Whether the process-wide channels are wired. One set, however many worlds. */
+let wired = false
+
+/** Say something to every log still alive, and forget the ones that are not. */
+function reportToLogs(level, source, message, extra) {
+  for (const reference of LOGS) {
+    const log = reference.deref()
+    if (log) log.push(level, source, message, extra)
+    else LOGS.delete(reference)
+  }
+}
+
+/**
+ * Wire the channels a world cannot listen for itself, once.
+ *
+ * `console.error` only catches what someone remembered to log. An uncaught throw
+ * or a rejected promise in game code would otherwise be invisible — the log would
+ * say the run was clean while the run was not — and that is the worst thing to
+ * hand an agent working without a screen. Wrapped once rather than once per world,
+ * so eleven worlds are not eleven nested wrappers passing everything along.
+ */
+function wireOnce() {
+  if (wired) return
+  wired = true
+
+  const uncaught = (error, at) => reportToLogs('error', 'uncaught',
+    error?.stack || error?.message || String(error), { at })
+  const rejected = reason => reportToLogs('error', 'rejection',
+    reason?.stack || reason?.message || String(reason))
+
+  if (typeof addEventListener === 'function') {
+    addEventListener('error', event => uncaught(event.error || event.message,
+      event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined))
+    addEventListener('unhandledrejection', event => rejected(event.reason))
+  } else if (typeof process !== 'undefined' && typeof process.on === 'function') {
+    process.on('uncaughtException', error => uncaught(error))
+    process.on('unhandledRejection', reason => rejected(reason))
+  }
+
+  const original = console.error
+  console.error = (...args) => {
+    reportToLogs('error', 'console', args.map(a => (a?.stack || a?.message || String(a))).join(' '))
+    original.apply(console, args)
+  }
+}
 
 /**
  * The world's log, and everything that has to be listening before there is a
@@ -46,35 +107,68 @@ export function makeLog(bus) {
     `${c.file} ${c.removed ? 'removed' : c.entities != null ? `→ ${c.entities} entities` : c.skipped || 'applied'}`))
   bus.on('hot:failed', c => push('error', 'hot', `${c.file} — ${c.error}`))
 
-  const origError = console.error
-  console.error = (...args) => {
-    push('error', 'console', args.map(a => (a?.stack || a?.message || String(a))).join(' '))
-    origError.apply(console, args)
-  }
-
-  // console.error only catches what someone remembered to log. An uncaught
-  // throw or a rejected promise in game code would otherwise be invisible here
-  // — the log would say the run was clean while the run was not.
-  //
-  // Node reports the same two things under different names, so both are wired
-  // up. A headless run that silently swallowed an uncaught throw would be the
-  // worst possible thing to hand an agent working without a screen.
-  const uncaught = (error, at) => push('error', 'uncaught', error?.stack || error?.message || String(error), { at })
-  const rejected = reason => push('error', 'rejection', reason?.stack || reason?.message || String(reason))
-
-  if (typeof addEventListener === 'function') {
-    addEventListener('error', event => uncaught(event.error || event.message,
-      event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined))
-    addEventListener('unhandledrejection', event => rejected(event.reason))
-  } else if (typeof process !== 'undefined' && typeof process.on === 'function') {
-    process.on('uncaughtException', error => uncaught(error))
-    process.on('unhandledRejection', reason => rejected(reason))
-  }
-
-  return { lines, push }
+  const log = { lines, push }
+  // This world is now one of the logs a process-wide error is reported to, and
+  // the wiring is installed if this is the first world to ask.
+  LOGS.add(new WeakRef(log))
+  wireOnce()
+  return log
 }
 
-export function makeInspect({ world, loader, loop, files, bus, editor, view, log, reload }) {
+/**
+ * The columns one row of a bulk entity list can carry.
+ *
+ * Named here rather than discovered from the first row, so a projection can refuse a
+ * field that does not exist instead of answering with a column of nulls — which reads
+ * as a world where nothing has a rotation.
+ */
+const ENTITY_COLUMNS = ['id', 'type', 'at', 'rotation', 'note', 'properties', 'behaviours']
+
+/**
+ * Rows as columns: the field names once, then one array per row.
+ *
+ * A dump of four hundred and forty entities is 22 KB as rows of objects and 14 KB as
+ * columns, because the names are a third of it. The projection is the larger half —
+ * the same dump of `id` and `at` is 9 KB — and it is the same data, so a caller that
+ * asks for two columns gets two columns rather than reading seven and discarding five.
+ *
+ * @param {object[]} rows One object per row.
+ * @param {string[]} fields Which of its fields to keep, in this order.
+ * @returns {object} `{ columns, rows }`.
+ */
+const asColumns = (rows, fields) => ({
+  columns: fields,
+  rows: rows.map(row => fields.map(field => row[field]))
+})
+
+/**
+ * The fields a projection named, checked.
+ *
+ * @param {string|string[]} asked Field names, or one string of them separated by commas.
+ * @param {string[]} known Every field this reply's rows can carry.
+ * @returns {string[]} The names, in the order asked for.
+ * @throws When a name is not a field of this row, naming the ones that are.
+ */
+function wantedFields(asked, known) {
+  const fields = (Array.isArray(asked) ? asked : String(asked).split(','))
+    .map(field => String(field).trim())
+    .filter(Boolean)
+  if (!fields.length) throw new Error(`name the fields to keep, separated by commas — this row carries ${known.join(', ')}`)
+  const wrong = fields.filter(field => !known.includes(field))
+  if (wrong.length) throw new Error(`no field "${wrong.join('", "')}" — this row carries ${known.join(', ')}`)
+  return fields
+}
+
+/**
+ * The read and drive surface: `snapshot`, `run`, `simulate`, and the direct
+ * verbs a script uses instead of going through a command.
+ *
+ * It reads the same objects the loop and the plugins write, so an answer is
+ * what the world holds at the moment asked. `reload` is the one-shot note from
+ * a page reload; it is appended to the first plain-object reply that can hold
+ * it and then stops.
+ */
+export function makeInspect({ world, loader, loop, files, bus, editor, view, log, reload, rewind }) {
   /**
    * Add the reload note to a reply, once.
    *
@@ -145,8 +239,20 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
   }
 
   const api = {
-    /** Compact by default. Pass { entities:true, log:true, plugins:true } for detail. */
+    /**
+     * Compact by default. Pass `{ entities: true, log: true, plugins: true }` for detail.
+     *
+     * `entities` may also name the fields to keep — `{ entities: ['id', 'at'] }` — and
+     * the reply comes back as columns: the names once, then one array per entity. Same
+     * world, a fifth of the reading.
+     */
     snapshot(options = {}) {
+      // `snapshot --entities id,at` reaches here as a string first argument, because
+      // the flag parser keeps a bare flag boolean on purpose. Answering the compact
+      // reply then reads as the projection having done nothing.
+      if (typeof options !== 'object' || options === null) {
+        throw new Error(`snapshot takes an options object — for some fields as columns: snapshot '{"entities":["id","at"]}'`)
+      }
       const types = [...world.types.keys()]
       const broken = loader.failures()
       const out = {
@@ -163,6 +269,11 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         // hardest thing to diagnose without being told who asked for that.
         ...(loop.paused ? { paused: loop.holds } : {}),
         seed: loop.random.seed,
+        // One value that changes whenever the world does. Two runs are compared
+        // by this rather than by reading a thousand entities: it is what answers
+        // whether a change altered the simulation at all, and it is what makes a
+        // rewind or a restored world checkable. See `stateHash` in world.js.
+        hash: stateHash(world),
         camera: { x: r(view.x), y: r(view.y), zoom: r(view.zoom), mode: view.mode },
         counts: {
           entities: world.entities.length,
@@ -183,7 +294,10 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         unsaved: files.pending > 0 || !!files.refused,
         ...(files.refused ? { refused: files.refused.message } : {})
       }
-      if (options.entities) out.entities = world.entities.map(e => entityView(e, true))
+      if (options.entities) {
+        const rows = world.entities.map(e => entityView(e, true))
+        out.entities = options.entities === true ? rows : asColumns(rows, wantedFields(options.entities, ENTITY_COLUMNS))
+      }
       if (options.plugins) out.plugins = [...loader.plugins.entries()]
         .map(([name, p]) => (p.file
           // A file that never imported has no name to show. Say what it is
@@ -201,13 +315,17 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      *
      * Toolbar entries are included. A button a person can press has to be
      * reachable from a terminal too, or the two ways of driving the editor
-     * quietly diverge.
+     * quietly diverge. `fields` projects the rows the same way `snapshot` does, and
+     * a session that only needs the ids should not pay for two hundred labels.
      */
-    commands() {
-      return [
+    commands({ fields } = {}) {
+      const rows = [
         ...loader.contrib.commands.map(c => ({ id: c.id, label: c.label, plugin: c.plugin })),
         ...loader.contrib.menus.map(m => ({ id: m.id, label: m.label, plugin: m.plugin, toolbar: true }))
       ]
+      if (fields === undefined) return rows
+      if (fields === true) throw new Error(`commands takes the fields as a value — commands '{"fields":["id"]}'`)
+      return asColumns(rows, wantedFields(fields, ['id', 'label', 'plugin', 'toolbar']))
     },
 
     // Async, because a command handler may be. Both callers — the CLI and the
@@ -217,6 +335,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       const command = loader.contrib.commands.find(c => c.id === id)
         || loader.contrib.menus.find(m => m.id === id)
       if (!command) throw new Error(missingCommand(id, loader.failures()))
+      validateCommandInput(command.inputSchema, args === undefined && command.inputSchema?.type === 'object' ? {} : args)
       const out = await command.run(editor.context, args)
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
@@ -227,13 +346,16 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       return plainReply(out) ? note({ ...out }) : out
     },
 
+    /** One entity in full, or null when no entity has that id. */
     entity(id) {
       const e = world.byId(id)
       return e ? entityView(e) : null
     },
 
     // ---- direct verbs, for driving without going through a command ----
+    /** Select ids, as clicking them in the editor would. */
     select: ids => editor.select(ids),
+    /** Enter play mode. A no-op when the world is already playing. */
     play: () => { if (!loop.running) editor.togglePlay() },
 
     /**
@@ -280,7 +402,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       }
       return snapshot
     },
+    /** Spawn one entity and return its view, as a placement in the level would. */
     spawn: (type, placement) => entityView(editor.context.spawn(type, placement)),
+    /** Destroy one entity by id. */
     destroy: id => editor.context.destroy(world.byId(id)),
 
     /**
@@ -314,9 +438,42 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       return { seed: loop.random.seed, time: loop.time }
     },
 
+    /** The last `n` log lines, oldest first. */
     log: (n = 40) => log.lines.slice(-n),
+    /** Every error-level line in the ring. */
     errors: () => log.lines.filter(l => l.level === 'error'),
+    /** Empty the log ring. */
     clearLog: () => { log.lines.length = 0 },
+
+    // ---- going back through the run ----
+
+    /**
+     * The counts this run can be put back to, oldest first.
+     *
+     * Counts rather than moments: a moment is hundreds of kilobytes with a solver
+     * in it, and what a caller wants to know is how far back it can go.
+     */
+    marks: () => ({ steps: loop.steps, stride: rewind.stride, depth: rewind.depth, oldest: rewind.oldest, marks: rewind.marks }),
+
+    /**
+     * Take a mark now.
+     *
+     * The ring marks on its own every `stride` steps. This is for the moment worth
+     * returning to exactly — before a change whose effect is the question.
+     */
+    mark: () => ({ steps: rewind.mark(), marks: rewind.length }),
+
+    /**
+     * Step back `n` fixed steps, and say where the clock ended up.
+     *
+     * This is the verb the ring exists for: run the thing, look, come back. An
+     * exact rewind, because the clock, the stream, the input record and every
+     * plugin's own state come back with the entities.
+     */
+    stepBack: (count = 1) => rewind.back(count),
+
+    /** Go back to a step count. Refused for a count the run has not reached. */
+    seek: (steps = 0) => rewind.to(steps),
 
     // direct handles for anything the summary does not cover
     world, loader, loop, files, bus, editor, view,

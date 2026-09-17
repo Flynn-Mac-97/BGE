@@ -33,16 +33,29 @@ const HOST = process.env.ENGINE_HOST || `http://localhost:${PORT}`
  * point them elsewhere, so a test can isolate a log.
  */
 const HERE = fileURLToPath(new URL('..', import.meta.url))
+
+/**
+ * The main worktree, found once, and only when a ledger is actually reached.
+ *
+ * Finding it runs `git`, and a subprocess costs about what starting node costs.
+ * Read at the module's top it was charged to every command, including the many
+ * that never look at a ledger; one that does read a ledger pays it once.
+ */
+let ledgerRoot = null
 const ledgerHome = () => {
+  if (ledgerRoot !== null) return ledgerRoot
+  ledgerRoot = HERE
   try {
     const line = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: HERE, encoding: 'utf8' })
       .split(/\r?\n/).find(value => value.startsWith('worktree '))
-    if (line) return path.resolve(line.slice('worktree '.length))
+    if (line) ledgerRoot = path.resolve(line.slice('worktree '.length))
   } catch { /* not a git checkout — this repo is still the right answer */ }
-  return HERE
+  return ledgerRoot
 }
-const PAIN_FILE = process.env.ENGINE_PAIN_FILE || path.join(ledgerHome(), 'agent-runs/painpoints.jsonl')
-const INSIGHT_FILE = process.env.ENGINE_INSIGHT_FILE || path.join(ledgerHome(), 'agent-runs/insights.jsonl')
+
+/** The two ledger paths. A function, so an op that never reads one never finds it. */
+const PAIN_FILE = () => process.env.ENGINE_PAIN_FILE || path.join(ledgerHome(), 'agent-runs/painpoints.jsonl')
+const INSIGHT_FILE = () => process.env.ENGINE_INSIGHT_FILE || path.join(ledgerHome(), 'agent-runs/insights.jsonl')
 
 const HELP = `engine — read and drive the running editor
 
@@ -53,10 +66,18 @@ state     snapshot [--entities --log --plugins --commands --timers]
           check                exits 1 if anything is broken, nondeterministic,
                                or a plugin file that will not load. A problem
                                marked "warning" is reported and exits 0
+          a list can name its columns instead of repeating them every row:
+          snapshot '{"entities":["id","at"]}'                  the whole level
+          commands '{"fields":["id"]}'                          every verb
 drive     select <id...>       set <id> <key> <value>
           spawn <type> ['{"at":[1,2,0]}']     destroy <id>
           run <command-id> [arg]              commands
 run       play    stop    simulate <seconds>    seed <n>
+          marks                what this run can be put back to, oldest first
+          mark                 mark this moment, to come back to exactly
+          stepBack [n]         go back n fixed steps, exactly
+          seek <step>          go back to a step count. Forward is refused —
+                               step with simulate instead
           script '[["simulate",30],["run","see.describe"]]'
                                several ops, one world — headless only
 servers   servers              every dev server this checkout started — port,
@@ -75,6 +96,10 @@ lanes     lanes                every headless browser started for a lane, each
                                untargeted call would reach
           lock                 whether lanes are working, and so whether anybody
                                else may write
+session   serve                one headless world, many ops, read from stdin:
+                               one JSON request per line, one JSON reply per
+                               line. What --headless pays per command, a session
+                               pays once
 debug     errors    log [n]    watch    eval '<js>'
 friction  pain "<what the ENGINE made hard>" [--kind engine|cli|docs|editor]
                engine friction only — a game defect goes in your report, not here
@@ -154,6 +179,20 @@ workspace; parallel writers get a git worktree and require a clean baseline.
 
   node bin/engine.mjs --headless run tests.run
   node bin/engine.mjs --headless simulate 2 --level level1
+
+serve is --headless held open. It boots one private world, then reads one JSON
+object per line on stdin and writes one JSON line per request on stdout, so a
+hundred questions cost one boot instead of a hundred. An op is a method on the
+engine, or a dotted path to one, because a session that could not open a level
+would need a second session per level:
+
+  {"op":"simulate","args":[10]}
+  {"op":"editor.loadLevel","args":["level1"]}
+  {"op":"snapshot","args":[{entities:true}]}
+  {"op":"exit"}
+
+A request that throws answers {"error":"..."} and the session stays up. Anything
+the engine prints goes to stderr, so stdout stays one JSON value per line.
 
 Headless cannot draw — there is no canvas, so no screenshot and no picking.
 Everything else behaves as it does on screen, because it is the same engine.
@@ -335,6 +374,42 @@ function materialise(value) {
 // hit at the worst moment.
 const out = v => process.stdout.write(JSON.stringify(materialise(v), null, pretty ? 2 : 0) + '\n')
 
+/**
+ * Wall milliseconds a process is given to leave on its own before it is made to.
+ *
+ * Long enough that a world being torn down is not cut off mid-close, short enough that an
+ * agent waiting on a command does not read a hang. See `stop`.
+ */
+const DRAIN_LIMIT = 2000
+
+/**
+ * Whether the op has been answered, so nothing below it runs.
+ *
+ * `process.exit()` used to do this, and it is also what `stop` no longer does.
+ */
+let finished = false
+
+/**
+ * End this file here, with an exit code, and let node leave when the loop drains.
+ *
+ * Not `process.exit()`, and that is the whole point. A world that has stepped a Rapier
+ * body leaves the runtime with a handle still closing, and ending the process under it
+ * asserts inside libuv: a headless `simulate` wrote a complete reply and then exited
+ * 3221226505, so a caller reading the exit code saw a crash for a run that worked.
+ * Measured four ways on the same run — natural exit 0, exit 3221226505, write-then-exit
+ * 3221226505, write-then-set-the-code-and-drain 0.
+ *
+ * The bound is for the other half: a world in play mode holds a frame timer, and a plugin
+ * may hold one of its own, so draining alone can wait for ever where an exit used to
+ * work. The timer is unref'd, so it never delays a process that was going to leave
+ * anyway, and it only fires for one that cannot.
+ */
+const stop = code => {
+  finished = true
+  process.exitCode = code
+  setTimeout(() => process.exit(code), DRAIN_LIMIT).unref()
+}
+
 function die(code, message, detail) {
   process.stderr.write(message + '\n')
   if (detail && flags.verbose) process.stderr.write(detail + '\n')
@@ -362,13 +437,14 @@ function reportedFailure(value) {
  * One exit code for every path: the op ran, and the answer says whether it
  * passed.
  *
- * This ends the process. Every op runs at the top level of this file, so a
- * `finish` that only set `process.exitCode` would fall through into the ops
- * below it and run one of them.
+ * This ends the file. Every op runs at the top level of it, so an answer with nothing to
+ * stop the rest would fall through into the ops below — which is what `finished` and the
+ * two guards on it are for. See `stop` for why the process is not exited here.
  */
 const finish = value => {
+  if (finished) return
   out(value === undefined ? { ok: true } : value)
-  process.exit(reportedFailure(value) ? 1 : 0)
+  stop(reportedFailure(value) ? 1 : 0)
 }
 
 
@@ -438,9 +514,9 @@ function nextId(records, prefix) {
   return `${prefix}${n}`
 }
 
-const readPain = () => readLedger(PAIN_FILE)
-const appendPain = record => appendLedger(PAIN_FILE, record)
-const foldPain = () => foldLedger(PAIN_FILE, 'resolved')
+const readPain = () => readLedger(PAIN_FILE())
+const appendPain = record => appendLedger(PAIN_FILE(), record)
+const foldPain = () => foldLedger(PAIN_FILE(), 'resolved')
 
 if (op === 'pain') {
   const what = words.join(' ').trim()
@@ -537,8 +613,8 @@ if (op === 'pain.list') {
 // group together.
 const INSIGHT_KINDS = ['method', 'engine', 'cli', 'docs', 'editor']
 
-const readInsights = () => readLedger(INSIGHT_FILE)
-const foldInsights = () => foldLedger(INSIGHT_FILE, 'adopted')
+const readInsights = () => readLedger(INSIGHT_FILE())
+const foldInsights = () => foldLedger(INSIGHT_FILE(), 'adopted')
 
 /** Every word must appear somewhere in the record. Case is ignored. */
 const insightMatches = (record, words) => {
@@ -574,7 +650,7 @@ if (op === 'insight') {
     // What would turn this into one step: a verb, a check, a line of guidance.
     ...(typeof flags.tool === 'string' ? { tool: flags.tool } : {})
   }
-  appendLedger(INSIGHT_FILE, record)
+  appendLedger(INSIGHT_FILE(), record)
   out(record)
   process.exit(0)
 }
@@ -584,7 +660,7 @@ if (op === 'insight.adopt') {
   const note = words.join(' ').trim()
   if (!id) die(1, 'which one?  insight.adopt i3 "added `lock`, which derives it the same way"')
   if (!foldInsights().some(record => record.id === id)) die(1, `no insight "${id}". Try insight.list`)
-  appendLedger(INSIGHT_FILE, { id, adopted: true, at: new Date().toISOString(), note: note || undefined })
+  appendLedger(INSIGHT_FILE(), { id, adopted: true, at: new Date().toISOString(), note: note || undefined })
   out({ id, adopted: true })
   process.exit(0)
 }
@@ -1000,10 +1076,16 @@ if (LANE && !flags.headless && !flags.port) {
  * the same moment without trampling one another's world, which one shared
  * editor makes impossible.
  */
-if (flags.headless) {
-  // Anything the engine prints goes to stderr, so stdout stays one JSON value.
-  // A caller that has to strip log lines out of the result is a caller that
-  // will eventually strip the wrong one.
+/**
+ * Boot a world of this process's own, and send anything the engine prints to
+ * stderr.
+ *
+ * stdout carries one JSON value per reply, so a log line written there makes the
+ * reply unparseable — a caller that strips log lines out of the result is a
+ * caller that will eventually strip the wrong one. `--headless` and `serve` need
+ * the same world and the same redirect, so they boot it here rather than twice.
+ */
+async function startPrivateWorld() {
   const original = console.log
   const toStderr = (...a) => process.stderr.write(a.map(String).join(' ') + '\n')
   console.log = toStderr
@@ -1012,18 +1094,6 @@ if (flags.headless) {
   console.info = toStderr
 
   const { startWorldInNode, writesRefusedHere } = await import('../engine/start-world-node.mjs')
-
-  /**
-   * The work lock refused a write, so the run failed whatever the op answered.
-   *
-   * A command that awaits the write throws and dies before this. One that
-   * ignores the rejection would otherwise print its usual result and exit 0,
-   * and the caller would believe the file is on disk.
-   */
-  const failOnRefusedWrite = () => {
-    const [first] = writesRefusedHere()
-    if (first) die(1, `refused to write ${first.file} — ${first.why}`)
-  }
 
   let engine, editor
   try {
@@ -1036,6 +1106,85 @@ if (flags.headless) {
   if (typeof flags.level === 'string') {
     try { await editor.loadLevel(flags.level) }
     catch (e) { die(1, `no level "${flags.level}" — ${e.message}`) }
+  }
+
+  return { engine, editor, original, writesRefusedHere }
+}
+
+/**
+ * One headless world, many ops: a session rather than a command.
+ *
+ * `--headless` boots a world per invocation, and that boot is most of what an
+ * agent's look-decide-act loop costs. A session holds one world open and reads
+ * requests from stdin, so the twentieth question pays nothing the first did not.
+ *
+ * An op is a method on the engine, or a dotted path to one — `editor.loadLevel`,
+ * `loop.step` — because the engine already hands out those handles, and a
+ * session that could not open a level would need a second session per level.
+ */
+if (op === 'serve') {
+  const { engine, writesRefusedHere } = await startPrivateWorld()
+  const readline = await import('node:readline')
+
+  // Refusals already reported, so one refused write is not repeated on every
+  // later reply. `writesRefusedHere` returns the whole list, oldest first.
+  let reported = 0
+  const newRefusals = () => {
+    const all = writesRefusedHere()
+    const fresh = all.slice(reported)
+    reported = all.length
+    return fresh
+  }
+
+  /** One reply. A refused write is named in it, because it must not read as done. */
+  const reply = value => {
+    const refusals = newRefusals()
+    if (!refusals.length) return out(value === undefined ? { ok: true } : value)
+    const named = refusals.map(refusal => refusal.file)
+    out(value && typeof value === 'object' && !Array.isArray(value)
+      ? { ...value, refusedWrites: named }
+      : { value, refusedWrites: named })
+  }
+
+  const methodAtPath = (path, from) => path.reduce((value, key) => value?.[key], from)
+
+  for await (const line of readline.createInterface({ input: process.stdin })) {
+    const text = line.trim()
+    if (!text) continue
+    let request
+    try { request = JSON.parse(text) }
+    catch (error) { out({ error: `not JSON: ${error.message}` }); continue }
+    if (request.op === 'exit') break
+
+    const path = String(request.op || '').split('.')
+    const verb = methodAtPath(path, engine)
+    if (typeof verb !== 'function') { out({ error: `no op "${request.op}"` }); continue }
+    const owner = path.length > 1 ? methodAtPath(path.slice(0, -1), engine) : engine
+
+    try { reply(await verb.apply(owner, request.args || [])) }
+    catch (error) { out({ error: String(error?.message || error) }) }
+  }
+
+  // Not `process.exit()`: a session that stepped a solver would assert on the way out,
+  // and the last reply is already written. The driver is stopped first, because a session
+  // that played would otherwise hold the process open for ever.
+  engine.loop?.stop()
+  stop(0)
+}
+
+if (flags.headless) {
+  const { engine, original, writesRefusedHere } = await startPrivateWorld()
+
+  /**
+   * The work lock refused a write, so the run failed whatever the op answered.
+   *
+   * A command that awaits the write throws and dies before this. One that
+   * ignores the rejection would otherwise print its usual result and exit 0,
+   * and the caller would believe the file is on disk.
+   */
+  const failOnRefusedWrite = () => {
+    const [first] = writesRefusedHere()
+    if (first) die(1, `refused to write ${first.file} — ${first.why}`)
   }
 
   /**
@@ -1059,25 +1208,35 @@ if (flags.headless) {
     }
     console.log = original
     failOnRefusedWrite()
+    // A world left in play mode holds its own frame timer, and the op that put it there
+    // has answered: the driver has nothing left to do, and nothing else would end it.
+    engine.loop?.stop()
     finish(results.map(result => result === undefined ? { ok: true } : result))
   }
 
-  const verb = engine[op]
-  if (typeof verb !== 'function') {
-    die(1, `no op "${op}" — every op is a method on the engine. Try: node bin/engine.mjs --headless commands`)
+  // Only reached when the op above answered nothing. `script` finishes inside its own
+  // block, and without this guard the file would keep going and die on "no op script"
+  // after having answered — which is exactly what it did.
+  if (!finished) {
+    const verb = engine[op]
+    if (typeof verb !== 'function') {
+      die(1, `no op "${op}" — every op is a method on the engine. Try: node bin/engine.mjs --headless commands`)
+    }
+
+    let result
+    try { result = await verb.apply(engine, args) }
+    catch (e) { die(1, String(e?.message || e), e?.stack) }
+
+    console.log = original
+    failOnRefusedWrite()
+    // The op may have started play, and a world in play mode holds its own frame timer.
+    // Leaving it running would keep the process alive with nothing left to answer.
+    engine.loop?.stop()
+    finish(result)
   }
-
-  let result
-  try { result = await verb.apply(engine, args) }
-  catch (e) { die(1, String(e?.message || e), e?.stack) }
-
-  console.log = original
-  failOnRefusedWrite()
-  // The loop may hold a timer open. The op is done, so leave rather than wait.
-  finish(result)
 }
 
-if (op === 'watch') {
+if (op === 'watch' && !finished) {
   // Poll rather than stream: the reply channel is request/response, and an
   // agent tailing errors wants lines, not a socket to manage.
   let last = -1
@@ -1095,8 +1254,12 @@ if (op === 'watch') {
   }
 }
 
-// `simulate 60` legitimately takes a while, so give the wall clock room.
-const ms = op === 'simulate' ? Math.max(timeout, 2000 + Number(words[0] || 1) * 1000) : timeout
+// The live path: an op that drives the editor through the dev server. Only reached when
+// nothing above answered — an answered op has set `finished` and has no server to call.
+if (!finished) {
+  // `simulate 60` legitimately takes a while, so give the wall clock room.
+  const ms = op === 'simulate' ? Math.max(timeout, 2000 + Number(words[0] || 1) * 1000) : timeout
 
-const result = await call(op, args, ms)
-finish(result)
+  const result = await call(op, args, ms)
+  finish(result)
+}

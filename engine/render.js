@@ -62,16 +62,17 @@ import {
 import * as TSL from 'three/tsl'
 import { assetURL } from './ui.js'
 
+/** Everything this file has already complained about, so each distinct message is said once. */
+const alreadySaid = new Set()
+
 /**
- * Everything this file has already complained about.
+ * Complain once per distinct message.
  *
  * Geometry and materials are read every frame, so a message about a bad
  * declaration would otherwise arrive sixty times a second — and a console that
  * scrolls is a console nobody reads, which is how the next real error goes
  * unseen. Say each distinct thing once and mean it.
  */
-const alreadySaid = new Set()
-
 function report(message) {
   if (alreadySaid.has(message)) return
   alreadySaid.add(message)
@@ -94,6 +95,7 @@ const variantCache = new Map()  // "mode:u,v:src"    -> a copy with its own repe
  */
 let maxAnisotropy = 1
 
+/** Whether a texture's file has arrived, is still loading, or failed. */
 const statusOf = (src, mode) => texState.get(`${mode}:${src}`)?.status || 'unknown'
 
 /**
@@ -236,10 +238,30 @@ let gltfLoading = null
  */
 function gltf() {
   if (!gltfLoading) {
-    gltfLoading = import('three/examples/jsm/loaders/GLTFLoader.js')
-      .then(module => { gltfLoader = new module.GLTFLoader(); return gltfLoader })
+    gltfLoading = Promise.all([
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
+      import('three/examples/jsm/utils/SkeletonUtils.js')
+    ]).then(([loaderModule, skeletonModule]) => {
+      cloneSkinned = skeletonModule.clone
+      gltfLoader = new loaderModule.GLTFLoader()
+      return gltfLoader
+    })
   }
   return gltfLoading
+}
+
+let cloneSkinned = null
+
+/**
+ * One entity's copy of a loaded model.
+ *
+ * `clone(true)` leaves a skinned mesh bound to the original's bones, so turning
+ * the copy's bones would move nothing. SkeletonUtils rebinds each copy to its own.
+ */
+function cloneModel(loaded) {
+  let skinned = false
+  loaded.traverse(node => { if (node.isSkinnedMesh) skinned = true })
+  return skinned ? cloneSkinned(loaded) : loaded.clone(true)
 }
 
 const modelCache = new Map()   // file -> { status, scene, waiting }
@@ -268,6 +290,7 @@ function model(file, onReady, onFail) {
   const entry = { status: 'loading', scene: null, waiting: [{ onReady, onFail }] }
   modelCache.set(file, entry)
 
+  /** Report a model that would not load, and answer every waiter with its failure. */
   const fail = detail => {
     entry.status = 'failed'
     report(`[render] missing model ${url} (referenced as "${file}")${detail ? ` — ${detail}` : ''}`)
@@ -353,6 +376,7 @@ const readAxis = (given, where, axis) => {
   return Number.isFinite(value) ? value : number(value, 0, `${where}.${axis}`)
 }
 
+/** A `{x, y, z}` from a declaration, a missing axis being zero rather than a complaint. */
 const readVector = (given, where) => ({
   x: readAxis(given, where, 'x'),
   y: readAxis(given, where, 'y'),
@@ -455,6 +479,9 @@ const spinRadians = entity => Array.isArray(entity.rotation)
   ? degrees(entity.rotation[2], `${entity.type}.rotation[2]`)
   : degrees(entity.rotation, `${entity.type}.rotation`)
 
+/** The anchors a model may declare. Anything else is treated as the centre. */
+const ANCHORS = new Set(['centre', 'center', 'feet'])
+
 /**
  * How far to drop a model whose origin is not its middle.
  *
@@ -475,8 +502,6 @@ const spinRadians = entity => Array.isArray(entity.rotation)
  * rest of this file trusts, because a thing that has said how big it hits has
  * already said how tall it is.
  */
-const ANCHORS = new Set(['centre', 'center', 'feet'])
-
 function anchorOffset(entity) {
   const declared = meshOf(entity)
   const anchor = declared?.anchor
@@ -491,6 +516,9 @@ function anchorOffset(entity) {
   const height = declared.box?.[1] ?? entity.collider?.box?.[1] ?? 0
   return -(height / 2) * totalScale(entity)
 }
+
+/** Parsed part lists, keyed by the array the type declared, so a shared type parses once. */
+const partsCache = new WeakMap()
 
 /**
  * One entity drawn as several boxes.
@@ -525,8 +553,6 @@ function anchorOffset(entity) {
  * Parts are never merged into a batch. A batch is one geometry and one material,
  * and a part-built body is several of each — the same reason a model is left out.
  */
-const partsCache = new WeakMap()
-
 function partsOf(declared, where = 'mesh') {
   if (!Array.isArray(declared?.parts) || !declared.parts.length) return null
   const cached = partsCache.get(declared.parts)
@@ -594,6 +620,17 @@ function partsOf(declared, where = 'mesh') {
 }
 
 /**
+ * How finely a shape is divided, from the declaration.
+ *
+ * One by default, because a wall wants four vertices and not four hundred. It
+ * is only worth raising for a material that moves them.
+ */
+function subdivisionOf(declared, entity) {
+  if (declared.segments === undefined) return 1
+  return number(declared.segments, 1, `${entity.type}.mesh.segments`)
+}
+
+/**
  * What an entity's mesh is: a shape and three numbers, or null for a sprite.
  *
  * `box` and `quad` say it outright. `parts` is measured from the boxes it lists,
@@ -605,17 +642,6 @@ function partsOf(declared, where = 'mesh') {
  * how big it is. A metre cube is the last resort, and it is deliberately a size
  * you can see rather than nothing at all.
  */
-/**
- * How finely a shape is divided, from the declaration.
- *
- * One by default, because a wall wants four vertices and not four hundred. It
- * is only worth raising for a material that moves them.
- */
-function subdivisionOf(declared, entity) {
-  if (declared.segments === undefined) return 1
-  return number(declared.segments, 1, `${entity.type}.mesh.segments`)
-}
-
 function meshShape(entity) {
   const declared = meshOf(entity)
   if (!declared) return null
@@ -750,6 +776,9 @@ function tint(type) {
 
 const PLANE = new THREE.PlaneGeometry(1, 1)
 
+/** Geometry cached by kind and dimensions, so a map of walls shares a handful of sizes. */
+const geometryCache = new Map()
+
 /**
  * Solid geometry, cached by its dimensions.
  *
@@ -758,8 +787,6 @@ const PLANE = new THREE.PlaneGeometry(1, 1)
  * hitch on load. Nothing here is ever disposed: the cache is keyed by size, so
  * it is bounded by how many sizes the project actually uses.
  */
-const geometryCache = new Map()
-
 function solid(kind, w, h, d, segments = 1) {
   const parts = Math.max(1, Math.min(96, Math.round(segments) || 1))
   const key = `${kind}:${w},${h},${d}:${parts}`
@@ -1084,6 +1111,7 @@ function groundRingBand() {
 
 // ---------------------------------------------------------------- materials
 
+/** Call `fn` with every material on one node, whether it has one or an array. */
 const eachMaterial = (node, fn) => {
   if (!node.material) return
   if (Array.isArray(node.material)) node.material.forEach(fn)
@@ -1127,11 +1155,23 @@ const namedNodes = new WeakMap()
  */
 const attachedModels = new WeakMap()
 
+/** Where each entity is drawn this frame, filled by `sync`. See `world.drawnPlace`. */
+const drawnPlaces = new Map()
+let placeOf = entity => entity
+
 /** Every named node of a freshly cloned model, so pose and attachments can find one. */
 function indexNodes(holder, instance) {
   const nodes = {}
   instance.traverse(node => { if (node.name && !nodes[node.name]) nodes[node.name] = node })
   namedNodes.set(holder, nodes)
+}
+
+/**
+ * A node by the name the file gives it. The glTF loader strips `.`, `:`, `/`
+ * and brackets from node names, so `DEF-shin.R` is stored as `DEF-shinR`.
+ */
+function nodeNamed(nodes, name) {
+  return nodes[name] || nodes[THREE.PropertyBinding.sanitizeNodeName(name)]
 }
 
 /**
@@ -1198,7 +1238,7 @@ function applyAttachments(holder, declared) {
 
     let entry = record.get(name)
     if (!entry) {
-      const node = nodes[name]
+      const node = nodeNamed(nodes, name)
       if (!node) {
         // Once, by name. This is written every frame, and a message that repeats
         // sixty times a second is a console nobody reads.
@@ -1224,6 +1264,7 @@ function applyAttachments(holder, declared) {
   }
 }
 
+/** Load one attachment model and add it to its group, unless either has gone stale first. */
 function loadAttachment(holder, group, file) {
   model(file, loaded => {
     // Either the attachment or the thing it hangs off may have gone while the
@@ -1231,7 +1272,7 @@ function loadAttachment(holder, group, file) {
     // cache is answered before its group has been parented at all, so the flags
     // are the only honest test.
     if (group.userData.stale || holder.userData.stale) return
-    const instance = loaded.clone(true)
+    const instance = cloneModel(loaded)
     // A viewmodel is in front of the eye by construction, so culling it against
     // a frustum it is always inside costs a test per frame and can only ever be
     // wrong. A weapon in somebody else's hands is culled like anything else.
@@ -1273,6 +1314,9 @@ function wantsWebGL() {
 }
 
 /**
+ * Build the GL context and return the renderer surface: sync, draw, pick, the
+ * two hook points and the frame stats.
+ *
  * `view` and `viewport` are handed in, not owned here.
  *
  * Where the camera looks and how big the picture is are game values — the
@@ -1603,6 +1647,7 @@ export async function makeRenderer(canvas, view, viewport) {
     material.lightMapIntensity = number(declared.lightmapIntensity, 1, `${where}.lightmapIntensity`)
   }
 
+  /** The unlit, painter-ordered material a sprite draws with, tinted when its file cannot be read. */
   function spriteMaterial(entity) {
     const mat = new THREE.MeshBasicMaterial({
       transparent: true,
@@ -1635,6 +1680,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return mat
   }
 
+  /** The shared geometry an entity's declared shape asks for: its plane, box or sphere. */
   const geometryFor = entity => {
     const shape = meshShape(entity)
     if (!shape) return PLANE
@@ -1706,6 +1752,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return holder
   }
 
+  /** A group holding a placeholder box, replaced by the model clone once its file arrives. */
   function buildModel(entity, declared, described) {
     const holder = new THREE.Group()
     holder.userData.entity = entity.id
@@ -1723,7 +1770,7 @@ export async function makeRenderer(canvas, view, viewport) {
       // to want a model already in the cache is answered on the spot, before
       // the caller has had a chance to add this holder to the scene at all.
       if (holder.userData.stale) return
-      const instance = loaded.clone(true)
+      const instance = cloneModel(loaded)
       indexNodes(holder, instance)
       holder.remove(waiting)
       holder.add(instance)
@@ -1738,6 +1785,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return holder
   }
 
+  /** Remove an object from the scene and revoke anything private it still holds. */
   function discard(object) {
     scene.remove(object)
     namedNodes.delete(object)
@@ -1749,6 +1797,7 @@ export async function makeRenderer(canvas, view, viewport) {
     object.traverse(node => eachMaterial(node, material => material.dispose()))
   }
 
+  /** The scene object for one entity, rebuilt when its look changed. */
   function objectFor(entity, described) {
     let object = meshes.get(entity.id)
     if (object && object.userData.look !== described.look) {
@@ -1796,7 +1845,8 @@ export async function makeRenderer(canvas, view, viewport) {
    *
    *   entity.pose = {
    *     legLeft: -0.4,                  // radians about X — a hinge
-   *     LeftArm: [0.1, 0, 0.3, 0.94]    // a quaternion x,y,z,w — the whole turn
+   *     LeftArm: [0.1, 0, 0.3, 0.94],   // a quaternion x,y,z,w — the whole turn
+   *     Thigh: [0, 0, 0, 1, 0.1, 3, 0]  // a turn, then a local position
    *   }
    *
    * A number is the cheap half: a walk cycle a behaviour computes from speed is
@@ -1819,20 +1869,21 @@ export async function makeRenderer(canvas, view, viewport) {
     // Still loading. The next frame will pose it, and there is no state to keep.
     if (!nodes) return
     for (const name of Object.keys(pose)) {
-      const node = nodes[name]
+      const node = nodeNamed(nodes, name)
       if (!node) {
         report(`[render] ${object.userData.model || object.userData.entity}: no node named "${name}" to pose`)
         continue
       }
       const turn = pose[name]
       if (Array.isArray(turn)) {
-        if (turn.length !== 4) {
-          report(`[render] pose.${name}: a rotation is 4 numbers x,y,z,w, got ${turn.length}`)
+        if (turn.length !== 4 && turn.length !== 7) {
+          report(`[render] pose.${name}: a rotation is 4 numbers x,y,z,w, or 7 with a local position after, got ${turn.length}`)
           continue
         }
         // Normalised because a clip stores rounded numbers, and an unnormalised
         // quaternion scales the node it is set on.
         node.quaternion.set(turn[0], turn[1], turn[2], turn[3]).normalize()
+        if (turn.length === 7) node.position.set(turn[4], turn[5], turn[6])
         continue
       }
       // The fast path: this runs for every limb of every character every frame,
@@ -1939,6 +1990,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return Math.max(0, number(declared.keyline, 0, 'mesh.keyline'))
   }
 
+  /** Add, resize or remove an entity's keyline so it matches the width it now declares. */
   function updateKeyline(entity, object, declared, shape, moved) {
     const width = keylineWidth(declared, moved)
     const drawn = object.userData.keylineMesh
@@ -1978,6 +2030,7 @@ export async function makeRenderer(canvas, view, viewport) {
   let contactShadows = null
   let contactStrengths = null
 
+  /** The one instanced material every contact shadow in the frame shares. */
   function contactShadowMaterial() {
     const material = new THREE.MeshBasicNodeMaterial({
       color: readColour(readability.shadowColour, 'readability.shadowColour') || new THREE.Color('#000000'),
@@ -1992,6 +2045,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return material
   }
 
+  /** Grow the shadow instance room to hold `wanted`, never shrinking it. */
   function growContactShadows(wanted) {
     // Against the room allocated, not against `count` — `count` is last frame's
     // number of shadows and says nothing about how many will fit.
@@ -2027,8 +2081,8 @@ export async function makeRenderer(canvas, view, viewport) {
 
     const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - readability.groundY) / readability.shadowRange))
     shadowPlaces.push({
-      x: entity.x,
-      z: entity.z || 0,
+      x: placeOf(entity).x,
+      z: placeOf(entity).z || 0,
       radius: stated * (1 + lift * 0.7),
       strength: (declared.shadowStrength ?? readability.shadowStrength) * (1 - lift) ** 1.5
     })
@@ -2111,6 +2165,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return colour
   }
 
+  /** The instanced material every ground ring in the frame shares. */
   function groundRingMaterial() {
     const material = new THREE.MeshBasicNodeMaterial({
       transparent: true, depthWrite: false, fog: false
@@ -2123,6 +2178,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return material
   }
 
+  /** Grow the ring instance room to hold `wanted`, never shrinking it. */
   function growGroundRings(wanted) {
     if (groundRings && groundRings.instanceMatrix.count >= wanted) return
     const room = Math.max(8, 2 ** Math.ceil(Math.log2(wanted)))
@@ -2175,8 +2231,8 @@ export async function makeRenderer(canvas, view, viewport) {
     if (!(stated > 0)) return
 
     ringPlaces.push({
-      x: entity.x,
-      z: entity.z || 0,
+      x: placeOf(entity).x,
+      z: placeOf(entity).z || 0,
       radius: stated,
       colour: declared.ringColour ?? readability.ringColour,
       strength: declared.ringStrength ?? readability.ringStrength
@@ -2234,6 +2290,7 @@ export async function makeRenderer(canvas, view, viewport) {
   const batches = new Map()  // batch key -> { material, members, object, dirty }
   const stillness = new Map() // entity id -> { signature, frames, batch }
 
+  /** Take an entity out of its batch and put its own mesh back on the drawn layer. */
   function leaveBatch(id) {
     const record = stillness.get(id)
     if (!record?.batch) return
@@ -2250,6 +2307,7 @@ export async function makeRenderer(canvas, view, viewport) {
     object.userData.keylineMesh?.layers.set(layer)
   }
 
+  /** Add an entity to the batch for its key, creating the batch if needed. */
   function joinBatch(entity, record, key, materialKey) {
     let batch = batches.get(key)
     if (!batch) {
@@ -2265,6 +2323,7 @@ export async function makeRenderer(canvas, view, viewport) {
     record.batch = key
   }
 
+  /** Rebuild every dirty batch's merged mesh, or drop one below the merge minimum. */
   function rebuildBatches() {
     for (const [key, batch] of batches) {
       if (!batch.dirty) continue
@@ -2374,6 +2433,7 @@ export async function makeRenderer(canvas, view, viewport) {
   const viewmodelShift = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } }
   let viewmodelHeld = null
 
+  /** Drop the held viewmodel and dispose only the geometry and materials built for it. */
   function clearViewmodel() {
     if (!viewmodelHeld) return
     viewmodelRoot.remove(viewmodelHeld)
@@ -2393,6 +2453,7 @@ export async function makeRenderer(canvas, view, viewport) {
     viewmodelHeld = null
   }
 
+  /** Put the viewmodel root at its base pose plus the current sway and kick shift. */
   function placeViewmodel() {
     if (!viewmodelHeld) return
     viewmodelRoot.position.set(
@@ -2423,6 +2484,8 @@ export async function makeRenderer(canvas, view, viewport) {
   // Each is `{ list, camera, chain, passes }`.
   let built = null
   let warming = null
+  // The node frame the last post draw used; a draw that finds it unchanged advances it.
+  let drawnFrameId = null
 
   /**
    * Build the chain, or take it down.
@@ -2514,6 +2577,7 @@ export async function makeRenderer(canvas, view, viewport) {
       })
   }
 
+  /** Dispose both post chains and forget them, so the next draw builds fresh. */
   function dropPost() {
     warming?.chain.dispose?.()
     built?.chain.dispose?.()
@@ -2546,6 +2610,7 @@ export async function makeRenderer(canvas, view, viewport) {
     cpuMs: 0
   }
 
+  /** Take the canvas's own size as the viewport and rebuild the camera for it. */
   function resize() {
     const r = canvas.getBoundingClientRect()
     viewport.width = Math.max(1, r.width)
@@ -2568,9 +2633,12 @@ export async function makeRenderer(canvas, view, viewport) {
     updateCamera()
   }
 
+  /** Whether the session's view is the flat orthographic one. */
   const flat = () => view.mode === 'ortho'
+  /** The camera the current view mode draws through. */
   const activeCamera = () => (flat() ? orthographic : perspective)
 
+  /** Rebuild the active camera from the view and viewport: ortho, or perspective. */
   function updateCamera() {
     if (flat()) {
       const hw = viewport.width / 2 / view.zoom
@@ -2610,6 +2678,7 @@ export async function makeRenderer(canvas, view, viewport) {
     return camera
   }
 
+  /** A pixel in the viewport as normalized device coordinates, y upward. */
   const toNDC = (px, py) => new THREE.Vector2(
     (px / Math.max(1, viewport.width)) * 2 - 1,
     1 - (py / Math.max(1, viewport.height)) * 2
@@ -2676,8 +2745,19 @@ export async function makeRenderer(canvas, view, viewport) {
     resize,
     frameSize,
 
-    /** Push entity state into the scene graph. Called every frame. */
-    sync(world) {
+    /**
+     * Push entity state into the scene graph. Called every frame.
+     *
+     * `blend` is `loop.blend`: bodies are drawn that far between their last two
+     * fixed steps, so motion is smooth on a screen faster than the step rate.
+     */
+    sync(world, blend = 1) {
+      drawnPlaces.clear()
+      placeOf = entity => {
+        let place = drawnPlaces.get(entity)
+        if (!place) drawnPlaces.set(entity, place = world.drawnPlace ? world.drawnPlace(entity, blend) : entity)
+        return place
+      }
       const painters = flat()
       const live = new Set()
       shadowPlaces.length = 0
@@ -2688,7 +2768,8 @@ export async function makeRenderer(canvas, view, viewport) {
         live.add(entity.id)
         const described = describe(entity)
         const object = objectFor(entity, described)
-        object.position.set(entity.x, entity.y + anchorOffset(entity), entity.z || 0)
+        const place = placeOf(entity)
+        object.position.set(place.x, place.y + anchorOffset(entity), place.z || 0)
         object.visible = !entity.hidden
 
         if (entity.mesh) {
@@ -2698,6 +2779,7 @@ export async function makeRenderer(canvas, view, viewport) {
           const s = totalScale(entity)
           object.scale.set(s, s, s)
           turnObject(object, entity)
+          if (Number.isFinite(place.yaw)) object.rotation.y = place.yaw
           // The editor dims a hovered entity to preview it.
           const opacity = entity.opacity ?? 1
           dim(object, opacity)
@@ -2829,6 +2911,7 @@ export async function makeRenderer(canvas, view, viewport) {
       return false
     },
 
+    /** Draw one frame: the world, then the post chain, then the viewmodel in its own pass. */
     draw() {
       const startedAt = performance.now()
       const camera = readyCamera()
@@ -2844,6 +2927,12 @@ export async function makeRenderer(canvas, view, viewport) {
         // Compiling keeps a pass's target and outputs set on the renderer, so
         // a draw now would build pipelines for the wrong outputs.
       } else if (built) {
+        // A pass renders its scene once per node frame, and three advances that
+        // frame only on its own animation tick. A second draw in one tick, such
+        // as See drawing from another camera, would show the tick's first view.
+        const nodeFrame = renderer._nodes?.nodeFrame
+        if (nodeFrame && nodeFrame.frameId === drawnFrameId) nodeFrame.update()
+        drawnFrameId = nodeFrame?.frameId
         built.chain.render()
       } else {
         renderer.clear()
@@ -2995,7 +3084,7 @@ export async function makeRenderer(canvas, view, viewport) {
 
         model(spec.model, loaded => {
           if (viewmodelHeld !== held) return
-          const instance = loaded.clone(true)
+          const instance = cloneModel(loaded)
           // Never culled: it is always in front of the eye by construction, and
           // a viewmodel that vanishes at the wrong angle is the classic bug.
           instance.traverse(node => { node.frustumCulled = false })

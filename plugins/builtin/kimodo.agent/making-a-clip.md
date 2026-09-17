@@ -1,7 +1,7 @@
 # Making a clip
 
 ```sh
-node tools/make-rig-clip.mjs --prompt "a person walks forward" --name walk
+node tools/make-rig-clip.mjs --project <project> --prompt "a person walks forward" --name walk --onto models/hero.glb
 ```
 
 Three doors, in the order the tool tries them:
@@ -12,8 +12,7 @@ Three doors, in the order the tool tries them:
 | `--server http://127.0.0.1:8094` | the demo server, if one is running |
 | neither | the `kmd-generate` binary under `KIMODO_HOME` |
 
-Other flags: `--frames 150 --steps 100 --seed 0 --model soma-rp-v1.1 --fps 30
---once --up z --scale 1 --map <file.json> --skeleton soma-30 --out <path>`.
+Other flags: `--frames 150 --steps 100 --seed 0 --model soma-rp-v1.1 --fps 30 --up z --scale 1 --map <file.json> --skeleton soma-30`. `--onto`, `--source` and the rest are in the Rig Animation guide's `making-a-clip.md`.
 The frame and step defaults are the demo server's own.
 
 **Do not cut `--steps` to make a run finish sooner.** 150 frames at 100 steps

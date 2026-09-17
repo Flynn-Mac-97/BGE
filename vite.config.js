@@ -1,3 +1,5 @@
+import { listDocuments, readDocument, writeDocument } from './engine/document-store.mjs'
+import { readSource, sourceCatalog, writeSource } from './engine/source-files.mjs'
 import { defineConfig } from 'vite'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -394,6 +396,23 @@ function api() {
             const opened = await openProject(server, target)
             await buildIndex()
             return send(res, 200, { ...opened, saved: true })
+          }
+
+          if (url.pathname === '/api/systems/catalog' && req.method === 'GET') return send(res, 200, await sourceCatalog(ROOT, PROJECT, url.searchParams.get('selection') || 'core'))
+          if (url.pathname === '/api/systems/documents' && req.method === 'GET') return send(res,200,await listDocuments(PROJECT))
+          if (url.pathname === '/api/systems/document' && req.method === 'GET') return send(res,200,await readDocument(PROJECT,url.searchParams.get('id'),url.searchParams.get('backup') === 'true'))
+          if (url.pathname === '/api/systems/document' && req.method === 'POST') {
+            const refused = refusedFileWrite(req); if (refused) return send(res,423,refused)
+            const body = await readBody(req)
+            return send(res,200,await writeDocument(PROJECT,body.id,body.data,body.revision))
+          }
+          if (url.pathname === '/api/systems/source' && req.method === 'POST') {
+            const refused = refusedFileWrite(req); if (refused) return send(res,423,refused)
+            const body = await readBody(req)
+            return send(res,200,await writeSource(ROOT,PROJECT,body.scope,body.file,body.text,body.expectedHash))
+          }
+          if (url.pathname === '/api/systems/source' && req.method === 'GET') {
+            return send(res, 200, await readSource(ROOT, PROJECT, url.searchParams.get('scope'), url.searchParams.get('path')))
           }
 
           if (url.pathname === '/api/file' && req.method === 'GET') {

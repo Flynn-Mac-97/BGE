@@ -25,3 +25,13 @@ agent-runs/*
 !agent-runs/README.md
 !agent-runs/painpoints.jsonl
 !agent-runs/insights.jsonl
+
+# Codemap's working state: what was asked, what was briefed, what it noticed.
+# A record of one machine's session, not of the engine, and it changes under
+# every question.
+**/.codemap/
+
+# The MCP servers this checkout is wired to. Every path in it is absolute and
+# belongs to the machine it was written on, so a copy here is wrong for anyone
+# else and goes stale the moment a tool moves.
+**/.mcp.json

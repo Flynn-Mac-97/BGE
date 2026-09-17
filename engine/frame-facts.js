@@ -23,7 +23,11 @@ export function yawOf(entity) {
 /** The drawn extents of an entity, in world units: width, height, length. */
 export function boundsOf(entity) {
   const mesh = entity.mesh || entity._definition?.mesh
-  if (mesh?.box) return { w: mesh.box[0], h: mesh.box[1], l: mesh.box[2] || 0 }
+  if (mesh?.box) {
+    // A model's box is in model units; the renderer multiplies it by `mesh.scale`.
+    const scale = (entity.scale ?? 1) * (mesh.model ? Number(mesh.scale) || 1 : 1)
+    return { w: mesh.box[0] * scale, h: mesh.box[1] * scale, l: (mesh.box[2] || 0) * scale }
+  }
   if (Array.isArray(mesh?.parts)) {
     let w = 0, h = 0, l = 0
     for (const part of mesh.parts) {
@@ -42,7 +46,6 @@ export function boundsOf(entity) {
   return { w: 1, h: 1, l: 1 }
 }
 
-/** A stable colour per type name, so two sketches of one world agree. */
 /** The type's hash-derived hue and brightness — the raw material of its colour. */
 export function typeHue(name) {
   let hash = 0
@@ -50,6 +53,7 @@ export function typeHue(name) {
   return { hue: hash % 360, bright: 0.45 + ((hash >>> 9) % 40) / 100 }
 }
 
+/** A stable colour per type name, so two sketches of one world agree. */
 export function typeColour(name) {
   const { hue, bright } = typeHue(name)
   const [r, g, b] = hueToRgb(hue, 0.65, bright)
@@ -61,6 +65,7 @@ export function hueHex(hue, bright) {
   return '#' + hueToRgb(hue, 0.65, bright).map(v => v.toString(16).padStart(2, '0')).join('')
 }
 
+/** A hue and brightness as an RGB triple, the form both colour helpers return. */
 function hueToRgb(hue, saturation, lightness) {
   const a = saturation * Math.min(lightness, 1 - lightness)
   const at = n => {
@@ -70,11 +75,6 @@ function hueToRgb(hue, saturation, lightness) {
   return [at(0), at(8), at(4)]
 }
 
-/**
- * A camera to look at one entity: a three-quarter front view, because a model
- * is judged by its face and silhouette and a straight-behind view shows
- * neither. The subject's own facing decides where "front" is.
- */
 /**
  * The named shots a subject can be framed with. `azimuth` is measured from
  * the subject's own facing — front means its face, whichever way it points —
@@ -91,6 +91,11 @@ export const SHOTS = {
   low: { azimuth: Math.PI - 0.6, pitch: -0.05, distance: 2.2 }
 }
 
+/**
+ * A camera to look at one entity: a three-quarter front view, because a model
+ * is judged by its face and silhouette and a straight-behind view shows
+ * neither. The subject's own facing decides where "front" is.
+ */
 export function frameSubject(entity, bounds, shotName) {
   const shot = SHOTS[shotName] || SHOTS['three-quarter']
   const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * shot.distance)
@@ -119,6 +124,9 @@ export function facingOffset(entity, other) {
   return { degreesOff: Math.round(off * 180 / Math.PI), facingIt: off < Math.PI / 6 }
 }
 
+/** Contact tolerance in world units — a tenth of a millimetre, below anything a level measures. */
+const CONTACT = 0.0001
+
 /**
  * Axis-aligned world boxes, centred on the entity, feet at the centre's base.
  *
@@ -127,7 +135,6 @@ export function facingOffset(entity, other) {
  * carries a tolerance of a tenth of a millimetre — below anything a level
  * measures in, and wide enough for the error in a sum of positions and sizes.
  */
-const CONTACT = 0.0001
 export function boxesTouch(a, b) {
   return Math.abs(a.x - b.x) <= (a.w + b.w) / 2 + CONTACT
     && Math.abs(a.y - b.y) <= (a.h + b.h) / 2 + CONTACT

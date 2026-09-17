@@ -19,11 +19,13 @@
 // forwards the name without creating a local binding, so `ui.thumb` and
 // `ui.preview` called an `assetURL` that was not in scope and threw for any
 // image. Silently — the loader catches a panel's error and disables it.
+import { makeFlowInspector } from './ui-flow-inspector.js'
 import { assetURL } from './asset-path.js'
 export { assetURL }
 
 const IMAGE = /\.(png|jpg|jpeg|webp|gif|svg)$/i
 
+/** Build one element. `on` takes listeners by event name; `text` sets the text content. */
 function h(tag, className, attributes = {}) {
   const element = document.createElement(tag)
   if (className) element.className = className
@@ -36,6 +38,7 @@ function h(tag, className, attributes = {}) {
   return element
 }
 
+/** Append children, skipping null and false. A string becomes a text node. */
 const append = (element, children) => {
   for (const k of [].concat(children || [])) {
     if (k == null || k === false) continue
@@ -45,6 +48,9 @@ const append = (element, children) => {
 }
 
 /**
+ * The widget vocabulary a panel composes from: layout, text, inputs, lists,
+ * trees, grids and asset views. Every method returns a DOM node.
+ *
  * @param state  the panel's persisted state object (context.state)
  * @param redraw called whenever a bound input changes
  */
@@ -60,6 +66,8 @@ export function makeUI(state, redraw) {
   }
 
   const ui = {
+    flowInspector: options => makeFlowInspector(options),
+
     // ---- layout ----
     stack: (children, o = {}) => append(h('div', 'u-stack' + (o.pad ? ' pad' : '')), children),
     row:   (children, o = {}) => append(h('div', 'u-row' + (o.pad ? ' pad' : '')), children),

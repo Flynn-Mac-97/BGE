@@ -109,6 +109,44 @@ export default {
       run: context => context.rigAnimation.loadDeclared()
     },
     {
+      id: 'rig.sources',
+      label: 'Stored motion in assets/motion/source, ready to retarget',
+      run: async context => {
+        if (!context.host) return needsNode('rig.sources')
+        return (await clipShelf()).listSources(context.host.project)
+      }
+    },
+    {
+      id: 'rig.retarget',
+      label: 'Put stored motion onto a model: {"model":"models/hero.glb","clips":["idle","walk"],"once":["death"]}',
+      run: async (context, options = {}) => {
+        if (!context.host) return needsNode('rig.retarget', options)
+        if (!options.model) return { error: 'name the model as a type does: {"model":"models/hero.glb"}' }
+        const done = (await clipShelf()).retargetSources({ project: context.host.project, ...options })
+        clips.clear()
+        return done
+      }
+    },
+    {
+      id: 'rig.check',
+      label: 'Measure a model\'s clips against their capture — height, floor, limbs, still bones, loop seam: {"model":"models/hero.glb"}',
+      run: async (context, options = {}) => {
+        if (!context.host) return needsNode('rig.check', options)
+        if (!options.model) return { error: 'name the model as a type does: {"model":"models/hero.glb"}' }
+        const { checkClips } = await import(/* @vite-ignore */ '../../tools/lib/rig-check.mjs')
+        return checkClips({ project: context.host.project, ...options })
+      }
+    },
+    {
+      id: 'rig.compare',
+      label: 'Render a clip in Blender beside its capture, front and side: {"model":"models/hero.glb","clip":"run","frames":[0,6,12]}',
+      run: async (context, options = {}) => {
+        if (!context.host) return needsNode('rig.compare', options)
+        if (!options.model || !options.clip) return { error: 'name the model and the clip: {"model":"models/hero.glb","clip":"run"}' }
+        return compareInBlender(context, options)
+      }
+    },
+    {
       id: 'rig.play',
       label: 'Play a clip on one entity',
       run: (context, { entity, clip }) => {
@@ -131,6 +169,35 @@ export default {
     }))
   }]
 }
+
+/** The node-only retarget shelf, loaded on first use so the browser never imports it. */
+const clipShelf = () => import(/* @vite-ignore */ '../../tools/lib/retarget-clips.mjs')
+
+/** Pose the clip in Blender beside its capture and return the sheet. Blender is found by Blender Assets. */
+async function compareInBlender(context, { model, clip, frames }) {
+  const path = await import('node:path')
+  const { writeComparePoses, COMPARE_SCRIPT } = await import(/* @vite-ignore */ '../../tools/lib/rig-compare.mjs')
+  const found = await context.run('blender.check')
+  if (!found?.blender) return { error: `no Blender: ${found?.error || 'blender.check gave nothing'}` }
+  const name = `${path.basename(model, path.extname(model))}-${path.basename(clip, '.json')}`
+  const out = path.join(context.host.checkout, 'agent-runs', 'rig-compare', name)
+  const prepared = writeComparePoses({ project: context.host.project, model, clip, frames, out })
+  const result = await context.host.run(found.blender, [prepared.blend, '--background', '--python', COMPARE_SCRIPT, '--', prepared.poses, out])
+  const sheet = /engine-compare-sheet (.+)/.exec(result.out)?.[1]?.trim()
+  if (!sheet) return { error: 'Blender did not write the sheet', blender: (result.error || result.out).slice(-1200) }
+  return {
+    sheet: path.relative(context.host.checkout, sheet).split(path.sep).join('/'),
+    clip: prepared.clip,
+    frames: prepared.frames,
+    read: 'rows: front, then side; columns: frames. Grey is the model posed by the clip, orange is the capture. Look for limbs that point differently, bones left behind, and joints that come apart.'
+  }
+}
+
+/** Refuse in the browser, naming the command that works: retargeting reads and writes project files. */
+const needsNode = (id, options) => ({
+  error: `${id} runs headless`,
+  terminal: `node bin/engine.mjs --headless run ${id}${options ? ` '${JSON.stringify(options)}'` : ''}`
+})
 
 /** Every clip any type declares, once per declaration. */
 function declaredClips(world) {
@@ -177,9 +244,15 @@ export function widenClip(raw, file) {
   if (rotations[0].length !== nodes.length * 4) {
     throw new Error(`${file}: ${nodes.length} nodes needs ${nodes.length * 4} numbers a frame, got ${rotations[0].length}`)
   }
+  const positions = raw.positions || null
+  for (const [node, frames] of Object.entries(positions || {})) {
+    if (!nodes.includes(node)) throw new Error(`${file}: positions names ${node}, which is not in nodes`)
+    if (frames.length !== rotations.length) throw new Error(`${file}: positions.${node} has ${frames.length} frames, rotations have ${rotations.length}`)
+  }
   return {
     nodes,
     rotations,
+    positions,
     root: raw.root || null,
     count: rotations.length,
     framesPerSecond: raw.framesPerSecond || 30,
@@ -213,6 +286,12 @@ export function applyClip(entity, clip, rig) {
   const b = clip.rotations[second]
   for (let index = 0; index < clip.nodes.length; index++) {
     mixInto(pose[clip.nodes[index]], a, b, index * 4, blend)
+  }
+  for (const node in clip.positions) {
+    const from = clip.positions[node][first]
+    const to = clip.positions[node][second]
+    const into = pose[node]
+    for (let axis = 0; axis < 3; axis++) into[4 + axis] = from[axis] + (to[axis] - from[axis]) * blend
   }
 
   if (!clip.root) return
@@ -251,7 +330,8 @@ export function applyClip(entity, clip, rig) {
 function poseFor(entity, clip) {
   if (entity._rigPoseFor === clip && entity.pose) return entity.pose
   const pose = {}
-  for (const node of clip.nodes) pose[node] = [0, 0, 0, 1]
+  // A node that also moves carries its local position after the rotation.
+  for (const node of clip.nodes) pose[node] = clip.positions?.[node] ? [0, 0, 0, 1, 0, 0, 0] : [0, 0, 0, 1]
   entity.pose = pose
   entity._rigPoseFor = clip
   return pose

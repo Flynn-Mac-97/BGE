@@ -253,11 +253,18 @@ export default {
   category: 'agents',
   about: 'Measures what a frame costs on the thread and on the card, over many frames drawn back to back rather than at the screen refresh, and what a fixed step costs system by system.',
 
-  onLoad(context) {
+  lifecycle: 'scoped',
+  provides: ['profiler'],
+  onLoad(context, scope) {
     context.profiler = {
       measure: options => measure(context, options),
       fill: options => measureFill(context, options),
       steps: options => measureSteps(context, options)
+    }
+    if (scope) {
+      const service = context.profiler
+      scope.provide('profiler', service)
+      scope.defer(() => { if (context.profiler === service) delete context.profiler })
     }
   },
 

@@ -1,91 +1,172 @@
 /**
  * Kernel: loads plugins and collects what they contribute.
  *
- * Built-ins load through this exact path with no extra privileges. If the API is
- * not good enough to build our own inspector, it is not good enough to ship.
+ * It collects the seven contribution points and hands them to whoever consumes
+ * them, so the shell and the loop never learn which plugin supplied a panel or
+ * a system. Activation is ordered by declared needs and services; a plugin that
+ * fails is contained, and its dependents go with it.
  */
+import { compileSchedule, makePluginScope } from './plugin-runtime.js'
 const POINTS = ['panels', 'tools', 'commands', 'fields', 'importers', 'systems', 'menus']
-
-/** The definition a file that never imported did not export. It gives nothing. */
 const NOTHING = Object.freeze({ name: null, about: '' })
-
 /** An error as a reader wants it: the kind of failure, then what went wrong. */
-const describe = error =>
-  error?.name && error?.message ? `${error.name}: ${error.message}` : String(error?.message || error)
+const describe = error => error?.name && error?.message ? `${error.name}: ${error.message}` : String(error?.message || error)
 
+/**
+ * The plugin loader: registration, activation order and the compiled schedule.
+ *
+ * @param {object} bus The bus every plugin error and change is announced on.
+ * @returns {object} Registries, `order`, `add`, `enable`, `boot` and `contracts`.
+ */
 export function makeLoader(bus) {
-  // name -> { definition, enabled, error, builtin }, plus a file that never
-  // became a plugin, keyed by its path and carrying `file`.
-  const plugins = new Map()
-  const contrib = Object.fromEntries(POINTS.map(p => [p, []]))
+  const plugins = new Map(), services = new Map()
+  const contrib = Object.fromEntries(POINTS.map(point => [point, []]))
+  let context = null, schedule = { fixed: [], frame: [] }, scheduleError = null
+  const diagnostics = []
+  const report = (name, error) => { bus.emit('plugin:error', { name, error }); diagnostics.push({ plugin: name, error }); if (diagnostics.length > 100) diagnostics.shift() }
+  const dependencies = definition => [...new Set([...(definition.needs || []), ...(definition.requires || []).map(key => [...plugins.values()].find(plugin => (plugin.definition.provides || []).includes(key))?.definition.name).filter(Boolean)])]
 
+  /** Revoke a plugin's scope and leave it inactive, ready for a fresh scope on the next enable. */
+  function cleanup(name, plugin) {
+    for (const error of plugin.scope?.dispose() || []) report(name, `cleanup: ${error}`)
+    plugin.scope = null
+    plugin.active = false
+  }
+  /**
+   * Turn a plugin off, and its enabled dependents before it.
+   *
+   * Dependents go first so nothing is left running against a service that is
+   * about to disappear. `visited` stops a dependency cycle from recursing.
+   */
+  function deactivate(name, reason, visited = new Set()) {
+    if (visited.has(name)) return
+    visited.add(name)
+    for (const [other, plugin] of plugins) {
+      if (plugin.enabled && dependencies(plugin.definition).includes(name)) deactivate(other, `dependency disabled: ${name}`, visited)
+    }
+    const plugin = plugins.get(name)
+    if (!plugin) return
+    cleanup(name, plugin)
+    plugin.enabled = false
+    if (reason) { plugin.error = reason; report(name, reason) }
+  }
+  /**
+   * Rebuild the contribution lists and both schedules from the enabled plugins.
+   *
+   * An invalid schedule empties it rather than leaving the last good one in
+   * place: a stale order would run a plugin that is no longer registered.
+   */
   function rebuild() {
-    for (const p of POINTS) contrib[p] = []
+    for (const point of POINTS) contrib[point] = []
     for (const { definition, enabled, builtin } of plugins.values()) {
       if (!enabled) continue
-      for (const p of POINTS) {
-        // Where it came from travels with what it contributed, so the shell can
-        // credit a project plugin's panel without reading its name for a clue.
-        for (const item of definition[p] || []) contrib[p].push({ ...item, plugin: definition.name, builtin })
-      }
+      for (const point of POINTS) for (const item of definition[point] || []) contrib[point].push({ ...item, plugin: definition.name, builtin })
+    }
+    try {
+      schedule = compileSchedule(contrib.systems)
+      contrib.systems = [...schedule.fixed, ...schedule.frame]
+      scheduleError = null
+    } catch (error) {
+      if (scheduleError !== error.message) report('System Schedule', error.message)
+      scheduleError = error.message
+      schedule = { fixed: [], frame: [] }
+      contrib.systems = []
     }
     bus.emit('plugins:changed')
   }
-
-  return {
-    plugins,
-    contrib,
-
-    /** Sort by declared dependencies so a plugin never loads before what it needs. */
-    order(defs) {
-      const byName = new Map(defs.map(d => [d.name, d]))
-      const seen = new Set(), out = []
-      const visit = (d, stack = []) => {
-        if (seen.has(d.name)) return
-        if (stack.includes(d.name)) throw new Error(`plugin cycle: ${[...stack, d.name].join(' -> ')}`)
-        for (const need of d.needs || []) {
-          const dep = byName.get(need)
-          if (dep) visit(dep, [...stack, d.name])
-        }
-        seen.add(d.name)
-        out.push(d)
+  /**
+   * Run one plugin's onLoad inside its scope, once its dependencies and every
+   * required service are present. Throws on failure; the caller deactivates and
+   * reports, so a broken plugin contributes nothing.
+   */
+  function activate(name) {
+    const plugin = plugins.get(name)
+    if (!plugin || plugin.active) return
+    for (const need of dependencies(plugin.definition)) {
+      if (!plugins.get(need)?.enabled || !plugins.get(need)?.active) throw new Error(`${name}: dependency unavailable: ${need}`)
+    }
+    for (const key of plugin.definition.requires || []) if (!services.has(key)) throw new Error(`${name}: service unavailable: ${key}`)
+    // Legacy registrations keep their original enable behaviour until migrated to scopes.
+    if (plugin.loaded && plugin.definition.lifecycle !== 'scoped') { plugin.active = true; return }
+    const scope = makePluginScope(name, plugin.definition, bus, services)
+    plugin.scope = scope
+    try {
+      const result = plugin.definition.onLoad?.(context, scope)
+      if (result && typeof result.then === 'function' && plugin.definition.lifecycle === 'scoped') {
+        Promise.resolve(result).catch(error => report(name, `async initialization: ${describe(error)}`))
+        throw new Error(`${name}: scoped onLoad must be synchronous; register background-job cleanup with scope.defer`)
       }
-      defs.forEach(d => visit(d))
+      if (typeof result === 'function') scope.defer(result)
+      for (const key of plugin.definition.provides || []) if (services.get(key)?.owner !== name) throw new Error(`${name}: declared service was not provided: ${key}`)
+      plugin.active = true; plugin.loaded = true; plugin.error = null
+    } catch (error) { cleanup(name, plugin); throw error }
+  }
+  const api = {
+    plugins, contrib,
+    get schedule() { return schedule },
+    /**
+     * Definitions in dependency order, needs before dependents.
+     *
+     * Throws on a duplicate name, a missing dependency or service, and a cycle,
+     * because each leaves the order undefined rather than merely short.
+     */
+    order(definitions) {
+      const byName = new Map(), providers = new Map()
+      for (const definition of definitions) {
+        if (!definition?.name) throw new Error('plugin has no name')
+        if (byName.has(definition.name)) throw new Error(`duplicate plugin: ${definition.name}`)
+        byName.set(definition.name, definition)
+        for (const field of ['needs', 'provides', 'requires']) if (definition[field] !== undefined && (!Array.isArray(definition[field]) || definition[field].some(value => typeof value !== 'string' || !value))) throw new Error(`${definition.name}.${field} must be an array of names`)
+        for (const key of definition.provides || []) {
+          if (providers.has(key)) throw new Error(`service ${key} declared by both ${providers.get(key)} and ${definition.name}`)
+          providers.set(key, definition.name)
+        }
+      }
+      const seen = new Set(), out = []
+      const visit = (definition, stack = []) => {
+        if (seen.has(definition.name)) return
+        if (stack.includes(definition.name)) throw new Error(`plugin cycle: ${[...stack, definition.name].join(' -> ')}`)
+        const needs = [...(definition.needs || []), ...(definition.requires || []).map(key => {
+          if (!providers.has(key)) throw new Error(`${definition.name}: missing service provider: ${key}`)
+          return providers.get(key)
+        })]
+        for (const need of needs) {
+          if (!byName.has(need)) throw new Error(`${definition.name}: missing plugin dependency: ${need}`)
+          visit(byName.get(need), [...stack, definition.name])
+        }
+        seen.add(definition.name); out.push(definition)
+      }
+      definitions.forEach(definition => visit(definition))
       return out
     },
-
-    /** `builtin` is where the file was found, not something the plugin may claim. */
+    /** Register one definition. With a context already booted, activate it now. */
     add(definition, builtin = false) {
       if (!definition?.name) throw new Error('plugin has no name')
-      plugins.set(definition.name, { definition, enabled: true, error: null, builtin })
+      if (plugins.has(definition.name)) throw new Error(`duplicate plugin: ${definition.name}`)
+      plugins.set(definition.name, { definition, enabled: true, error: null, builtin, active: false, loaded: false })
+      if (context) {
+        try { activate(definition.name) } catch (error) { deactivate(definition.name, describe(error)); rebuild(); throw error }
+        rebuild()
+      }
     },
-
+    /** Turn one plugin on or off, cascading to the plugins that depend on it. */
     enable(name, on) {
-      const p = plugins.get(name)
-      if (!p) return
-      p.enabled = on
+      const plugin = plugins.get(name)
+      if (!plugin) throw new Error(`unknown plugin: ${name}`)
+      if (!on) deactivate(name)
+      else {
+        plugin.enabled = true
+        if (context) try { activate(name) } catch (error) { deactivate(name, describe(error)); rebuild(); throw error }
+      }
       rebuild()
     },
-
-    /** A plugin that throws is disabled and reported — it never takes the editor with it. */
-    fail(name, error) {
-      const p = plugins.get(name)
-      if (!p) return
-      p.enabled = false
-      p.error = describe(error)
-      console.error(`[plugin:${name}]`, error)
-      bus.emit('plugin:error', { name, error: p.error })
-      rebuild()
-    },
-
+    /** Stop a plugin whose system threw mid-tick, and everything depending on it. */
+    fail(name, error) { if (!plugins.has(name)) return; deactivate(name, describe(error)); rebuild() },
     /**
-     * A file that threw on import, recorded as a plugin that is present and
-     * broken rather than one that was never there.
+     * Record a file that would not import under its path, disabled.
      *
-     * It has no definition and so no name, so its path is the key and travels
-     * on as `file`. An empty definition stands in for the one it never
-     * exported, because every reader of this map asks a definition what it
-     * contributes and the honest answer is "nothing".
+     * It has no plugin name, so the path is its key; a command it would have
+     * owned then answers as missing instead of failing silently.
      */
     failedImport(file, error, builtin = false) {
       const path = String(file).replaceAll('\\', '/')
@@ -93,61 +174,48 @@ export function makeLoader(bus) {
       plugins.set(path, { definition: NOTHING, enabled: false, error: reason, builtin, file: path })
       bus.emit('plugin:error', { name: path, file: path, error: reason })
     },
-
-    /**
-     * Every plugin the loader could not use, with the reason. A failed import
-     * has a `file` and no `name`; a plugin that threw in onLoad has a `name`
-     * and no `file`, because by then the path is behind it.
-     */
+    /** The failed plugins and failed imports, as the shell and an agent report them. */
     failures() {
-      return [...plugins.entries()].filter(([, p]) => p.error).map(([key, p]) => ({
-        name: p.file ? null : key,
-        file: p.file || null,
-        error: p.error,
-        builtin: p.builtin === true,
-        failedToImport: p.file != null
-      }))
+      return [...plugins.entries()].filter(([, plugin]) => plugin.error).map(([key, plugin]) => ({ name: plugin.file ? null : key, file: plugin.file || null, error: plugin.error, builtin: plugin.builtin === true, failedToImport: plugin.file != null }))
     },
-
     /**
-     * Run every plugin's onLoad, and say who took a name that was already taken.
+     * Activate every enabled plugin in dependency order.
      *
-     * Contributing onto `context` is how a plugin publishes a verb, and two
-     * plugins reaching for one name is a silent replacement — the loser is not
-     * broken, it is absent, and nothing distinguishes that from never having
-     * loaded. Run Clock assigned `context.run` and destroyed the kernel's
-     * command runner; every `context.run(id)` in that project threw "not a
-     * function", including the one a test is handed, and the game played on.
-     *
-     * Reported rather than refused. A game deliberately shadowing a builtin's
-     * verb is a real thing to want, and the loader is not the place to decide
-     * that it is wrong — but nobody may do it by accident and hear nothing.
+     * A plugin that replaces a context key it did not own is recorded and does
+     * not stop the boot.
      */
-    boot(context) {
-      // Data properties only. `context.selection` and `context.time` are
-      // getters that answer freshly every read, so comparing what they returned
-      // would report every plugin as replacing both of them.
-      const values = () => new Map(Object.keys(context)
-        .filter(key => !Object.getOwnPropertyDescriptor(context, key)?.get)
-        .map(key => [key, context[key]]))
-
-      const owner = new Map([...values().keys()].map(key => [key, 'the kernel']))
-      for (const [name, p] of plugins) {
-        if (!p.enabled) continue
+    boot(value) {
+      context = value
+      const values = () => new Map(Object.keys(context).filter(key => !Object.getOwnPropertyDescriptor(context, key)?.get).map(key => [key, context[key]]))
+      const owners = new Map([...values().keys()].map(key => [key, 'the kernel']))
+      const ordered = api.order([...plugins.values()].filter(plugin => plugin.definition.name).map(plugin => plugin.definition))
+      for (const definition of ordered) {
+        const name = definition.name, plugin = plugins.get(name)
+        if (!plugin.enabled) continue
         const before = values()
-        try { p.definition.onLoad?.(context) } catch (e) { this.fail(name, e) }
-        for (const [key, value] of values()) {
-          if (!before.has(key)) { owner.set(key, name); continue }
-          if (before.get(key) === value) continue
-          console.error(`[loader] ${name} replaced context.${key}, which belonged to ${owner.get(key) || 'another plugin'}. ` +
-            'Two plugins cannot own one name — the earlier one is now unreachable. Rename one of them.')
-          bus.emit('context:replaced', { key, by: name, from: owner.get(key) || null })
-          owner.set(key, name)
+        try { activate(name) } catch (error) { deactivate(name, describe(error)) }
+        for (const [key, current] of values()) {
+          if (!before.has(key)) { owners.set(key, name); continue }
+          if (before.get(key) === current) continue
+          const error = `${name} replaced context.${key}, which belonged to ${owners.get(key) || 'another plugin'}`
+          diagnostics.push({ plugin: name, error }); console.error(`[loader] ${error}`)
+          bus.emit('context:replaced', { key, by: name, from: owners.get(key) || null }); owners.set(key, name)
         }
       }
       rebuild()
     },
-
+    /** Deactivate every plugin in reverse registration order. */
+    dispose() { for (const name of [...plugins.keys()].reverse()) deactivate(name); rebuild() },
+    /** The read-only report of plugins, services and the compiled schedule. */
+    contracts() {
+      return {
+        plugins: [...plugins.values()].filter(plugin => plugin.definition.name).map(plugin => ({ name: plugin.definition.name, enabled: plugin.enabled, active: plugin.active, lifecycle: plugin.definition.lifecycle || 'legacy', needs: plugin.definition.needs || [], provides: plugin.definition.provides || [], requires: plugin.definition.requires || [], error: plugin.error })),
+        services: [...services].map(([name, service]) => ({ name, owner: service.owner })),
+        schedule: Object.fromEntries(Object.entries(schedule).map(([phase, systems]) => [phase, systems.map(system => ({ id: system.id, plugin: system.plugin, before: system.before || [], after: system.after || [], reads: system.reads || [], writes: system.writes || [], dataContractDeclared: Array.isArray(system.reads) && Array.isArray(system.writes) }))])),
+        scheduleError, diagnostics: diagnostics.slice(-20)
+      }
+    },
     rebuild
   }
+  return api
 }

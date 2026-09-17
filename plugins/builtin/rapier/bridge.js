@@ -238,16 +238,25 @@ export function makeBridge({ RAPIER, tag, claims, flat, gravity }) {
     })
   }
 
+  /**
+   * A Rapier world and event queue, holding nothing.
+   *
+   * The state a world that has never stepped is in: an empty arena, no handle
+   * allocated, no island built. Both `start` and `forget` go through this, because
+   * the two have to produce the same thing.
+   */
+  function startSolver() {
+    world = new RAPIER.World(vector(0, gravity, 0))
+    events = new RAPIER.EventQueue(true)
+  }
+
   return {
     get ready() { return world !== null },
     get rapierWorld() { return world },
     get bodies() { return tracked },
     entityFor: handle => byCollider.get(handle),
 
-    start() {
-      world = new RAPIER.World(vector(0, gravity, 0))
-      events = new RAPIER.EventQueue(true)
-    },
+    start: startSolver,
 
     /** One fixed step. A held world passes zero seconds, and nothing moves. */
     step(gameWorld, seconds, context) {
@@ -260,15 +269,78 @@ export function makeBridge({ RAPIER, tag, claims, flat, gravity }) {
       tell(gameWorld, context)
     },
 
-    /** A level reload builds new entities, so every body belongs to the last one. */
+    /**
+     * A level reload builds new entities, so every body belongs to the last one.
+     *
+     * The Rapier world is REPLACED rather than emptied, and that is the difference
+     * between a level played again and a level played for the first time. Removing
+     * every body one at a time leaves the arena, the handle allocation and the island
+     * structure of the run that just ended, so the level that follows is solved from a
+     * different internal order than the same level solved in a fresh world — and the
+     * two then answer differently. A fresh world allocates in the order the entities
+     * are built, which is what a world that has never stepped does.
+     */
     forget() {
       if (!world) return
-      for (const [entity, entry] of [...tracked]) drop(entity, entry)
+      tracked.clear()
       byCollider.clear()
+      startSolver()
     },
 
     /** The same bytes on every machine, which is what makes a replay provable. */
     snapshot() { return world?.takeSnapshot() || null },
+
+    /**
+     * Put the solver back to the moment a snapshot was taken.
+     *
+     * The wrappers in `tracked` point into the world that is replaced here, so
+     * every body and collider is looked up again by handle. Handles survive a
+     * snapshot — that is the whole reason a rewind can be exact — and `tracked` is
+     * only rewritten once every one of them has resolved.
+     *
+     * The restored bodies are then pushed out onto the entities. Without that the
+     * entities would still be where the run had got to, and the next step's `pull`
+     * would drag the restored bodies back to them.
+     *
+     * @param {Uint8Array} bytes A snapshot from `snapshot()`.
+     * @returns {boolean} Whether the solver went back.
+     */
+    restore(bytes) {
+      if (!world || !bytes) return false
+      const held = [...tracked].map(([entity, entry]) =>
+        [entity, entry, entry.body.handle, entry.collider.handle])
+
+      let restored = null
+      try { restored = RAPIER.World.restoreSnapshot(bytes) } catch { return false }
+      world = restored
+      events = new RAPIER.EventQueue(true)
+
+      const resolved = held.map(([entity, entry, bodyHandle, colliderHandle]) => {
+        const body = world.getRigidBody(bodyHandle)
+        const collider = world.getCollider(colliderHandle)
+        return body && collider ? { entity, entry, body, collider, colliderHandle } : null
+      })
+
+      // A handle that will not resolve means these bodies did not come from the
+      // same lineage — a level load allocates its own. Pairing an entity with a
+      // body that is not its own is a silent wrong answer, so every body is let go
+      // of instead and built again on the next step: positions keep, velocities do
+      // not, and `false` is what says so.
+      if (resolved.some(one => one === null)) {
+        tracked.clear()
+        byCollider.clear()
+        return false
+      }
+
+      byCollider.clear()
+      for (const one of resolved) {
+        one.entry.body = one.body
+        one.entry.collider = one.collider
+        byCollider.set(one.colliderHandle, one.entity)
+        push(one.entity, one.entry)
+      }
+      return true
+    },
 
     stats() {
       let dynamic = 0, fixed = 0, sensor = 0, asleep = 0

@@ -14,6 +14,7 @@
     { "id": "core", "title": "Shared Rules", "kind": "instruction", "parent": "architecture", "file": "agents/core.md", "always": true },
     { "id": "code-style", "title": "Code Style", "kind": "instruction", "parent": "architecture", "file": "agents/code-style.md", "override": "code-style", "always": true },
     { "id": "comment-style", "title": "Comment Style", "kind": "instruction", "parent": "architecture", "file": "agents/comment-style.md", "override": "comment-style", "always": true },
+    { "id": "codebase-design", "title": "Codebase Design", "kind": "instruction", "parent": "architecture", "file": "agents/codebase-design.md", "override": "codebase-design", "always": true },
     { "id": "engine", "title": "Engine", "kind": "instruction", "parent": "architecture", "file": "agents/engine.md", "match": ["engine/**"], "tests": ["node bin/engine.mjs check", "npm run test:offline", "npm test"] },
     { "id": "editor", "title": "Editor", "kind": "instruction", "parent": "architecture", "file": "agents/editor.md", "match": ["plugins/builtin/**", "engine/ui.js", "engine/shell.js", "engine/render.js"], "tests": ["node bin/engine.mjs check", "npm run test:offline", "npm test"] },
     { "id": "tooling", "title": "CLI and Tools", "kind": "instruction", "parent": "architecture", "file": "agents/tooling.md", "match": ["bin/**", "tools/**", "vite.config.js", "package.json", "agents/**", "project/agents/**"], "tests": ["node bin/engine.mjs check", "npm run test:offline", "npm test"] },

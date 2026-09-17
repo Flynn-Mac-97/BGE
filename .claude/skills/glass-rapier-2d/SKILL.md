@@ -37,12 +37,21 @@ takes `rapier2d.use` with it, because a disabled plugin contributes nothing.
 Rapier's WebAssembly build is cross-platform deterministic. The same world,
 stepped the same number of times, gives the same bytes on any machine.
 
+It is compiled before the world is handed over, so a run never begins without it.
+
 ```sh
 run rapier2d.snapshot     # bytes, steps, and a sha256 of the world
 ```
 
 Two runs that agree have the same hash. Two that disagree have diverged, and
 the snapshot is the evidence.
+
+The solver hands those bytes to a checkpoint, so `context.capture()` and
+`context.restore()` bring the bodies back with the entities. Each world builds its
+own Rapier world; only the compiled WebAssembly is shared between them.
+
+**A level reload starts the solver again from nothing**, so a level played,
+reloaded and played again is the level played once.
 
 ## Commands
 

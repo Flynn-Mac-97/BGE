@@ -36,6 +36,7 @@ const CHROME_PLACES = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 ].filter(Boolean)
 
+/** The first Chrome on this machine that exists, or a message naming every place tried. */
 export function findChrome() {
   const found = CHROME_PLACES.find(place => fs.existsSync(place))
   if (!found) {
@@ -65,8 +66,10 @@ function mainCheckout(root) {
   return mainCheckouts.get(root)
 }
 
+/** The lane browser registry's path in the main checkout. */
 const registryFile = root => path.join(mainCheckout(root), '.engine/lane-browsers.json')
 
+/** The recorded lane browsers for this checkout, or an empty list when the file is missing or broken. */
 export function readLaneBrowsers(root) {
   try {
     const value = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'))
@@ -74,6 +77,7 @@ export function readLaneBrowsers(root) {
   } catch { return [] }
 }
 
+/** Replace the lane browser registry for this checkout. */
 function writeLaneBrowsers(root, browsers) {
   const file = registryFile(root)
   fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -87,6 +91,7 @@ export function recordLaneBrowser(root, entry) {
   return entry
 }
 
+/** Remove one client's record from the registry. */
 export function forgetLaneBrowser(root, client) {
   writeLaneBrowsers(root, readLaneBrowsers(root).filter(entry => entry.client !== client))
 }
@@ -154,8 +159,10 @@ function ask(port, resource = '/json/version') {
 // pool this code cannot close, and a socket still closing when the CLI exits
 // aborts the process on Windows with a libuv assertion. Here the socket is this
 // function's to destroy.
+/** Whether anything answers a debugging port at all. */
 const answers = port => ask(port).then(said => said !== null)
 
+/** Whether a process id still exists. */
 const alive = pid => {
   try { process.kill(pid, 0); return true } catch { return false }
 }

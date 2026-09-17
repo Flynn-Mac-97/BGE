@@ -135,6 +135,14 @@ export async function writeFrameFiles(name, png, description) {
   }
 }
 
+/**
+ * The node sketch: the same facts painted into a raw RGBA buffer for node to
+ * encode as a PNG.
+ *
+ * Drawn at a quarter of the frame size, because the buffer is a diagram rather
+ * than a picture and every pixel costs memory. Marks are drawn as digit
+ * stamps, there being no font.
+ */
 export function sketchPixels(description, options = {}) {
   if (description.error) return description
   const scale = 4
@@ -143,6 +151,7 @@ export function sketchPixels(description, options = {}) {
   const pixels = Buffer.alloc(width * height * 4)
   for (let at = 0; at < pixels.length; at += 4) pixels.set([32, 40, 48, 255], at)
 
+  /** Set one pixel, ignoring a coordinate outside the buffer. */
   const paint = (x, y, colour) => {
     if (x < 0 || y < 0 || x >= width || y >= height) return
     pixels.set(colour, (y * width + x) * 4)

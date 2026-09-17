@@ -18,40 +18,90 @@ import { makeBridge, GRAVITY_3D } from './rapier/bridge.js'
 
 const REPLACES = 'Physics 3D'
 
+/** The plugin's own name, and the hold the world waits under while it compiles. */
+const NAME = 'Rapier 3D'
+const HOLD = `${NAME} loading`
+
 /** Three numbers in the collider box is the single flag that says "3D". */
 const is3D = entity =>
   Array.isArray(entity?.collider?.box) && entity.collider.box.length === 3
 
 const round = value => Math.round(value * 1000) / 1000
 
+// Held for the two shapes `raycast` and `canStand` build themselves — a Ray and a
+// Cuboid. Everything else reaches Rapier through this world's bridge.
 let RAPIER = null
-let bridge = null
 let loading = null
 
-/** What the panel remembers between renders. */
-const panel = { hash: '' }
+/**
+ * This world's solver, by its context.
+ *
+ * The compiled module is shared — two megabytes, and compiling it twice for two
+ * worlds costs seconds for nothing. The Rapier world and the entity-to-body map
+ * are not: a bridge reconciles against one entity list and drops every body that
+ * is not in it, so one bridge over two worlds made each step tear the other
+ * world's bodies down and build them again from the entities. Two worlds in one
+ * process then answered differently from the same worlds run one at a time, which
+ * is the whole promise a headless fan-out rests on.
+ */
+const solvers = new WeakMap()
+
+/** This world's bridge, or null while the WebAssembly is still compiling. */
+const bridgeOf = context => solvers.get(context)?.bridge || null
+
+/** What the panel remembers between renders, per world. */
+const panelHashes = new WeakMap()
 
 /**
- * The module is 2 MB of WebAssembly, so it is fetched only once this is the
- * chosen solver.
+ * The module is 2 MB of WebAssembly, so it is fetched once for the process.
  *
  * The timer holds the event loop open. Neither the import nor Rapier's `init`
- * counts as pending work in node, so a headless process with nothing else to
- * do exits part-way through the load and reports success.
+ * counts as pending work in node, so a headless process with nothing else to do
+ * exits part-way through the load and reports success.
  */
-async function load() {
-  if (bridge) return bridge
+async function loadModule() {
   if (!loading) {
     const hold = setInterval(() => {}, 50)
     loading = import('@dimforge/rapier3d-deterministic-compat').then(async module => {
-      RAPIER = module.default ?? module
-      await RAPIER.init()
-      bridge = makeBridge({ RAPIER, tag: 'rapier-3d', claims: is3D, flat: false, gravity: GRAVITY_3D })
-      bridge.start()
-      return bridge
+      const loaded = module.default ?? module
+      await loaded.init()
+      RAPIER = loaded
+      return loaded
     }).finally(() => clearInterval(hold))
   }
   return loading
+}
+
+/**
+ * Start the WebAssembly, build this world's solver, and hold the world until it
+ * lands.
+ *
+ * The hold is what makes the wait safe. A step taken while the solver is still
+ * compiling moves a world with no physics in it and answers as though it had,
+ * and two runs of the same level then disagree by however long the load took.
+ * The hold is named, so `snapshot().paused` and a `simulate` reply say what the
+ * world is waiting for.
+ *
+ * The promise is held rather than the bridge, so a step that arrives while the
+ * module is still compiling waits on the first load instead of building a second
+ * solver under the same world.
+ *
+ * A world from the kernel has a loop to hold and a startup registry the caller
+ * waits on. A bare context in a unit test has neither, and there the load starts
+ * unannounced, which is how it behaved before.
+ */
+function startLoading(context) {
+  let solver = solvers.get(context)
+  if (!solver) { solver = { bridge: null, started: null }; solvers.set(context, solver) }
+  if (solver.started) return solver.started
+  context.loop?.hold(HOLD)
+  solver.started = loadModule().then(module => {
+    solver.bridge = makeBridge({ RAPIER: module, tag: 'rapier-3d', claims: is3D, flat: false, gravity: GRAVITY_3D })
+    solver.bridge.start()
+    return solver.bridge
+  }).finally(() => context.loop?.release(HOLD))
+  context.startup?.add(NAME, solver.started)
+  return solver.started
 }
 
 const asVector = value => {
@@ -70,6 +120,7 @@ const real = vector => vector && [vector.x, vector.y, vector.z].every(Number.isF
  * answer at the world origin.
  */
 function raycast(context, origin, direction, maxDistance = 1000, options = {}) {
+  const bridge = bridgeOf(context)
   if (!bridge?.ready) return null
   const from = asVector(origin)
   const along = asVector(direction)
@@ -102,7 +153,8 @@ function raycast(context, origin, direction, maxDistance = 1000, options = {}) {
 }
 
 /** Is there room for this entity to be this tall, where it stands? */
-function canStand(entity, height) {
+function canStand(context, entity, height) {
+  const bridge = bridgeOf(context)
   if (!bridge?.ready || !is3D(entity)) return true
   const tall = Number(height)
   if (!(tall > 0)) {
@@ -123,6 +175,28 @@ function canStand(entity, height) {
   return room
 }
 
+/**
+ * Put this world's solver back to the moment a checkpoint holds.
+ *
+ * `bytes` null means the checkpoint was taken while the solver held nothing — it
+ * was still compiling, or nothing had stepped yet. Holding nothing is what it was,
+ * so the bodies are dropped and built again from the entities on the next step.
+ * Keeping them would leave the bodies of the later run standing in a world rewound
+ * to an earlier one, with the entities looking right and the velocities wrong.
+ *
+ * @param {object} context The world's context.
+ * @param {Uint8Array|null} bytes A snapshot, or null.
+ * @returns {boolean} Whether the solver is where the checkpoint says it was.
+ */
+function restoreSolver(context, bytes) {
+  const bridge = bridgeOf(context)
+  // Not loaded yet, so it holds nothing and there is nothing to put back.
+  if (!bridge) return true
+  if (bytes) return bridge.restore(bytes) === true
+  bridge.forget()
+  return true
+}
+
 /** Whether this solver may run, and the one sentence that says why not. */
 function standingDown(context) {
   const other = context.loader.plugins.get(REPLACES)
@@ -136,39 +210,60 @@ function standingDown(context) {
  * Physics 3D puts its own on context in `onLoad`, which runs whether or not
  * it is enabled, so the two are swapped here each step rather than once at
  * load: then the answer never depends on which plugin loaded last.
+ *
+ * What was there before is kept per world. One `took` for the process meant the
+ * first world's two verbs were handed back on behalf of the second, which then
+ * kept Rapier's answer for ever.
  */
-let took = null
+const verbOwners = new WeakMap()
 
 function takeVerbs(context) {
-  if (took) return
-  took = { raycast: context.raycast, canStand: context.canStand }
+  if (verbOwners.has(context)) return
+  verbOwners.set(context, { raycast: context.raycast, canStand: context.canStand })
   context.raycast = (origin, direction, maxDistance, options) =>
     raycast(context, origin, direction, maxDistance, options || {})
-  context.canStand = (entity, height) => canStand(entity, height)
+  context.canStand = (entity, height) => canStand(context, entity, height)
 }
 
 function giveBackVerbs(context) {
+  const took = verbOwners.get(context)
   if (!took) return
   context.raycast = took.raycast
   context.canStand = took.canStand
-  took = null
+  verbOwners.delete(context)
 }
 
 export default {
-  name: 'Rapier 3D',
+  name: NAME,
   category: 'engine',
   about: 'Rigid body physics in three dimensions, solved by Rapier. Adds rotation, mass, friction and sleeping to the Physics 3D contract, and replays identically on any machine.',
 
   onLoad(context) {
     context.rapier3d = {
-      snapshot: () => bridge?.snapshot() || null,
+      snapshot: () => bridgeOf(context)?.snapshot() || null,
+      /** Put the solver back to a snapshot's moment. False when it would not go. */
+      restore: bytes => bridgeOf(context)?.restore(bytes) === true,
       raycast: (origin, direction, maxDistance, options) =>
         raycast(context, origin, direction, maxDistance, options || {}),
-      canStand
+      canStand: (entity, height) => canStand(context, entity, height)
     }
+    // What this solver holds, so a checkpoint of the run carries the bodies. The
+    // entities alone are not enough: a box restored to where it was with no
+    // velocity behind it is a world that stands still and looks right. Null is a
+    // moment taken before the solver had bodies, and putting that back means
+    // holding none — otherwise the rewind replays the later run's velocities.
+    context.checkpoints?.add(NAME, {
+      capture: () => bridgeOf(context)?.snapshot() || null,
+      restore: bytes => restoreSolver(context, bytes)
+    })
     // A level reload builds new entities under the same ids, so every body
     // belongs to the level that is gone.
-    context.bus.on('level:loaded', () => bridge?.forget())
+    context.bus.on('level:loaded', () => bridgeOf(context)?.forget())
+
+    // Started here, before anything can step, so no run begins without its
+    // solver. The choice is already readable: this stands down while Physics 3D
+    // is enabled, and then the module is never fetched.
+    if (!standingDown(context)) startLoading(context)
   },
 
   inspect: [{
@@ -176,7 +271,7 @@ export default {
     rows: context => {
       const held = standingDown(context)
       if (held) return [['state', held]]
-      const stats = bridge?.stats()
+      const stats = bridgeOf(context)?.stats()
       if (!stats) return [['state', 'loading WebAssembly']]
       return [
         ['dynamic bodies', stats.dynamic], ['solids', stats.solid],
@@ -190,7 +285,8 @@ export default {
     run(world, seconds, context) {
       if (standingDown(context)) { giveBackVerbs(context); return }
       takeVerbs(context)
-      if (!bridge) { load(); return }
+      const bridge = bridgeOf(context)
+      if (!bridge) { startLoading(context); return }
       bridge.step(world, seconds, context)
     }
   }],
@@ -203,7 +299,7 @@ export default {
 
     render(ui, context) {
       const held = standingDown(context)
-      const stats = bridge?.stats()
+      const stats = bridgeOf(context)?.stats()
       const counts = stats
         ? [['dynamic', stats.dynamic], ['solid', stats.solid], ['sensors', stats.sensors], ['asleep', stats.asleep]]
         : [['state', 'loading WebAssembly']]
@@ -219,10 +315,10 @@ export default {
           : counts.map(([name, value]) => ui.row([ui.label(name), ui.value(value)]))),
         ui.button('Hash the world', async () => {
           const reply = await context.run('rapier3d.snapshot')
-          panel.hash = reply?.sha256?.slice(0, 16) || reply?.error || 'nothing simulated yet'
+          panelHashes.set(context, reply?.sha256?.slice(0, 16) || reply?.error || 'nothing simulated yet')
           context.redraw()
         }),
-        ui.text(panel.hash ? `sha256 ${panel.hash}` : 'hash two runs to compare them', { dim: true })
+        ui.text(panelHashes.get(context) ? `sha256 ${panelHashes.get(context)}` : 'hash two runs to compare them', { dim: true })
       ])
     }
   }],
@@ -237,7 +333,7 @@ export default {
         const on = options?.on === undefined ? true : !!options.on
         await context.run('plugins.enable', [REPLACES, !on])
         await context.run('plugins.enable', ['Rapier 3D', on])
-        if (on) await load()
+        if (on) await startLoading(context)
         return {
           solver: on ? 'Rapier 3D' : REPLACES,
           wrote: 'game.json',
@@ -253,6 +349,7 @@ export default {
       run(context) {
         const held = standingDown(context)
         if (held) return { standingDown: held }
+        const bridge = bridgeOf(context)
         if (!bridge) return { state: 'loading WebAssembly — call again' }
         const bodies = []
         for (const [entity, entry] of bridge.bodies) {
@@ -277,7 +374,7 @@ export default {
        * only question anyone asks of it is whether two of them agree.
        */
       async run(context) {
-        const bytes = bridge?.snapshot()
+        const bytes = bridgeOf(context)?.snapshot()
         if (!bytes) return { error: 'nothing simulated yet' }
         const digest = await crypto.subtle.digest('SHA-256', bytes)
         return {

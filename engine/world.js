@@ -89,11 +89,219 @@ const lookDiff = (value, base) => {
   return Object.keys(out).length ? out : null
 }
 
+/**
+ * The numbers a run is compared by.
+ *
+ * A fingerprint has to be exact to be worth anything: one that rounded would
+ * call two different worlds the same, and every comparison built on it would be
+ * a comfort rather than a check. So each value goes in as its own bits.
+ */
+const scratch = new Float64Array(1)
+const scratchBits = new Uint32Array(scratch.buffer)
+
+/** Fold one 32-bit word into the running hash. */
+const fold = (hash, word) => {
+  let mixed = Math.imul((hash ^ word) >>> 0, 0x21f0aaad) >>> 0
+  mixed = Math.imul(mixed ^ (mixed >>> 15), 0x735a2d97) >>> 0
+  return (mixed ^ (mixed >>> 15)) >>> 0
+}
+
+/**
+ * Fold a number in by its bits.
+ *
+ * `-0` is normalised to `0`: the two are the same number, and a negative zero
+ * arriving from one arithmetic path and not another would report a difference
+ * that is not one.
+ */
+const foldNumber = (hash, value) => {
+  scratch[0] = value === 0 ? 0 : Number(value)
+  return fold(fold(hash, scratchBits[0]), scratchBits[1])
+}
+
+/** Fold text in, one code unit at a time. */
+const foldText = (hash, text) => {
+  let out = hash
+  for (let at = 0; at < text.length; at++) out = fold(out, text.charCodeAt(at))
+  return out
+}
+
+/** Distinct words, so "absent", "null" and "unreadable" do not read alike. */
+const ABSENT = 0x297a2d39
+const NOTHING = 0x2c1b3c6d
+const OTHER = 0x1b873593
+const RECORD = 0x85ebca6b
+const LIST = 0x9e3779b9
+
+/**
+ * How deep to walk before a value is folded as a single word.
+ *
+ * An entity may point at something that points back at it, and a hash is not
+ * worth a stack overflow.
+ */
+const DEPTH = 5
+
+/**
+ * Fold one value in, whatever shape it is.
+ *
+ * Lists have to be walked rather than converted. `Number([16, 1, 1])` is `NaN`,
+ * so a scale or a rotation written as a vector folded to one constant and the
+ * hash was blind to it — two worlds differing only in a rotated body hashed the
+ * same, which is the worst way for a check to fail.
+ *
+ * Records are folded by sorted key, so the order a plugin happened to set them
+ * does not change the answer.
+ */
+const foldValue = (hash, value, depth = 0) => {
+  if (typeof value === 'number') return foldNumber(hash, value)
+  if (typeof value === 'boolean') return fold(hash, value ? 1 : 2)
+  if (typeof value === 'string') return foldText(hash, value)
+  if (value === null) return fold(hash, NOTHING)
+  if (value === undefined) return fold(hash, ABSENT)
+  if (depth >= DEPTH) return fold(hash, OTHER)
+  if (Array.isArray(value)) {
+    let out = fold(hash, LIST ^ value.length)
+    for (const item of value) out = foldValue(out, item, depth + 1)
+    return out
+  }
+  if (typeof value === 'object') {
+    let out = fold(hash, RECORD)
+    for (const key of Object.keys(value).sort()) out = foldValue(foldText(out, key), value[key], depth + 1)
+    return out
+  }
+  return fold(hash, OTHER)
+}
+
+/**
+ * The one field of an entity that is not state.
+ *
+ * `_definition` is the type the entity was built from: a live object holding the
+ * hooks themselves. Folding it would walk functions rather than numbers, and
+ * would arrive back at the entity that points at it.
+ */
+const NOT_STATE = new Set(['_definition'])
+
+/**
+ * A number that changes whenever the simulated world does.
+ *
+ * Two runs of the same level, seed and steps answer with the same number, and a
+ * run that diverged answers with a different one — so "did my change alter the
+ * simulation" is one value to compare rather than a thousand rows to read, and a
+ * rewind or a restored world is proved exact rather than eyeballed.
+ *
+ * Everything an entity carries is folded, except its type definition, so a field
+ * a plugin adds later is in the hash without anyone remembering to add it here.
+ * A behaviour's own bag is folded too: it is where a behaviour keeps its running
+ * state, and a behaviour that diverged there would change the next step without
+ * changing anything the entity shows today.
+ *
+ * Takes the world as an argument rather than being a method on one, so a test
+ * double standing in for a world needs only `entities` and `state` to answer it.
+ *
+ * @param {object} world The world to read.
+ * @returns {number} A 32-bit number.
+ */
+export function stateHash(world) {
+  const entities = world.entities
+  let hash = fold(0x811c9dc5, entities.length)
+  for (const e of entities) {
+    hash = foldValue(hash, e.id)
+    hash = foldValue(hash, e.type)
+    for (const key of Object.keys(e)) {
+      if (NOT_STATE.has(key) || key === 'behaviours') continue
+      hash = foldValue(foldText(hash, key), e[key])
+    }
+    for (const record of e.behaviours || []) {
+      hash = foldValue(foldText(hash, record.name), record.bag)
+    }
+  }
+  // A world in a test may stand in with nothing but its entities.
+  return foldValue(hash, world.state || {})
+}
+
+/**
+ * How deep a checkpoint copies before it stops.
+ *
+ * A behaviour may keep a structure of its own, and a checkpoint that walked one
+ * for ever would be worse than one that says how far it went.
+ */
+const CHECKPOINT_DEPTH = 6
+
+/** Bumped when the shape of a checkpoint changes, so an old one is refused rather than misread. */
+const CHECKPOINT_VERSION = 1
+
+/** A value a checkpoint could not carry, kept apart from `null`, which is a value. */
+const LOST = Symbol('lost')
+
+/**
+ * What a value becomes on the way into a checkpoint.
+ *
+ * Plain data is COPIED, because a checkpoint that shares a live object changes
+ * when the world carries on and is then no longer a checkpoint. A reference to
+ * another entity is written down as its id and resolved again on the way back:
+ * a state object holding two entities is a graph, and copying it would quietly
+ * split it into two. Anything else — a function, a node from outside — is
+ * counted and named, because a checkpoint that dropped something in silence is
+ * worse than one that says what it could not keep.
+ */
+function asCopy(value, live, lost, where, depth = 0) {
+  if (value === null) return null
+  if (typeof value === 'function') { lost.push(`${where} is a function`); return LOST }
+  if (typeof value !== 'object') return value
+  if (live.has(value)) return { $entity: value.id }
+  if (depth >= CHECKPOINT_DEPTH) { lost.push(`${where} is deeper than ${CHECKPOINT_DEPTH}`); return LOST }
+  if (Array.isArray(value)) return value.map((item, at) => asCopy(item, live, lost, `${where}[${at}]`, depth + 1))
+  if (value instanceof Set) return { $set: [...value].map((item, at) => asCopy(item, live, lost, `${where}<${at}>`, depth + 1)) }
+  if (value instanceof Map) return {
+    $map: [...value].map(([key, item]) => [
+      asCopy(key, live, lost, `${where} key`, depth + 1),
+      asCopy(item, live, lost, `${where}[${String(key)}]`, depth + 1)])
+  }
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) {
+    lost.push(`${where} is a ${value.constructor?.name || 'object'}, which a checkpoint cannot copy`)
+    return LOST
+  }
+  const copy = {}
+  for (const key of Object.keys(value)) copy[key] = asCopy(value[key], live, lost, `${where}.${key}`, depth + 1)
+  return copy
+}
+
+/** The other direction. A reference to an entity resolves against the world it goes back into. */
+function asValue(copy, byId) {
+  if (copy === LOST) return undefined
+  if (copy === null || typeof copy !== 'object') return copy
+  if (Array.isArray(copy)) return copy.map(item => asValue(item, byId))
+  if (typeof copy.$entity === 'string') return byId.get(copy.$entity) || null
+  if (Array.isArray(copy.$set)) return new Set(copy.$set.map(item => asValue(item, byId)))
+  if (Array.isArray(copy.$map)) return new Map(copy.$map.map(([key, item]) => [asValue(key, byId), asValue(item, byId)]))
+  const value = {}
+  for (const key of Object.keys(copy)) value[key] = asValue(copy[key], byId)
+  return value
+}
+
+/**
+ * The entity store, the type and behaviour registries, and the hooks that run
+ * them.
+ *
+ * State lives in the closure, so two worlds share nothing and a test makes one
+ * per case. The bus is the only way out: every change worth noticing is
+ * emitted, and a reader listens rather than polling.
+ *
+ * @param {object} bus The bus every change is announced on.
+ * @returns {object} The world: `entities`, the `types` and `behaviours`
+ *   registries, the hooks, and the methods that spawn, retype and serialise.
+ */
 export function makeWorld(bus) {
   let entities = []
   const types = new Map()
   const behaviours = new Map()
 
+  /**
+   * Build one entity from a placement, filling in the type's defaults.
+   *
+   * The type is read once here and kept as `_definition`, so a later edit can
+   * find every entity still running the old one — see `retype`.
+   */
   function makeEntity(typeName, placement = {}) {
     const type = types.get(typeName) || {}
     const at = placement.at || [0, 0, 0]
@@ -241,6 +449,9 @@ export function makeWorld(bus) {
     catch (err) { console.error(`[${e.type}] ${which}`, err) }
   }
 
+  // Keyed by the entity object, so a destroyed body's entry goes with it.
+  const previousPlaces = new WeakMap()
+
   const world = {
     get entities() { return entities },
     types,
@@ -257,6 +468,34 @@ export function makeWorld(bus) {
      */
     simulated: false,
 
+    /** Store every body's place before a fixed step moves it. The loop calls this. */
+    rememberPlaces() {
+      for (const entity of entities) {
+        previousPlaces.set(entity, { x: entity.x, y: entity.y, z: entity.z || 0, yaw: entity.yaw })
+      }
+    },
+
+    /**
+     * Where to draw a body: `blend` of the way from its place before the last
+     * step to its place now. A body spawned since that step has no earlier place
+     * and is drawn where it is. Game code reads `x`, `y` and `z`, never this.
+     */
+    drawnPlace(entity, blend = 1) {
+      const before = previousPlaces.get(entity)
+      const z = entity.z || 0
+      if (!before || blend >= 1) return { x: entity.x, y: entity.y, z, yaw: entity.yaw }
+      const between = (from, to) => from + (to - from) * blend
+      return {
+        x: between(before.x, entity.x),
+        y: between(before.y, entity.y),
+        z: between(before.z, z),
+        yaw: Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
+          ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
+          : entity.yaw
+      }
+    },
+
+    /** Put a type definition in the registry, for the next spawn to read. */
     registerType(name, definition) { types.set(name, definition) },
 
     /**
@@ -302,12 +541,14 @@ export function makeWorld(bus) {
       return moved
     },
 
+    /** Remove a type. Live entities keep their `_definition`, so they keep working. */
     unregisterType(name) {
       types.delete(name)
       bus.emit('type:changed', { name, removed: true })
     },
 
     // ---------------------------------------------------------- behaviours
+    /** Put a behaviour definition in the registry, for the next attach to read. */
     registerBehaviour(name, definition) { behaviours.set(name, definition) },
 
     /**
@@ -364,6 +605,12 @@ export function makeWorld(bus) {
       return record
     },
 
+    /**
+     * Take a behaviour off one entity.
+     *
+     * A behaviour the type declares is recorded as detached, or the next sync
+     * from the type file would put it straight back.
+     */
     detach(e, name) {
       const i = e.behaviours.findIndex(b => b.name === name)
       if (i < 0) return false
@@ -384,6 +631,12 @@ export function makeWorld(bus) {
       return record
     },
 
+    /**
+     * Add one entity and announce it.
+     *
+     * A generated id is checked against the live entities, because a level's
+     * ids are position-in-file and stable across loads.
+     */
     spawn(typeName, placement) {
       const e = makeEntity(typeName, placement)
       // A generated id must not land on one a level already used, and level ids
@@ -394,6 +647,7 @@ export function makeWorld(bus) {
       return e
     },
 
+    /** Remove one entity, run its onDestroy hook, and announce it. */
     destroy(e) {
       const i = entities.indexOf(e)
       if (i < 0) return
@@ -402,10 +656,111 @@ export function makeWorld(bus) {
       bus.emit('entity:removed', e)
     },
 
+    /** The first entity of a type. */
     find(typeName) { return entities.find(e => e.type === typeName) },
+    /** Every entity of a type. */
     all(typeName) { return entities.filter(e => e.type === typeName) },
+    /** One entity by its level id. */
     byId(id) { return entities.find(e => e.id === id) },
 
+    /**
+     * Everything about this world that a checkpoint has to carry.
+     *
+     * Plain values, copied, so the checkpoint is a moment rather than a view of a
+     * world that carries on changing. What could not be copied is named in `lost`,
+     * so a checkpoint that is not exact says so instead of pretending.
+     *
+     * Not here: the clock, the random stream and the input record, which belong to
+     * the loop, and anything a plugin keeps of its own — a solver's world, for one.
+     * Those travel beside this, not inside it.
+     */
+    capture() {
+      const lost = []
+      const live = new Set(entities)
+      const taken = entities.map(entity => {
+        const names = new Set(entity.behaviours.map(record => record.name))
+        const fields = {}
+        for (const key of Object.keys(entity)) {
+          // `_definition` is the type itself, hooks and all, and is looked up
+          // again on the way back. A behaviour's bag is carried with its record
+          // rather than twice, once as `e[name]` and once as the bag.
+          if (key === '_definition' || key === 'behaviours' || names.has(key)) continue
+          fields[key] = asCopy(entity[key], live, lost, `${entity.id}.${key}`)
+        }
+        return {
+          fields,
+          behaviours: entity.behaviours.map(record => ({
+            name: record.name,
+            own: !!record.own,
+            overrides: [...record.overrides],
+            error: record.error,
+            bag: asCopy(record.bag, live, lost, `${entity.id}.${record.name}`)
+          }))
+        }
+      })
+      return {
+        version: CHECKPOINT_VERSION,
+        simulated: world.simulated,
+        state: asCopy(world.state, live, lost, 'world.state'),
+        entities: taken,
+        lost
+      }
+    },
+
+    /**
+     * Put this world back to a checkpoint.
+     *
+     * An entity is matched by id and written INTO the object already here rather
+     * than replaced. Identity is what everything else holds: the solver maps an
+     * entity to a body, a behaviour watches one, a chase remembers one. A restore
+     * that handed out new objects would break every one of them, and the symptom
+     * would look like a physics bug.
+     *
+     * @param {object} capture From `capture()`.
+     * @returns {object} How many entities went back, and how much was lost.
+     */
+    restore(capture) {
+      if (capture?.version !== CHECKPOINT_VERSION) throw new Error(`checkpoint version ${capture?.version} is not ${CHECKPOINT_VERSION}`)
+      const byId = new Map(entities.map(entity => [entity.id, entity]))
+
+      // Every entity is found or made FIRST, with its keys cleared, so that a value
+      // pointing at one — a field holding an entity, or the shared state holding
+      // one — has something to point at. Resolving references as the fields were
+      // assigned would depend on the order the entities happened to be captured in,
+      // and would lose any entity the world had destroyed since.
+      const rebuilt = capture.entities.map(entry => {
+        const fields = entry.fields
+        const entity = byId.get(fields.id) || makeEntity(fields.type, { id: fields.id })
+        byId.set(fields.id, entity)
+        for (const key of Object.keys(entity)) if (key !== '_definition') delete entity[key]
+        return { entity, entry }
+      })
+
+      for (const { entity, entry } of rebuilt) {
+        for (const key of Object.keys(entry.fields)) entity[key] = asValue(entry.fields[key], byId)
+        entity._definition = types.get(entity.type) || {}
+        entity.behaviours = entry.behaviours.map(record => ({
+          name: record.name,
+          own: record.own,
+          overrides: [...record.overrides],
+          error: record.error,
+          definition: behaviours.get(record.name) || {},
+          bag: asValue(record.bag, byId)
+        }))
+        for (const record of entity.behaviours) entity[record.name] = record.bag
+      }
+
+      entities = rebuilt.map(one => one.entity)
+      // The state object keeps its identity: a plugin that read it once still has
+      // the same object, holding the values from before.
+      for (const key of Object.keys(world.state)) delete world.state[key]
+      Object.assign(world.state, asValue(capture.state, byId))
+      world.simulated = !!capture.simulated
+      bus.emit('world:changed')
+      return { entities: entities.length, lost: capture.lost.length }
+    },
+
+    /** Empty the world and mark it unsimulated, as loading a level does first. */
     clear() {
       entities = []
       world.simulated = false

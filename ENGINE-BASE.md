@@ -28,6 +28,7 @@ file, and nothing is saved anywhere else.
 
 - Code style: `agents/code-style.md`
 - Comment style: `agents/comment-style.md`
+- Codebase design: `agents/codebase-design.md`
 - Plugin rules: Plugin Master — `plugins/builtin/plugin-master.agent.md`
 
 ## Where everything is

@@ -12,6 +12,13 @@
  */
 import { makeUI } from './ui.js'
 
+/**
+ * Mount the dock frame into `root` and return its handles.
+ *
+ * The shell composes panels without knowing them: `panelsFor` asks the loader
+ * for whatever a plugin contributed to a dock. It also owns the one keyboard
+ * listener, because only the shell can see two plugins claiming the same key.
+ */
 export function makeShell(root, context) {
   const { loader, bus, editor } = context
   // renderer is read lazily: the canvas it draws into is created below, so the
@@ -55,6 +62,7 @@ export function makeShell(root, context) {
   installResizer('resize-centre', 'centre', 'x', -1)
   installResizer('resize-bottom', 'bottom', 'y', -1)
 
+  /** The drag range of one divider, from the frame's current size. */
   function boundsFor(key) {
     const box = frame.getBoundingClientRect()
     if (key === 'bottom') return [100, Math.max(100, Math.round(box.height * 0.65))]
@@ -62,6 +70,7 @@ export function makeShell(root, context) {
     return [120, Math.max(120, Math.min(480, Math.round(box.width * 0.45)))]
   }
 
+  /** Set one layout size, clamp it to its range, and tell the renderer the viewport changed. */
   function resize(key, value, save = false) {
     const [least, most] = boundsFor(key)
     layout[key] = Math.round(Math.max(least, Math.min(most, Number(value) || DEFAULT_LAYOUT[key])))
@@ -74,16 +83,22 @@ export function makeShell(root, context) {
     rend()?.resize()
   }
 
+  /** Apply every stored size to the frame, without writing the layout back. */
   function applyLayout() {
     for (const key of Object.keys(DEFAULT_LAYOUT)) resize(key, layout[key])
   }
 
+  /** Put one divider, or all of them, back to the default size. */
   function resetLayout(key = null) {
     for (const name of key ? [key] : Object.keys(DEFAULT_LAYOUT)) resize(name, DEFAULT_LAYOUT[name])
     saveLayout(layout)
     return { ...layout }
   }
 
+  /**
+   * Wire one divider: pointer drag, double-click and Home to reset, and arrow
+   * keys to step it.
+   */
   function installResizer(id, key, axis, direction) {
     const handle = element(id)
     if (!handle) return
@@ -153,6 +168,12 @@ export function makeShell(root, context) {
     return wanted
   }
 
+  /**
+   * The panels a dock shows, in contribution order.
+   *
+   * `whenTool` and `when` let a plugin hide a panel without the shell knowing
+   * what it is for — the kernel holds the rule, the plugin holds the policy.
+   */
   function panelsFor(dock) {
     return loader.contrib.panels
       .filter(p => p.dock === dock)
@@ -161,6 +182,13 @@ export function makeShell(root, context) {
       .sort((a, b) => (a.order ?? 50) - (b.order ?? 50))
   }
 
+  /**
+   * Build one panel element and run its `render` with a state bag that survives
+   * a redraw.
+   *
+   * A panel that throws disables its plugin and says so in its body, so one
+   * broken panel does not take the rest of the editor down.
+   */
   function drawPanel(p) {
     if (!panelState.has(p.id)) panelState.set(p.id, {})
     const state = panelState.get(p.id)
@@ -204,6 +232,7 @@ export function makeShell(root, context) {
     return wrap
   }
 
+  /** Rebuild one dock from its contributed panels, and hide its divider when empty. */
   function drawDock(dock) {
     const host = element('dock-' + dock)
     const list = panelsFor(dock)
@@ -224,6 +253,7 @@ export function makeShell(root, context) {
     for (const p of list) host.append(drawPanel(p))
   }
 
+  /** Draw the play button, the project path, the tool rail and the toolbar. */
   function drawBar() {
     const bar = element('bar')
     bar.innerHTML = ''
@@ -274,6 +304,7 @@ export function makeShell(root, context) {
     bar.append(end)
   }
 
+  /** Draw the status line: selection, the agent hint, and whether the level is saved. */
   function drawStatus() {
     const s = element('status')
     const sel = [...editor.selection]
@@ -334,6 +365,7 @@ export function makeShell(root, context) {
   })
 
   let shortcuts = new Map()
+  /** Rebuild the key table from the current contributions, reporting each collision once. */
   const gatherShortcuts = () => { shortcuts = collectShortcuts(declaredShortcuts(), reportShortcut) }
   gatherShortcuts()
   bus.on('plugins:changed', gatherShortcuts)
@@ -384,6 +416,7 @@ export function makeShell(root, context) {
 
   let queued = false
 
+  /** Draw the whole frame in one pass. Called by `draw`, never directly. */
   function paint() {
     queued = false
     drawBar()
@@ -392,6 +425,12 @@ export function makeShell(root, context) {
     rend()?.resize()
   }
 
+  /**
+   * Queue one redraw, coalesced to at most one per animation frame.
+   *
+   * A hidden tab gets no animation frames, so it paints at once instead of
+   * silently stopping — the case an agent driving the browser runs in.
+   */
   function draw() {
     if (queued) return
     queued = true
@@ -473,24 +512,22 @@ export function readShortcut(declaration) {
   return [...MODIFIERS.filter(m => parts.includes(m)), key === 'space' ? ' ' : key].join('+')
 }
 
-/**
- * Whether a keystroke belongs to whoever is typing.
- *
- * A shortcut must not fire into a field and must not be swallowed on the way
- * there: Ctrl+Z in a text box is the text box's undo. Both hand-rolled guards in
- * the built-ins test the same two tags; a contentEditable element is the same
- * mistake under another name.
- */
+/** The input types that swallow a character, so a shortcut must stay out of them. */
+const TEXT_INPUT = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week'])
+
 /**
  * Is this element taking text, so a shortcut must stay out of it?
+ *
+ * A shortcut must neither fire into a field nor be swallowed on the way there:
+ * Ctrl+Z in a text box is the text box's undo. Both hand-rolled guards in the
+ * built-ins test the same two tags; a contentEditable element is the same
+ * mistake under another name.
  *
  * Not every `input` is typing. `ui.slider` builds `input type="range"`, and it
  * keeps focus after a drag — a tag-name test therefore turned every shortcut
  * off for as long as someone had touched a slider, silently. Only the types
  * that swallow a character count.
  */
-const TEXT_INPUT = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week'])
-
 export const typingIn = element =>
   element?.tagName === 'TEXTAREA' ||
   element?.isContentEditable === true ||
@@ -527,11 +564,13 @@ export function collectShortcuts(declarations, report = () => {}) {
 
 const LAYOUT_KEY = 'browser-game-engine.layout.v1'
 
+/** The stored layout, over the defaults, or the defaults when storage is blocked. */
 function readLayout(fallback) {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') } }
   catch { return { ...fallback } }
 }
 
+/** Store the layout for the next page. Blocked storage is not an error. */
 function saveLayout(layout) {
   try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)) } catch { /* storage may be blocked */ }
 }

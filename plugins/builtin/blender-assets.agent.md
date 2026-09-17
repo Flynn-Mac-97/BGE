@@ -28,9 +28,8 @@ Blender is a program, and only a headless run can start one.
 |---|---|
 | `blender.check` | names the Blender it will use, and its version |
 | `blender.list` | every `.blend`, and whether its `.glb` is current |
-| `blender.import '{"all":true}'` | builds every stale model |
-| `blender.import '{"file":"assets/models/kitten.blend"}'` | builds one |
-| `blender.import '{"all":true,"force":true}'` | builds even the fresh ones |
+| `blender.inspect '{"file":"..."}'` | each character's armature, meshes, height, `collection` and `scaleForPerson` |
+| `blender.import '{"file":"..."}'` | builds one; `{"all":true}` every stale one; `"force":true` fresh ones too |
 | `blender.settings '{"file":"...","scale":0.01}'` | writes an import setting |
 
 Every one refuses in the browser and answers with the terminal line instead.
@@ -55,10 +54,9 @@ a texture instead.
 `scale`, `applyModifiers`, `collection`, `bake`, `bakeSize`, `bakeSamples`,
 `textureSize`, `imageFormat`, `occlusion`, `occlusionSamples`, `shaders`.
 
-`"occlusion": true` bakes blocked sky light into the model. The engine cannot
-see what blocks a surface, so without it a hat leaves the face under it lit by
-the whole sky and hair looks grey. The bake is stored in the `_occlusion`
-attribute and dims environment light only. Changing one makes the model stale, so the next import rebuilds it.
+`"occlusion": true` bakes blocked sky light into the `_occlusion` attribute,
+which dims environment light only: use it where a hat or hair covers skin.
+Changing a setting makes the model stale.
 
 ## What it refuses
 

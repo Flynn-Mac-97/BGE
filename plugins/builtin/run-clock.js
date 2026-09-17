@@ -124,35 +124,42 @@ export default {
       get running() { return state.running },
       get over() { return state.over },
       get reason() { return state.reason },
-      get watching() { return watching() }
+      get watching() { return watching() },
+
+      /**
+       * One fixed step of THIS world's run.
+       *
+       * Reached through `context`, never through a module. A module holds one
+       * value, so with two worlds in one process the second to load would drive
+       * the first world's clock, and the first world would publish its run time
+       * into the second world's state.
+       */
+      tick() {
+        if (state.over) return
+        // Started by the first step rather than by `play:started`, so a headless
+        // simulate() times a run exactly as pressing play does.
+        if (!state.running) begin()
+        publish()
+
+        if (limit && secondsNow() >= limit) return void end('survived')
+
+        if (watched == null) return
+        const entity = watching()
+        if (!entity || !context.world.entities.includes(entity)) return void end('died')
+        const health = entity.properties?.health
+        if (health != null && health <= 0) return void end('died')
+      }
     }
 
     publish()
     context.bus.on('level:loaded', reset)
-
-    /** Kept on the module so the system below reaches this world's own run. */
-    runClock.tick = () => {
-      if (state.over) return
-      // Started by the first step rather than by `play:started`, so a headless
-      // simulate() times a run exactly as pressing play does.
-      if (!state.running) begin()
-      publish()
-
-      if (limit && secondsNow() >= limit) return void end('survived')
-
-      if (watched == null) return
-      const entity = watching()
-      if (!entity || !context.world.entities.includes(entity)) return void end('died')
-      const health = entity.properties?.health
-      if (health != null && health <= 0) return void end('died')
-    }
   },
 
   systems: [{
     // Fixed, because ending a run is a change to the game and must land on the
     // same step on every replay.
     phase: 'fixed',
-    run: () => runClock.tick?.()
+    run: (world, seconds, context) => context.runClock?.tick()
   }],
 
   commands: [
@@ -160,9 +167,6 @@ export default {
     { id: 'run.end', label: 'End the run now', run: (context, args) => context.runClock.end([].concat(args ?? [])[0] || 'ended') }
   ]
 }
-
-/** The live run's tick, published so the declared system can reach it. */
-export const runClock = { tick: null }
 
 /** 12:34 — the only format a survivor's clock is ever read in. */
 function asClock(seconds) {

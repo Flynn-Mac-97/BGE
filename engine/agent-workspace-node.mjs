@@ -5,12 +5,15 @@ import { execFileSync, execSync } from 'node:child_process'
 import { resolveAgentContext } from './agent-workspace.js'
 import { onDisk } from './start-world-node.mjs'
 
+/** A path in the one spelling the tree uses: forward slashes, no leading `./`. */
 const normal = value => String(value || '').replaceAll('\\', '/').replace(/^\.\//, '')
 
+/** Run git in a checkout and return its trimmed output; a failure throws with git's own message. */
 const git = (root, args) => execFileSync('git', ['-C', root, ...args], {
   encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
 }).trim()
 
+/** The main worktree's absolute path, so lane records survive a worktree being deleted. */
 export function mainWorktree(root) {
   const line = git(root, ['worktree', 'list', '--porcelain'])
     .split(/\r?\n/).find(value => value.startsWith('worktree '))
@@ -18,11 +21,13 @@ export function mainWorktree(root) {
   return path.resolve(line.slice('worktree '.length))
 }
 
+/** The run registry's path in the main worktree. */
 const registryFile = root => path.join(mainWorktree(root), '.engine/agents.json')
 
 /** A registry edit is one read and one rename; a lock older than this is a corpse. */
 const STALE_LOCK_MILLISECONDS = 60_000
 
+/** The run records for this checkout, or an empty registry when the file is missing or broken. */
 export function readAgentRegistry(root) {
   try {
     const value = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'))
@@ -30,6 +35,7 @@ export function readAgentRegistry(root) {
   } catch { return { version: 1, runs: [] } }
 }
 
+/** Read, change and rename the run registry under a lock, breaking a lock older than a minute. */
 function editRegistry(root, change) {
   const file = registryFile(root)
   const lock = file + '.lock'
@@ -64,11 +70,13 @@ function editRegistry(root, change) {
   }
 }
 
+/** The directory part of a glob before its first wildcard. */
 function staticPrefix(pattern) {
   const at = pattern.search(/[?*]/)
   return normal(at < 0 ? pattern : pattern.slice(0, at)).replace(/\/$/, '')
 }
 
+/** Whether two claimed paths are the same or one is inside the other. */
 export function claimsOverlap(left, right) {
   const a = normal(left), b = normal(right)
   if (a === b) return true
@@ -103,12 +111,14 @@ export const claimsCollide = (root, left, right) => {
  *
  * Suffixed rather than random so the suggestion still names the work.
  */
+/** A free id suffixed off `id`, so a suggestion still names the work. */
 function freeId(taken, id) {
   let n = 2
   while (taken.has(`${id}-${n}`)) n++
   return `${id}-${n}`
 }
 
+/** Refuse an id or file claim that an active or unmerged run already holds. */
 function assertAvailable(root, runs, id, files, parallel) {
   const active = runs.filter(run => run.status === 'active')
   if (active.some(run => run.id === id)) throw new Error(`agent task "${id}" is already active`)
@@ -136,12 +146,19 @@ function assertAvailable(root, runs, id, files, parallel) {
   }
 }
 
+/** Refuse a task id that is not lowercase letters, numbers, hyphens or underscores. */
 const validateId = id => {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) {
     throw new Error('task id must use lowercase letters, numbers, hyphens, or underscores')
   }
 }
 
+/**
+ * Build a packet for a request by reading the tree off disk.
+ *
+ * The read refuses any path that leaves the scope it named, so a request cannot
+ * pull in a file outside the engine or the project.
+ */
 export async function contextFromDisk(root, request, projectPath = 'project') {
   root = path.resolve(root)
   const project = path.resolve(root, projectPath)
@@ -156,6 +173,13 @@ export async function contextFromDisk(root, request, projectPath = 'project') {
   return resolveAgentContext(read, request, await onDisk(project, root).agentPlugins(), project)
 }
 
+/**
+ * Claim a run: build its packet, check the claim, and make a worktree when the
+ * caller asked for parallel work.
+ *
+ * The claim is checked twice — once before the worktree exists and again under
+ * the registry lock — so two prepares racing for one file cannot both win.
+ */
 export async function prepareAgent(root, id, request = {}, projectPath = 'project') {
   validateId(id)
   const main = mainWorktree(root)
@@ -242,6 +266,7 @@ export async function prepareAgent(root, id, request = {}, projectPath = 'projec
  * writes the whole command line.
  */
 const SERIAL = ['npm test', 'test/cli.bridge.mjs']
+/** Whether a required check needs the one dev server and editor tab, so a lane must defer it. */
 const isSerial = check => SERIAL.some(needle => check.includes(needle))
 
 /**
@@ -403,10 +428,12 @@ function gitWorktrees(main) {
     .map(line => path.resolve(line.slice('worktree '.length)))
 }
 
+/** Whether a branch ref exists in the checkout. */
 const branchExists = (main, branch) => {
   try { git(main, ['rev-parse', '--verify', '--quiet', branch]); return true } catch { return false }
 }
 
+/** Whether a branch's commits are already in HEAD. */
 const inHead = (main, branch) => {
   try { git(main, ['merge-base', '--is-ancestor', branch, 'HEAD']); return true } catch { return false }
 }

@@ -80,6 +80,7 @@ export function projectName(projectPath, title) {
  * Existing files are never touched, so this is safe to call on every start.
  */
 export async function ensureProject(projectPath, name) {
+  /** Write one starter file only if it is not already there. */
   const put = async (file, text) => {
     const target = path.join(projectPath, file)
     await fs.mkdir(path.dirname(target), { recursive: true })

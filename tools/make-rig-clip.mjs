@@ -2,7 +2,13 @@
 /**
  * Make a rig clip from a text prompt, through kimodo.cpp.
  *
- *   node tools/make-rig-clip.mjs --prompt "a person walks forward" --name walk
+ *   node tools/make-rig-clip.mjs --prompt "a person walks forward" --name walk --onto models/hero.glb
+ *
+ * The raw motion is stored in `<project>/assets/motion/source/<name>/`. With
+ * `--onto` it is then retargeted onto that model's own skeleton, through the
+ * bone map in `tools/lib/rig-maps` that fits it, into
+ * `assets/motion/<model name>/<name>.json`. `--source <name>` retargets stored
+ * motion without generating it again.
  *
  * Three doors to the same clip, in the order to try them:
  *
@@ -19,6 +25,8 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { buildClip, writeClip, readFloats, skeletonFor } from './lib/motion-clip.mjs'
+import { readModelSkeleton } from './lib/retarget.mjs'
+import { retargetSources, SOURCE_DIRECTORY } from './lib/retarget-clips.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const HOME = process.env.KIMODO_HOME || path.resolve(CHECKOUT, '..', 'kimodo.cpp')
@@ -41,6 +49,10 @@ const DEFAULTS = {
   textBundle: null,
   skeleton: null,
   map: null,
+  rest: null,
+  cycle: false,
+  onto: null,
+  source: null,
   fps: 30,
   loop: true,
   up: 'y',
@@ -54,6 +66,7 @@ function options(argv) {
     const key = argv[index]
     if (key === '--once') { settings.loop = false; continue }
     if (key === '--loop') { settings.loop = true; continue }
+    if (key === '--cycle') { settings.cycle = true; continue }
     if (!key.startsWith('--')) throw new Error(`unexpected argument ${key}`)
     const name = key.slice(2).replace(/-(.)/g, (_, letter) => letter.toUpperCase())
     if (!(name in settings)) throw new Error(`unknown option ${key}`)
@@ -69,6 +82,20 @@ async function generate(settings) {
   if (settings.from) return fromDirectory(settings.from, settings)
   if (settings.server) return fromServer(settings)
   return fromGenerator(settings)
+}
+
+/**
+ * Write generated buffers where `--source` and `rig.retarget` find them. The
+ * generator already writes there, so only a server's answer is written here.
+ */
+function storeSource(project, settings, motion) {
+  const directory = path.join(project, SOURCE_DIRECTORY, settings.name)
+  if (fs.existsSync(path.join(directory, 'local_rotations_xyzw.f32')) && !settings.server) return
+  fs.mkdirSync(directory, { recursive: true })
+  const bytes = values => Buffer.from(values.buffer, values.byteOffset, values.byteLength)
+  fs.writeFileSync(path.join(directory, 'local_rotations_xyzw.f32'), bytes(motion.rotations))
+  fs.writeFileSync(path.join(directory, 'root_positions.f32'), bytes(motion.root))
+  fs.writeFileSync(path.join(directory, 'prompt.txt'), settings.prompt || '')
 }
 
 /** The prompt a generator run left beside its buffers, when it left one. */
@@ -133,7 +160,9 @@ async function fromGenerator(settings) {
     }
   }
 
-  const workspace = path.join(CHECKOUT, 'agent-runs', 'rig-clips', settings.name)
+  // Stored in the project rather than scratch: the same motion can go onto any
+  // model later, and generating it again costs minutes.
+  const workspace = path.join(CHECKOUT, settings.project, SOURCE_DIRECTORY, settings.name)
   fs.mkdirSync(workspace, { recursive: true })
   const promptFile = path.join(workspace, 'prompt.txt')
   fs.writeFileSync(promptFile, settings.prompt)
@@ -182,7 +211,27 @@ const run = (command, args, libraries) => new Promise((resolve, reject) => {
 
 export async function main(argv = process.argv.slice(2)) {
   const settings = options(argv)
-  if (!settings.prompt && !settings.from) throw new Error('--prompt is required, or --from <directory>')
+  const project = path.join(CHECKOUT, settings.project)
+  if (settings.source) settings.from = path.join(project, SOURCE_DIRECTORY, settings.source)
+  if (!settings.prompt && !settings.from) throw new Error('--prompt is required, or --source <stored name>, or --from <directory>')
+
+  if (settings.onto) {
+    if (settings.from && !settings.source) throw new Error('--onto reads stored motion: use --source <name>, not --from')
+    if (!settings.source) storeSource(project, settings, await generate(settings))
+    const done = retargetSources({
+      project,
+      model: settings.onto,
+      clips: [settings.name],
+      once: settings.loop ? [] : [settings.name],
+      map: settings.map ? JSON.parse(fs.readFileSync(settings.map, 'utf8')) : null,
+      framesPerSecond: settings.fps
+    })
+    for (const one of done.written) console.log(`assets/${one.file} — ${one.frames} frames, ${one.nodes} nodes, ${done.rig} map`)
+    console.log(`
+declare it on the type:
+  rig: { clips: { ${settings.name}: '${done.written[0].file}' } }`)
+    return path.join(project, 'assets', done.written[0].file)
+  }
 
   const { rotations, root, frames, joints } = await generate(settings)
   if (!Number.isInteger(joints)) throw new Error(`${rotations.length} rotation values is not ${frames} frames of whole joints`)
@@ -193,6 +242,8 @@ export async function main(argv = process.argv.slice(2)) {
   const clip = buildClip({
     rotations, root, joints, frames, skeleton,
     map: settings.map ? JSON.parse(fs.readFileSync(settings.map, 'utf8')) : null,
+    model: settings.rest ? readModelSkeleton(settings.rest) : null,
+    cycle: settings.cycle,
     upAxis: settings.up,
     rootScale: settings.scale,
     framesPerSecond: settings.fps,

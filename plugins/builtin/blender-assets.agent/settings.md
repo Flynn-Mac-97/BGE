@@ -27,7 +27,7 @@ One file per `.blend`, beside it: `kitten.blend` → `kitten.import.json`.
 |---|---|
 | `scale` | multiplies every exported size. Use `0.01` for a file built in centimetres. |
 | `applyModifiers` | export shapes as modifiers leave them, not the base mesh. |
-| `collection` | export only this collection. `null` exports the whole file. |
+| `collection` | export only this collection, or a list: `["Hero", "Hero_Rig"]` — a character and its armature. Hidden objects in it are exported. `null` exports the whole file. |
 | `bake` | bake procedural material colour to a texture first. See `materials.md`. |
 | `bakeSize` | the baked image's width and height in pixels. Default 1024. |
 | `bakeSamples` | Cycles samples per bake. Default 16; colour alone needs few. |

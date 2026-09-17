@@ -1,0 +1,74 @@
+{
+  "_what": "SOMA-30 joints to Rigify DEF bones. Twist bones (.001), palms and fingers follow their parents.",
+  "_order": "Neck1 comes before the shoulders so Chest aims at the neck.",
+  "Hips": {
+    "node": "DEF-spine"
+  },
+  "Spine1": {
+    "node": "DEF-spine.001"
+  },
+  "Spine2": {
+    "node": "DEF-spine.002"
+  },
+  "Chest": {
+    "node": "DEF-spine.003",
+    "aim": "Neck1"
+  },
+  "Neck1": {
+    "node": "DEF-spine.004"
+  },
+  "Neck2": {
+    "node": "DEF-spine.005"
+  },
+  "Head": {
+    "node": "DEF-spine.006"
+  },
+  "LeftShoulder": {
+    "node": "DEF-shoulder.L"
+  },
+  "LeftArm": {
+    "node": "DEF-upper_arm.L"
+  },
+  "LeftForeArm": {
+    "node": "DEF-forearm.L"
+  },
+  "LeftHand": {
+    "node": "DEF-hand.L"
+  },
+  "RightShoulder": {
+    "node": "DEF-shoulder.R"
+  },
+  "RightArm": {
+    "node": "DEF-upper_arm.R"
+  },
+  "RightForeArm": {
+    "node": "DEF-forearm.R"
+  },
+  "RightHand": {
+    "node": "DEF-hand.R"
+  },
+  "LeftLeg": {
+    "node": "DEF-thigh.L"
+  },
+  "LeftShin": {
+    "node": "DEF-shin.L"
+  },
+  "LeftFoot": {
+    "node": "DEF-foot.L"
+  },
+  "LeftToeBase": {
+    "node": "DEF-toe.L"
+  },
+  "RightLeg": {
+    "node": "DEF-thigh.R"
+  },
+  "RightShin": {
+    "node": "DEF-shin.R"
+  },
+  "RightFoot": {
+    "node": "DEF-foot.R"
+  },
+  "RightToeBase": {
+    "node": "DEF-toe.R"
+  }
+}

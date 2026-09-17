@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS = {
   scale: 1,
   /** Export shapes as modifiers leave them, not as the base mesh. */
   applyModifiers: true,
-  /** Export only this collection. Null exports the whole file. */
+  /** Export only this collection, or a list of them — a character and its armature. Null exports the whole file. */
   collection: null,
   /**
    * Bake procedural material colour to an image before exporting.

@@ -98,8 +98,10 @@ const MODELLED = new Set([
   '_definition', '_detached', '_setByPlacement', '_extraKeys'
 ])
 
+/** Three decimal places, so a captured time or place round-trips through storage. */
 const round = n => Math.round(n * 1000) / 1000
 
+/** Whether a value is data: a plain or null-prototype object, not an array or an instance. */
 const isPlainObject = value =>
   !!value && typeof value === 'object' && !Array.isArray(value) &&
   (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)

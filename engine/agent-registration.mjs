@@ -84,6 +84,7 @@ function firstSentences(text, limit) {
     spans.push(span)
     return `@@${spans.length - 1}@@`
   })
+  /** Put the masked code spans back, so a split never cut inside one. */
   const restore = value => value.replace(/@@(\d+)@@/g, (_, index) => spans[index])
   const sentences = masked.match(/[^.!?]+[.!?]+(\s|$)/g) || []
   let out = ''
@@ -173,6 +174,7 @@ const pluginPlaces = (root, projectPath) => [
  */
 function frontmatterOf(guide) {
   const block = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
+  /** One frontmatter field's value, or undefined when the guide does not declare it. */
   const field = name => block?.match(new RegExp(`^${name}:\\s*(.+)$`, 'm'))?.[1]?.trim()
   return { skill: field('skill'), description: field('description'), triggers: field('triggers'), match: field('match') }
 }
@@ -191,10 +193,10 @@ const bodyOf = guide => guide.replace(/^---\s*\n[\s\S]*?\n---\s*/, '')
 async function detailOf(directory, stem) {
   const detailDirectory = path.join(directory, `${stem}.agent`)
   const names = await fs.readdir(detailDirectory).catch(() => [])
-  const parts = []
-  for (const name of names.filter(name => name.endsWith('.md')).sort()) {
-    parts.push(await fs.readFile(path.join(detailDirectory, name), 'utf8').catch(() => ''))
-  }
+  // Together rather than one at a time: a guide may keep many detail files, and
+  // waiting for each read before starting the next is time spent doing nothing.
+  const parts = await Promise.all(names.filter(name => name.endsWith('.md')).sort()
+    .map(name => fs.readFile(path.join(detailDirectory, name), 'utf8').catch(() => '')))
   return parts.join('\n')
 }
 
@@ -212,28 +214,38 @@ export async function pluginGuides(root, projectPath) {
   for (const place of pluginPlaces(root, projectPath)) {
     let names = []
     try { names = await fs.readdir(place.directory) } catch { continue }
-    for (const name of names.filter(name => name.endsWith('.agent.md')).sort()) {
-      const stem = name.slice(0, -'.agent.md'.length)
-      const source = await fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => null)
-      const pluginName = source?.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
-      // Deleted between the listing and the read. A guide that is gone is not a
-      // problem to report, and throwing here would end the whole check.
-      const text = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => null)
-      if (text === null) continue
-      guides.push({
-        scope: place.scope,
-        stem,
-        file: `${place.prefix}/${name}`,
-        fileFromRoot: `${place.fromRoot}/${name}`,
-        sourceFromRoot: `${place.fromRoot}/${stem}.js`,
-        hasSource: source !== null,
-        plugin: pluginName,
-        enabled: !disabled.has(pluginName),
-        frontmatter: frontmatterOf(text),
-        body: bodyOf(text),
-        detail: await detailOf(place.directory, stem)
-      })
-    }
+    // A guide, its source and its detail files, read together. This is every
+    // plugin in the checkout — guide, source and detail for each — and reading
+    // them one at a time was most of what `check` spent its time on. The list is
+    // sorted first and `Promise.all` keeps that order, so the problems are
+    // reported in the same order they always were.
+    const found = await Promise.all(
+      names.filter(name => name.endsWith('.agent.md')).sort().map(async name => {
+        const stem = name.slice(0, -'.agent.md'.length)
+        const [source, text, detail] = await Promise.all([
+          fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => null),
+          fs.readFile(path.join(place.directory, name), 'utf8').catch(() => null),
+          detailOf(place.directory, stem)
+        ])
+        // Deleted between the listing and the read. A guide that is gone is not a
+        // problem to report, and throwing here would end the whole check.
+        if (text === null) return null
+        const pluginName = source?.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
+        return {
+          scope: place.scope,
+          stem,
+          file: `${place.prefix}/${name}`,
+          fileFromRoot: `${place.fromRoot}/${name}`,
+          sourceFromRoot: `${place.fromRoot}/${stem}.js`,
+          hasSource: source !== null,
+          plugin: pluginName,
+          enabled: !disabled.has(pluginName),
+          frontmatter: frontmatterOf(text),
+          body: bodyOf(text),
+          detail
+        }
+      }))
+    guides.push(...found.filter(Boolean))
   }
   return guides
 }
@@ -244,10 +256,13 @@ export async function pluginsWithoutGuide(root, projectPath) {
   for (const place of pluginPlaces(root, projectPath)) {
     let names = []
     try { names = await fs.readdir(place.directory) } catch { continue }
-    for (const name of names.filter(name => name.endsWith('.js')).sort()) {
+    // Asked together. This is one `fs.access` per plugin in the checkout, and
+    // waiting for each answer before asking the next is the whole of its cost.
+    const missing = await Promise.all(names.filter(name => name.endsWith('.js')).sort().map(async name => {
       const guide = path.join(place.directory, `${name.slice(0, -'.js'.length)}.agent.md`)
-      if (await fs.access(guide).then(() => false, () => true)) found.push(`${place.fromRoot}/${name}`)
-    }
+      return await fs.access(guide).then(() => null, () => `${place.fromRoot}/${name}`)
+    }))
+    found.push(...missing.filter(Boolean))
   }
   return found
 }
@@ -258,7 +273,7 @@ export async function pluginsWithoutGuide(root, projectPath) {
  * Nothing is written here. One list serves both the writer and the check, so
  * the two can never disagree about what current means.
  */
-export async function generatedAgentFiles(root, projectPath) {
+export async function generatedAgentFiles(root, projectPath, guides = null) {
   // No source, nothing to generate. `check` calls this, so a missing file has
   // to be an empty answer rather than an exception that stops every other
   // problem being reported.
@@ -271,7 +286,7 @@ export async function generatedAgentFiles(root, projectPath) {
     { path: 'AGENTS.md', source: BOOTSTRAP, text: bootstrap },
     { path: 'CLAUDE.md', source: BOOTSTRAP, text: bootstrap }
   ]
-  for (const guide of await pluginGuides(root, projectPath)) {
+  for (const guide of guides || await pluginGuides(root, projectPath)) {
     // The listing belongs to the engine, not to whichever game is open. It is
     // written when the workspace opens and does not change when the project
     // does, so two games in one checkout cannot overwrite each other's. A
@@ -379,8 +394,8 @@ export async function writeGeneratedAgentFiles(root, projectPath) {
  * start, so a stale file is read by every agent for a whole session and there
  * is no second chance to correct it.
  */
-export async function generatedFileProblems(root, projectPath) {
-  const files = await generatedAgentFiles(root, projectPath)
+export async function generatedFileProblems(root, projectPath, guides = null) {
+  const files = await generatedAgentFiles(root, projectPath, guides)
   const problems = []
   for (const file of files) {
     const onDisk = await fs.readFile(path.join(root, file.path), 'utf8').catch(() => null)
@@ -411,9 +426,9 @@ export async function generatedFileProblems(root, projectPath) {
  * skill and the generator would silently drop it — a dropped declaration reads
  * exactly like a plugin that never wanted one.
  */
-export async function skillRegistrationProblems(root, projectPath) {
+export async function skillRegistrationProblems(root, projectPath, guides = null) {
   const problems = []
-  for (const guide of await pluginGuides(root, projectPath)) {
+  for (const guide of guides || await pluginGuides(root, projectPath)) {
     // An opt-out is a decision, not a broken declaration: the guide still
     // arrives in a packet when the task names the plugin.
     if (!listedForAgents(guide)) continue
@@ -532,29 +547,39 @@ function commandIds(source) {
  * A warning, not a failure: a plugin may register something deliberately
  * internal, and a guide is prose that cannot be generated from an id.
  */
-export async function undocumentedCommandProblems(root, projectPath) {
+export async function undocumentedCommandProblems(root, projectPath, guides = null) {
+  const listed = (guides || await pluginGuides(root, projectPath))
+    .filter(guide => guide.enabled && guide.hasSource)
+  // Read the sources together rather than one at a time while walking the list.
+  // Each is read only to look for command ids its guide does not name, and no
+  // read depends on another.
+  const sources = await Promise.all(listed.map(guide =>
+    fs.readFile(path.join(root, guide.sourceFromRoot), 'utf8').catch(() => null)))
   const problems = []
-  for (const guide of await pluginGuides(root, projectPath)) {
-    if (!guide.enabled || !guide.hasSource) continue
-    const source = await fs.readFile(path.join(root, guide.sourceFromRoot), 'utf8').catch(() => null)
-    if (source === null) continue
+  listed.forEach((guide, at) => {
+    const source = sources[at]
+    if (source === null) return
     const documented = `${guide.body}\n${guide.detail}`
     const missing = [...new Set(commandIds(source))].filter(id => !documented.includes(id)).sort()
-    if (!missing.length) continue
+    if (!missing.length) return
     problems.push({
       warning: true,
       file: guide.fileFromRoot,
       why: `registers ${missing.join(', ')} and its guide names none of them. An agent reads the guide before its first call, so an undocumented verb is one nothing will use`
     })
-  }
+  })
   return problems
 }
 
 /** Everything this module reports, for one call from `check`. */
 export async function agentRegistrationProblems(root, projectPath) {
+  // Read the guides once and hand the same list to all three checks. Each one
+  // compares against that same list, and reading every guide, its source and its
+  // detail files three times over was half of what `check` spent its time on.
+  const guides = await pluginGuides(root, projectPath)
   return [
-    ...await generatedFileProblems(root, projectPath),
-    ...await skillRegistrationProblems(root, projectPath),
-    ...await undocumentedCommandProblems(root, projectPath)
+    ...await generatedFileProblems(root, projectPath, guides),
+    ...await skillRegistrationProblems(root, projectPath, guides),
+    ...await undocumentedCommandProblems(root, projectPath, guides)
   ]
 }

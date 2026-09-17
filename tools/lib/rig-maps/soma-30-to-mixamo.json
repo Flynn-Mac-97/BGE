@@ -1,0 +1,71 @@
+{
+  "_what": "SOMA-30 joints to Mixamo bones. Names keep the mixamorig: prefix the file carries.",
+  "_order": "Neck comes before the shoulders so Spine2 aims at the neck.",
+  "Hips": {
+    "node": "mixamorig:Hips"
+  },
+  "Spine1": {
+    "node": "mixamorig:Spine"
+  },
+  "Spine2": {
+    "node": "mixamorig:Spine1"
+  },
+  "Chest": {
+    "node": "mixamorig:Spine2",
+    "aim": "Neck1"
+  },
+  "Neck1": {
+    "node": "mixamorig:Neck"
+  },
+  "Head": {
+    "node": "mixamorig:Head"
+  },
+  "LeftShoulder": {
+    "node": "mixamorig:LeftShoulder"
+  },
+  "LeftArm": {
+    "node": "mixamorig:LeftArm"
+  },
+  "LeftForeArm": {
+    "node": "mixamorig:LeftForeArm"
+  },
+  "LeftHand": {
+    "node": "mixamorig:LeftHand"
+  },
+  "RightShoulder": {
+    "node": "mixamorig:RightShoulder"
+  },
+  "RightArm": {
+    "node": "mixamorig:RightArm"
+  },
+  "RightForeArm": {
+    "node": "mixamorig:RightForeArm"
+  },
+  "RightHand": {
+    "node": "mixamorig:RightHand"
+  },
+  "LeftLeg": {
+    "node": "mixamorig:LeftUpLeg"
+  },
+  "LeftShin": {
+    "node": "mixamorig:LeftLeg"
+  },
+  "LeftFoot": {
+    "node": "mixamorig:LeftFoot"
+  },
+  "LeftToeBase": {
+    "node": "mixamorig:LeftToeBase"
+  },
+  "RightLeg": {
+    "node": "mixamorig:RightUpLeg"
+  },
+  "RightShin": {
+    "node": "mixamorig:RightLeg"
+  },
+  "RightFoot": {
+    "node": "mixamorig:RightFoot"
+  },
+  "RightToeBase": {
+    "node": "mixamorig:RightToeBase"
+  }
+}

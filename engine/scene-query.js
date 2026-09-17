@@ -226,4 +226,5 @@ export function diffMoments(before, after) {
   return { appeared, gone, moved, enteredFrame, leftFrame }
 }
 
+/** Two decimal places, so a moved distance reads as motion rather than noise. */
 const round = n => Math.round(n * 100) / 100

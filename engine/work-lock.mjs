@@ -16,6 +16,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+/** Parse one coordination file, or null when it is missing or broken. */
 const readJson = file => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null }
 }
@@ -74,6 +75,7 @@ function proveLaneBrowsers(browsers) {
   return { live, stale }
 }
 
+/** One sentence naming the stale lane records, or an empty string when there are none. */
 const staleSentence = stale => {
   if (!stale.length) return ''
   const one = stale.length === 1
@@ -81,6 +83,14 @@ const staleSentence = stale => {
     `${stale.map(entry => entry.id).join(', ')}. Run lanes.stop to clear ${one ? 'it' : 'them'}.`
 }
 
+/**
+ * Whether the checkout is locked, by whom, and which records are stale.
+ *
+ * Derived on every call from the agent registry and the lane browsers, so
+ * nothing has to remember to unlock. An agent run has no process to prove, so
+ * it holds until `agent.release`; a lane browser holds only while its process
+ * is alive.
+ */
 export function workLock(root) {
   const engineDirectory = path.join(root, COORDINATION)
   const runs = readJson(path.join(engineDirectory, 'agents.json'))?.runs || []

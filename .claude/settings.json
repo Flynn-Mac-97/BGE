@@ -6,7 +6,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PROJECT_DIR}/tools/claude-code-session-rules.mjs"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/tools/claude-code-session-rules.mjs"
+            ],
             "timeout": 20,
             "statusMessage": "Reading the engine rules"
           }
@@ -19,7 +21,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PROJECT_DIR}/tools/claude-code-session-rules.mjs"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/tools/claude-code-session-rules.mjs"
+            ],
             "timeout": 20
           }
         ]
@@ -32,8 +36,29 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PROJECT_DIR}/tools/claude-code-style-reminder.mjs"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/tools/claude-code-style-reminder.mjs"
+            ],
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s --max-time 1 -X POST -H \"Content-Type: application/json\" --data-binary @- http://localhost:4322/api/events"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s --max-time 1 -X POST -H \"Content-Type: application/json\" --data-binary @- http://localhost:4322/api/events"
           }
         ]
       }

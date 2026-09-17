@@ -189,3 +189,10 @@ while entities keep running the last version that parsed.
 Two things still reload the page: editing a **plugin** (it owns DOM and
 listeners), and **deleting** any project file (Vite does not consult plugins on
 unlink).
+
+
+## Discover command and plugin contracts
+
+Before guessing command arguments, run `node bin/engine.mjs --headless run agent.commands '{"query":"words"}'`.
+Use `run agent.contracts '{"plugin":"Exact Display Name"}'` to inspect owned services and scheduling dependencies.
+Follow nextOffset for another page. Undeclared schemas and legacy lifecycle ownership are explicit gaps; consult the guide for those plugins.

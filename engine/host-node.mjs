@@ -33,6 +33,7 @@ function runProgram(command, args = [], { cwd, timeout = 600000, input } = {}) {
       return resolve({ code: null, out: '', error: String(error?.message || error) })
     }
     let out = '', error = ''
+    /** Append output, keeping only the last KEEP characters so a chatty tool cannot exhaust memory. */
     const keep = (text, into) => (into + text).slice(-KEEP)
     child.stdout?.on('data', chunk => { out = keep(String(chunk), out) })
     child.stderr?.on('data', chunk => { error = keep(String(chunk), error) })

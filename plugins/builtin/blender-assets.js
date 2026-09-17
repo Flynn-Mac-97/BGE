@@ -329,6 +329,17 @@ export default {
       }
     },
     {
+      id: 'blender.inspect',
+      label: 'What a .blend holds: each character\'s armature, meshes, height and the collection setting that exports it',
+      // args: {"file":"assets/models/figures.blend"}
+      run: async (context, args) => {
+        const asked = typeof args === 'string' ? { file: args } : (args || {})
+        if (!context.host) return needsNode('blender.inspect', asked)
+        if (!/\.blend$/i.test(String(asked.file || ''))) throw new Error('name a .blend file')
+        return (await nodeHalf()).inspectBlend(context.host, await findBlender(context), String(asked.file))
+      }
+    },
+    {
       id: 'blender.settings',
       label: 'Write the import settings for a .blend',
       // args: {"file":"assets/models/kitten.blend","scale":0.01}

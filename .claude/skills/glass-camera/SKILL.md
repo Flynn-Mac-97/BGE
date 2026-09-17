@@ -14,3 +14,4 @@ description: What the player sees and how it follows — orthographic follow, fi
 - Follow, move, and shake through `context.camera`. A shake turns the aim in first person and knocks the eye in third.
 - Check state with `camera.state` — it reports the eye, the focus, and why it is not following anything.
 - `view.follows` carries the followed entity's id, or null. It is the only kernel-visible answer to "which body is the player's"; the renderer reads it to place the ground ring.
+- It steps on the fixed clock. For a mouse-driven 3D camera use **Live Camera** (a level `cameras` list), which updates every drawn frame; give a level one or the other.

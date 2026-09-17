@@ -24,7 +24,11 @@ const clientName = () => {
   try { return globalThis.sessionStorage?.getItem('engine:tab-id') || '' } catch { return '' }
 }
 
-/** Talk to the dev server. The transport the editor uses. */
+/**
+ * Talk to the dev server. The transport the editor uses.
+ *
+ * @returns {object} The transport `makeFiles` reads and writes through.
+ */
 export function overHTTP() {
   const j = async (url, options) => {
     const r = await fetch(url, options)
@@ -40,6 +44,12 @@ export function overHTTP() {
     tree: () => j('/api/tree'),
     agentPlugins: () => j('/api/agent-plugins'),
     read: async path => (await j('/api/file?path=' + encodeURIComponent(path))).text,
+    sourceCatalog: (selection = 'core') => j('/api/systems/catalog?selection=' + encodeURIComponent(selection)),
+    listDocuments: () => j('/api/systems/documents'),
+    readDocument: (id, backup = false) => j('/api/systems/document?id=' + encodeURIComponent(id) + '&backup=' + backup),
+    writeDocument: (id, data, revision) => j('/api/systems/document', { method:'POST', headers:writeHeaders(), body:JSON.stringify({id,data,revision}) }),
+    writeSource: (scope, file, text, expectedHash) => j('/api/systems/source', { method:'POST', headers:writeHeaders(), body:JSON.stringify({scope,file,text,expectedHash}) }),
+    readSource: (scope, path) => j('/api/systems/source?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path)),
     readAgent: async (scope, path) => (await j('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
     write: (path, text) => j('/api/file', {
       method: 'POST',
@@ -70,6 +80,17 @@ const laneRenderPageGuard = () => {
   return `this page renders for ${who}, and a lane render page never writes the shared checkout`
 }
 
+/**
+ * The file surface the world writes through.
+ *
+ * Every write passes the guards, then the transport. A refusal is recorded and
+ * announced rather than thrown away, because a refused write and a write still
+ * in flight both leave `pending` at zero — only `refused` tells them apart.
+ *
+ * @param {object} bus The bus writes and refusals are announced on.
+ * @param {object} [transport] Where bytes land; the dev server by default.
+ * @returns {object} The file surface: read, write, guards and their state.
+ */
 export function makeFiles(bus, transport = overHTTP()) {
   let writing = 0
 
@@ -129,6 +150,24 @@ export function makeFiles(bus, transport = overHTTP()) {
     async tree() { return transport.tree() },
     async agentPlugins() { return transport.agentPlugins() },
     async read(path) { return transport.read(path) },
+    async sourceCatalog(selection = 'core') {
+      if (!transport.sourceCatalog) throw new Error('source catalog unavailable in this transport')
+      return transport.sourceCatalog(selection)
+    },
+    async listDocuments() { return transport.listDocuments() },
+    async readDocument(id, backup = false) { return transport.readDocument(id, backup) },
+    async writeDocument(id, data, revision) {
+      stopIfRefused('.engine/systems/' + id + '.json', 'project')
+      return transport.writeDocument(id, data, revision)
+    },
+    async writeSource(scope, file, text, expectedHash) {
+      stopIfRefused(file, scope)
+      return transport.writeSource(scope, file, text, expectedHash)
+    },
+    async readSource(scope, path) {
+      if (!transport.readSource) throw new Error('source inspection is unavailable in this transport')
+      return transport.readSource(scope, path)
+    },
     async readAgent(scope, path) { return transport.readAgent(scope, path) },
 
     async write(path, text) {

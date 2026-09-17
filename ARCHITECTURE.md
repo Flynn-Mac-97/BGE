@@ -47,3 +47,46 @@ step.
 | `docs/surfaces.md` | the ways in: editor gestures, the CLI, the bridge, headless |
 | `docs/agent-workspace.md` | the instruction tree, packets, project overrides, live reload |
 | `docs/design.md` | design rules the code follows, what is deliberately absent, known gaps |
+
+
+## Systems Inspector
+
+Open **SYSTEMS** in the editor toolbar to inspect Engine Core separately from Plugins.
+Expand fixed/frame systems in their registered order and select a node to read code.
+Entity updates expand into representative loaded types and their behaviour hooks.
+The kernel outline is a teaching view; plugin children come from the live registry.
+This is scheduled flow, not an execution trace. Source access is read-only.
+Commands and limits: `plugins/builtin/systems-inspector.agent.md`.
+
+Systems Inspector opens across the editor window. **Systems Map** shows core modules and labelled relationships, with plugins grouped separately. Simulation and presentation remain separate views. Use **Dock view** or **Close** to return to the editor.
+
+**Function calls** in the Systems Inspector parses the selected full source file. Select a function to inspect calls and file-local callers, jump to call-site lines, or follow local definitions and direct relative imports. Dynamic calls are marked unresolved. This does not record runtime execution.
+
+Select a module in Systems Map to highlight its connections while keeping the full map visible. Call lines link resolved imported functions, labelled caller → function; arrows open call sites. Import lines is a separate mode.
+
+The core map inventories index.html and all engine/ JavaScript, MJS and CSS sources from disk. It marks engine/index.js as browser main and draws literal imports. Hover or select a file to highlight its connections. Selection opens source beside the map; Local function detail is optional.
+
+## Systems Workspace: inspection, design and visual scripting
+
+Systems Inspector consumes three ordinary scoped plugins: Monaco Code Editor (`editor.code`), JointJS Diagrams (`editor.diagram`), and ELK Graph Layout (`graph.layout`). The loader orders these services and disables the consumer before a provider. Their libraries load on demand. Monaco owns editor models and workers; JointJS owns diagram papers; the consumer owns source buffers, validation and disk writes. The workspace view and its styles are in the Systems Inspector plugin, not the kernel UI.
+
+ELK arranges source calls with fixed ports at function rows and returns orthogonal routes. JointJS renders file compartments and interactions. Layout requests discard stale scan results. Headless sessions register the same services without loading browser editors, and can use ELK to arrange graphs.
+
+SYSTEMS opens a fullscreen workspace. Inspect code scans source files across engine, builtin plugins and game plugins. The graph follows parsed imports and resolved function calls; it never executes source. Filter by source group or file, select nodes and call sites, and inspect coupling, cycles and unresolved code.
+
+Design mode creates editable architecture drafts with typed nodes, connections, responsibility, inputs, outputs, constraints, decisions and acceptance criteria. Save and reopen project-local versioned diagrams; use undo/redo, JSON import, SVG/Mermaid export or an AI implementation brief. A source-linked draft reports changed evidence after a scan.
+
+Visual scripting converts one selected JavaScript function into code, condition, while and return nodes. Preview validates the flow before Apply writes that function back. Arbitrary statements remain code blocks; generators remain source-only. Source writes check the original hash, retain a backup, and preserve surrounding code. Invalid or conflicting changes remain editable.
+
+The host adapter and UI are separate from `plugins/builtin/systems-inspector/toolkit/`, a plain-data library with a standalone source-scanning CLI. Its README documents reuse outside the engine. Diagrams are stored under the game's `.engine/systems/`, with optimistic revision checks and one previous saved revision.
+
+
+## Plugin and agent contracts
+
+The loader now owns scoped plugin resources and compiles system schedules.
+A plugin may also declare start-up work it cannot finish synchronously, through
+`context.startup`; the world is not handed over until that work has settled.
+Use `node bin/engine.mjs --headless run agent.commands '{"query":"profile"}'`
+to discover command arguments, and `run agent.contracts` for service owners,
+dependencies, lifecycle coverage and schedules. Reports are paginated.
+Contracts and migration limits are documented in `docs/kernel.md`.

@@ -1,6 +1,9 @@
 /**
  * Kernel: the channel plugins talk through.
  * Deliberately tiny — if this grows, something belongs in a plugin instead.
+ *
+ * @returns {object} `on(event, listener)` returns its own unsubscribe;
+ *   `emit(event, ...payload)` calls every listener for the event.
  */
 export function makeBus() {
   const map = new Map()

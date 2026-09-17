@@ -27,6 +27,12 @@ export function reportImportFailure(loader, file, error, builtin = false) {
   else console.error(`[loader] ${file} failed to import`, error)
 }
 
+/** Where a definition was found, keyed by the definition so a plugin cannot claim another's location. */
+const sources = new WeakMap()
+
+/** The location `importPlugin` recorded for a definition, or null when it did not import it. */
+export const sourceOfPlugin = definition => definition ? sources.get(definition) || null : null
+
 /**
  * Import one plugin file. Returns its definition, or null when there is none —
  * because the file threw, or because it exports nothing.
@@ -38,7 +44,14 @@ export function reportImportFailure(loader, file, error, builtin = false) {
  */
 export async function importPlugin({ file, load, loader, builtin = false }) {
   try {
-    return (await load()).default || null
+    const definition = (await load()).default || null
+    if (definition && typeof definition === 'object') {
+      const path = String(file).replaceAll('\\', '/')
+      sources.set(definition, builtin
+        ? { scope: 'engine', file: path.replace(/^\//, '') }
+        : { scope: 'project', file: 'plugins/' + path.split('/').pop() })
+    }
+    return definition
   } catch (error) {
     reportImportFailure(loader, file, error, builtin)
     return null
