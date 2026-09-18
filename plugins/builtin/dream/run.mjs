@@ -78,6 +78,39 @@ export function runStatus({ checkout, directory }) {
 }
 
 /**
+ * What a run wrote about itself.
+ *
+ * Read here rather than through `context.files`, which is the project's file
+ * surface: a run lives in `agent-runs/`, inside the checkout, and that surface
+ * cannot reach it. So a report is read from disk and handed back as text, with
+ * the paths a person needs to open the pictures.
+ */
+export function readReport({ checkout, directory }) {
+  const name = path.basename(directory ?? '')
+  const runDirectory = path.join(checkout, RUNS, name)
+  if (!name.startsWith(RUN_PREFIX) || !existsSync(runDirectory)) return { refused: `no run at ${directory}` }
+
+  const markdown = (() => {
+    try {
+      return readFileSync(path.join(runDirectory, 'report.md'), 'utf8')
+    } catch {
+      return null
+    }
+  })()
+
+  const where = file => {
+    const at = path.join(runDirectory, file)
+    return existsSync(at) ? at : null
+  }
+  const paths = { report: where('report.md'), graph: where('graph.svg'), tree: where('tree.svg'), winner: where('winner.patch') }
+
+  if (!markdown) {
+    return { refused: `this run has written no report yet — it writes one after the first round`, paths }
+  }
+  return { run: name, paths, markdown }
+}
+
+/**
  * Start a run: make its directory, then hand the work to a detached loop.
  *
  * The directory is made here rather than by the loop so the plugin can answer

@@ -211,8 +211,7 @@ export default {
         if (!context.host) return needsNode('dream.report')
         const run = directory ? state.runs.find(one => one.name === directory || one.directory === directory) ?? newest() : newest()
         if (!run) return { refused: 'no run to report on' }
-        const text = await context.files.read(`${run.directory}/report.md`).catch(() => null)
-        return text ?? { refused: `no report at ${run.directory}/report.md`, run: shape(run) }
+        return (await node()).readReport({ checkout: context.host.checkout, directory: run.directory })
       }
     },
     {
