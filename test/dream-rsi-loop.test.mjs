@@ -109,6 +109,10 @@ test('the whole loop explores, pools, dreams, redeploys and names a winner', asy
   const summary = JSON.parse(await fs.readFile(path.join(directory, 'rsi-summary.json'), 'utf8'))
   const deployed = JSON.parse(await fs.readFile(path.join(directory, 'rsi.json'), 'utf8'))
   const pool = await fs.readdir(path.join(directory, 'pool'))
+  const roundFiles = {}
+  for (const name of ['round-001', 'round-002']) {
+    roundFiles[name] = await fs.readdir(path.join(directory, 'rsi', name)).catch(() => [])
+  }
   await fs.rm(directory, { recursive: true, force: true })
 
   assert.equal(result.error, undefined, result.error)
@@ -121,16 +125,21 @@ test('the whole loop explores, pools, dreams, redeploys and names a winner', asy
   // Round one played the shipping policy; round two played what dreaming deployed.
   assert.equal(result.rounds[0].policy.name, 'parallel-refine')
   assert.equal(result.rounds[1].policy.name, 'branch-one-first', 'the redeployed policy was not the one dreaming selected')
-  assert.equal(result.rounds[1].dreaming.winner.file.endsWith('v001.mjs'), true, 'the winning version was not the revised one')
+  assert.equal(result.rounds[0].dreaming.winner.file.endsWith('v001.mjs'), true, 'round one did not select the revised version')
+  assert.equal(result.rounds[0].dreaming.improved, true, 'the revised version did not beat the shipping policy')
+  // Round two's revision writes the same policy again, so the version it started
+  // from ties with it — and a tie keeps the policy already deployed, which is the
+  // paper's guarantee that the selected policy is never worse than the current one.
+  assert.equal(result.rounds[1].dreaming.winner.version, 0, 'an unchanged revision displaced the policy it was copied from')
+  assert.equal(result.rounds[1].dreaming.gain, 0)
 
   assert.equal(summary.best.score, 0.8, 'the winner is not the best attempt that was really made')
   assert.equal(summary.improvement, 0.6)
   assert.ok(files.includes('winner.patch'), 'the winner patch was not written')
   assert.equal(deployed.phase, 'done')
   for (const name of ['round-001', 'round-002']) {
-    const roundFiles = await fs.readdir(path.join(directory, 'rsi', name))
-    assert.ok(roundFiles.includes('rollout.json'), `${name} kept no rollout record`)
-    assert.ok(roundFiles.includes('dreaming.json'), `${name} kept no dreaming record`)
+    assert.ok(roundFiles[name].includes('rollout.json'), `${name} kept no rollout record`)
+    assert.ok(roundFiles[name].includes('dreaming.json'), `${name} kept no dreaming record`)
   }
 })
 

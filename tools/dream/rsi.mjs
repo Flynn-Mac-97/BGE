@@ -92,8 +92,14 @@ export async function rsiRun({
   attempt = null,
   revise = undefined
 } = {}) {
-  const ready = preflight(checkout)
-  if (ready.error) return { error: ready.error }
+  // The clean-baseline guard is about real candidates: each one is a worktree
+  // branched from HEAD, so work that is not committed is work it cannot see. An
+  // injected attempt makes no worktree, so the guard would refuse a run that
+  // touches nothing — and would make the loop untestable without committing.
+  if (!attempt) {
+    const ready = preflight(checkout)
+    if (ready.error) return { error: ready.error }
+  }
 
   let directory = runDirectory
   if (!directory) {
