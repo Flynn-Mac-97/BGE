@@ -10,9 +10,15 @@
  * The loop stops when the rounds run out, when `patience` rounds bring no
  * improvement, or when the plugin is asked to stop. Everything it decided is in
  * the run's directory: the target, the setup, one record per candidate, the
- * winner's patch, and a status file the plugin reads.
+ * winner's patch, a status file the plugin reads, and `history.json` holding the
+ * run's whole state in one file.
+ *
+ * A run is resumed by naming its directory. It continues after its last recorded
+ * round, from the best version those rounds produced, so ten rounds can be run
+ * as ten, or as three rounds then seven, without a record being overwritten.
  *
  * Usage: node tools/dream/loop.mjs --target "<what to improve>" [--rounds 3] [--candidates 1] [--patience 2]
+ *        node tools/dream/loop.mjs --run agent-runs/dream-... --rounds 7
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -23,7 +29,7 @@ import { costBands, sumCosts } from './pricing.mjs'
 import { renderReport } from './report.mjs'
 import { CHECKOUT, designSetup, preflight, recordSetupCheck, startRun, verifySetup } from './setup.mjs'
 
-/** Rounds of candidates after the setup is frozen. */
+/** Rounds of candidates after the setup is frozen. On a resume, this many more. */
 const DEFAULT_ROUNDS = 3
 
 /** Candidates tried in one round. Each is one agent working in its own worktree. */
@@ -136,7 +142,12 @@ export async function dreamRun({
   // record, so a resumed run still counts what it spent before the resume.
   const designRecord = JSON.parse(await fs.readFile(path.join(directory, 'design.json'), 'utf8').catch(() => 'null'))
   const spent = designRecord?.tokens ? [costBands(designRecord.tokens)] : []
-  let incumbent = {
+
+  // A resume picks up where the records stop: the round after the last one
+  // written, the best version those rounds produced, and the rounds that have
+  // already brought nothing.
+  const prior = await recordedState(directory)
+  const baseline = {
     id: 'baseline',
     value: checkRecord.working.value,
     measures: checkRecord.working.totals?.measures ?? null,
@@ -144,11 +155,26 @@ export async function dreamRun({
     depth: 0,
     patch: null
   }
-  const history = []
+  let incumbent = prior.best ?? baseline
+  const history = [...prior.attempts]
+  const roundLog = [...prior.rounds]
   const id = path.basename(directory).replace(/^dream-/, '')
 
-  let withoutImprovement = 0
-  for (let round = 1; round <= rounds; round++) {
+  await writeHistory(directory, {
+    run: path.basename(directory),
+    target: targetText,
+    setup: { name: setup.name, digest: suiteHash },
+    baseline: { value: baseline.value, measures: baseline.measures },
+    best: { id: incumbent.id, value: incumbent.value, measures: incumbent.measures },
+    rounds: roundLog,
+    attempts: history,
+    cost: sumCosts(spent),
+    resumedFrom: prior.lastRound || null
+  })
+
+  let withoutImprovement = prior.withoutImprovement
+  const firstRound = prior.lastRound + 1
+  for (let round = firstRound; round < firstRound + rounds; round++) {
     if (await stopRequested(directory)) {
       await writeStatus(directory, { status: 'stopped', round, best: incumbent })
       break
@@ -199,6 +225,17 @@ export async function dreamRun({
       `${JSON.stringify({ round, improved, best: { id: incumbent.id, value: incumbent.value, depth: incumbent.depth } }, null, 2)}\n`,
       'utf8'
     )
+    roundLog.push({ round, improved, best: { id: incumbent.id, value: incumbent.value, depth: incumbent.depth } })
+    await writeHistory(directory, {
+      run: path.basename(directory),
+      target: targetText,
+      setup: { name: setup.name, digest: suiteHash },
+      baseline: { value: baseline.value, measures: baseline.measures },
+      best: { id: incumbent.id, value: incumbent.value, measures: incumbent.measures },
+      rounds: roundLog,
+      attempts: history,
+      cost: sumCosts(spent)
+    })
     // Rewritten every round, so the document and the pictures follow the run
     // while it is still going rather than being a summary written at the end.
     await renderReport(directory)
@@ -246,6 +283,17 @@ export async function dreamRun({
   }
 
   await fs.writeFile(path.join(directory, 'winner.json'), `${JSON.stringify(winner, null, 2)}\n`, 'utf8')
+  await writeHistory(directory, {
+    run: path.basename(directory),
+    target: targetText,
+    setup: { name: setup.name, digest: suiteHash },
+    baseline: { value: baseline.value, measures: baseline.measures },
+    best: { id: incumbent.id, value: incumbent.value, measures: incumbent.measures },
+    rounds: roundLog,
+    attempts: history,
+    winner: { id: winner.id, value: winner.value, improvement: winner.improvement, patch: winner.patch ?? null },
+    cost: sumCosts(spent)
+  })
   await writeStatus(directory, { status: 'done', best: incumbent, cost: sumCosts(spent) })
   await renderReport(directory)
   return {
@@ -255,6 +303,74 @@ export async function dreamRun({
     history,
     baseline: { value: checkRecord.working.value, measures: checkRecord.working.totals?.measures ?? null }
   }
+}
+
+/**
+ * What a run has already done, read from its own records.
+ *
+ * A run is resumed by naming its directory, so everything the loop needs must
+ * come off disk: how far it got, what the best version is, the patch that
+ * version consists of, and how many rounds running have brought nothing. Without
+ * this a resume restarts at round one and overwrites the records it already
+ * wrote, and a best version found before the resume would be forgotten and could
+ * be replaced by a worse one.
+ */
+export async function recordedState(runDirectory) {
+  const roundsDirectory = path.join(runDirectory, 'rounds')
+  const names = (await fs.readdir(roundsDirectory).catch(() => [])).sort()
+
+  const attempts = []
+  const rounds = []
+  let best = null
+  let lastRound = 0
+  let withoutImprovement = 0
+
+  for (const name of names) {
+    const directory = path.join(roundsDirectory, name)
+    const round = Number(name.replace(/^r/, ''))
+    if (!Number.isFinite(round)) continue
+    lastRound = Math.max(lastRound, round)
+
+    const files = await fs.readdir(directory).catch(() => [])
+    for (const file of files.filter(entry => entry.endsWith('.json') && entry !== 'round.json').sort()) {
+      try {
+        const record = JSON.parse(await fs.readFile(path.join(directory, file), 'utf8'))
+        attempts.push({ id: record.id, value: record.value, pass: record.verdict === 'scored', reason: record.reason ?? null })
+        if (record.best === true) {
+          const patch = path.join(directory, `${record.id}.patch`)
+          best = {
+            id: record.id,
+            value: record.value,
+            measures: record.measures ?? null,
+            pass: true,
+            depth: record.depth ?? 1,
+            patch: (await fs.access(patch).then(() => true, () => false)) ? patch : null
+          }
+        }
+      } catch { /* a candidate still being written */ }
+    }
+
+    const record = JSON.parse(await fs.readFile(path.join(directory, 'round.json'), 'utf8').catch(() => 'null'))
+    if (record) {
+      rounds.push({ round, improved: record.improved === true, best: record.best ?? null })
+      withoutImprovement = record.improved ? 0 : withoutImprovement + 1
+    }
+  }
+
+  return { lastRound, attempts, rounds, best, withoutImprovement }
+}
+
+/**
+ * The run's whole state in one file.
+ *
+ * Written after every round beside the records it summarises, so an agent or a
+ * person can read what a run has done without walking the round directories, and
+ * so a run interrupted mid-round still says what it knew.
+ */
+async function writeHistory(runDirectory, state) {
+  const file = path.join(runDirectory, 'history.json')
+  await fs.writeFile(file, `${JSON.stringify({ ...state, updatedAt: new Date().toISOString() }, null, 2)}\n`, 'utf8')
+  return file
 }
 
 // Run directly: one target, to a winner.

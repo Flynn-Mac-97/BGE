@@ -13,11 +13,26 @@ agent-runs/dream-<stamp>-<target>/
   tree.svg             who descends from whom
   winner.json          the best version, and its improvement
   winner.patch         the winning diff
+  history.json         the run's whole state in one file: rounds, attempts, best, cost
   rounds/r0001/
     c1.json            one candidate: verdict, measures, tokens, duration, report
     c1.patch           what that candidate changed
     round.json         whether the round improved
 ```
+
+## Resuming a run
+
+A run is resumed by naming its directory. It continues after its last recorded
+round and from the best version those rounds produced, so ten rounds may be run
+as ten, or as three and then seven, without a record being overwritten:
+
+```
+node tools/dream/loop.mjs --run agent-runs/dream-<stamp>-<target> --rounds 7
+```
+
+`--rounds` is always how many more rounds this invocation may run. The rounds
+already brought nothing are counted too, so a resumed run still stops when it has
+stopped improving.
 
 ## Reading the pictures
 

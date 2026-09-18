@@ -9,7 +9,7 @@ import { costOf, bandAt, costBands, sumCosts } from '../tools/dream/pricing.mjs'
 import { digestOf, loadSetup, scoreRun } from '../tools/dream/scoring.mjs'
 import { sessionTokens } from '../tools/dream/measures.mjs'
 import { renderReport } from '../tools/dream/report.mjs'
-import { writeCandidateRecord } from '../tools/dream/loop.mjs'
+import { writeCandidateRecord, recordedState } from '../tools/dream/loop.mjs'
 import { replaceOnce } from '../tools/dream/worktree.mjs'
 import reference from '../tools/dream/examples/agent-connection.mjs'
 
@@ -137,6 +137,39 @@ test('a sum keeps both bands and says which one it was worked out at', () => {
   assert.equal(total.now, 10)
   assert.equal(total.band, 'peak')
   assert.equal(total.totalTokens, 2_000_000)
+})
+
+test('a resumed run continues after its last round, from the best version it found', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-resume-'))
+  const write = async (file, value) => {
+    await fs.mkdir(path.dirname(path.join(directory, file)), { recursive: true })
+    await fs.writeFile(path.join(directory, file), `${JSON.stringify(value, null, 2)}\n`, 'utf8')
+  }
+  await write('rounds/r0001/c1.json', { id: 'run-r1c1', value: 0.5, verdict: 'scored', depth: 1, best: true, measures: { characters: 10 } })
+  await fs.writeFile(path.join(directory, 'rounds/r0001/run-r1c1.patch'), 'diff\n', 'utf8')
+  await write('rounds/r0001/round.json', { round: 1, improved: true, best: { id: 'run-r1c1', value: 0.5 } })
+  await write('rounds/r0002/c1.json', { id: 'run-r2c1', value: 0.4, verdict: 'scored', depth: 2 })
+  await write('rounds/r0002/round.json', { round: 2, improved: false, best: { id: 'run-r1c1', value: 0.5 } })
+
+  const state = await recordedState(directory)
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(state.lastRound, 2, 'a resume would write over round two')
+  assert.equal(state.best.id, 'run-r1c1', 'the best version of an earlier round was forgotten')
+  assert.match(state.best.patch, /run-r1c1\.patch$/, 'the best version came back without the patch it consists of')
+  assert.equal(state.withoutImprovement, 1, 'the rounds that already brought nothing were not counted')
+  assert.equal(state.attempts.length, 2)
+})
+
+test('a run with no rounds yet resumes at round one with the target as its best', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-fresh-'))
+  const state = await recordedState(directory)
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(state.lastRound, 0)
+  assert.equal(state.best, null)
+  assert.equal(state.withoutImprovement, 0)
+  assert.deepEqual(state.attempts, [])
 })
 
 /** A run directory with one refused candidate and one that beat the target. */
