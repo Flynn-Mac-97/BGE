@@ -31,19 +31,32 @@ function readRun(checkout, name) {
     }
   }
   const target = read('target.json')
-  const status = read('run.json')
+  // A run is either the evolutionary loop or the Dream-RSI loop. Both write a
+  // status beside their records, and the panel shows whichever is there.
+  const rsi = read('rsi.json')
+  const status = rsi ?? read('run.json')
   const winner = read('winner.json')
+  const summary = read('rsi-summary.json')
 
   return {
     name,
     directory: path.relative(checkout, directory).split(path.sep).join('/'),
+    loop: rsi ? 'Dream-RSI' : 'evolutionary',
     target: target?.target ?? null,
     startedAt: target?.startedAt ?? null,
-    phase: status?.status ?? 'unknown',
+    phase: status?.status ?? status?.phase ?? 'unknown',
     round: status?.round ?? 0,
-    best: status?.best ?? null,
+    best: summary?.best
+      ? { id: `grid ${summary.best.grid} cell ${summary.best.cell}`, value: summary.best.score, measures: summary.best.measures ?? null }
+      : status?.best ?? null,
+    pool: status?.pool ?? summary?.pool ?? null,
+    policy: status?.policy ?? summary?.policies?.[summary.policies.length - 1]?.policy ?? null,
     why: status?.why ?? null,
-    winner: winner ? { id: winner.id, value: winner.value, improvement: winner.improvement, patch: winner.patch ?? null } : null,
+    winner: summary?.best
+      ? { id: `${summary.best.grid} ${summary.best.cell}`, value: summary.best.score, improvement: summary.improvement, patch: summary.winnerPatch ?? null }
+      : winner
+        ? { id: winner.id, value: winner.value, improvement: winner.improvement, patch: winner.patch ?? null }
+        : null,
     live: status?.pid ? isLive(status.pid) : null
   }
 }
@@ -108,6 +121,44 @@ export function readReport({ checkout, directory }) {
     return { refused: `this run has written no report yet — it writes one after the first round`, paths }
   }
   return { run: name, paths, markdown }
+}
+
+/**
+ * Start the Dream-RSI loop: explore, pool, dream, redeploy.
+ *
+ * Separate from `startRun` because it is a different loop, not a different
+ * setting of one: the evolutionary loop improves the artifact and keeps a fixed
+ * measure, and this one improves the exploration policy over recorded attempts.
+ */
+export async function startRsi({ checkout, target, rounds = 2, versions = 3, parallelism = 3, timeout, model }) {
+  if (!target || !String(target).trim()) return { refused: 'dream.rsi needs a target to improve' }
+
+  const { startRun: makeRun } = await import(/* @vite-ignore */ '../../../tools/dream/setup.mjs')
+  const started = await makeRun({ checkout, target, files: [] })
+  const directory = started.runDirectory
+  const log = path.join(directory, 'loop.log')
+
+  const args = ['tools/dream/rsi.mjs', '--run', directory, '--target', String(target), '--rounds', String(rounds), '--versions', String(versions), '--parallelism', String(parallelism)]
+  for (const [flag, value] of [['timeout', timeout], ['model', model]]) {
+    if (value !== undefined && value !== null && value !== '') args.push(`--${flag}`, String(value))
+  }
+
+  const handle = openSync(log, 'a')
+  const child = spawn(process.execPath, args, {
+    cwd: checkout,
+    detached: true,
+    stdio: ['ignore', handle, handle],
+    windowsHide: true
+  })
+  child.unref()
+  closeSync(handle)
+
+  writeFileSync(path.join(directory, 'rsi.json'), `${JSON.stringify({ phase: 'starting', target, pid: child.pid, at: new Date().toISOString() }, null, 2)}\n`, 'utf8')
+  return {
+    run: path.relative(checkout, directory).split(path.sep).join('/'),
+    log: path.relative(checkout, log).split(path.sep).join('/'),
+    pid: child.pid
+  }
 }
 
 /**

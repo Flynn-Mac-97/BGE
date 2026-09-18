@@ -179,6 +179,26 @@ export default {
       }
     },
     {
+      id: 'dream.rsi',
+      label: 'Dream: run the recursive self-improvement loop',
+      // args: the target in words, then { rounds, versions, parallelism, timeout, model }
+      run: async (context, target, options = {}) => {
+        if (!context.host) return needsNode('dream.rsi')
+        if (!target) return { refused: 'name a target to improve, in words' }
+        const started = await (await node()).startRsi({
+          checkout: context.host.checkout,
+          target: String(target),
+          rounds: options.rounds,
+          versions: options.versions,
+          parallelism: options.parallelism,
+          timeout: options.timeout,
+          model: options.model
+        })
+        await refresh(context)
+        return started
+      }
+    },
+    {
       id: 'dream.status',
       label: 'Dream: what the runs are doing',
       run: async (context, directory) => {
