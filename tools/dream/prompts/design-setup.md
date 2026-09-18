@@ -58,10 +58,30 @@ helpers.sessionTokens(sessionDirectory)
 - Every task must pass on the checkout as it is now. A setup whose tasks fail
   before any candidate exists measures nothing.
 - At least one task must measure a cost, or the score cannot change.
+- **A task that measures a cost must also check the content it paid for.** If a
+  task only counts characters, the cheapest candidate is an empty answer, and the
+  run will find it. State what the answer must still contain — the rule sets a
+  packet has to carry, the commands a list has to name, the fields a record has
+  to keep — and check each one. A cost with no such check is a hole a candidate
+  will fall through, and then you have measured nothing but deletion.
 - The control must break the target by a literal string replacement in one file,
   and at least one task must then fail. This is what proves the setup can tell a
   working target from a broken one.
 - No task may read the score, the weights, or another task's measures.
+
+## The engine will change
+
+The target's candidates may add, rename and delete files, and later runs happen
+on a different engine than this one. So a task should measure a mechanism an
+agent depends on rather than today's arrangement:
+
+- Prefer a task whose route is a command id, a documented entry point or a
+  generated index, because those keep answering after files move.
+- When a task must name a path, name the one the target's own change is about —
+  and say in `question` what that path is for, so a rename is visibly a change
+  to the measurement rather than a silent failure.
+- Do not write a task around a file list that exists only because nothing has
+  been reorganised yet.
 
 ## Before you finish
 

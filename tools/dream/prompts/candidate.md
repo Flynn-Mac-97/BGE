@@ -11,6 +11,12 @@ against a setup that is already frozen, and that you may not change.
 
 {{FILES}}
 
+The graph of this repository is reachable over MCP as `code-review-graph`. It
+answers who calls a function, who implements a type and what a file contains,
+from a graph built outside the checkout. You may use it to find your way in. Do
+not make anything rely on it being built or running: the measurement runs
+headless, and the engine must keep working when no graph exists.
+
 ## What you must not change
 
 - Anything under `{{RUN_DIR}}/` — the setup, the task checks and the records.
@@ -36,6 +42,11 @@ improving anything, so it is refused rather than rewarded.
 Every task must pass. A candidate that breaks one task scores zero, whatever it
 saved. Among candidates that pass, the weighted measures are subtracted from 1,
 so lower measured cost is a higher score.
+
+Lower cost by making the work genuinely shorter — fewer files to read, fewer
+processes to run, a smaller answer that still answers. Deleting the content a
+check requires raises nothing: the checks name what the answer must still carry,
+and a candidate that drops it fails the task and scores zero.
 
 ## Before you finish
 
