@@ -1,6 +1,6 @@
 ---
 name: glass-cli-tests
-description: Run the CLI-and-editor bridge suite, which drives the real CLI against a live editor tab and a real project on disk. Use when changing bin/engine.mjs, the dev server's API routes, hot reload, or anything an agent drives from a terminal.
+description: "Run the CLI-and-editor bridge suite, which drives the real CLI against a live editor tab and a real project on disk. Use when changing bin/engine.mjs, the dev server's API routes, hot reload, or anything an agent drives from a terminal."
 ---
 <!-- generated from plugins/builtin/cli-tests.agent.md at server start; edits are lost -->
 

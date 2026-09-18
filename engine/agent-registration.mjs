@@ -20,6 +20,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { PROJECT_PREFIX } from './asset-path.js'
 import { projectName } from './project-path.mjs'
+import { BUILTIN_REGISTERED_TYPES, loadedModuleSource, registeredTypeNames } from './project-index.mjs'
 
 /** Where the harness looks. Fixed by the harness, not by this project. */
 const SKILL_DIRECTORY = '.claude/skills'
@@ -51,6 +52,45 @@ const skillNameFor = guide => `${ENGINE}-${guide.frontmatter.skill || guide.stem
  * `skill: none`.
  */
 const listedForAgents = guide => !['none', 'false'].includes((guide.frontmatter.skill || '').toLowerCase())
+
+/**
+ * Every category a guide may declare. The always-on one is first.
+ *
+ * The listing is read by every agent before its first tool call, so it holds
+ * what the engine itself needs. What a game is built from is a category a
+ * checkout switches on for the task in hand. This is the vocabulary; the
+ * manifest holds the switches.
+ */
+const CATEGORIES = ['core', 'engine', 'gameplay', 'presentation', 'assets', 'authoring', 'harnesses']
+
+/**
+ * The category a guide belongs to when it declares none.
+ *
+ * An unclassified guide is one whose cost nobody decided, so it joins the
+ * always-on set and `check` says so.
+ */
+const DEFAULT_CATEGORY = 'core'
+
+/**
+ * Which categories this checkout registers, from the manifest.
+ *
+ * A category nobody switched on is out of the listing. That is the answer that
+ * costs the least when a name is misspelled: a skill that is absent is noticed,
+ * and one that is present is paid for by every agent of the session.
+ *
+ * No block at all is different — a manifest that is missing or unreadable
+ * costs the optional skills, not every skill.
+ */
+async function enabledCategories(root) {
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
+  const declared = manifest.skillCategories
+  if (!declared || typeof declared !== 'object') return new Set([DEFAULT_CATEGORY])
+  return new Set(CATEGORIES.filter(name => declared[name] === true))
+}
+
+/** A guide's category, or the default when it declares none. */
+const categoryOf = guide => guide.frontmatter.category || DEFAULT_CATEGORY
 
 /**
  * How long a description may run.
@@ -133,6 +173,17 @@ function describedBy(guide) {
 }
 
 /**
+ * One frontmatter value as YAML.
+ *
+ * A description is a sentence, and a sentence holds colons — "Options: …",
+ * "Blender 3D: …". Unquoted, YAML reads the first colon as a nested mapping
+ * and rejects the block; pi then drops the whole skill, so the file is on disk
+ * and no listing names it. Inside quotes a backslash or a quote must be
+ * escaped, or the description ends early.
+ */
+const yamlValue = value => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+
+/**
  * How a generated skill is told from a hand-written one.
  *
  * Cleanup deletes only files carrying this, so a skill a person wrote by hand
@@ -146,6 +197,9 @@ const SKILL_NAME = /^[a-z0-9][a-z0-9-]*$/
 
 /** The source of AGENTS.md, which is a copy of it. */
 const BOOTSTRAP = 'agents/bootstrap.md'
+
+/** The instruction tree, which also declares which skill categories register. */
+const MANIFEST = 'agents/manifest.json'
 
 
 /** The two places plugins are found, engine first, as the loader reads them. */
@@ -176,7 +230,13 @@ function frontmatterOf(guide) {
   const block = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
   /** One frontmatter field's value, or undefined when the guide does not declare it. */
   const field = name => block?.match(new RegExp(`^${name}:\\s*(.+)$`, 'm'))?.[1]?.trim()
-  return { skill: field('skill'), description: field('description'), triggers: field('triggers'), match: field('match') }
+  return {
+    skill: field('skill'),
+    category: field('category'),
+    description: field('description'),
+    triggers: field('triggers'),
+    match: field('match')
+  }
 }
 
 /** The guide without its frontmatter. This is what a skill file carries. */
@@ -206,7 +266,7 @@ async function detailOf(directory, stem) {
  * `file` is named from the plugin's own scope, which is how the manifest node
  * and the generated marker name it. `fileFromRoot` is the path to open.
  */
-export async function pluginGuides(root, projectPath) {
+export async function pluginGuides(root, projectPath, { detail = true } = {}) {
   const game = JSON.parse(
     await fs.readFile(path.join(path.resolve(root, projectPath), 'game.json'), 'utf8').catch(() => '{}'))
   const disabled = new Set(game.plugins?.disabled || [])
@@ -219,13 +279,23 @@ export async function pluginGuides(root, projectPath) {
     // them one at a time was most of what `check` spent its time on. The list is
     // sorted first and `Promise.all` keeps that order, so the problems are
     // reported in the same order they always were.
+    //
+    // `check` never reads a guide's detail files: they carry what an agent opens
+    // on demand, and the checks here answer from the guide, its source and its
+    // frontmatter. Reading eighty detail directories to throw the answer away
+    // was most of one check's directory reads.
     const found = await Promise.all(
       names.filter(name => name.endsWith('.agent.md')).sort().map(async name => {
         const stem = name.slice(0, -'.agent.md'.length)
-        const [source, text, detail] = await Promise.all([
-          fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => null),
+        const sourceFile = path.join(place.directory, `${stem}.js`)
+        // The loader already read this file when `check` imported every plugin
+        // to find the ones that will not load. Reuse that text rather than read
+        // the same bytes a second time; a caller with no import behind it gets
+        // undefined here and the disk read below as before.
+        const [source, text, detailText] = await Promise.all([
+          loadedModuleSource(sourceFile) ?? fs.readFile(sourceFile, 'utf8').catch(() => null),
           fs.readFile(path.join(place.directory, name), 'utf8').catch(() => null),
-          detailOf(place.directory, stem)
+          detail ? detailOf(place.directory, stem) : ''
         ])
         // Deleted between the listing and the read. A guide that is gone is not a
         // problem to report, and throwing here would end the whole check.
@@ -240,9 +310,13 @@ export async function pluginGuides(root, projectPath) {
           hasSource: source !== null,
           plugin: pluginName,
           enabled: !disabled.has(pluginName),
+          // The type names this plugin contributes, read from the same source
+          // the loader will run. The index reads the generated catalog built
+          // from these, and this is what holds the catalog to the sources.
+          registers: registeredTypeNames(source || ''),
           frontmatter: frontmatterOf(text),
           body: bodyOf(text),
-          detail
+          detail: detailText
         }
       }))
     guides.push(...found.filter(Boolean))
@@ -286,7 +360,9 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     { path: 'AGENTS.md', source: BOOTSTRAP, text: bootstrap },
     { path: 'CLAUDE.md', source: BOOTSTRAP, text: bootstrap }
   ]
-  for (const guide of guides || await pluginGuides(root, projectPath)) {
+  const known = guides || await pluginGuides(root, projectPath)
+  const enabled = await enabledCategories(root)
+  for (const guide of known) {
     // The listing belongs to the engine, not to whichever game is open. It is
     // written when the workspace opens and does not change when the project
     // does, so two games in one checkout cannot overwrite each other's. A
@@ -296,7 +372,11 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     // A game that switches a builtin off is reported by
     // `skillRegistrationProblems`, because the listing then names a command
     // that game does not have.
-    if (guide.scope !== 'engine' || !listedForAgents(guide)) continue
+    //
+    // A category that is off is left out the same way: the guide still reaches
+    // a packet that names its plugin, and its skill comes back when the
+    // category is switched on again.
+    if (guide.scope !== 'engine' || !listedForAgents(guide) || !enabled.has(categoryOf(guide))) continue
     const skill = skillNameFor(guide)
     const description = describedBy(guide)
     if (!description || !SKILL_NAME.test(skill)) continue
@@ -310,11 +390,34 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     files.push({
       path: `${SKILL_DIRECTORY}/${skill}/SKILL.md`,
       source: guide.fileFromRoot,
-      text: `---\nname: ${skill}\ndescription: ${description}\n---\n${GENERATED_MARKER}${guide.file} at server start; edits are lost -->\n\n${where}${guide.body}`
+      text: `---\nname: ${skill}\ndescription: ${yamlValue(description)}\n---\n${GENERATED_MARKER}${guide.file} at server start; edits are lost -->\n\n${where}${guide.body}`
     })
   }
-  files.push(...await manifestSkillFiles(root, new Set(files.map(file => file.path))))
+  // The engine-contributed types, compiled from the same sources the guides
+  // above are read from, so the index learns them with one small read instead of
+  // scanning every builtin plugin on every rebuild. Generated and checked like
+  // every other file here: a plugin edit that adds a type makes this stale, and
+  // `check` says so.
+  files.push({
+    path: BUILTIN_REGISTERED_TYPES,
+    source: 'plugins/builtin/*.js',
+    text: registeredTypesText(known)
+  })
+  files.push(...await manifestSkillFiles(root, new Set(files.map(file => file.path)), enabled))
   return files
+}
+
+/**
+ * The engine-contributed type names, as the generated catalog holds them.
+ *
+ * Sorted and deduped, so the file is the same bytes whatever order the guides
+ * were read in and a check compares it byte for byte.
+ */
+export function registeredTypesText(guides) {
+  const types = [...new Set(guides
+    .filter(guide => guide.scope === 'engine')
+    .flatMap(guide => guide.registers || []))].sort()
+  return `${JSON.stringify({ source: 'plugins/builtin/*.js', types }, null, 2)}\n`
 }
 
 /**
@@ -325,12 +428,15 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
  * skill the manifest lists is one no session sees. Registered under the same
  * prefix as the rest, and read from the same file the manifest names.
  */
-async function manifestSkillFiles(root, taken = new Set()) {
+async function manifestSkillFiles(root, taken = new Set(), enabled = new Set([DEFAULT_CATEGORY])) {
   const manifest = JSON.parse(
-    await fs.readFile(path.join(root, 'agents/manifest.json'), 'utf8').catch(() => '{"nodes":[]}'))
+    await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
   const files = []
   for (const node of manifest.nodes || []) {
     if (node.kind !== 'skill' || !node.file) continue
+    // A hand-written skill belongs to a category like any other, so a checkout
+    // that keeps its listing small keeps it of this one too.
+    if (!enabled.has(node.category || DEFAULT_CATEGORY)) continue
     const skill = `${ENGINE}-${node.id}`
     if (!SKILL_NAME.test(skill)) continue
     // A plugin's own guide owns the name. It is the live plugin, and two
@@ -345,7 +451,7 @@ async function manifestSkillFiles(root, taken = new Set()) {
       source: node.file,
       text: `---
 name: ${skill}
-description: ${description}
+description: ${yamlValue(description)}
 ---
 ${GENERATED_MARKER}${node.file} at server start; edits are lost -->
 
@@ -367,7 +473,10 @@ async function generatedSkillsOnDisk(root) {
     // An empty file is a write that did not finish. It carries no marker, so
     // treating "no marker" as hand-written would leave it on disk for good —
     // and the harness lists it, with no name and no description.
-    if (text.includes(GENERATED_MARKER) || !text.trim()) found.push({ name, path: file })
+    //
+    // The text read here is the file's text, so the freshness check below
+    // compares against it rather than reading every SKILL.md a second time.
+    if (text.includes(GENERATED_MARKER) || !text.trim()) found.push({ name, path: file, text })
   }
   return found
 }
@@ -401,12 +510,23 @@ export async function writeGeneratedAgentFiles(root, projectPath) {
  * start, so a stale file is read by every agent for a whole session and there
  * is no second chance to correct it.
  */
-export async function generatedFileProblems(root, projectPath, guides = null) {
+export async function generatedFileProblems(root, projectPath, guides = null, skillsOnDisk = null) {
   const files = await generatedAgentFiles(root, projectPath, guides)
+  // The skill listing already read every generated SKILL.md to tell a generated
+  // one from a hand-written one, so the freshness check compares against that
+  // text rather than reading each file a second time.
+  const alreadyRead = new Map((skillsOnDisk || []).map(skill => [skill.path, skill.text]))
   const problems = []
   for (const file of files) {
-    const onDisk = await fs.readFile(path.join(root, file.path), 'utf8').catch(() => null)
+    const onDisk = alreadyRead.has(file.path)
+      ? alreadyRead.get(file.path)
+      : await fs.readFile(path.join(root, file.path), 'utf8').catch(() => null)
     if (onDisk === file.text) continue
+    // A missing catalog is not a failure: the index reads the plugin sources
+    // when the file is not there, so a checkout without it still names every
+    // type. A catalog that is there and stale is the failure below, because the
+    // index would trust it.
+    if (onDisk === null && file.path === BUILTIN_REGISTERED_TYPES) continue
     problems.push({
       file: file.path,
       why: onDisk === null
@@ -415,7 +535,7 @@ export async function generatedFileProblems(root, projectPath, guides = null) {
     })
   }
   const wanted = new Set(files.map(file => file.path))
-  for (const skill of await generatedSkillsOnDisk(root)) {
+  for (const skill of skillsOnDisk || await generatedSkillsOnDisk(root)) {
     if (wanted.has(skill.path)) continue
     problems.push({
       file: skill.path,
@@ -429,16 +549,42 @@ export async function generatedFileProblems(root, projectPath, guides = null) {
  * Guides the harness will never show, and plugins with no guide at all.
  *
  * A plugin author who omits `skill:` ships work no future agent finds, and
- * nothing today says so. These are warnings except where an author asked for a
- * skill and the generator would silently drop it — a dropped declaration reads
- * exactly like a plugin that never wanted one.
+ * nothing today says so. A category the engine does not define, or none at all,
+ * is the same kind of silence. These are warnings except where an author asked
+ * for a skill and the generator would silently drop it — a dropped declaration
+ * reads exactly like a plugin that never wanted one.
  */
-export async function skillRegistrationProblems(root, projectPath, guides = null) {
+export async function skillRegistrationProblems(root, projectPath, guides = null, skillsOnDisk = null) {
   const problems = []
+  const enabled = await enabledCategories(root)
   for (const guide of guides || await pluginGuides(root, projectPath)) {
+    const { skill, category, description, triggers, match } = guide.frontmatter
+
+    // A category the engine does not define registers nothing, and the listing
+    // shows no sign of why: the guide is on disk and correct in every other way.
+    if (category && !CATEGORIES.includes(category)) {
+      problems.push({
+        file: guide.fileFromRoot,
+        why: `declares category ${JSON.stringify(category)}, which is not one of ${CATEGORIES.join(', ')}, so no skill is registered for it. Use one of them`
+      })
+    }
+
+    // This is the set every agent of every session pays for, so a guide that
+    // lands in it by omission is worth one line when it is written.
+    if (listedForAgents(guide) && !category) {
+      problems.push({
+        warning: true,
+        file: guide.fileFromRoot,
+        why: `declares no category, so it registers as \`${DEFAULT_CATEGORY}\` and every agent of every session reads its listing. Add a category line`
+      })
+    }
+
     // An opt-out is a decision, not a broken declaration: the guide still
     // arrives in a packet when the task names the plugin.
     if (!listedForAgents(guide)) continue
+    // So is a category this checkout keeps out of the listing. The rest of these
+    // checks are about a registered listing, and this guide is not in one.
+    if (!enabled.has(categoryOf(guide))) continue
     // The listing is the engine's and does not change with the open project, so
     // a game that switches a builtin off is listing a command it does not have.
     if (guide.scope === 'engine' && !guide.enabled) {
@@ -450,7 +596,6 @@ export async function skillRegistrationProblems(root, projectPath, guides = null
       continue
     }
     if (!guide.enabled) continue
-    const { skill, description, triggers, match } = guide.frontmatter
 
     if (skill && !SKILL_NAME.test(skill)) {
       problems.push({
@@ -499,7 +644,7 @@ export async function skillRegistrationProblems(root, projectPath, guides = null
     })
   }
 
-  problems.push(...await manifestSkillProblems(root))
+  problems.push(...await manifestSkillProblems(root, skillsOnDisk))
   return problems
 }
 
@@ -510,12 +655,14 @@ export async function skillRegistrationProblems(root, projectPath, guides = null
  * agent only through a packet. A guide's `skill:` frontmatter is the one route
  * into the session listing, so a manifest skill is a skill in name only.
  */
-async function manifestSkillProblems(root) {
+async function manifestSkillProblems(root, skillsOnDisk = null) {
   const manifest = JSON.parse(
-    await fs.readFile(path.join(root, 'agents/manifest.json'), 'utf8').catch(() => '{"nodes":[]}'))
-  const registered = new Set((await generatedSkillsOnDisk(root)).map(skill => skill.name))
+    await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
+  const enabled = await enabledCategories(root)
+  const registered = new Set((skillsOnDisk || await generatedSkillsOnDisk(root)).map(skill => skill.name))
   return (manifest.nodes || [])
-    .filter(node => node.kind === 'skill' && !registered.has(`${ENGINE}-${node.id}`))
+    .filter(node => node.kind === 'skill' && enabled.has(node.category || DEFAULT_CATEGORY))
+    .filter(node => !registered.has(`${ENGINE}-${node.id}`))
     .map(node => ({
       warning: true,
       file: node.file || 'agents/manifest.json',
@@ -555,9 +702,13 @@ export async function agentRegistrationProblems(root, projectPath) {
   // check that read the guide looking for a missing verb is gone, and no check
   // is needed to replace it — a command reaches an agent whether or not the
   // guide ever mentions it.
-  const guides = await pluginGuides(root, projectPath)
+  const guides = await pluginGuides(root, projectPath, { detail: false })
+  // One listing of the generated skills on disk, handed to both checks. Each
+  // wanted to know which generated skills are there, and each read every
+  // SKILL.md to find out.
+  const skillsOnDisk = await generatedSkillsOnDisk(root)
   return [
-    ...await generatedFileProblems(root, projectPath, guides),
-    ...await skillRegistrationProblems(root, projectPath, guides)
+    ...await generatedFileProblems(root, projectPath, guides, skillsOnDisk),
+    ...await skillRegistrationProblems(root, projectPath, guides, skillsOnDisk)
   ]
 }

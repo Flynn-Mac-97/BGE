@@ -177,9 +177,12 @@ export function makeFiles(bus, transport = overHTTP()) {
       writing++
       bus.emit('files:writing', { path, pending: writing })
       try {
-        await transport.write(path, text)
+        // The transport's answer, which carries the rebuilt index where the
+        // transport builds one. A caller that ignores it writes exactly as before.
+        const written = await transport.write(path, text)
         refused = null
         bus.emit('files:written', { path })
+        return written
       } catch (error) {
         // The server refuses too — the work lock answers the file routes — and
         // a write it turned away is as unsaved as one a guard stopped.

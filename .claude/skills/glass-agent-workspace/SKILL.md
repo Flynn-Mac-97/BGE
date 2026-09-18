@@ -1,6 +1,6 @@
 ---
 name: glass-agent-workspace
-description: Builds the instruction tree and small task packets, claims files, and opens or merges a parallel lane. Use at the start of any task to get its packet, before fanning work out to several agents, and when a claim or worktree is refused.
+description: "Builds the instruction tree and small task packets, claims files, and opens or merges a parallel lane. Use at the start of any task to get its packet, before fanning work out to several agents, and when a claim or worktree is refused."
 ---
 <!-- generated from plugins/builtin/agent-workspace.agent.md at server start; edits are lost -->
 
@@ -33,7 +33,9 @@ node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/agent
   `--all` prints the raw registry.
 - `agent.skills` — rewrite the generated `AGENTS.md`, `CLAUDE.md` and skill
   copies. The dev server writes these at start-up, so run it after editing a
-  guide while the server runs.
+  guide while the server runs. Which guides become skills is decided by
+  `skillCategories` in `agents/manifest.json`: `core` alone is on, and a guide
+  in a category that is off still reaches a packet naming its plugin.
 - `agent.toggle` and `agent.create` — switch an optional skill on or off, and
   add an instruction or skill node. Editor verbs; they need a browser.
 

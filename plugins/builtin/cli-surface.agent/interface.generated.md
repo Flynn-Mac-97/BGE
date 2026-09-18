@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/cli-surface.js; sha256 227c9b3eafc8511dec7e06f23fb1474a16e966d42b83008edd53c3d1c0dafbd2. Do not edit. -->
+<!-- Generated from plugins/builtin/cli-surface.js; sha256 608280af24e9369fa4e91cde03b71e45e685834701cc0bf214040d9cda4c388c. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/cli-surface.js). Where the prose below it disagrees, this is the code.
 
 ```

@@ -1,6 +1,7 @@
 ---
 description: Reusable lazy-loaded JointJS diagram service for plugin panels.
 match: ["plugins/builtin/joint-diagrams.js", "plugins/builtin/joint-diagrams/**"]
+category: authoring
 ---
 # JointJS Diagrams
 

@@ -1,6 +1,6 @@
 ---
 name: glass-project
-description: Which game the editor has open, and how to open, name or leave one. Use when starting a new game, switching between games, saving the untitled project under a name, or working out where a project lives on disk.
+description: "Which game the editor has open, and how to open, name or leave one. Use when starting a new game, switching between games, saving the untitled project under a name, or working out where a project lives on disk."
 ---
 <!-- generated from plugins/builtin/project.agent.md at server start; edits are lost -->
 

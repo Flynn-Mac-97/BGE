@@ -1,5 +1,6 @@
 ---
 description: Watches one parallel lane from the person's tab: a schematic from its own engine and its last captured frame. Use when several lanes work at once and you want to see one without touching it.
+category: core
 ---
 
 # Lane View

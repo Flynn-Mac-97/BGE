@@ -2,6 +2,7 @@
 skill: what-things-are
 description: What an object IS, in its author's own words — the sentence written when it was made, not a guess reverse-engineered from its name, box, colour or code. Use when something in a level or on screen is unidentified, before reading a type file to work out what it is, and to check whether the art still matches what the author said.
 triggers: what is that, what is this, what it is, unidentified, identify, describe, description, about, appearance, looks wrong, looksWrongWhen, note, type file, new type, backfill
+category: core
 ---
 
 # Object Descriptions

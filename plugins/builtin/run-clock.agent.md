@@ -1,5 +1,6 @@
 ---
 description: Times a run from first step to end and reports why it ended. Use for survival timers, run summaries, died or survived outcomes, and the numbers a results screen shows.
+category: gameplay
 ---
 
 # Run Clock

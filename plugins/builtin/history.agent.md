@@ -1,5 +1,6 @@
 ---
 description: Undo and redo of editor edits, as a list of level snapshots. Use for ctrl+z, stepping back through edits, or when an undo does nothing while playing or during a write.
+category: engine
 ---
 
 # History

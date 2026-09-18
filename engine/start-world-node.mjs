@@ -111,7 +111,9 @@ export function onDisk(projectDirectory, checkout = ROOT) {
       const abs = inside(rel)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, text, 'utf8')
-      await buildIndex(projectDirectory, root)
+      // The rebuild is the write's own, so its result is handed back: a caller
+      // that needs the index it just changed does not pay for a second rebuild.
+      return buildIndex(projectDirectory, root)
     },
     async writeAgent(scope, rel, text) {
       const abs = insideAgent(scope, rel)

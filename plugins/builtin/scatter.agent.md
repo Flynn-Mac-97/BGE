@@ -1,5 +1,6 @@
 ---
 description: Bulk placement declared in the level: this many of these types over this area, this far apart, out of named circles and corridors. Use to fill a field, forest or crowd of props without writing placements by hand.
+category: authoring
 ---
 
 # Scatter

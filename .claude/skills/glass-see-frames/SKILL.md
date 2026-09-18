@@ -1,6 +1,6 @@
 ---
 name: glass-see-frames
-description: Produce an actual image of the running game and read it — sketches, marked captures, saved moments, the size a frame comes out at, and how to prompt a vision model on one. Use only after the data verbs in See cannot answer, because a picture costs about fifty times a query and answers less. Also covers getting a frame from a terminal with no tab of your own.
+description: "Produce an actual image of the running game and read it — sketches, marked captures, saved moments, the size a frame comes out at, and how to prompt a vision model on one. Use only after the data verbs in See cannot answer, because a picture costs about fifty times a query and answers less. Also covers getting a frame from a terminal with no tab of your own."
 ---
 <!-- generated from plugins/builtin/see-frames.agent.md at server start; edits are lost -->
 

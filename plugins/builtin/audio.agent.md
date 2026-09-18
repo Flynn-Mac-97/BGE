@@ -1,5 +1,6 @@
 ---
 description: Play sound — effects a type declares and the game triggers by name. Use when adding a sound effect, music, a footstep or a weapon noise, or when something should be audible and is not.
+category: gameplay
 ---
 # Sound
 

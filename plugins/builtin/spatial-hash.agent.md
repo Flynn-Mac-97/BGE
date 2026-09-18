@@ -1,5 +1,6 @@
 ---
 description: Who is near whom, over entities that move every step. Use for any near or nearest query at scale: targeting, flocking, pickups, area effects. Crowd moves them; this only finds them.
+category: gameplay
 ---
 
 # Spatial Hash

@@ -1,5 +1,6 @@
 ---
 description: Frame animation for sprite sheets: clips declared on the type, chosen by assigning entity.animation each step. Use for any 2D sprite that walks, idles, attacks or plays a one-shot clip, and when a clip does not advance or shows the wrong frame.
+category: gameplay
 ---
 
 # Sprite Animation

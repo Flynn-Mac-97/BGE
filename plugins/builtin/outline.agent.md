@@ -1,5 +1,6 @@
 ---
 description: Switches an outline on and off round one thing — the standard feedback for hover, selection, a target, or what a player can act on. Works on a 3D solid and on a flat sprite, at one width in screen pixels. Use when something has to be picked out of a frame without moving or recolouring it.
+category: presentation
 ---
 
 # Outline

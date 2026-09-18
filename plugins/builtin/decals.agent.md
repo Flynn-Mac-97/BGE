@@ -1,5 +1,6 @@
 ---
 description: Marks stuck to world surfaces: bullet holes, blood, scorch. Use for anything left behind on a wall or floor after a hit, and when decals pile up, float, or do not appear.
+category: gameplay
 ---
 
 # Decals

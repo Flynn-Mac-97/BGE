@@ -7,7 +7,9 @@ import path from 'node:path'
 // The index builder and the determinism lint live in the engine, not in this
 // config, so a world running headless in node builds the same index from the
 // same code. Two implementations of "what is in this project" would drift.
-import { buildIndex as buildProjectIndex, problemsIn, fatal, walk, KIND, recordServer, forgetServer } from './engine/project-index.mjs'
+import { buildIndex as buildProjectIndex, walk, KIND } from './engine/project-index.mjs'
+import { problemsIn, fatal } from './engine/project-problems.mjs'
+import { recordServer, forgetServer } from './engine/project-servers.mjs'
 import { writeGeneratedAgentFiles } from './engine/agent-registration.mjs'
 import { chooseClient, describeClient, explainClientError, isLive, mergeClient, ownNonce, publicClient } from './engine/bridge-clients.mjs'
 import { readLaneBrowsers } from './engine/lane-browsers.mjs'

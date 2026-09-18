@@ -1,6 +1,6 @@
 ---
 name: glass-agent-contracts
-description: Discover live plugin dependencies, service owners, execution schedules, and command argument schemas. Use before extending a plugin, diagnosing a missing capability, or guessing command arguments.
+description: "Discover live plugin dependencies, service owners, execution schedules, and command argument schemas. Use before extending a plugin, diagnosing a missing capability, or guessing command arguments."
 ---
 <!-- generated from plugins/builtin/agent-contracts.agent.md at server start; edits are lost -->
 

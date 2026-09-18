@@ -1,6 +1,7 @@
 ---
 description: Keeps a .blend file in the project and builds the .glb a type uses from it. Use when a model should stay editable in Blender, when a model looks out of date, or when an import fails.
 triggers: blend, blender file, reimport, import model, source model
+category: assets
 ---
 
 # Blender Assets

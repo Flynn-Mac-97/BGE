@@ -1,5 +1,6 @@
 ---
 description: Puts an entity of a type into the open level at a point, from a drop gesture or one command. Use to place things while editing, never to spawn during a run.
+category: authoring
 ---
 
 # Place And Attach

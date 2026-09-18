@@ -1,6 +1,7 @@
 ---
 description: Reusable ELK graph arrangement service for browser and headless plugins.
 match: ["plugins/builtin/elk-layout.js", "plugins/builtin/elk-layout/**"]
+category: authoring
 ---
 # ELK Graph Layout
 

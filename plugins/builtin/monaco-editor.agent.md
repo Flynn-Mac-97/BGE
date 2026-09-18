@@ -1,6 +1,7 @@
 ---
 description: Reusable lazy-loaded Monaco editor service for plugin panels.
 match: ["plugins/builtin/monaco-editor.js", "plugins/builtin/monaco-editor/**"]
+category: authoring
 ---
 # Monaco Code Editor
 

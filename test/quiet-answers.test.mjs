@@ -17,7 +17,8 @@ import path from 'node:path'
 
 import { makeLoop } from '../engine/loop.js'
 import { makeWorld } from '../engine/world.js'
-import { buildIndex, problemsIn, fatal, tintProblems } from '../engine/project-index.mjs'
+import { buildIndex, tintProblems } from '../engine/project-index.mjs'
+import { problemsIn, fatal } from '../engine/project-problems.mjs'
 
 // ------------------------------------------------------------------ p105
 

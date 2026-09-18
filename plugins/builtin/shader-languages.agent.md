@@ -1,5 +1,6 @@
 ---
 description: Which language each shader is written in, which the live backend can build, and the switch that swaps between them. Use when a shader must exist in two languages, when a GLSL or TSL shader draws in the wrong one, and before adding a shader language of your own.
+category: engine
 ---
 # Shader Languages
 

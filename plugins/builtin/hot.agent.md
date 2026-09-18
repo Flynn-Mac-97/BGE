@@ -1,5 +1,6 @@
 ---
 description: Project file edits reach the running editor without a page reload. Use when an edit does not show up, when a broken file kept the last working version, or to re-import one type by hand.
+category: core
 ---
 
 # Live File Updates

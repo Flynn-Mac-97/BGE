@@ -1,6 +1,7 @@
 ---
 match: test/**
 description: Run the CLI-and-editor bridge suite, which drives the real CLI against a live editor tab and a real project on disk. Use when changing bin/engine.mjs, the dev server's API routes, hot reload, or anything an agent drives from a terminal.
+category: core
 ---
 
 # CLI Tests

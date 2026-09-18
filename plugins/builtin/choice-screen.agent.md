@@ -1,5 +1,6 @@
 ---
 description: Stops the world and offers a row of cards to pick from. Use for level-up choices, upgrade picks, shop rows, or any paused decision the player must make before play resumes.
+category: presentation
 ---
 
 # Choice Screen

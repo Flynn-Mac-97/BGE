@@ -3,6 +3,7 @@ skill: art-direction
 description: Set a game's visual direction from gathered references instead of taste — measure the references, turn what they agree on into rulings with numbers, generate the art bible, and check a real frame against it. Use before making art for a new game or subsystem, when redesigning a UI or a level's look, and whenever an art rule needs evidence behind it.
 triggers: art direction, art bible, art language, style guide, references, reference, moodboard, look and feel, visual style, palette, art style, redesign, restyle, direction, aesthetic, art research, style
 match: "*/art/**"
+category: assets
 ---
 
 # Art Direction

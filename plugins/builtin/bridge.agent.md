@@ -1,5 +1,6 @@
 ---
 description: Connects the terminal to one live editor tab so CLI verbs read and drive the page. Use when a command answers 'no editor attached', when two tabs fight over the bridge, or when checking live state and drawing rather than a headless world.
+category: core
 ---
 
 # Terminal Bridge

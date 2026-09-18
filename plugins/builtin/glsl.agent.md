@@ -1,5 +1,6 @@
 ---
 description: Shaders written as GLSL source — one function per slot, its arguments bound to engine inputs by name. Use when writing or changing a shader, when a GLSL shader draws nothing, and to check which backend is drawing.
+category: engine
 ---
 # GLSL
 

@@ -1,5 +1,6 @@
 ---
 description: Wires combat events to named particle effects and decals: muzzle flash, tracer, blood, dust, bullet holes, explosions. Use when a weapon fires or hits and nothing shows, when restyling what a hit looks like, or when adding an effect to a new combat event.
+category: gameplay
 ---
 
 # Combat Effects

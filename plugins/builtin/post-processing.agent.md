@@ -1,5 +1,6 @@
 ---
 description: Screen-wide image effects and the chain that runs them — bloom, contact shadow, grading, vignette, antialiasing. Use for image polish over the whole frame, to name a look for a level, and to see what each pass costs.
+category: presentation
 ---
 
 # Post Processing

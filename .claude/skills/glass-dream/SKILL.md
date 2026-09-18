@@ -1,6 +1,6 @@
 ---
 name: glass-dream
-description: What a dream run is, how to start one over a target in this engine, and how to read what it wrote. Read this before running or changing the dream loop, or when a run refused to start.
+description: "What a dream run is, how to start one over a target in this engine, and how to read what it wrote. Read this before running or changing the dream loop, or when a run refused to start."
 ---
 <!-- generated from plugins/builtin/dream.agent.md at server start; edits are lost -->
 

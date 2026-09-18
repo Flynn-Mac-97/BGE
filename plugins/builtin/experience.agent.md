@@ -1,5 +1,6 @@
 ---
 description: Counts experience points against a curve and announces every level gained. Use for XP, levelling, progression thresholds, and anything that must trigger once per level.
+category: gameplay
 ---
 
 # Experience

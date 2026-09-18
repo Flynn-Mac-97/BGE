@@ -1,5 +1,6 @@
 ---
 description: Creates a project file of a known kind — type, behaviour, level, test or plugin — with a template that shows the whole shape. Use to start a new file from the editor or a terminal so it appears in the project tree at once.
+category: core
 ---
 
 # New File

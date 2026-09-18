@@ -1,5 +1,6 @@
 ---
 description: The sky of a level: a flat colour or a panorama over a sphere, declared in the level's world block. Use when the background is wrong, black, or should be a picture.
+category: presentation
 ---
 
 # Skybox

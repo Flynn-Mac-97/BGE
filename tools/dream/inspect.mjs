@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { parseRecord } from './report.mjs'
 import { PRICING, costBands, sumCosts } from './pricing.mjs'
 import { addUsage, transcriptFrames, usageTotals } from './measures.mjs'
+import { liveCalls, sessionsFor } from './live.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const RUNS = path.join(CHECKOUT, 'agent-runs')
@@ -199,102 +200,6 @@ function readWorktrees(checkout) {
     })
   }
   return worktrees.sort((left, right) => (left.quietSeconds ?? 1e9) - (right.quietSeconds ?? 1e9))
-}
-
-/**
- * The agent sessions for this checkout and its worktrees.
- *
- * A candidate agent runs with its working directory inside its own worktree, and
- * the harness keeps sessions per working directory, so an attempt's transcript is
- * not in the checkout's slug. The slug is a lossy encoding of the path, which is
- * why sessions are matched by the worktree's own name rather than by rebuilding
- * the encoding.
- */
-function sessionRoot() {
-  return path.join(process.env.DSH_HOME || path.join(process.env.USERPROFILE, '.dsh'), 'sessions')
-}
-
-function sessionsFor(name) {
-  const root = sessionRoot()
-  if (!fs.existsSync(root) || !name) return []
-  const slugs = fs.readdirSync(root).filter(slug => slug.includes('browser~0020game~0020engine') && slug.includes(name))
-  const found = []
-  for (const slug of slugs) {
-    const directory = path.join(root, slug)
-    for (const session of fs.readdirSync(directory)) {
-      const file = path.join(directory, session, 'session.v3.jsonl.zstd')
-      if (fs.existsSync(file)) found.push({ slug, session, file, mtime: fs.statSync(file).mtimeMs })
-    }
-  }
-  return found.sort((left, right) => right.mtime - left.mtime)
-}
-
-/** The tail of a transcript, so polling a growing session stays cheap. */
-function tailFrames(file, bytes = 2_000_000) {
-  try {
-    const buffer = fs.readFileSync(file)
-    return transcriptFrames(buffer.subarray(Math.max(0, buffer.length - bytes)))
-  } catch {
-    return []
-  }
-}
-
-/** One tool call, as much of it as a person needs to see what is happening. */
-function describeCall(record) {
-  const data = record.data ?? {}
-  let detail = ''
-  try {
-    const args = JSON.parse(data.arguments ?? '{}')
-    detail = args.command ?? args.file_path ?? args.path ?? args.pattern ?? args.query ?? args.subject
-      ?? Object.keys(args).slice(0, 3).map(key => `${key}=${String(args[key]).slice(0, 40)}`).join(' ')
-  } catch {
-    detail = String(data.arguments ?? '').slice(0, 120)
-  }
-  return {
-    seq: record.seq ?? null,
-    at: record.time ? new Date(record.time).toISOString().slice(11, 19) : null,
-    tool: String(data.name ?? '?'),
-    detail: String(detail).split('\n')[0].slice(0, 160)
-  }
-}
-
-/**
- * What an attempt is doing right now, from its own transcript.
- *
- * The last tool calls and the newest reasoning line, which is the only place the
- * work is visible while it happens: the run directory gains nothing until the
- * attempt finishes.
- */
-function liveCalls({ name, since = 0, limit = 12 } = {}) {
-  const sessions = sessionsFor(name).filter(session => session.mtime >= since)
-  if (!sessions.length) return { session: null, calls: [], thought: null, quietSeconds: null }
-
-  const newest = sessions[0]
-  const frames = tailFrames(newest.file)
-  const calls = []
-  let thought = null
-  for (const frame of frames) {
-    for (const line of frame.split('\n')) {
-      if (!line.includes('tool/call') && !line.includes('assistant/message')) continue
-      try {
-        const record = JSON.parse(line)
-        if (record.type === 'tool/call') calls.push(describeCall(record))
-        if (record.type === 'assistant/message') {
-          const content = record.data?.message?.content ?? []
-          const said = content.filter(part => part.type === 'reasoning' || part.type === 'text').map(part => part.text).join(' ')
-          if (said.trim()) thought = { at: record.time ? new Date(record.time).toISOString().slice(11, 19) : null, text: said.trim().slice(0, 400) }
-        }
-      } catch { /* a line cut by the tail window */ }
-    }
-  }
-
-  return {
-    session: newest.session,
-    calls: calls.slice(-limit),
-    callsSeen: calls.length,
-    thought,
-    quietSeconds: Math.round((Date.now() - newest.mtime) / 1000)
-  }
 }
 
 /**

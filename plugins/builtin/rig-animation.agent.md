@@ -3,6 +3,7 @@ skill: rig-animation
 description: Plays motion clips on a 3D model's bones and brings any rigged character in to play them. Use for character or skeleton animation, mocap or generated clips, rigs, bones, retargeting, and anything that animates a 3D body.
 triggers: rig, rigged, skeleton, skeletal, bone, bones, mocap, motion capture, motion clip, character animation, walk cycle, idle animation, animate 3d, text to motion, pose, retarget, rigify, mixamo
 match: plugins/builtin/rig-animation.js, tools/make-rig-clip.mjs, tools/lib/motion-clip.mjs, tools/lib/retarget*.mjs, tools/lib/rig-*.mjs
+category: assets
 ---
 
 # Rig Animation

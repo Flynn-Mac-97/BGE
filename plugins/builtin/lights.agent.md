@@ -1,5 +1,6 @@
 ---
 description: Light a scene: point, spot, directional, area and hemisphere lights, placed as entities in a level. Use when a scene is too dark or flat, when adding a lamp, sun or torch, or when shadows and light falloff are wrong.
+category: presentation
 ---
 # Lights
 

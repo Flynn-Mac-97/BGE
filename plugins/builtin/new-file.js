@@ -94,8 +94,11 @@ async function create(context) {
   const taken = await context.files.read(path).then(() => true, () => false)
   if (taken) throw new Error(`${path} already exists`)
 
-  await context.files.write(path, TEMPLATES[kind.id](name))
-  context.editor.index = await context.files.index()
+  // A transport that rebuilds the index on write hands it back, and asking
+  // again would rebuild the whole project for the record the write already
+  // produced. One that answers without an index still gets asked.
+  const written = await context.files.write(path, TEMPLATES[kind.id](name))
+  context.editor.index = written?.types ?? written?.index ?? await context.files.index()
 
   context.editor._creating = false
   state.name = ''

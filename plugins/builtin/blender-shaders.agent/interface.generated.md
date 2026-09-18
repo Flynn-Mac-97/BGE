@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/blender-shaders.js; sha256 34e268c08ca13af9e6a36db5202a068c23e1569aa6b3094bdaed53c4e90a4994. Do not edit. -->
+<!-- Generated from plugins/builtin/blender-shaders.js; sha256 50c1410f5f6a966dac372c19142ece175e56dbbab018fbda9833282eef167633. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/blender-shaders.js). Where the prose below it disagrees, this is the code.
 
 ```
@@ -11,5 +11,5 @@
   arguments  blender.shaders.apply: none
   systems    frame
   listens    frame:painted, hot:applied
-  source     280 lines
+  source     288 lines
 ```

@@ -1,5 +1,6 @@
 ---
 description: Sparks, smoke, dust, trails and clouds — the deterministic particle field. Use for anything made of many small moving points. For an effect with a shape rather than a cloud, such as a beam, use VFX; to fire one on a game event, use Combat Effects.
+category: gameplay
 ---
 # Particles
 

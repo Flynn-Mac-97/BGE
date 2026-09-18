@@ -1,6 +1,7 @@
 ---
 description: The beam field and its options — bolts, lasers, tracers, tethers: anything drawn as a line with a direction rather than a cloud of dots. Use when writing or tuning a beam, reading `vfx.state`, or adding a new effect kind. To design a whole effect out of several layers, use the Effects skill first.
 match: plugins/builtin/vfx.js plugins/builtin/vfx/**
+category: gameplay
 ---
 
 # VFX

@@ -11,11 +11,10 @@
  * the engine may import this.
  */
 import fs from 'node:fs/promises'
-import { mkdirSync, openSync, closeSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import * as nodeModule from 'node:module'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 import { pathToFileURL, fileURLToPath } from 'node:url'
-import { assetPath, PROJECT_PREFIX } from './asset-path.js'
+import { assetPath } from './asset-path.js'
 
 /** The checkout this module was loaded from. The engine's own plugins are here. */
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -40,13 +39,33 @@ export const KIND = f =>
 
 /** Every file under a directory, as paths relative to it. A directory that will not read yields nothing. */
 export async function walk(directory, base = '') {
+  // One recursive listing rather than one readdir per folder. The tree read is
+  // the same; what falls is the number of directory reads a build pays for.
+  let items
+  try {
+    items = await fs.readdir(directory, { recursive: true, withFileTypes: true })
+  } catch {
+    return walkByFolder(directory, base)
+  }
+  const root = path.resolve(directory)
+  const out = []
+  for (const item of items) {
+    const rel = path.relative(root, path.join(item.parentPath ?? root, item.name)).split(path.sep).join('/')
+    if (rel.split('/').some(part => part.startsWith('.'))) continue
+    if (!item.isDirectory()) out.push(base ? `${base}/${rel}` : rel)
+  }
+  return out
+}
+
+/** The per-folder walk, for a node whose `readdir` has no recursive listing. */
+async function walkByFolder(directory, base = '') {
   const out = []
   let items = []
   try { items = await fs.readdir(directory, { withFileTypes: true }) } catch { return out }
   for (const it of items) {
     if (it.name.startsWith('.')) continue
     const rel = base ? `${base}/${it.name}` : it.name
-    if (it.isDirectory()) out.push(...await walk(path.join(directory, it.name), rel))
+    if (it.isDirectory()) out.push(...await walkByFolder(path.join(directory, it.name), rel))
     else out.push(rel)
   }
   return out
@@ -133,6 +152,90 @@ let readCount = 0
 const importFresh = async abs => (await import(pathToFileURL(abs).href + '?read=' + ++readCount)).default || {}
 
 /**
+ * The type names one plugin's source registers, by the text the loader runs.
+ *
+ * `world.retype('light', LIGHT_TYPE)` is the only way a plugin contributes a
+ * type, so the name is the first argument. Being a text read is safe in the one
+ * direction that matters: a registration written some other way is missed and
+ * the old false report comes back, and nothing is ever wrongly called present.
+ */
+export function registeredTypeNames(text) {
+  const out = []
+  for (const match of String(text || '').matchAll(/\bretype\s*\(\s*['"`]([\w-]+)['"`]/g)) out.push(match[1])
+  return out
+}
+
+/**
+ * The generated list of type names the checkout's own plugins register.
+ *
+ * Reading every builtin plugin source to learn two names cost one rebuild a
+ * hundred directory reads and a megabyte of bytes. The list changes only when an
+ * engine plugin changes, and the dev server writes this file at start-up with
+ * the rest of the generated agent files; `check` holds it to the sources. A
+ * checkout without it falls back to the source scan below, so the index still
+ * answers.
+ */
+export const BUILTIN_REGISTERED_TYPES = 'plugins/builtin/registered-types.generated.json'
+
+/** The builtin plugin directory, where the loader looks for engine plugins. */
+const builtinPlugins = checkout => path.join(checkout, 'plugins/builtin')
+
+/** Read the generated catalog, or scan the sources when there is none. */
+async function builtinRegisteredTypes(checkout) {
+  const stored = await fs.readFile(path.join(checkout, BUILTIN_REGISTERED_TYPES), 'utf8')
+    .then(text => JSON.parse(text), () => null)
+  if (Array.isArray(stored?.types)) return stored.types
+  const names = (await fs.readdir(builtinPlugins(checkout)).catch(() => [])).filter(name => name.endsWith('.js'))
+  const texts = await Promise.all(names.map(name => fs.readFile(path.join(builtinPlugins(checkout), name), 'utf8').catch(() => '')))
+  return [...new Set(texts.flatMap(registeredTypeNames))].sort()
+}
+
+/**
+ * Source text of every file module the loader has run, by absolute path.
+ *
+ * Two readers want the same bytes the loader already read. The index lints
+ * every project `.js` file as text and then imports it for its properties and
+ * hooks; `check` imports every plugin to prove it loads and then reads its guide
+ * and source as text. The loader holds the text either way, so recording it lets
+ * the second read go. A file this process never imported is not here, and the
+ * reader falls back to disk exactly as it did before.
+ */
+const loadedSources = new Map()
+
+/** Whether the recording hook is already installed. One module load is enough. */
+let sourceRecorderInstalled = false
+
+/**
+ * Record the source of every file module this process loads.
+ *
+ * The hook sits in front of the standard loader and returns its result
+ * untouched: this observes, it never changes what loads. Node without
+ * `registerHooks` records nothing, and every reader falls back to disk.
+ */
+export function recordModuleSources() {
+  if (sourceRecorderInstalled) return
+  sourceRecorderInstalled = true
+  if (typeof nodeModule.registerHooks !== 'function') return
+  nodeModule.registerHooks({
+    load(url, context, nextLoad) {
+      const result = nextLoad(url, context)
+      if (typeof url === 'string' && url.startsWith('file:') && result && result.source != null) {
+        // The loader hands the text back as bytes; a reader wants the same
+        // string a disk read would have produced.
+        const text = typeof result.source === 'string'
+          ? result.source
+          : Buffer.from(result.source).toString('utf8')
+        loadedSources.set(path.resolve(fileURLToPath(url.split('?')[0].split('#')[0])), text)
+      }
+      return result
+    }
+  })
+}
+
+/** The source text this process loaded for a file, or undefined when it never did. */
+export const loadedModuleSource = file => loadedSources.get(path.resolve(file))
+
+/**
  * Type names a plugin registers, which therefore have no file under `types/`.
  *
  * `light` is the one that exists today: Lights registers it with
@@ -144,30 +247,26 @@ const importFresh = async abs => (await import(pathToFileURL(abs).href + '?read=
  *
  * Found by reading the plugins as TEXT rather than by importing them. A plugin
  * is browser code that may pull in three or touch the DOM, and node has no
- * business running forty of them to learn one string. Being a regex is safe here
- * in the one direction that matters: a registration written some other way is
- * missed and the old false report comes back, which is exactly today's
- * behaviour, and nothing is ever wrongly called present.
+ * business running forty of them to learn one string.
+ *
+ * Only the top level of a plugin directory is loaded: `findPlugins` reads one
+ * directory and imports the `.js` files directly in it, so a nested file runs
+ * only if a plugin imports it, and it has no world to register against. So a
+ * nested file cannot contribute a type, and reading the tree charged one rebuild
+ * for every guide and asset folder under `plugins/builtin`.
  */
-async function typesRegisteredByPlugins(projectDirectory, checkout) {
-  const found = new Set()
-  const folders = [
-    path.join(checkout, 'plugins/builtin'),
-    path.join(projectDirectory, 'plugins')
-  ]
-  for (const folder of folders) {
-    const names = (await walk(folder)).filter(name => name.endsWith('.js'))
-    // Read together rather than one at a time. This is 127 files and 1.3 MB in
-    // the checkout, no read depends on another, and together they were most of
-    // what one rebuild cost — 26 ms against 5 ms. A file that cannot be read is
-    // skipped, exactly as before.
-    const texts = await Promise.all(names.map(async name => {
-      try { return await fs.readFile(path.join(folder, name), 'utf8') } catch { return '' }
-    }))
-    for (const text of texts) {
-      for (const match of text.matchAll(/\bretype\s*\(\s*['"`]([\w-]+)['"`]/g)) found.add(match[1])
-    }
-  }
+async function typesRegisteredByPlugins(projectFiles, projectDirectory, checkout, sources) {
+  const found = new Set(await builtinRegisteredTypes(checkout))
+  const project = projectFiles.filter(file => /^plugins\/[^/]+\.js$/.test(file))
+  const texts = await Promise.all(project.map(file =>
+    fs.readFile(path.join(projectDirectory, file), 'utf8').then(text => text, () => null)))
+  project.forEach((file, at) => {
+    // A plugin file is read once here for the names it registers and again by
+    // the determinism lint below. Hand the text over so the lint can skip its read.
+    if (texts[at] === null) return
+    sources.set(file, texts[at])
+    for (const name of registeredTypeNames(texts[at])) found.add(name)
+  })
   return [...found].sort()
 }
 
@@ -221,14 +320,17 @@ function agentRecords(records, view) {
  * Types are imported rather than parsed so `properties` and asset references
  * are exact.
  */
-export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
+export async function buildIndex(projectDirectory, checkout = CHECKOUT, { write = true } = {}) {
   const files = await walk(projectDirectory)
+  // The text of every project plugin, read to find the types it registers. The
+  // lint below reuses it rather than reading the same file again.
+  const pluginSources = new Map()
   // Every file in the project, by its path from `project/`. `assets` is keyed by
   // basename and so cannot answer "is this exact file there" — two folders may
   // hold a `jump.wav` — and that question is the one the asset check asks.
   const index = {
     types: {}, behaviours: {}, levels: {}, tests: {}, assets: {}, files, config: [], warnings: [],
-    pluginTypes: await typesRegisteredByPlugins(projectDirectory, checkout)
+    pluginTypes: await typesRegisteredByPlugins(files, projectDirectory, checkout, pluginSources)
   }
   /** One project file by its path from the project directory. */
   const inside = f => path.join(projectDirectory, f)
@@ -239,19 +341,25 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
   // for data only this one pass needs.
   const levelPlacements = {}
 
+  // Record what the loader reads, so a file imported below for its properties
+  // and hooks is not read a second time as text for the determinism lint.
+  recordModuleSources()
+
   for (const f of files) {
     const kind = KIND(f)
-
-    // Every hand-written JS file in the project runs inside the fixed step, so
-    // every one of them is held to the determinism rules.
-    if (f.endsWith('.js')) {
-      index.warnings.push(...lint(f, await fs.readFile(inside(f), 'utf8')))
-    }
-
     const reader = READERS[kind]
     // A file no reader names is data a level may reference, so it is an asset.
     if (reader) await reader(index, f, inside, levelPlacements)
     else index.assets[path.basename(f)] = { file: f, kind, usedBy: [] }
+
+    // Every hand-written JS file in the project runs inside the fixed step, so
+    // every one of them is held to the determinism rules. A file the reader
+    // just imported is linted from the text the loader read; a project plugin
+    // was read for its registrations; anything else is read here.
+    if (f.endsWith('.js')) {
+      const text = loadedModuleSource(inside(f)) ?? pluginSources.get(f) ?? await fs.readFile(inside(f), 'utf8')
+      index.warnings.push(...lint(f, text))
+    }
   }
 
   // relationships: assets -> types that reference them, types -> levels that place them
@@ -279,8 +387,17 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
   index.invariantProblems = invariantProblems(index, levelPlacements)
   index.tintProblems = tintProblems(index, levelPlacements)
 
+  // A caller that only reads the answer — `check` — does not write it to disk.
+  // The routes that own the generated files (`index`, a write, a boot) pass
+  // `write: true`; the reader pays no serialized characters and leaves no file
+  // for a later reader to mistake for fresh.
+  if (!write) return index
+
   await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
-  await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index, null, 2))
+  // Compact, not indented. Every reader parses it — the editor, `check`, and an
+  // agent through the generated agent view — so the indentation is bytes written
+  // on every rebuild that nothing reads. The records are unchanged.
+  await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index))
 
   // The agent view: the same map, minus what the editor alone acts on (the
   // file lists, per-level asset tables, reverse references). This is the file
@@ -295,7 +412,7 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
     // lookup rather than a guess across folders.
     assets: Object.fromEntries(Object.values(index.assets).map(a => [a.file, a.kind]))
   }
-  await writeAtomic(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent, null, 2))
+  await writeAtomic(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent))
   return index
 }
 
@@ -470,6 +587,16 @@ let writeCount = 0
  * lock, because it accumulates rather than derives.
  */
 async function writeAtomic(file, text) {
+  // A rebuild that lands the same bytes as the file already holds has done its
+  // work: the content a reader sees is already there. Skipping the temporary and
+  // the rename leaves no window for a reader to catch a half-written index, and
+  // saves the serialized characters of rewriting a file nothing changed. The
+  // comparison read is the price, and a file that is not there yet — the first
+  // build — pays none of it.
+  const current = await fs.stat(file).then(
+    stat => stat.size === Buffer.byteLength(text) ? fs.readFile(file, 'utf8').catch(() => null) : null,
+    () => null)
+  if (current === text) return
   // The pid is not enough on its own. One process rebuilds the index on every
   // save, and two of those overlap the moment saves come faster than a write —
   // they would then share a temporary name, and the second rename would find
@@ -506,90 +633,6 @@ async function renameWhenAllowed(from, to, tries = 5) {
   }
 }
 
-/** Every attachment, from a type or a level, that names a behaviour file that is not there. */
-export function missingAttachments(index) {
-  const out = []
-  /** Push one problem for each name that has no behaviour file. */
-  const check = (names, file, where) => {
-    for (const n of names || []) {
-      if (!index.behaviours[n]) out.push({ file, why: `${where} attaches behaviour "${n}" — no project/behaviours/${n}.js` })
-    }
-  }
-  for (const [name, t] of Object.entries(index.types)) check(t.behaviours, t.file, `type "${name}"`)
-  for (const [name, l] of Object.entries(index.levels)) check(l.behaviours, l.file, `level "${name}"`)
-  return out
-}
-
-/**
- * Every asset a type or a level names that is not a file on disk.
- *
- * This is the check whose absence shipped a whole map broken. `check` validated
- * that types loaded, that levels parsed and that behaviours existed, and never
- * once asked whether the two hundred textures the level named were there — so a
- * map with 231 unresolvable references passed clean, and the only symptom was a
- * viewport full of untextured grey.
- *
- * Reported once per file-and-reference with a count, because a map names the
- * same texture forty times and forty identical lines are worse than one.
- */
-export function missingAssets(index) {
-  const onDisk = new Set(index.files || [])
-  const out = []
-
-  // `references` is how many times the file names it, so the summary can say
-  // "4 missing assets, named 231 times" rather than leaving the two confused.
-  const missing = (reference, file, references, said) => {
-    const resolved = assetPath(reference)
-    if (onDisk.has(resolved)) return
-    out.push({ file, reference, references, why: `${said} — there is no project/${resolved}` })
-  }
-
-  for (const [name, t] of Object.entries(index.types)) {
-    for (const reference of t.uses || []) {
-      const where = t.usesBy?.[reference]
-      missing(reference, t.file, 1, `type "${name}" names "${reference}"${where ? ` as ${where}` : ''}`)
-    }
-  }
-
-  for (const [name, l] of Object.entries(index.levels)) {
-    for (const [reference, use] of Object.entries(l.assets || {})) {
-      const times = use.count === 1 ? 'once' : `${use.count} times`
-      missing(reference, l.file, use.count, `level "${name}" names "${reference}" ${times}, first at ${use.first}`)
-    }
-  }
-
-  // A file list that is empty because the project is empty is a true answer;
-  // one that is empty while something names an asset means the index was never
-  // built, and every reference would be reported as absent.
-  if (!onDisk.size && out.length) {
-    return [{
-      file: `${PROJECT_PREFIX}/.engine/index.json`,
-      why: 'the index carries no file list, so no asset reference could be checked — rebuild it with `node bin/engine.mjs index`'
-    }]
-  }
-  return out
-}
-
-/**
- * Every type a placement names that has no file.
- *
- * A level naming a type that was deleted, or misspelled, places nothing — no
- * mesh, no collider, nothing in the viewport — and said nothing about it. In a
- * 281-entity map one mistyped name is invisible by eye.
- */
-export function missingTypes(index) {
-  const out = []
-  for (const [name, l] of Object.entries(index.levels)) {
-    for (const type of l.types || []) {
-      if (typeof type !== 'string' || !type.trim()) {
-        out.push({ file: l.file, why: `level "${name}" has a placement with no "type" — it will place nothing` })
-      } else if (!index.types[type] && !(index.pluginTypes || []).includes(type)) {
-        out.push({ file: l.file, why: `level "${name}" places type "${type}" — there is no project/types/${type}.js, so those placements are empty` })
-      }
-    }
-  }
-  return out
-}
 
 /**
  * The drawn height of one placement, along the same rule engine/world.js's
@@ -748,545 +791,4 @@ export function tintProblems(index, levelPlacements) {
     }
   }
   return out
-}
-
-/**
- * One line saying how big the asset problem is, ahead of the list itself.
- *
- * "231 missing assets" and "one missing asset" are two different situations and
- * the difference is invisible in a long JSON array. An agent reading `check`
- * should learn which one it is looking at from the first line, not by counting.
- */
-function assetSummary(missing) {
-  if (!missing.length) return []
-  const files = [...new Set(missing.map(m => m.file))]
-  const where = files.length === 1 ? files[0] : `${files.length} files`
-  const references = missing.reduce((total, m) => total + (m.references || 1), 0)
-  // A map naming four absent textures on 231 brushes is four things to draw and
-  // 231 places it shows, and both numbers are worth having.
-  const named = references === missing.length ? '' : `, named ${references} times`
-  return [{
-    file: files.length === 1 ? files[0] : 'project',
-    why: missing.length === 1
-      ? `one missing asset, in ${where}${named} — it is the next line`
-      : `${missing.length} missing assets, in ${where}${named} — every one is listed below`
-  }]
-}
-
-/**
- * Every plugin file that will not load, found by importing it.
- *
- * A plugin whose file throws on import loses every command it registers, and
- * the only thing anybody sees is `no command "see.capture"` — the plugin's own
- * name appears nowhere, so the search starts in the wrong file. The loader has
- * to carry on past a broken plugin or one bad file would take the editor with
- * it, and that tolerance is exactly what makes the failure silent.
- *
- * Nothing about that is visible in the index, because the index never imports a
- * plugin. Finding it means trying the import, which is what this does, on the
- * same two directories and in the same order the loader reads.
- *
- * A file with no default export is the same failure wearing a different hat.
- * The loader skips it without a word, so its commands are missing just as
- * completely; a plugin directory holds plugins, and a helper module belongs in
- * a folder beneath one. It is reported with `failedToImport: false`, because
- * the file imported perfectly and was thrown away afterwards.
- *
- * The record is shaped as the running loader shapes its own — name, file,
- * error, builtin, failedToImport — so `check` can be pointed at a live
- * loader's list instead of this one without the reply changing shape. `name` is
- * always null here: a module that would not load never said what it was called.
- *
- * Deliberately not part of `buildIndex`. The index is rebuilt on every save
- * inside the dev server, and importing forty browser modules on each keystroke
- * would charge every edit for an answer only `check` asks for.
- */
-export async function pluginImportFailures(checkout, projectDirectory) {
-  const places = [
-    { directory: path.join(checkout, 'plugins/builtin'), builtin: true },
-    { directory: path.join(projectDirectory, 'plugins'), builtin: false }
-  ]
-  const out = []
-  for (const { directory, builtin } of places) {
-    let names = []
-    try { names = await fs.readdir(directory) } catch { continue }
-    for (const name of names.filter(name => name.endsWith('.js')).sort()) {
-      const file = path.join(directory, name)
-      const said = path.relative(checkout, file).split(path.sep).join('/')
-      const href = pathToFileURL(file).href
-      try {
-        // One broken plugin must not hide the next one, so every file is tried
-        // and every failure is collected rather than thrown.
-        const loaded = await import(href + '?plugin=' + ++readCount)
-        if (!loaded.default) {
-          out.push({ name: null, file: said, builtin, failedToImport: false, noDefaultExport: true, error: 'no default export' })
-        }
-      } catch (error) {
-        // Where it broke, which is the first thing anybody wants. A file that
-        // threw while running says so in its stack; a file that would not parse
-        // says nothing at all, because node keeps the position of a module
-        // syntax error out of the error object — so ask for it separately.
-        const frame = String(error?.stack || '').split('\n').map(line => line.trim()).find(line => line.includes(href))
-        const line = Number(frame?.match(/:(\d+)(?::\d+)?\)?$/)?.[1]) || syntaxErrorLine(file)
-        out.push({
-          name: null, file: said, builtin, failedToImport: true,
-          error: String(error?.message || error).split('\n')[0],
-          ...(Number.isFinite(line) ? { line } : {})
-        })
-      }
-    }
-  }
-  return out
-}
-
-/**
- * Say what a failed plugin costs, in the words `check` answers in.
- *
- * Kept apart from the finding so either source of failures — these imports, or
- * a running loader's own list — reads out the same way.
- */
-export const pluginProblems = failures => failures.map(failure => ({
-  file: failure.file,
-  ...(Number.isFinite(failure.line) ? { line: failure.line } : {}),
-  why: failure.failedToImport
-    ? `plugin "${failure.file}" failed to import — ${failure.error}. Every command in it is missing until this loads.`
-    : `plugin "${failure.file}" has no default export, so the loader skips it and every command it meant to register is missing`
-}))
-
-/**
- * The line a file will not parse at.
- *
- * `node --check` prints the position that a caught import error withholds. It
- * costs a child process, so it is only ever reached once a file has already
- * failed — a line number is worth a few milliseconds at exactly that moment.
- */
-function syntaxErrorLine(file) {
-  try {
-    execFileSync(process.execPath, ['--check', file], { stdio: ['ignore', 'pipe', 'pipe'] })
-    return null
-  } catch (error) {
-    return Number(String(error.stderr || '').split('\n')[0]?.match(/:(\d+)\s*$/)?.[1]) || null
-  }
-}
-
-/**
- * How long each authored description may be.
- *
- * `about` is repeated once per marked type in every See sidecar, so its cost is
- * multiplied by how many types a frame holds. The other two never enter a
- * sidecar and are held to one sentence a reader takes in at a glance.
- */
-const CAPS = { about: 100, appearance: 200, looksWrongWhen: 200 }
-
-/**
- * What nobody has written, and what somebody wrote too much of.
- *
- * Both are warnings. A check that failed the build the day it shipped, against
- * every type at once, is a check somebody switches off.
- */
-function describedProblems(index) {
-  const out = []
-  for (const [name, type] of Object.entries(index.types)) {
-    if (type.error) continue
-    for (const [field, cap] of Object.entries(CAPS)) {
-      const written = type[field]
-      if (!written || written.length <= cap) continue
-      out.push({
-        file: type.file,
-        warning: true,
-        why: field === 'about'
-          ? `type "${name}" has an about of ${written.length} characters — it is repeated once per marked type in every See sidecar, so keep it under ${cap}`
-          : `type "${name}" has an ${field} of ${written.length} characters — it should read as one sentence, so keep it under ${cap}`
-      })
-    }
-    if (!type.about) {
-      out.push({
-        file: type.file,
-        warning: true,
-        why: `type "${name}" has no about — an agent reading a level cannot say what it is`
-      })
-    }
-  }
-  return out
-}
-
-/**
- * Every record of one kind that failed to load, as a problem naming it.
- *
- * A type and a behaviour carry the loader's own message; a level carries the
- * parser's. `reason` is the half of the sentence that differs.
- */
-function failedRecords(records, label, reason) {
-  return Object.entries(records)
-    .filter(([, record]) => record.error)
-    .map(([name, record]) => ({ file: record.file, why: `${label} "${name}" ${reason} — ${record.error}` }))
-}
-
-/**
- * Everything wrong with the project right now.
- *
- * The same list `/api/check` returns, built here so it is available with no
- * server running. No entry without `warning` is the only clean answer; an entry
- * marked `warning` is reported and never fails a check — see `fatal`.
- */
-export function problemsIn(index) {
-  const missing = missingAssets(index)
-  return [
-    ...failedRecords(index.types, 'type', 'failed to load'),
-    ...failedRecords(index.behaviours, 'behaviour', 'failed to load'),
-    ...failedRecords(index.levels, 'level', 'is not valid JSON'),
-    // An attachment naming a file that is not there is silent at runtime except
-    // for one console line, and the symptom is an entity that simply does not
-    // do the thing. Catch it here.
-    ...missingAttachments(index),
-    // A placement naming a type that is not there places nothing at all, and a
-    // texture, model or sound that is not on disk draws as grey or plays as
-    // silence. Both are invisible in a large level, and both used to pass.
-    ...missingTypes(index),
-    // A type's own declared rule, broken by a placement — built once, inside
-    // buildIndex, because it needs every type loaded first.
-    ...(index.invariantProblems || []),
-    // A tint on a type multiplies the texture of every placement that did not
-    // state its own, and neither file reads as wrong on its own.
-    ...(index.tintProblems || []),
-    ...assetSummary(missing),
-    ...missing,
-    ...Object.entries(index.tests).filter(([, t]) => t.error)
-      .map(([name, t]) => ({ file: t.file, why: `test "${name}" failed to load — ${t.error}` })),
-    ...describedProblems(index),
-    ...index.warnings
-  ]
-}
-
-/**
- * The problems that fail a check.
- *
- * Every caller that turns the list into a pass or a fail goes through this one
- * function, so a warning cannot be fatal in one place and advisory in another.
- */
-export const fatal = problems => problems.filter(problem => !problem.warning)
-
-// ------------------------------------------------------------------ servers
-/**
- * What this checkout has running, so cleanup is one command instead of a hunt.
- *
- * A dev server and the editor tabs attached to it are what a task leaves
- * behind, and neither used to be written down anywhere. The damage is quiet: a
- * stale hidden tab answers a capture with a blank frame, and a forgotten server
- * on the expected port serves a different project, so the next agent reads the
- * wrong game and is never told which one it is reading.
- *
- * Both halves live in this module because both halves need them. The dev server
- * writes its record from `vite.config.js` and the CLI reads and stops them from
- * `bin/engine.mjs`, and those are the two files that already import this one —
- * two implementations of "which servers are there" would drift the first time
- * either half changed.
- */
-
-/**
- * Where the record lives.
- *
- * Anchored to the MAIN worktree, exactly as the agent run registry is. A lane
- * runs in `.agent-worktrees/<id>`, so a record written there is deleted with the
- * worktree — and the servers most in need of stopping would be the ones nothing
- * remembered. The checkout's own `.engine/`, not a project's: a server belongs
- * to the checkout that started it, and the project may be any directory.
- */
-export function serverRegistryFile(checkout) {
-  return path.join(mainWorktreeOf(checkout), '.engine/servers.json')
-}
-
-/** The main worktree of a checkout, so a registry file survives its lane worktree being deleted. */
-function mainWorktreeOf(checkout) {
-  try {
-    const line = execFileSync('git', ['-C', checkout, 'worktree', 'list', '--porcelain'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-      .split(/\r?\n/).find(value => value.startsWith('worktree '))
-    if (line) return path.resolve(line.slice('worktree '.length))
-  } catch { /* not a git checkout — this checkout is the right answer */ }
-  return path.resolve(checkout)
-}
-
-/** The server records for a checkout, or an empty registry when the file is missing or broken. */
-export function readServerRegistry(checkout) {
-  try {
-    const value = JSON.parse(readFileSync(serverRegistryFile(checkout), 'utf8'))
-    return { version: 1, servers: Array.isArray(value.servers) ? value.servers : [] }
-  } catch { return { version: 1, servers: [] } }
-}
-
-/** A registry edit is one read and one rename; a lock older than this is a corpse. */
-const STALE_LOCK_MILLISECONDS = 60_000
-
-/**
- * Read, change, write — under a lock, because this file accumulates rather than
- * derives. Two servers starting in the same second would otherwise each write
- * the registry they read before the other existed, and one of them would vanish.
- */
-function editServerRegistry(checkout, change) {
-  const file = serverRegistryFile(checkout)
-  const lock = file + '.lock'
-  mkdirSync(path.dirname(file), { recursive: true })
-  let handle
-  try {
-    handle = openSync(lock, 'wx')
-  } catch {
-    const age = Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now())
-    if (age < STALE_LOCK_MILLISECONDS) throw new Error('another process is updating the server registry; retry in a moment')
-    try { unlinkSync(lock) } catch { /* already gone */ }
-    handle = openSync(lock, 'wx')
-  }
-  try {
-    const registry = readServerRegistry(checkout)
-    const next = change(registry) || registry
-    const temporary = `${file}.${process.pid}.tmp`
-    writeFileSync(temporary, JSON.stringify(next, null, 2) + '\n', 'utf8')
-    renameSync(temporary, file)
-    return next
-  } finally {
-    if (handle != null) closeSync(handle)
-    try { unlinkSync(lock) } catch { /* already gone */ }
-  }
-}
-
-/**
- * Write down a server that has just begun listening.
- *
- * The port is the key: one process can hold it at a time, so an older record for
- * the same port is a corpse by definition. Records whose process no longer
- * exists are dropped in the same pass, or a month of crashed servers piles up in
- * a file whose whole value is being short enough to read.
- */
-export function recordServer(checkout, server) {
-  return editServerRegistry(checkout, registry => ({
-    ...registry,
-    servers: [
-      ...registry.servers.filter(entry => entry.port !== server.port && processIsAlive(entry.pid)),
-      server
-    ]
-  }))
-}
-
-/** Forget one server, by the two facts that identify it. */
-export function forgetServer(checkout, port, pid) {
-  return editServerRegistry(checkout, registry => ({
-    ...registry,
-    servers: registry.servers.filter(entry => !(entry.port === port && entry.pid === pid))
-  }))
-}
-
-/**
- * Does this process id exist at all?
- *
- * Signal 0 asks the question without sending anything, on Windows as well as
- * elsewhere. Being refused permission is still an answer: something is there.
- */
-export function processIsAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false
-  try { process.kill(pid, 0); return true } catch (error) { return error.code === 'EPERM' }
-}
-
-/**
- * Which program owns a process id right now.
- *
- * The operating system hands a dead server's number to whatever starts next, so
- * "the process id in the record still exists" is not the same as "our server is
- * still there". Asking what the number belongs to is what keeps `stop` from
- * killing a stranger.
- */
-function processImage(pid) {
-  try {
-    if (process.platform === 'win32') {
-      const row = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-      if (!row || !row.startsWith('"')) return null
-      return row.slice(1).split('"')[0]
-    }
-    return execFileSync('ps', ['-o', 'comm=', '-p', String(pid)],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() || null
-  } catch { return null }
-}
-
-/** Whether a process image name is node, the only program a dev server starts as. */
-const isNodeProcess = image => /^node(\.exe)?$/i.test(path.basename(image || ''))
-
-/**
- * Ask a port whether an engine dev server is behind it, and what it serves.
- *
- * This is the proof. A record is a note somebody left; a reply is the server
- * saying it is here, which checkout it serves, and which tabs are attached.
- *
- * By the same name every command drives it with. A dev server binds to
- * `localhost`, which resolves to the IPv6 address first on Windows, so asking
- * `127.0.0.1` is refused by a server that is running perfectly — and a running
- * server reported dead is the one answer this must never give.
- */
-async function askServer(port, milliseconds = 1500) {
-  const stop = AbortSignal.timeout(milliseconds)
-  try {
-    const response = await fetch(`http://localhost:${port}/api/server`, { signal: stop })
-    if (!response.ok) return null
-    const said = await response.json()
-    return typeof said?.pid === 'number' ? said : null
-  } catch { return null }
-}
-
-/**
- * One server, as it really is rather than as the file remembers it.
- *
- * Four honest answers, and only the first one means "you can talk to this":
- *   running       the port answers as this exact server
- *   unresponsive  the process is there and is node, but the port says nothing
- *   replaced      something else holds the port; it is named, and never killed
- *   dead          the process is gone, or its number now belongs to another
- *                 program
- */
-async function inspectServer(entry) {
-  const answer = await askServer(entry.port)
-  const image = processIsAlive(entry.pid) ? processImage(entry.pid) : null
-  const seen = {
-    ...entry,
-    uptimeSeconds: Math.max(0, Math.round((Date.now() - Date.parse(entry.startedAt || 0)) / 1000)) || 0
-  }
-
-  if (answer && answer.pid === entry.pid && path.resolve(answer.serves || '') === path.resolve(entry.serves || '')) {
-    return { ...seen, state: 'running', alive: true, project: answer.project ?? entry.project, tabs: describeTabs(answer.tabs) }
-  }
-  if (answer) {
-    return {
-      ...seen, state: 'replaced', alive: false,
-      answering: { pid: answer.pid, serves: answer.serves, project: answer.project },
-      why: `port ${entry.port} answers, but as process ${answer.pid} serving ${answer.serves} — an op sent there would read a different project. Nothing on this port is stopped for you.`
-    }
-  }
-  if (image && isNodeProcess(image)) {
-    return { ...seen, state: 'unresponsive', alive: false, why: `process ${entry.pid} is still there but port ${entry.port} answers nothing; it is either still starting or wedged` }
-  }
-  return {
-    ...seen, state: 'dead', alive: false,
-    why: image
-      ? `process ${entry.pid} now belongs to ${image}, so this server is gone and its number has been reused`
-      : `process ${entry.pid} is gone`
-  }
-}
-
-/**
- * A hidden tab renders nothing, so a capture taken through one comes back
- * blank. It is the single most confusing failure this listing exists to
- * explain, so it is spelled out rather than left as a flag to interpret.
- */
-const describeTabs = tabs => (Array.isArray(tabs) ? tabs : []).map(tab => ({
-  ...tab,
-  ...(tab.hidden ? { why: 'hidden — a hidden tab does not draw, so a capture taken through it comes back blank' } : {})
-}))
-
-/**
- * Every server this checkout knows about, proved one by one.
- *
- * `alsoProbe` names ports to ask about even though no record mentions them. The
- * default port belongs on that list: a server nothing wrote down, sitting where
- * every command looks by default, is the exact situation an agent cannot see.
- */
-export async function listServers(checkout, alsoProbe = []) {
-  const registry = readServerRegistry(checkout)
-  const servers = await Promise.all(registry.servers.map(inspectServer))
-
-  const known = new Set(registry.servers.map(entry => entry.port))
-  for (const port of alsoProbe) {
-    if (!Number.isInteger(port) || known.has(port)) continue
-    const answer = await askServer(port)
-    if (!answer) continue
-    servers.push({
-      port, pid: answer.pid, serves: answer.serves, project: answer.project,
-      url: `http://localhost:${port}`, startedAt: answer.startedAt,
-      state: 'unregistered', alive: true, tabs: describeTabs(answer.tabs),
-      why: `an engine server nothing wrote down is listening on port ${port}, serving ${answer.serves}`
-    })
-  }
-
-  servers.sort((left, right) => left.port - right.port)
-  return {
-    registry: serverRegistryFile(checkout),
-    running: servers.filter(server => server.alive).length,
-    servers
-  }
-}
-
-/** Stop a process and the children it started, and wait for it to actually go. */
-async function endProcess(pid) {
-  try {
-    if (process.platform === 'win32') {
-      // `npm run dev` is the parent of the vite process that holds the port, so
-      // the tree is killed rather than the one process — otherwise the shell is
-      // left behind holding the terminal.
-      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: ['ignore', 'pipe', 'pipe'] })
-    } else {
-      process.kill(pid, 'SIGTERM')
-    }
-  } catch { /* it may have died between the check and the kill, which is a win */ }
-  for (let attempt = 0; attempt < 20 && processIsAlive(pid); attempt++) {
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-  return !processIsAlive(pid)
-}
-
-/**
- * Stop one server, or every one of them, and say what actually happened.
- *
- * Safe to run when nothing is running: an empty registry is an empty answer and
- * a clean exit. A server that is not ours is reported and left alone — killing
- * whatever happens to hold a port would be a worse bug than the one this fixes.
- * Records that are proved dead are cleared in the same pass, so running this
- * twice leaves nothing behind.
- */
-export async function stopServers(checkout, port = null) {
-  const listed = await listServers(checkout, port == null ? [] : [port])
-  const targets = port == null ? listed.servers : listed.servers.filter(server => server.port === port)
-
-  const stopped = []
-  const alreadyDead = []
-  const refused = []
-  const forget = []
-
-  for (const server of targets) {
-    const named = { port: server.port, pid: server.pid, serves: server.serves, project: server.project }
-
-    if (server.state === 'dead') {
-      alreadyDead.push({ ...named, why: server.why })
-      forget.push(server)
-      continue
-    }
-    if (server.state === 'replaced') {
-      refused.push({ ...named, why: server.why })
-      forget.push(server)
-      continue
-    }
-    if (server.state === 'unregistered' && !path.resolve(server.serves || '.').startsWith(mainWorktreeOf(checkout))) {
-      refused.push({ ...named, why: `nothing here started it and it serves ${server.serves}, which is outside this checkout` })
-      continue
-    }
-
-    const gone = await endProcess(server.pid)
-    if (gone) {
-      stopped.push({ ...named, was: server.state, tabsAttached: (server.tabs || []).length })
-      forget.push(server)
-    } else {
-      refused.push({ ...named, why: `process ${server.pid} would not stop; stop it by hand` })
-    }
-  }
-
-  if (forget.length) {
-    editServerRegistry(checkout, registry => ({
-      ...registry,
-      servers: registry.servers.filter(entry => !forget.some(done => done.port === entry.port && done.pid === entry.pid))
-    }))
-  }
-
-  return {
-    registry: serverRegistryFile(checkout),
-    stopped,
-    alreadyDead,
-    refused,
-    ok: refused.length === 0
-  }
 }

@@ -1,5 +1,6 @@
 ---
 description: Rigid body physics in 3D solved by Rapier — rotation, mass, friction, sleeping and a provable replay. Use when boxes must tip, stack or roll, when a scene has hundreds of bodies, or when two runs have to come out identical.
+category: gameplay
 ---
 # Rapier 3D
 

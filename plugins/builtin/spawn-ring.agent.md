@@ -1,5 +1,6 @@
 ---
 description: Where just off screen is, in metres. Use to spawn enemies or waves outside the view, to cull what drifted too far, and to place a cluster on one bearing.
+category: gameplay
 ---
 
 # Spawn Ring

@@ -1,6 +1,6 @@
 ---
 name: glass-new-file
-description: Creates a project file of a known kind — type, behaviour, level, test or plugin — with a template that shows the whole shape. Use to start a new file from the editor or a terminal so it appears in the project tree at once.
+description: "Creates a project file of a known kind — type, behaviour, level, test or plugin — with a template that shows the whole shape. Use to start a new file from the editor or a terminal so it appears in the project tree at once."
 ---
 <!-- generated from plugins/builtin/new-file.agent.md at server start; edits are lost -->
 

@@ -964,18 +964,15 @@ if (op === 'tree') {
 // `check` exits non-zero when something is wrong, so it works in a shell chain:
 //   node bin/engine.mjs check && node bin/engine.mjs --headless run tests.run
 if (op === 'check') {
-  const { buildIndex, problemsIn, fatal, pluginImportFailures, pluginProblems } = await readProject()
+  const { buildIndex } = await readProject()
+  const { problemsIn, fatal, pluginImportFailures, pluginProblems } = await import('../engine/project-problems.mjs')
   // A plugin that will not import is listed first because it is the loudest
   // thing wrong and the quietest to find: the loader carries on without it, so
   // the only symptom anywhere else is a command that has stopped existing.
   //
   // The failures are found by importing the files off disk, because `check`
   // answers with nothing running and a world it never booted has no loader to
-  // ask. A live loader keeps the same list in the same shape, so this one line
-  // is the only thing that would change to read it instead.
-  //
-  // Gathered separately from the index so a broken plugin cannot stop the rest
-  // of the project being reported, and the other way round.
+  // ask.
   const failed = await pluginImportFailures(CHECKOUT, PROJECT)
   // What a fresh agent reads before its first call: the generated files against
   // their source, and every plugin's guide against the commands it registers.
@@ -984,9 +981,13 @@ if (op === 'check') {
   const { agentRegistrationProblems } = await import('../engine/agent-registration.mjs')
   const problems = [
     ...pluginProblems(failed),
-    ...problemsIn(await buildIndex(PROJECT)),
+    // Building without writing saves the serialized index characters and leaves
+    // no half-fresh artifact for the `index` route or a boot to disagree with;
+    // the project alone decides every problem below.
+    ...problemsIn(await buildIndex(PROJECT, undefined, { write: false })),
     ...await agentRegistrationProblems(CHECKOUT, PROJECT)
   ]
+
   // Warnings are reported and never fail the run. A warning that broke the
   // chain would be turned off, and then it reports nothing at all.
   const failures = fatal(problems)
@@ -1104,7 +1105,7 @@ if (op === 'clients') {
 }
 
 if (op === 'servers' || op === 'servers.stop') {
-  const { listServers, stopServers } = await readProject()
+  const { listServers, stopServers } = await import('../engine/project-servers.mjs')
   const named = typeof args[0] === 'number' ? args[0] : flags.port ? Number(flags.port) : null
   if (op === 'servers') {
     // The default port is asked about whether or not a record mentions it. A
@@ -1116,7 +1117,7 @@ if (op === 'servers' || op === 'servers.stop') {
     // once the port has been asked and did not answer. `--all` keeps them.
     const gone = (listed.servers || []).filter(entry => !entry.alive && entry.pid)
     if (gone.length && !flags.all) {
-      const { forgetServer } = await import('../engine/project-index.mjs')
+      const { forgetServer } = await import('../engine/project-servers.mjs')
       for (const entry of gone) {
         try { forgetServer(CHECKOUT, entry.port, entry.pid) } catch { /* already gone */ }
       }

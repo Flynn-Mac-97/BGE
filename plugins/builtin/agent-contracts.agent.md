@@ -1,5 +1,6 @@
 ---
 description: Discover live plugin dependencies, service owners, execution schedules, and command argument schemas. Use before extending a plugin, diagnosing a missing capability, or guessing command arguments.
+category: core
 ---
 # Agent Contracts
 

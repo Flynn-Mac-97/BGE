@@ -1,5 +1,14 @@
 {
   "version": 2,
+  "skillCategories": {
+    "core": true,
+    "engine": false,
+    "gameplay": false,
+    "presentation": false,
+    "assets": false,
+    "authoring": false,
+    "harnesses": false
+  },
   "nodes": [
     { "id": "agent-framework", "title": "Agent Framework", "kind": "group" },
     { "id": "bootstrap", "title": "Start Here", "kind": "document", "parent": "agent-framework", "file": "agents/bootstrap.md" },
@@ -24,9 +33,9 @@
     { "id": "art", "title": "Art and Assets", "kind": "instruction", "parent": "project", "file": "agents/art.md", "match": ["project/assets/**", "project/types/**", "project/levels/**"], "triggers": ["mesh", "model", "texture", "sprite", "lowpoly", "art", "look", "character", "hud"] },
     { "id": "plugins", "title": "Plugins", "kind": "group", "parent": "agent-framework" },
     { "id": "skills", "title": "Skills", "kind": "group", "parent": "agent-framework" },
-    { "id": "blender-3d", "title": "Blender 3D", "kind": "skill", "parent": "skills", "file": "agents/skills/blender-3d/SKILL.md", "optional": true, "triggers": ["blender", "3d model", ".blend", "mesh", "lowpoly", "character", "creature", "glb", "gltf", "model a", "sculpt"], "match": ["project/assets/**/*.blend", "project/assets/**/*.glb", "project/assets/**/*.gltf"] },
-    { "id": "blockout-prop", "title": "Blockout - one prop", "kind": "skill", "parent": "blender-3d", "file": "agents/skills/blockout-prop/SKILL.md", "triggers": ["blockout", "block-out", "blockmesh", "greybox", "whitebox", "massing", "base shapes", "rough pass", "block this out", "start this model", "prop", "weapon", "vehicle", "machine", "furniture", "container"], "match": ["project/assets/**/*.blend", "project/assets/**/*.glb"] },
-    { "id": "blockout-environment", "title": "Blockout - a space", "kind": "skill", "parent": "blender-3d", "file": "agents/skills/blockout-environment/SKILL.md", "triggers": ["blockout", "block-out", "blockmesh", "greybox", "whitebox", "massing", "level layout", "map layout", "block this scene out", "start this level", "arena", "street", "interior", "dungeon", "village", "camp", "station", "terrain", "hub", "layout"], "match": ["project/levels/**"] },
-    { "id": "effects", "title": "Effects", "kind": "skill", "parent": "skills", "file": "agents/skills/effects/SKILL.md", "triggers": ["vfx", "effect", "effects", "particle", "particles", "beam", "bolt", "laser", "impact", "explosion", "muzzle flash", "spell", "trail", "aura", "smoke", "sparks", "shader", "decal"], "match": ["plugins/builtin/vfx.js", "plugins/builtin/vfx/**", "plugins/builtin/particles.js", "plugins/builtin/particle-painter.js", "plugins/builtin/combat-effects.js"] }
+    { "id": "blender-3d", "title": "Blender 3D", "kind": "skill", "parent": "skills", "file": "agents/skills/blender-3d/SKILL.md", "optional": true, "category": "assets", "triggers": ["blender", "3d model", ".blend", "mesh", "lowpoly", "character", "creature", "glb", "gltf", "model a", "sculpt"], "match": ["project/assets/**/*.blend", "project/assets/**/*.glb", "project/assets/**/*.gltf"] },
+    { "id": "blockout-prop", "title": "Blockout - one prop", "kind": "skill", "parent": "blender-3d", "file": "agents/skills/blockout-prop/SKILL.md", "category": "assets", "triggers": ["blockout", "block-out", "blockmesh", "greybox", "whitebox", "massing", "base shapes", "rough pass", "block this out", "start this model", "prop", "weapon", "vehicle", "machine", "furniture", "container"], "match": ["project/assets/**/*.blend", "project/assets/**/*.glb"] },
+    { "id": "blockout-environment", "title": "Blockout - a space", "kind": "skill", "parent": "blender-3d", "file": "agents/skills/blockout-environment/SKILL.md", "category": "assets", "triggers": ["blockout", "block-out", "blockmesh", "greybox", "whitebox", "massing", "level layout", "map layout", "block this scene out", "start this level", "arena", "street", "interior", "dungeon", "village", "camp", "station", "terrain", "hub", "layout"], "match": ["project/levels/**"] },
+    { "id": "effects", "title": "Effects", "kind": "skill", "parent": "skills", "file": "agents/skills/effects/SKILL.md", "category": "gameplay", "triggers": ["vfx", "effect", "effects", "particle", "particles", "beam", "bolt", "laser", "impact", "explosion", "muzzle flash", "spell", "trail", "aura", "smoke", "sparks", "shader", "decal"], "match": ["plugins/builtin/vfx.js", "plugins/builtin/vfx/**", "plugins/builtin/particles.js", "plugins/builtin/particle-painter.js", "plugins/builtin/combat-effects.js"] }
   ]
 }

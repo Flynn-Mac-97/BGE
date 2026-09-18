@@ -1,5 +1,6 @@
 ---
 description: The readouts over live play — score, health bar, ammo, timer — declared in the level and bound to `world.state`. Use when putting a value on screen during play. For a full-screen menu or card, use Screen.
+category: presentation
 ---
 # Heads Up Display
 

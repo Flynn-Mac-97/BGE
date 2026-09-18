@@ -1,5 +1,6 @@
 ---
 description: Play cameras that update on every drawn frame, so mouse turn and follow have no step delay — third-person orbit now, more kinds later, chosen by priority like Cinemachine. Use for any real-time 3D game camera, when a camera feels laggy or judders, when a mouse should orbit the view, or to switch between cameras during play.
+category: gameplay
 ---
 
 # Live Camera

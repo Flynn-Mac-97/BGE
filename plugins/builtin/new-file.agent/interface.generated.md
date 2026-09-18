@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/new-file.js; sha256 caacabb393eeec45a395efeb82d90073b8b5c9ec60d7855e67c89199223595fd. Do not edit. -->
+<!-- Generated from plugins/builtin/new-file.js; sha256 dcd788b8deee895236661a97e36683b02712276bb7ff4ad131e14d9ae79a5af1. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/new-file.js). Where the prose below it disagrees, this is the code.
 
 ```
@@ -7,5 +7,5 @@
   points     1 panel
   commands   new.file (Create a type or level)
   arguments  new.file: args
-  source     205 lines
+  source     208 lines
 ```

@@ -1,5 +1,6 @@
 ---
 description: The punch of a hit: hit stop and camera shake by weight. Use for the freeze and shake on a hit, kill or explosion, and to tune how heavy a blow feels.
+category: gameplay
 ---
 
 # Impact

@@ -3,6 +3,7 @@ skill: kimodo
 description: How to install and drive kimodo.cpp, the local text-to-motion model that makes rig clips. Use to generate a 3D animation from a written description, or to build or check the kimodo install.
 triggers: kimodo, text to motion, generate animation, generate motion, mocap from text, motion model, gguf motion, smplx, soma skeleton, unitree g1
 match: tools/make-rig-clip.mjs, tools/install-kimodo.mjs, tools/lib/motion-clip.mjs
+category: assets
 ---
 
 # Kimodo

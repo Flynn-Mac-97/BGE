@@ -1,6 +1,6 @@
 ---
 name: glass-hot
-description: Project file edits reach the running editor without a page reload. Use when an edit does not show up, when a broken file kept the last working version, or to re-import one type by hand.
+description: "Project file edits reach the running editor without a page reload. Use when an edit does not show up, when a broken file kept the last working version, or to re-import one type by hand."
 ---
 <!-- generated from plugins/builtin/hot.agent.md at server start; edits are lost -->
 

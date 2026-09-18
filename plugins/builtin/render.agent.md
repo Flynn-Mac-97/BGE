@@ -1,6 +1,7 @@
 ---
 description: How the frame is rendered — tone mapping, exposure, environment light, shadow quality and backend, all in one table. Use when a scene looks flat, washed out, too dark or like generic 3D, when dialling in a game's look, and before changing any render setting.
 triggers: render, look, tone mapping, exposure, environment, hdri, shadows, washed out, flat lighting, premium
+category: engine
 ---
 
 # Render

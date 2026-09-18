@@ -1,6 +1,7 @@
 ---
 description: Rebuilds a Blender material's node graph as a live TSL shader, so a look designed in Blender draws in the engine. Use when a Blender material arrives flat grey, when a procedural look must move, and when a node type is reported as untranslatable.
 triggers: blender material, node graph, procedural material, blender shader, flat grey
+category: assets
 ---
 
 # Blender Shaders

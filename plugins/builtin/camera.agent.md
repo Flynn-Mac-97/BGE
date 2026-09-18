@@ -1,5 +1,6 @@
 ---
 description: What the player sees and how it follows — orthographic follow, first person, third person, framing and bounds. Use when the view is wrong, the camera does not follow, or the game needs a different viewpoint.
+category: gameplay
 ---
 # Camera
 

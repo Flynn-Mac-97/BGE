@@ -1,5 +1,6 @@
 ---
 description: Read the keyboard as named actions, so a test drives the same actions a player does. Use when adding controls, rebinding a key, or making a headless test press something.
+category: gameplay
 ---
 # Keyboard Input
 

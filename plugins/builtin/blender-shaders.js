@@ -209,7 +209,12 @@ export default {
   }],
 
   onLoad(context) {
-    readGraphs(context).then(() => loadToolkit()).catch(error => {
+    // Three and TSL are loaded only when the project has a graph to build. They
+    // are three megabytes of module source, and a world with no `.shaders.json`
+    // never draws one — loading them at every boot was the largest single read a
+    // headless world made. `loadToolkit` is idempotent, so the first graph that
+    // arrives still gets them.
+    readGraphs(context).then(found => found ? loadToolkit() : null).catch(error => {
       state.error = String(error?.message || error)
     })
 
@@ -217,7 +222,10 @@ export default {
     // shader built from the previous one.
     context.bus.on('hot:applied', change => {
       if (!change?.file?.endsWith('.shaders.json')) return
-      readGraphs(context).then(() => forgetBuilt(context))
+      readGraphs(context)
+        .then(() => state.graphs.size ? loadToolkit() : null)
+        .then(() => forgetBuilt(context))
+        .catch(error => { state.error = String(error?.message || error) })
     })
 
     // Two hooks for the same job, because they never both fire: a `frame`

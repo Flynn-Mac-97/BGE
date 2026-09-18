@@ -1,5 +1,6 @@
 ---
 description: Pickups any entity can drop and a collector magnets in. Use for coins, gems, XP orbs, health drops and anything the player collects by touch or by magnet.
+category: gameplay
 ---
 
 # Pickups

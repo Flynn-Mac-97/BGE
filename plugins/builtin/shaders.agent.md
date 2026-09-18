@@ -1,5 +1,6 @@
 ---
 description: The sample shelf of shaders — edges, grass, aura, waves, hologram, dissolve, gradient — described once and implemented in TSL. Use when a surface needs to glow, move, scan or burn rather than just sit there, and read it before writing a shader of your own.
+category: presentation
 ---
 
 # Shaders

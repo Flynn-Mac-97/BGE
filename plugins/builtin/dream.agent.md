@@ -1,6 +1,7 @@
 ---
 match: tools/dream/** agent-runs/dream-*
 description: What a dream run is, how to start one over a target in this engine, and how to read what it wrote. Read this before running or changing the dream loop, or when a run refused to start.
+category: core
 ---
 
 # Dream

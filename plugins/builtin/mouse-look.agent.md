@@ -1,5 +1,6 @@
 ---
 description: First-person pointer look: pointer lock, sensitivity, yaw and pitch, and the first-person key bindings. Use for any first-person or aimed camera driven by the mouse, and when pointer capture or sensitivity is wrong.
+category: gameplay
 ---
 
 # Mouse Look

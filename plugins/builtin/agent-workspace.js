@@ -82,7 +82,12 @@ export default {
       context: request => packetFor(context, request),
       status: async () => ({ workspace: await readAgentWorkspace(reader(context), await pluginNodes(context)), runs: await readRegistry(context) })
     }
-    refresh(context)
+    // The tree is built when the panel is opened or a packet is asked for, not
+    // here. Building it at load read every plugin guide, every plugin source and
+    // every instruction file in the checkout before anything had asked for it —
+    // over a megabyte of reads on every world boot, browser and headless both,
+    // for a panel most sessions never open. The menu's own `refresh` builds it on
+    // the first open, and `status`/`context` build it on demand.
     context.bus.on('files:written', ({ path }) => {
       if (path === REGISTRY || path.startsWith('agents/')) refresh(context)
     })

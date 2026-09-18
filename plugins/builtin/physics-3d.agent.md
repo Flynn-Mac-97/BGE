@@ -1,5 +1,6 @@
 ---
 description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use when things fall through the floor, walk through walls, need to stand on something, or when you need to know what a line of sight or a shot hits.
+category: gameplay
 ---
 # Physics 3D
 

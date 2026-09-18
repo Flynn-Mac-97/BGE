@@ -1,6 +1,6 @@
 ---
 name: glass-lane-view
-description: Watches one parallel lane from the person's tab: a schematic from its own engine and its last captured frame. Use when several lanes work at once and you want to see one without touching it.
+description: "Watches one parallel lane from the person's tab: a schematic from its own engine and its last captured frame. Use when several lanes work at once and you want to see one without touching it."
 ---
 <!-- generated from plugins/builtin/lane-view.agent.md at server start; edits are lost -->
 

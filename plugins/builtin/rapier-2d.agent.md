@@ -1,5 +1,6 @@
 ---
 description: Rigid body physics in 2D solved by Rapier — rotation, mass, friction, sleeping and a provable replay. Use when boxes must tip or roll in a side-on game, when a scene has hundreds of bodies, or when two runs have to come out identical.
+category: gameplay
 ---
 # Rapier 2D
 

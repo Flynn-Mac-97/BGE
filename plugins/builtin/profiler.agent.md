@@ -1,5 +1,6 @@
 ---
 description: Measures what a frame costs, on the thread and on the card, what a material's pixels cost, and what a fixed step costs system by system. Use before and after a rendering or simulation change, to find what a material, a shader or a physics load costs, and to answer how many of a thing the engine can draw or simulate.
+category: engine
 ---
 
 # Profiler

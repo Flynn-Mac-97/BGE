@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/agent-workspace.js; sha256 fd35a74de3fc483769e2f00c850b313d6bec6bccd1b7c511ca2053c5e25521ba. Do not edit. -->
+<!-- Generated from plugins/builtin/agent-workspace.js; sha256 996b47a7f2b30c29b2c0a7b8860f7f3e608d68e2ab43bd9437129662c27dea83. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/agent-workspace.js). Where the prose below it disagrees, this is the code.
 
 ```
@@ -18,5 +18,5 @@
   context    context.agents
   listens    files:written
   emits      open:agent-file {scope, path}
-  source     163 lines
+  source     168 lines
 ```

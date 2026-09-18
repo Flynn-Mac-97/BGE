@@ -1,5 +1,6 @@
 ---
 description: Hides marker entities — spawn points, patrol nodes, camera hints — while a run plays, and shows them again when it stops. Use when an editing aid is visible during play, when a marker never comes back after stopping, or when adding a type that should only be seen while building.
+category: authoring
 ---
 
 # Editor Markers

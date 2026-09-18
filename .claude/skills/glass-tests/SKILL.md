@@ -1,6 +1,6 @@
 ---
 name: glass-tests
-description: Lasting checks for a game, run headless and repeatably: arrange a small world, simulate a fixed time, assert what happened. Use when proving a behaviour, guarding a fix, or asked to test game logic.
+description: "Lasting checks for a game, run headless and repeatably: arrange a small world, simulate a fixed time, assert what happened. Use when proving a behaviour, guarding a fix, or asked to test game logic."
 ---
 <!-- generated from plugins/builtin/tests.agent.md at server start; edits are lost -->
 

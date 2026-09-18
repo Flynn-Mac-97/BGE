@@ -1,6 +1,6 @@
 ---
 name: glass-what-things-are
-description: What an object IS, in its author's own words — the sentence written when it was made, not a guess reverse-engineered from its name, box, colour or code. Use when something in a level or on screen is unidentified, before reading a type file to work out what it is, and to check whether the art still matches what the author said.
+description: "What an object IS, in its author's own words — the sentence written when it was made, not a guess reverse-engineered from its name, box, colour or code. Use when something in a level or on screen is unidentified, before reading a type file to work out what it is, and to check whether the art still matches what the author said."
 ---
 <!-- generated from plugins/builtin/object-descriptions.agent.md at server start; edits are lost -->
 
