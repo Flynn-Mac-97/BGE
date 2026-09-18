@@ -21,6 +21,12 @@
  * Rendered through a 2D canvas into a texture. Real fonts, no bitmap font to
  * ship, and it costs one texture upload on the frames where the text changed.
  */
+
+import { canvasLayer } from './render/canvas-layer.js'
+
+/** This plugin's canvas over the frame. */
+const LAYER = { owner: 'hud', className: 'hud-layer' }
+
 export default {
   name: 'Heads Up Display',
   category: 'game',
@@ -56,7 +62,7 @@ export default {
     phase: 'frame',
     run(world, seconds, context) {
       const hud = context.hud
-      const layer = ensureLayer(context)
+      const layer = canvasLayer(context, LAYER)
       if (!layer) return
 
       // Only playing shows the HUD. While editing it would sit on top of the
@@ -99,42 +105,6 @@ export default {
 }
 
 // ------------------------------------------------------------------ the layer
-/**
- * A 2D canvas sitting exactly on the viewport.
- *
- * The GL canvas cannot draw text without shipping a font atlas, and a HUD is
- * the one thing in a game that is genuinely 2D and screen-space. This is a
- * sibling canvas, not a DOM overlay of styled elements: still one rectangle of
- * pixels, still capturable, still nothing for a plugin to style.
- */
-function ensureLayer(context) {
-  const existing = context.hud._layer
-  // Still attached? Reuse it. `document.contains` rather than a plain cache
-  // check because another plugin can legitimately rebuild the viewport, and a
-  // detached canvas measures zero and paints nothing — silently.
-  if (existing && document.contains(existing.canvas)) return existing
-
-  // Its own element, not the gizmo's overlay: Transform Tool rewrites
-  // `shell.overlay` wholesale every redraw, which deleted this canvas. Two
-  // plugins drawing into one container is a shared-mutable-DOM bug waiting to
-  // happen, so each gets its own.
-  const host = context.shell?.viewport
-  if (!host) return null
-
-  const canvas = existing?.canvas || document.createElement('canvas')
-  canvas.className = 'hud-layer'
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none'
-  // Before the gizmo overlay in document order, so selection handles stay on top.
-  host.prepend(canvas)
-  // The GL canvas is first; keep the HUD after it.
-  const gl = host.querySelector('#gl')
-  if (gl) gl.after(canvas)
-
-  const layer = { canvas, g: canvas.getContext('2d'), last: null }
-  context.hud._layer = layer
-  return layer
-}
-
 function paint(layer, items, state) {
   const { canvas, g } = layer
   const dpr = Math.min(devicePixelRatio || 1, 2)

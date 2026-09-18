@@ -25,8 +25,10 @@ direction is the game's.**
 
 - `tools/lib/` — anything a second game would want. Seeded random, noise, colour,
   PNG and WAV encoding, seam checks. No game nouns.
-- `tools/make-<game>-<thing>.mjs` — what *this* game's surfaces look like. Its
-  palette, its structures, its list. Name the game here; that is the point.
+- A game's own generator lives in the game's project, under its `tools/`, and
+  writes into that project. `make-<game>-<thing>.mjs` names the game; that is the
+  point. It reaches this checkout's `tools/lib/` through the project's
+  `tools/where-engine.mjs`, which reads `ENGINE_CHECKOUT`.
 - **Look in `tools/lib/` before writing a generator.** It already holds the
   random, noise, colour, and encoding helpers. Copies drift, and a fix lands in
   only one of them.

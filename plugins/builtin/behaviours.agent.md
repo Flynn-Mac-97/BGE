@@ -3,7 +3,7 @@ description: Attach a shared trait to an entity — a behaviour file that runs a
 ---
 # Behaviours
 
-- This plugin owns the **verbs only** — attach, detach, list. The runtime is the kernel, `engine/world.js`, because the world is what runs hooks.
+- This plugin owns the **verbs only**. The runtime is the kernel, `engine/world.js`, because the world is what runs hooks.
 - A behaviour is one file, `project/behaviours/<name>.js`, shaped like a type with no art:
 
 ```js

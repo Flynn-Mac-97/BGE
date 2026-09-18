@@ -18,6 +18,8 @@
  * cost the grid exists to avoid.
  */
 
+import { groupRegistry } from './spatial-hash/registry.js'
+
 /** Cells about twice a member's width: selective, and a neighbour walk is nine cells. */
 const DEFAULT_CELL_SIZE = 1.5
 
@@ -158,6 +160,30 @@ export function makeGroup(name, context, options = {}) {
   const columnOf = x => clamp(Math.floor((x - originX) / cellSize), 0, columns - 1)
   const rowOf = z => clamp(Math.floor((z - originZ) / cellSize), 0, rows - 1)
 
+  /**
+   * Walk every member in the cells within `reach` of a point, calling
+   * `visit(index, dx, dz)`.
+   *
+   * `near` and `nearest` ask the same cells in the same order and differ only in
+   * what they do with each member. The callback is built once per question, not
+   * once per pair: a caller that wants to walk the pairs itself reads `flat`.
+   */
+  function forEachNear(x, z, reach, visit) {
+    const fromColumn = columnOf(x - reach), toColumn = columnOf(x + reach)
+    const fromRow = rowOf(z - reach), toRow = rowOf(z + reach)
+    for (let row = fromRow; row <= toRow; row++) {
+      const base = row * columns
+      for (let column = fromColumn; column <= toColumn; column++) {
+        const cell = base + column
+        const end = cellStart[cell + 1]
+        for (let k = cellStart[cell]; k < end; k++) {
+          const i = order[k]
+          visit(i, positionX[i] - x, positionZ[i] - z)
+        }
+      }
+    }
+  }
+
   return {
     name,
     get members() { return members },
@@ -207,22 +233,9 @@ export function makeGroup(name, context, options = {}) {
       into.length = 0
       if (!count) return into
       const squared = reach * reach
-      const fromColumn = columnOf(x - reach), toColumn = columnOf(x + reach)
-      const fromRow = rowOf(z - reach), toRow = rowOf(z + reach)
-
-      for (let row = fromRow; row <= toRow; row++) {
-        const base = row * columns
-        for (let column = fromColumn; column <= toColumn; column++) {
-          const cell = base + column
-          const end = cellStart[cell + 1]
-          for (let k = cellStart[cell]; k < end; k++) {
-            const i = order[k]
-            const dx = positionX[i] - x
-            const dz = positionZ[i] - z
-            if (dx * dx + dz * dz <= squared) into.push(members[i])
-          }
-        }
-      }
+      forEachNear(x, z, reach, (i, dx, dz) => {
+        if (dx * dx + dz * dz <= squared) into.push(members[i])
+      })
       return into
     },
 
@@ -230,24 +243,12 @@ export function makeGroup(name, context, options = {}) {
       fresh()
       let best = null
       let bestDistance = reach * reach
-      const fromColumn = columnOf(x - reach), toColumn = columnOf(x + reach)
-      const fromRow = rowOf(z - reach), toRow = rowOf(z + reach)
-      for (let row = fromRow; row <= toRow; row++) {
-        const base = row * columns
-        for (let column = fromColumn; column <= toColumn; column++) {
-          const cell = base + column
-          const end = cellStart[cell + 1]
-          for (let k = cellStart[cell]; k < end; k++) {
-            const i = order[k]
-            const dx = positionX[i] - x
-            const dz = positionZ[i] - z
-            const distance = dx * dx + dz * dz
-            if (distance >= bestDistance) continue
-            bestDistance = distance
-            best = members[i]
-          }
-        }
-      }
+      forEachNear(x, z, reach, (i, dx, dz) => {
+        const distance = dx * dx + dz * dz
+        if (distance >= bestDistance) return
+        bestDistance = distance
+        best = members[i]
+      })
       return best
     },
 
@@ -289,7 +290,7 @@ export default {
       console.error('[spatial-hash] something else already put a spatial on context — replacing it')
     }
 
-    const groups = new Map()
+    const spatial = groupRegistry((name, options) => makeGroup(name, context, options))
 
     // A member destroyed by anybody — a weapon, a level reload, a command — has
     // to leave its group, and the group cannot poll for it. Every group is told
@@ -298,24 +299,10 @@ export default {
     context.bus.on('entity:removed', entity => {
       if (!entity) return
       entity._spatialOut = true
-      for (const group of groups.values()) group.invalidate()
+      for (const group of spatial.groups) group.invalidate()
     })
 
-    context.spatial = {
-      group(name, options) {
-        const existing = groups.get(name)
-        if (existing) return existing
-        const made = makeGroup(name, context, options)
-        groups.set(name, made)
-        return made
-      },
-      get: name => groups.get(name) || null,
-      forget(name) {
-        groups.get(name)?.clear()
-        return groups.delete(name)
-      },
-      get groups() { return [...groups.values()] }
-    }
+    context.spatial = spatial
   },
 
   commands: [{

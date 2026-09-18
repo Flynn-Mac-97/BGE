@@ -18,6 +18,7 @@
 import bpy
 import bmesh
 import math
+import os
 
 
 def linear(hex_colour):

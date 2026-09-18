@@ -4,6 +4,12 @@ description: Run the CLI-and-editor bridge suite, which drives the real CLI agai
 ---
 <!-- generated from plugins/builtin/cli-tests.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/cli-tests.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/cli-tests.js"]}'
+```
+
 # CLI Tests
 
 - The suite is `test/cli.bridge.mjs`; run it with `node test/cli.bridge.mjs` or `npm test`.

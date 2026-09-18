@@ -4,6 +4,12 @@ description: Plays motion clips on a 3D model's bones and brings any rigged char
 ---
 <!-- generated from plugins/builtin/rig-animation.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/rig-animation.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/rig-animation.js"]}'
+```
+
 # Rig Animation
 
 Each fixed step it samples `entity.rigClip` into `entity.pose`; the renderer poses the bones.
@@ -30,7 +36,6 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 
 - Type keys: `rig.clips` (name → file), `rig.default` (first clip), `rig.rootMotion` (false: the clip's travel is not added). Choose by assigning `entity.rigClip`; there is no `play()`.
 
-- Commands: `rig.clips` · `rig.load` · `rig.play '{"entity":"player","clip":"run"}'` · `rig.sources` · `rig.retarget` · `rig.check` · `rig.compare` (last four headless).
 - Clips load asynchronously (a headless test awaits `rig.load`). A playing clip owns `entity.pose`. Unknown names hold the last pose. No blending.
 
 ## Detail

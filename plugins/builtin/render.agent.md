@@ -6,7 +6,6 @@ triggers: render, look, tone mapping, exposure, environment, hdri, shadows, wash
 # Render
 
 Every render setting is in one table: `plugins/builtin/render/settings.js`.
-Read what is set now, with where each value came from:
 
 ```sh
 node bin/engine.mjs run render.look
@@ -74,11 +73,9 @@ as drawn.
 
 ## Commands
 
-- `render.look` — every setting, its value, where it came from, its options.
 - `render.set '{"exposure":0.8}'` — writes game.json.
 - `render.set '{"exposure":0.8,"save":"level"}'` — writes the open level.
 - `render.set '{"exposure":0.8,"save":false}'` — this session only.
-- `render.reset` — drops session values.
 
 A bad value is refused before anything is written.
 

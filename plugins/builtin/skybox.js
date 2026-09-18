@@ -41,6 +41,8 @@ const DEFAULT_SKY = '#6d7f96'
  */
 const SKY_RADIUS = 100
 
+import { lookColour } from './render/look-colour.js'
+
 export default {
   name: 'Skybox',
   category: 'visuals',
@@ -222,7 +224,7 @@ function resolveSky(declared, overrides, say) {
   // A sky box still gets a flat colour behind it: it is what shows if the image
   // fails to load, and it is what the fog matches so the two agree at the horizon.
   const sky = stated('sky') != null
-    ? colour(stated('sky'), DEFAULT_SKY, 'sky', say)
+    ? lookColour(stated('sky'), DEFAULT_SKY, 'sky', say, 'Skybox')
     : (skyTexture ? DEFAULT_SKY : null)
 
   return { sky, skyTexture }
@@ -235,16 +237,6 @@ function resolveSky(declared, overrides, say) {
  * sky goes wrong, the log stays empty, and the author reads their own file
  * three times looking for the missing hash.
  */
-function colour(value, fallback, what, say) {
-  if (value == null) return fallback
-  if (typeof value === 'number') return value
-  const text = String(value).trim()
-  if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text)) return text
-  if (COLOUR_NAMES.has(text.toLowerCase())) return text
-  say(`[Skybox] "${text}" is not a colour the ${what} can use — it is neither a #hex value nor one of the CSS colour names — falling back to ${fallback}`)
-  return fallback
-}
-
 /**
  * Every colour name the renderer will actually take.
  *
@@ -253,21 +245,6 @@ function colour(value, fallback, what, say) {
  * through to a renderer that then rejected it. That is the precise failure this
  * function exists to prevent, so the list is written out.
  */
-const COLOUR_NAMES = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond ' +
-  'blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan ' +
-  'darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange ' +
-  'darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet ' +
-  'deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite ' +
-  'gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush ' +
-  'lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey ' +
-  'lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime ' +
-  'limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen ' +
-  'mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin ' +
-  'navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise ' +
-  'palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue ' +
-  'saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow ' +
-  'springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen').split(' '))
-
 // ------------------------------------------------------------------ the renderer
 /**
  * Call one renderer setter, and never take a level load down with it.

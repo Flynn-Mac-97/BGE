@@ -158,8 +158,14 @@ const validateId = id => {
  *
  * The read refuses any path that leaves the scope it named, so a request cannot
  * pull in a file outside the engine or the project.
+ *
+ * @param {string} root The checkout.
+ * @param {object} request The task, files and nodes asked for.
+ * @param {string} projectPath The open project, as the tree spells it.
+ * @param {Function} interfaceText `(scope, file)`, answering a plugin's parsed
+ * interface. Optional: without it a packet carries guide prose alone.
  */
-export async function contextFromDisk(root, request, projectPath = 'project') {
+export async function contextFromDisk(root, request, projectPath = 'project', interfaceText = null) {
   root = path.resolve(root)
   const project = path.resolve(root, projectPath)
   const read = (scope, file) => {
@@ -170,7 +176,9 @@ export async function contextFromDisk(root, request, projectPath = 'project') {
     }
     return fs.promises.readFile(target, 'utf8')
   }
-  return resolveAgentContext(read, request, await onDisk(project, root).agentPlugins(), project)
+  const transport = onDisk(project, root)
+  return resolveAgentContext(
+    read, request, await transport.agentPlugins(), project, interfaceText || transport.agentInterface)
 }
 
 /**
@@ -179,15 +187,18 @@ export async function contextFromDisk(root, request, projectPath = 'project') {
  *
  * The claim is checked twice — once before the worktree exists and again under
  * the registry lock — so two prepares racing for one file cannot both win.
+ *
+ * @param {Function} interfaceText `(scope, file)`, answering a plugin's parsed
+ * interface for the packet the lane is handed.
  */
-export async function prepareAgent(root, id, request = {}, projectPath = 'project') {
+export async function prepareAgent(root, id, request = {}, projectPath = 'project', interfaceText = null) {
   validateId(id)
   const main = mainWorktree(root)
   const files = [].concat(request.files || []).map(normal).filter(Boolean)
   const parallel = request.parallel === true || request.mode === 'parallel'
   if (parallel && !files.length) throw new Error('parallel tasks must claim at least one file')
 
-  const packet = await contextFromDisk(main, { ...request, files, parallel }, projectPath)
+  const packet = await contextFromDisk(main, { ...request, files, parallel }, projectPath, interfaceText)
   assertAvailable(main, readAgentRegistry(main).runs, id, files, parallel)
 
   let workspace = main

@@ -4,6 +4,12 @@ description: Draw a full game screen — a title card, pause menu, level-up choi
 ---
 <!-- generated from plugins/builtin/screen.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/screen.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/screen.js"]}'
+```
+
 # Screen
 
 - Draws **game** screens — a title card, a pause menu, a level-up choice, a
@@ -25,5 +31,5 @@ description: Draw a full game screen — a title card, pause menu, level-up choi
 - `screen.read` / `node bin/engine.mjs run screen.read` answers with what the
   screen says, in words. That is how a headless run checks a screen came up.
 - Needs no document. With no canvas every item is still built and still readable.
-- Screens are cleared on `level:loaded` and `play:stopped`. It refuses nothing else.
+- Screens are cleared on `level:loaded` and `play:stopped`.
 - `screen.list` — every screen registered, and which one is showing.

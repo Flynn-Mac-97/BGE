@@ -13,8 +13,6 @@ description: Counts experience points against a curve and announces every level 
   and `needFor(level)` / `totalFor(level)`.
 - Announces `experience:levelled` **once per level**, in order, even when one
   pickup crosses three thresholds — so a chooser can queue three offers.
-  Also `experience:gained`.
 - Mirrors `level`, `experience`, `experienceNeeded` and `experienceFraction`
   into `world.state`, so a HUD reads them with no wiring.
 - Resets on `level:loaded`. A run's progress belongs to that run.
-- Commands: `experience.state`, `experience.gain <n>`.

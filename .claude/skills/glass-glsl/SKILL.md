@@ -4,6 +4,12 @@ description: Shaders written as GLSL source — one function per slot, its argum
 ---
 <!-- generated from plugins/builtin/glsl.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/glsl.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/glsl.js"]}'
+```
+
 # GLSL
 
 - **One of the two languages a shader can be written in**; TSL is the other.
@@ -69,9 +75,7 @@ An unknown input is reported by name; the argument gets zero.
 
 ## Commands
 
-- `glsl.backend` — whether GLSL can build now, and why not if not.
 - `glsl.forceWebGL '[true]'` — choose WebGL on the next load; `'[false]'` goes back to WebGPU.
-- `glsl.list` — every GLSL shader, its slots and defaults.
 - `glsl.source '["dissolve"]'` — the helpers and slots of one.
 
 ## Detail

@@ -4,6 +4,12 @@ description: Rigid body physics in 3D solved by Rapier — rotation, mass, frict
 ---
 <!-- generated from plugins/builtin/rapier-3d.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/rapier-3d.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/rapier-3d.js"]}'
+```
+
 # Rapier 3D
 
 - **Same contract as Physics 3D.** It claims the same entities, reads the same
@@ -68,9 +74,7 @@ where the WebAssembly call overhead shows. 300 bodies cost 0.58 ms against
 
 ## Commands
 
-- `rapier3d.use` — switch solver, and write the choice to `game.json`.
 - `rapier3d.bodies` — every dynamic body: position, velocity, grounded, asleep.
-- `rapier3d.snapshot` — the hash two runs are compared by.
 - `rapier3d.raycast` — nearest hit, the same shape Physics 3D answers in.
 
 `context.raycast` and `context.canStand` follow whichever solver is chosen, so

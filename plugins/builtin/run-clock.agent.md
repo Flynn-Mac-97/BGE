@@ -18,4 +18,3 @@ description: Times a run from first step to end and reports why it ended. Use fo
   so a result screen still draws.
 - The words on a result screen belong to the game. This plugin writes none.
 - Mirrors `runSeconds`, `runClock` and `runOver` into `world.state`.
-- Commands: `run.state`, `run.end <reason>`.

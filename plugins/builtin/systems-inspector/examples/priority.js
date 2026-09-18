@@ -1,8 +1,0 @@
-// A small independent function for trying visual scripting without changing engine behaviour.
-export function priorityScore(priority) {
-  if (priority < 0) {
-    return 0;
-  } else {
-  }
-  return priority * 3;
-}

@@ -20,6 +20,8 @@
  * real answer to "did that hit land, and for how much" with no screen at all.
  */
 
+import { asVector } from '../../engine/vector.js'
+
 /** Live numbers, oldest first. Cleared on a level load with everything else. */
 const rising = []
 
@@ -55,12 +57,6 @@ const PLAIN = '#ffffff'
 const CRITICAL = '#ffd23f'
 
 let painter = null
-
-const asVector = value => {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object') return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  return null
-}
 
 export default {
   name: 'Damage Numbers',

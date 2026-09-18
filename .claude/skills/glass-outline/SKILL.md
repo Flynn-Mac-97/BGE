@@ -4,6 +4,12 @@ description: Switches an outline on and off round one thing — the standard fee
 ---
 <!-- generated from plugins/builtin/outline.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/outline.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/outline.js"]}'
+```
+
 # Outline
 
 - The line is the renderer's keyline: a hull grown by a fixed number of **screen
@@ -56,8 +62,7 @@ outline that is already on.
 
 - **It does not outline what a level declared.** A `keyline` written on a mesh
   is the level's, and hiding gives that back rather than deleting it.
-- **It has no hover of its own.** The editor's selection is the only signal it
-  listens to. A game says when, from its own input.
+- **It has no hover of its own.** A game says when, from its own input.
 - **An outlined entity leaves its merge batch**, so a field of five hundred
   outlined tufts costs five hundred draw calls. Outline the few things a player
   is looking at.

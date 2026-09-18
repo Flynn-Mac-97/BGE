@@ -401,16 +401,11 @@ function dragMove(context, renderer, p, event) {
     const t = axisT(ray, drag.pivot, drag.axis)
     const delta = (t - drag.t0)
     drag.moved ||= Math.abs(delta) > 1e-6
-    for (const o of drag.orig) {
-      const e = context.world.byId(o.id)
-      if (!e) continue
-      const next = {
-        x: o.x + drag.axis[0] * delta,
-        y: o.y + drag.axis[1] * delta,
-        z: o.z + drag.axis[2] * delta
-      }
-      applyMove(e, next, meta)
-    }
+    forEachSelected(context, drag.orig, (entity, original) => applyMove(entity, {
+      x: original.x + drag.axis[0] * delta,
+      y: original.y + drag.axis[1] * delta,
+      z: original.z + drag.axis[2] * delta
+    }, meta))
     return
   }
 
@@ -421,11 +416,11 @@ function dragMove(context, renderer, p, event) {
     const dy = q.y - drag.q0.y
     const dz = q.z - drag.q0.z
     drag.moved ||= (Math.abs(dx) + Math.abs(dy) + Math.abs(dz)) > 1e-6
-    for (const o of drag.orig) {
-      const e = context.world.byId(o.id)
-      if (!e) continue
-      applyMove(e, { x: o.x + dx, y: o.y + dy, z: o.z + dz }, meta)
-    }
+    forEachSelected(context, drag.orig, (entity, original) => applyMove(entity, {
+      x: original.x + dx,
+      y: original.y + dy,
+      z: original.z + dz
+    }, meta))
     return
   }
 
@@ -437,21 +432,19 @@ function dragMove(context, renderer, p, event) {
     let deg = (a1 - a0) * 180 / Math.PI
     if (!meta && shift) deg = Math.round(deg / ROTATE_SNAP) * ROTATE_SNAP
     drag.moved ||= Math.abs(deg) > 1e-4
-    for (const o of drag.orig) {
-      const e = context.world.byId(o.id)
-      if (!e) continue
-      // Each entity orbits the pivot AND turns by the same amount, so a group
-      // rotates as one thing rather than spinning in place.
-      const c = Math.cos(a1 - a0), s = Math.sin(a1 - a0)
-      const vx = o.x - drag.pivot.x, vz = o.z - drag.pivot.z
-      e.x = drag.pivot.x + vx * c - vz * s
-      e.z = drag.pivot.z + vx * s + vz * c
-      e.y = o.y
+    // Each entity orbits the pivot AND turns by the same amount, so a group
+    // rotates as one thing rather than spinning in place.
+    const c = Math.cos(a1 - a0), s = Math.sin(a1 - a0)
+    forEachSelected(context, drag.orig, (entity, original) => {
+      const vx = original.x - drag.pivot.x, vz = original.z - drag.pivot.z
+      entity.x = drag.pivot.x + vx * c - vz * s
+      entity.z = drag.pivot.z + vx * s + vz * c
+      entity.y = original.y
       // The same folding the engine uses everywhere: -10 and 350 are the same
       // facing, and one of them is the readable one.
-      const n = ((o.r + deg) % 360 + 360) % 360
-      e.rotation = n > 180 ? n - 360 : n
-    }
+      const n = ((original.r + deg) % 360 + 360) % 360
+      entity.rotation = n > 180 ? n - 360 : n
+    })
     return
   }
 
@@ -463,14 +456,25 @@ function dragMove(context, renderer, p, event) {
     if (!meta) factor = Math.round(factor / SCALE_SNAP) * SCALE_SNAP
     factor = Math.max(0.05, factor)
     drag.moved ||= Math.abs(factor - 1) > 1e-4
-    for (const o of drag.orig) {
-      const e = context.world.byId(o.id)
-      if (!e) continue
-      e.x = drag.pivot.x + (o.x - drag.pivot.x) * factor
-      e.y = drag.pivot.y + (o.y - drag.pivot.y) * factor
-      e.z = drag.pivot.z + (o.z - drag.pivot.z) * factor
-      e.scale = Math.max(0.05, (o.s ?? 1) * factor)
-    }
+    forEachSelected(context, drag.orig, (entity, original) => {
+      entity.x = drag.pivot.x + (original.x - drag.pivot.x) * factor
+      entity.y = drag.pivot.y + (original.y - drag.pivot.y) * factor
+      entity.z = drag.pivot.z + (original.z - drag.pivot.z) * factor
+      entity.scale = Math.max(0.05, (original.s ?? 1) * factor)
+    })
+  }
+}
+
+/**
+ * Run one drag action for every entity the selection started with.
+ *
+ * Every kind of drag walks the same list and skips what the world no longer
+ * has, which is what the four copies of this loop used to say separately.
+ */
+function forEachSelected(context, originals, apply) {
+  for (const original of originals) {
+    const entity = context.world.byId(original.id)
+    if (entity) apply(entity, original)
   }
 }
 

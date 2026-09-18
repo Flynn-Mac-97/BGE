@@ -4,6 +4,12 @@ description: Wires combat events to named particle effects and decals: muzzle fl
 ---
 <!-- generated from plugins/builtin/combat-effects.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/combat-effects.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/combat-effects.js"]}'
+```
+
 # Combat Effects
 
 - Wires the engine's combat events to named particle effects and decals: `weapon:fired` → muzzle-flash and brass, `weapon:hit` → tracer plus blood or surface dust and a bullet-hole decal, `entity:hurt`/`entity:killed` → blood, `grenade:detonated` → smoke/flash/explosion, `explosion` → fireball and scorch.

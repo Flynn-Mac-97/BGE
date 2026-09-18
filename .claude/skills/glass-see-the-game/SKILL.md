@@ -4,6 +4,12 @@ description: Use when a question is about what is actually there in the running 
 ---
 <!-- generated from plugins/builtin/see.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/see.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/see.js"]}'
+```
+
 # See
 
 Your model of the game and what a player sees can disagree, and the code does

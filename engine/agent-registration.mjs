@@ -300,10 +300,17 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     const skill = skillNameFor(guide)
     const description = describedBy(guide)
     if (!description || !SKILL_NAME.test(skill)) continue
+    // Keep one generated interface beside the guide and link it from skills.
+    const where = guide.hasSource
+      ? `Read the generated interface in \`${guide.sourceFromRoot.replace(/\.js$/, '.agent/interface.generated.md')}\`.`
+        + ` Plugin edits refresh it while the server runs. This packet command also checks freshness:\n\n`
+        + '```sh\nnode bin/engine.mjs agent.context \'{"task":"…","files":["'
+        + `${guide.sourceFromRoot}"]}'\n\`\`\`\n\n`
+      : ''
     files.push({
       path: `${SKILL_DIRECTORY}/${skill}/SKILL.md`,
       source: guide.fileFromRoot,
-      text: `---\nname: ${skill}\ndescription: ${description}\n---\n${GENERATED_MARKER}${guide.file} at server start; edits are lost -->\n\n${guide.body}`
+      text: `---\nname: ${skill}\ndescription: ${description}\n---\n${GENERATED_MARKER}${guide.file} at server start; edits are lost -->\n\n${where}${guide.body}`
     })
   }
   files.push(...await manifestSkillFiles(root, new Set(files.map(file => file.path))))
@@ -537,49 +544,20 @@ function commandIds(source) {
   return [...source.slice(from, index).matchAll(/id:\s*'([a-z][\w-]*\.[\w.-]+)'/g)].map(match => match[1])
 }
 
-/**
- * Commands a plugin registers that neither its guide nor its detail files name.
- *
- * The guide is what an agent reads before its first call, so a verb missing
- * from it is a verb nothing will use. Detail counts: the guide's index points
- * at it, so a verb documented there is still reachable.
- *
- * A warning, not a failure: a plugin may register something deliberately
- * internal, and a guide is prose that cannot be generated from an id.
- */
-export async function undocumentedCommandProblems(root, projectPath, guides = null) {
-  const listed = (guides || await pluginGuides(root, projectPath))
-    .filter(guide => guide.enabled && guide.hasSource)
-  // Read the sources together rather than one at a time while walking the list.
-  // Each is read only to look for command ids its guide does not name, and no
-  // read depends on another.
-  const sources = await Promise.all(listed.map(guide =>
-    fs.readFile(path.join(root, guide.sourceFromRoot), 'utf8').catch(() => null)))
-  const problems = []
-  listed.forEach((guide, at) => {
-    const source = sources[at]
-    if (source === null) return
-    const documented = `${guide.body}\n${guide.detail}`
-    const missing = [...new Set(commandIds(source))].filter(id => !documented.includes(id)).sort()
-    if (!missing.length) return
-    problems.push({
-      warning: true,
-      file: guide.fileFromRoot,
-      why: `registers ${missing.join(', ')} and its guide names none of them. An agent reads the guide before its first call, so an undocumented verb is one nothing will use`
-    })
-  })
-  return problems
-}
-
 /** Everything this module reports, for one call from `check`. */
 export async function agentRegistrationProblems(root, projectPath) {
-  // Read the guides once and hand the same list to all three checks. Each one
+  // Read the guides once and hand the same list to both checks. Each one
   // compares against that same list, and reading every guide, its source and its
-  // detail files three times over was half of what `check` spent its time on.
+  // detail files once per check was half of what `check` spent its time on.
+  //
+  // A guide no longer has to name its plugin's commands: an instruction packet
+  // prints every one of them, parsed from source as the packet is built. So the
+  // check that read the guide looking for a missing verb is gone, and no check
+  // is needed to replace it — a command reaches an agent whether or not the
+  // guide ever mentions it.
   const guides = await pluginGuides(root, projectPath)
   return [
     ...await generatedFileProblems(root, projectPath, guides),
-    ...await skillRegistrationProblems(root, projectPath, guides),
-    ...await undocumentedCommandProblems(root, projectPath, guides)
+    ...await skillRegistrationProblems(root, projectPath, guides)
   ]
 }

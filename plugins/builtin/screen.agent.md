@@ -22,5 +22,5 @@ description: Draw a full game screen — a title card, pause menu, level-up choi
 - `screen.read` / `node bin/engine.mjs run screen.read` answers with what the
   screen says, in words. That is how a headless run checks a screen came up.
 - Needs no document. With no canvas every item is still built and still readable.
-- Screens are cleared on `level:loaded` and `play:stopped`. It refuses nothing else.
+- Screens are cleared on `level:loaded` and `play:stopped`.
 - `screen.list` — every screen registered, and which one is showing.

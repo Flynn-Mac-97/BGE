@@ -11,6 +11,7 @@ import { boundsOf, facingOffset } from '../../../engine/frame-facts.js'
 import { occlusionGrid, insideOf, matches, diffMoments } from '../../../engine/scene-query.js'
 import { FIXED_STEP } from '../../../engine/loop.js'
 import { describe, aboutTypes } from './describe.js'
+import { clippedShare } from './describe-marks.js'
 
 /**
  * The ID buffer is another lane's module and may not exist yet, and a static
@@ -214,59 +215,17 @@ export async function isolate(context, options = {}) {
   const description = describe(context, {})
   const entry = (description.visible || []).find(seen => seen.id === entity.id) || null
 
-  let screen = null
-  if (entry) {
-    // describe only writes `cut` on marked entries; the dossier has exactly
-    // one subject, so it computes the same clip arithmetic for it directly.
-    const shownWidth = Math.min(100, entry.at[0] + entry.size[0] / 2) - Math.max(0, entry.at[0] - entry.size[0] / 2)
-    const shownHeight = Math.min(100, entry.at[1] + entry.size[1] / 2) - Math.max(0, entry.at[1] - entry.size[1] / 2)
-    const shown = Math.max(0, shownWidth) * Math.max(0, shownHeight) / (entry.size[0] * entry.size[1] || 1)
-    screen = {
-      at: entry.at,
-      size: entry.size,
-      depth: entry.depth,
-      ...(entry.mark ? { mark: entry.mark } : {}),
-      cut: round(Math.min(100, shown * 100)),
-      region: REGIONS.find(name => matches(entry, { region: name }))
-    }
-  }
+  const screen = entry ? screenBoxOf(entry) : null
 
   const cover = await occlusion(context, { of: entity.id })
 
-  let velocity = null
-  let velocityWhy
-  if (!context.loop.running && !context.world.simulated) {
-    // Stepping an unsimulated world runs start hooks and moves entities off
-    // their edited places — the dossier must not change the level it reads.
-    velocityWhy = 'not measured: the loop is stopped and the world is unsimulated — play or simulate first'
-  } else if (context.loop.paused) {
-    // A step under a held clock moves nothing, and [0, 0, 0] would report a
-    // sprinting rat as standing still. The holder is the answer instead.
-    velocityWhy = `not measured: the clock is held by ${JSON.stringify(context.loop.holds)} — a step would move nothing and read as a standstill`
-  } else {
-    const before = { x: entity.x, y: entity.y, z: entity.z || 0 }
-    context.loop.step(1)
-    velocity = [
-      round((entity.x - before.x) / FIXED_STEP),
-      round((entity.y - before.y) / FIXED_STEP),
-      round(((entity.z || 0) - before.z) / FIXED_STEP)
-    ]
-  }
-
-  const target = context.camera?.target
-  const followed = target && target.id !== entity.id && context.world.entities.includes(target) ? target : null
+  const { velocity, velocityWhy } = measureVelocity(context, entity)
 
   // One subject, so the whole authored block rides along: what it is, how a
   // correct one reads, how a broken one reads, and why this one is placed here.
   // `appearance` is safe in a dossier and never in an image sidecar, because
   // nothing here is handed to a vision model beside a picture.
-  const definition = entity._definition || {}
-  const authored = {
-    ...(definition.about ? { about: definition.about } : {}),
-    ...(definition.appearance ? { appearance: definition.appearance } : {}),
-    ...(definition.looksWrongWhen ? { looksWrongWhen: definition.looksWrongWhen } : {}),
-    ...(entity.note ? { note: entity.note } : {})
-  }
+  const authored = authoredBlock(entity)
 
   return {
     id: entity.id,
@@ -280,17 +239,81 @@ export async function isolate(context, options = {}) {
     blockedBy: cover.blockedBy,
     velocity,
     ...(velocityWhy ? { velocityWhy } : {}),
-    followed: followed
-      ? {
-          id: followed.id,
-          distance: round(Math.hypot(entity.x - followed.x, entity.y - followed.y, (entity.z || 0) - (followed.z || 0))),
-          facing: {
-            [entity.id]: facingOffset(entity, followed),
-            [followed.id]: facingOffset(followed, entity)
-          }
-        }
-      : null,
+    followed: followedBy(context, entity),
     method: `describe for the screen box, ${cover.method} for cover, ${velocity ? 'one fixed step for velocity' : 'no step taken'}`
+  }
+}
+
+/**
+ * Where one described entry landed on screen, as a fraction of its own box.
+ *
+ * `describe` writes `cut` on marked entries, and a dossier has exactly one
+ * subject, so it asks for the same share directly.
+ */
+function screenBoxOf(entry) {
+  const shown = clippedShare(entry)
+  return {
+    at: entry.at,
+    size: entry.size,
+    depth: entry.depth,
+    ...(entry.mark ? { mark: entry.mark } : {}),
+    cut: round(Math.min(100, shown * 100)),
+    region: REGIONS.find(name => matches(entry, { region: name }))
+  }
+}
+
+/**
+ * How fast the subject is moving, in world units a second, or why that cannot
+ * be said.
+ *
+ * Measured by stepping the loop one fixed step and reading the position change,
+ * so asking advances the world. Two cases answer with a reason instead: stepping
+ * an unsimulated world would run start hooks and move entities off their edited
+ * places, and a step under a held clock moves nothing and would report a
+ * sprinting rat as standing still.
+ */
+function measureVelocity(context, entity) {
+  if (!context.loop.running && !context.world.simulated) {
+    return { velocity: null, velocityWhy: 'not measured: the loop is stopped and the world is unsimulated — play or simulate first' }
+  }
+  if (context.loop.paused) {
+    return { velocity: null, velocityWhy: `not measured: the clock is held by ${JSON.stringify(context.loop.holds)} — a step would move nothing and read as a standstill` }
+  }
+  const before = { x: entity.x, y: entity.y, z: entity.z || 0 }
+  context.loop.step(1)
+  return {
+    velocity: [
+      round((entity.x - before.x) / FIXED_STEP),
+      round((entity.y - before.y) / FIXED_STEP),
+      round(((entity.z || 0) - before.z) / FIXED_STEP)
+    ],
+    velocityWhy: undefined
+  }
+}
+
+/** What the author wrote about this entity, and only what is written. */
+function authoredBlock(entity) {
+  const definition = entity._definition || {}
+  return {
+    ...(definition.about ? { about: definition.about } : {}),
+    ...(definition.appearance ? { appearance: definition.appearance } : {}),
+    ...(definition.looksWrongWhen ? { looksWrongWhen: definition.looksWrongWhen } : {}),
+    ...(entity.note ? { note: entity.note } : {})
+  }
+}
+
+/** The entity the camera follows, when it is another one, and where it stands. */
+function followedBy(context, entity) {
+  const target = context.camera?.target
+  const followed = target && target.id !== entity.id && context.world.entities.includes(target) ? target : null
+  if (!followed) return null
+  return {
+    id: followed.id,
+    distance: round(Math.hypot(entity.x - followed.x, entity.y - followed.y, (entity.z || 0) - (followed.z || 0))),
+    facing: {
+      [entity.id]: facingOffset(entity, followed),
+      [followed.id]: facingOffset(followed, entity)
+    }
   }
 }
 

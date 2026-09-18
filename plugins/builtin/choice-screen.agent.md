@@ -16,6 +16,4 @@ description: Stops the world and offers a row of cards to pick from. Use for lev
   ends at `pick(index)`, so a bot and a player play the same game.
 - Reads: `.isOpen` `.waiting` `.view()`; `cancel()` drops everything unanswered
   and gives the world back — call it on death.
-- Announces `choice:offered`, `choice:picked`, `choice:closed`.
-- Commands: `choice.show`, `choice.pick <number>`.
 - Draws through **Screen**; without it the offer still queues, holds and picks.

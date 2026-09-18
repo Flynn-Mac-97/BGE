@@ -4,10 +4,15 @@ description: How the frame is rendered — tone mapping, exposure, environment l
 ---
 <!-- generated from plugins/builtin/render.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/render.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/render.js"]}'
+```
+
 # Render
 
 Every render setting is in one table: `plugins/builtin/render/settings.js`.
-Read what is set now, with where each value came from:
 
 ```sh
 node bin/engine.mjs run render.look
@@ -75,11 +80,9 @@ as drawn.
 
 ## Commands
 
-- `render.look` — every setting, its value, where it came from, its options.
 - `render.set '{"exposure":0.8}'` — writes game.json.
 - `render.set '{"exposure":0.8,"save":"level"}'` — writes the open level.
 - `render.set '{"exposure":0.8,"save":false}'` — this session only.
-- `render.reset` — drops session values.
 
 A bad value is refused before anything is written.
 

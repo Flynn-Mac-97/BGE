@@ -246,7 +246,88 @@ const timeout = Number(flags.timeout || 8000)
 
 /** A word that reads as JSON is JSON; anything else is a plain string. */
 const coerce = w => {
-  try { return JSON.parse(w) } catch { return w }
+  try { return JSON.parse(w) } catch { return repairStrippedJSON(w) ?? w }
+}
+
+/**
+ * The object behind a JSON argument whose quotes a shell removed.
+ *
+ * A shell that strips quotes hands `{"task":"fix the bug"}` over as
+ * `{task:fix the bug}` — a string, not JSON, so the op receives one long
+ * filename and answers an empty packet with no error. PowerShell does this to
+ * every quoted argument, so the invocation written in AGENTS.md needs the
+ * quotes put back. Nothing else can be recovered: a shell that removed the
+ * quotes removed the only marks saying where a key ends and a value begins, so
+ * this reads the shape that survives — pairs, and lists of words.
+ *
+ * @param {string} text One argument, braces included.
+ * @returns {object|null} The request, or null when the shape is not readable.
+ */
+function repairStrippedJSON(text) {
+  if (typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return null
+  // Quoted input already failed JSON.parse for another reason. Guessing again
+  // would turn a syntax error into a wrong request.
+  if (text.includes('"')) return null
+
+  /** The text inside one bracket pair, at the depth it opens. */
+  const inner = (value, open, close) => value.startsWith(open) && value.endsWith(close)
+    ? value.slice(1, -1).trim()
+    : null
+
+  /** Split on commas that are not inside brackets. */
+  const split = value => {
+    const parts = []
+    let depth = 0, from = 0
+    for (let at = 0; at < value.length; at++) {
+      const character = value[at]
+      if ('[{'.includes(character)) depth++
+      else if (']}'.includes(character)) depth--
+      else if (character === ',' && depth === 0) { parts.push(value.slice(from, at)); from = at + 1 }
+    }
+    parts.push(value.slice(from))
+    return parts
+  }
+
+  /** One value: a nested collection, a literal, or a bare word that was a string. */
+  const read = value => {
+    const word = value.trim()
+    const list = inner(word, '[', ']')
+    if (list !== null) return split(list).map(read)
+    const object = inner(word, '{', '}')
+    if (object !== null) return repairStrippedJSON(`{${object}}`)
+    if (/^-?\d+(\.\d+)?$/.test(word)) return Number(word)
+    if (word === 'true') return true
+    if (word === 'false') return false
+    if (word === 'null') return null
+    return word
+  }
+
+  const request = {}
+  for (const part of split(text.slice(1, -1))) {
+    const colon = part.indexOf(':')
+    if (colon < 1) return null
+    const key = part.slice(0, colon).trim()
+    if (!/^[A-Za-z_$][\w$]*$/.test(key)) return null
+    request[key] = read(part.slice(colon + 1))
+  }
+  return Object.keys(request).length ? request : null
+}
+
+/**
+ * The arguments as one request when a shell split it.
+ *
+ * `{"task":"fix the bug"}` arrives as three words once the quotes are gone, and
+ * an op that takes a request would read the first word as a filename. One
+ * argument starting with a brace or a bracket, and the last ending the pair, is
+ * the whole test: a file path never looks like that.
+ */
+function rejoinSplitRequest(list) {
+  const from = list.findIndex(word => word.startsWith('{') || word.startsWith('['))
+  if (from < 0 || from === list.length - 1) return list
+  const joined = list.slice(from).join(' ')
+  const opens = list[from][0]
+  if (!joined.endsWith(opens === '{' ? '}' : ']')) return list
+  return [...list.slice(0, from), joined]
 }
 
 // Flags the CLI itself consumes never reach the browser.
@@ -256,7 +337,7 @@ for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
                  'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked',
                  'client', 'dry-run', 'dryRun', 'profile', 'debugPort']) delete options[k]
 
-let args = words.map(coerce)
+let args = rejoinSplitRequest(words).map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
 if (op === 'select' && args.length > 1) args = [args]
 if (Object.keys(options).length) args.push(options)
@@ -562,16 +643,7 @@ if (op === 'pain.list') {
 
   // Grouped by kind with the token cost summed, because one painpoint in `cli`
   // is an anecdote and 40,000 tokens spent in `cli` is the next thing to build.
-  const byKind = {}
-  for (const record of shown) {
-    const k = byKind[record.kind] || (byKind[record.kind] = { n: 0, cost: 0 })
-    k.n++
-    k.cost += record.cost || 0
-  }
-
-  // Most expensive first. An unpriced painpoint sorts last rather than as a
-  // zero, so "nobody estimated this" never reads as "this was free".
-  const ranked = [...shown].sort((a, b) => (b.cost ?? -1) - (a.cost ?? -1))
+  const { byKind, ranked } = grouped(shown, 'cost')
 
   out({
     open: open.length,
@@ -584,6 +656,23 @@ if (op === 'pain.list') {
   process.exit(0)
 }
 
+/**
+ * Records grouped by kind with one number summed, and the records ranked by it.
+ *
+ * The group keeps the number under the field's own name, so the reply reads
+ * `byKind.cli.cost`. An unpriced record sorts last rather than as a zero, so
+ * "nobody estimated this" never reads as "this was free".
+ */
+function grouped(records, field) {
+  const byKind = {}
+  for (const record of records) {
+    const group = byKind[record.kind] || (byKind[record.kind] = { n: 0, [field]: 0 })
+    group.n++
+    group[field] += record[field] || 0
+  }
+  const ranked = [...records].sort((a, b) => (b[field] ?? -1) - (a[field] ?? -1))
+  return { byKind, ranked }
+}
 
 // ------------------------------------------------------------------ insights
 /**
@@ -677,16 +766,10 @@ if (op === 'insight.list') {
     : flags.all ? all
       : open
 
-  const byKind = {}
-  for (const record of shown) {
-    const group = byKind[record.kind] || (byKind[record.kind] = { n: 0, saves: 0 })
-    group.n++
-    group.saves += record.saves || 0
-  }
-
-  // Biggest saving first. An unmeasured insight sorts last rather than as a
-  // zero, so "nobody estimated this" never reads as "this saves nothing".
-  const ranked = [...shown].sort((a, b) => (b.saves ?? -1) - (a.saves ?? -1))
+  // Grouped by kind with the saving summed, because one insight an agent found
+  // is worth telling and a kind that saves 40,000 tokens is worth building into
+  // the engine. Biggest saving first.
+  const { byKind, ranked } = grouped(shown, 'saves')
 
   out({
     ...(search.length ? { search: search.join(' '), found: shown.length } : {}),
@@ -727,13 +810,32 @@ const readProject = async () => import('../engine/project-index.mjs')
 // operations. They must work before a dev server or browser exists.
 if (op.startsWith('agent.')) {
   const agents = await import('../engine/agent-workspace-node.mjs')
+
+  /**
+   * Every plugin's interface, parsed from its source when a packet is built.
+   *
+   * Made on the first call and kept, because compiling the grammar costs about a
+   * tenth of a second and a packet describes only the plugins it selects. A
+   * packet built where the parser cannot run carries the guide alone.
+   */
+  let interfaceReader = null
+  const interfaceText = async (scope, file) => {
+    interfaceReader ??= (await import('../plugins/builtin/plugin-master/interface-block.js'))
+      .makeInterfaceReader({ root: REPO, projectDirectory: PROJECT })
+    return (await interfaceReader)(scope, file)
+  }
+
   try {
     if (op === 'agent.context') {
       const request = args[0] && typeof args[0] === 'object'
         ? args[0]
         : args.length ? { files: args.map(String) } : {}
-      out(await agents.contextFromDisk(REPO, request, PROJECT))
-      process.exit(0)
+      out(await agents.contextFromDisk(REPO, request, PROJECT, interfaceText))
+      // `stop`, not `process.exit`: the parser's wasm runtime still holds a
+      // handle when the packet is answered, and ending the process under it
+      // asserts inside libuv — a complete packet written, and 3221226505 for
+      // an exit code, which every caller reads as a failure.
+      stop(0)
     }
 
     /**
@@ -758,8 +860,10 @@ if (op.startsWith('agent.')) {
         ? { ...supplied }
         : { task: id, files: args.slice(1).map(String) }
       if (flags.parallel) request.parallel = true
-      out(await agents.prepareAgent(REPO, id, request, PROJECT))
-      process.exit(0)
+      out(await agents.prepareAgent(REPO, id, request, PROJECT, interfaceText))
+      // The packet this writes carries parsed interfaces, so this op loads the
+      // parser too. Leave the way `agent.context` leaves, for the same reason.
+      stop(0)
     }
 
     /**
@@ -834,7 +938,11 @@ if (op.startsWith('agent.')) {
       process.exit(0)
     }
 
-    die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, agent.release, agent.merge, agent.sweep, or agent.skills`)
+    // `finished` is set by `stop`, which is how an op that loaded the parser
+    // leaves — this fall-through would otherwise report the op it just answered.
+    if (!finished) {
+      die(1, `no agent op "${op}". Try agent.context, agent.prepare, agent.status, agent.release, agent.merge, agent.sweep, or agent.skills`)
+    }
   } catch (error) {
     die(1, String(error?.message || error), error?.stack)
   }

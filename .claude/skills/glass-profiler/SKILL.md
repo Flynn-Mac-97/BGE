@@ -4,6 +4,12 @@ description: Measures what a frame costs, on the thread and on the card, what a 
 ---
 <!-- generated from plugins/builtin/profiler.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/profiler.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/profiler.js"]}'
+```
+
 # Profiler
 
 - `profile.frames` draws many frames as fast as it can and reports what they

@@ -280,7 +280,7 @@ scoped plugins initialize again. A cleanup failure is reported and does not
 prevent remaining cleanup. Legacy plugins retain their former activation
 behaviour and may retain direct subscriptions or context mutations. This is
 reported as `lifecycle: legacy`, not treated as complete lifecycle coverage.
-Profiler and Systems Inspector use scopes and remove their compatibility aliases.
+Profiler uses scopes and removes its compatibility aliases.
 
 Systems may declare a stable `id` and same-phase `before`/`after` arrays. The
 loader compiles fixed and frame schedules when registrations change, preserving

@@ -4,13 +4,21 @@
  * The rules live in the sidecar guide, which declares `match: plugins/**
  * project/plugins/**`, so any plugin task carries them.
  *
- * It also measures. Everything here is a plugin, and an agent pays for every
- * line it reads: a plugin nobody can open cheaply is one nobody will edit
- * correctly. `plugin.sizes` says which files have grown past the point where
- * finding one part of them costs more than the change is worth. Reading source
- * needs node, so the browser answers with the command instead — the same shape
- * `tools.make` uses in Agent Tools.
+ * It also measures and describes. Everything here is a plugin, and an agent pays
+ * for every line it reads: a plugin nobody can open cheaply is one nobody will
+ * edit correctly. `plugin.sizes` says which files have grown past the point
+ * where finding one part of them costs more than the change is worth.
+ * `plugin.facts` reads a plugin's syntax tree and answers with its interface and
+ * a description derived from the code, so no author keeps a second copy of the
+ * same facts in step by hand.
+ *
+ * Reading source needs node, so the browser answers with the command instead —
+ * the same shape `tools.make` uses in Agent Tools. The browser needs no parser:
+ * it holds every definition already, and `describe.js` words the same line from
+ * whichever of the two it has.
  */
+import { makeSourceReader } from './plugin-master/source-facts.js'
+import { summaryOf } from './plugin-master/describe.js'
 
 /** Past this, split it. Roughly twice the median builtin, so it flags the tail. */
 const BIG = 400
@@ -52,35 +60,65 @@ async function gameWords(root, directory, join, readFile) {
   } catch { return [] }
 }
 
-async function measure(directory) {
+/** The parser, made once: loading the grammar costs more than parsing one plugin. */
+let reader = null
+const sourceReader = async () => (reader ??= await makeSourceReader())
+
+/**
+ * Every plugin file of this checkout and its project, with source, guide and facts.
+ *
+ * One walk for both commands: `plugin.sizes` and `plugin.facts` ask different
+ * questions of the same three reads, and reading every file twice would be the
+ * slow half of `check`.
+ */
+async function pluginSources(directory) {
   const { readdir, readFile } = await import('node:fs/promises')
   const { join, dirname } = await import('node:path')
   const { fileURLToPath } = await import('node:url')
 
   const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
-  const words = await gameWords(root, directory, join, readFile)
+  const parser = await sourceReader()
   const out = []
-
   for (const place of ['plugins/builtin', `${directory}/plugins`]) {
-    const directory = join(root, place)
-    for (const name of (await readdir(directory).catch(() => [])).sort()) {
+    const full = join(root, place)
+    for (const name of (await readdir(full).catch(() => [])).sort()) {
       if (!name.endsWith('.js')) continue
       const stem = name.slice(0, -3)
-      const source = await readFile(join(directory, name), 'utf8').catch(() => '')
-      const guide = await readFile(join(directory, `${stem}.agent.md`), 'utf8').catch(() => '')
+      const source = await readFile(join(full, name), 'utf8').catch(() => '')
+      const guide = await readFile(join(full, `${stem}.agent.md`), 'utf8').catch(() => '')
       out.push({
         plugin: `${place}/${name}`,
+        stem,
         builtin: place === 'plugins/builtin',
-        lines: source.split('\n').length,
-        guide: guide ? guide.split('\n').length : null,
-        category: source.match(/^\s*category:\s*'([a-z-]+)'/m)?.[1] || null,
-        // A comment may name the game — explaining why something is shaped the
-        // way it is often has to. Code that names it is the smell.
-        names: place === 'plugins/builtin' ? gameNouns(source, words) : []
+        source,
+        guide,
+        facts: await parser.facts(name, source)
       })
     }
   }
   return out
+}
+
+/** Measure every plugin and guide against the two limits. */
+async function measure(directory) {
+  const { readFile } = await import('node:fs/promises')
+  const { join, dirname } = await import('node:path')
+  const { fileURLToPath } = await import('node:url')
+
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
+  const words = await gameWords(root, directory, join, readFile)
+  return (await pluginSources(directory)).map(entry => ({
+    plugin: entry.plugin,
+    builtin: entry.builtin,
+    lines: entry.source.split('\n').length,
+    guide: entry.guide ? entry.guide.split('\n').length : null,
+    // The syntax tree, not a pattern: `category` may sit on the same line as
+    // `name`, which an anchored pattern reads as no category at all.
+    category: entry.facts?.category ?? null,
+    // A comment may name the game — explaining why something is shaped the way
+    // it is often has to. Code that names it is the smell.
+    names: entry.builtin ? gameNouns(entry.source, words) : []
+  }))
 }
 
 /**
@@ -175,6 +213,55 @@ export default {
         ok: over.length === 0 && unguided.length === 0 && branded.length === 0 &&
           uncategorised.length === 0 && guidesOver.length === 0
       }
+    }
+  }, {
+    id: 'plugin.facts',
+    label: 'Describe a plugin from its source, and list every derived description',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { plugin: { type: 'string', description: 'one plugin name; omit for every plugin' } }
+    },
+    run: async (context, options = {}) => {
+      if (typeof process === 'undefined' || !process.versions?.node) {
+        return { ...info(), why: 'reading source needs node — use --headless or the terminal' }
+      }
+      const all = await pluginSources(context.editor.projectDirectory)
+      const named = typeof options?.plugin === 'string' && options.plugin ? options.plugin : null
+
+      if (named === null) {
+        return {
+          counted: all.length,
+          // `described` says which plugins carry a sentence of their own. Every
+          // other one is answered by the derived line, so no surface shows a
+          // blank and nothing has to be worded twice.
+          plugins: all.map(entry => ({
+            plugin: entry.plugin,
+            name: entry.facts?.name ?? null,
+            category: entry.facts?.category ?? null,
+            // The authored sentence travels with the list, so one call answers
+            // both which plugins wrote their own and what they wrote.
+            about: entry.facts?.about ?? null,
+            described: entry.facts?.about ? 'declared' : 'derived',
+            description: summaryOf(entry.facts ?? {})
+          }))
+        }
+      }
+
+      const one = all.filter(entry => entry.stem === named || entry.plugin.endsWith(`/${named}.js`))
+      if (!one.length) return { error: `no plugin named "${named}"`, counted: all.length }
+      return one.map(entry => {
+        const description = summaryOf(entry.facts ?? {})
+        const declared = entry.facts?.about ?? null
+        return {
+          ...entry.facts,
+          plugin: entry.plugin,
+          description,
+          // Ready to paste when an author wants the authored slot filled: the
+          // words are the code's own answer, not a second opinion about it.
+          aboutLine: declared ? null : `about: '${description.replaceAll("'", "\\'")}'`
+        }
+      })
     }
   }]
 }

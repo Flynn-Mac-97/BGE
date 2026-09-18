@@ -4,6 +4,12 @@ description: The beam field and its options — bolts, lasers, tracers, tethers:
 ---
 <!-- generated from plugins/builtin/vfx.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/vfx.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/vfx.js"]}'
+```
+
 # VFX
 
 - Owns `context.vfx`: effect kinds that have a **shape** rather than a cloud of points. Particles owns anything that is a cloud; this owns everything a particle cannot say. A beam has a direction and a ribbon has a width across it, so both break into dots when built from particles and fall apart as the camera turns.
@@ -21,7 +27,6 @@ tether.stop()
 - Named beams: `bolt` `laser` `arc`. `vfx.beams.define(name, overrides)` merges over one or adds a new one — that is the game's tuning door, never an edit to the table in the file.
 - `points(record, time)` is a beam's spine as flat world metres and `shapeAt(record, along, time)` its width and alpha. Both are pure functions of the record and the clock, so the picture and a test read one implementation.
 - Read it back: `vfx.state` → every kind's counts, `vfx.recent(n)`, `vfx.kinds`, `vfx.clear()`. Per kind: `.recent(n)`, `.state`, `.count`, `.all`, `.names`.
-- Commands: `vfx.beam '["laser", {"from": [0,1,0], "to": [4,1,0]}]'` · `vfx.state` · `vfx.recent` · `vfx.clear`.
 - 64 beams live at most. Over that the oldest go, counted in `state.dropped`.
 - **Adding a kind** is one module in `plugins/builtin/vfx/` exporting `{ kind, title, about, make, painter }` and one entry in `KINDS`. `make` builds the field — it must answer `bind` `step` `clear` `recent` `state`. `painter` is imported only after `shell:ready`, so headless never parses drawing code. Nothing in `vfx.js` knows what a beam is.
 - **Emits no events.** Listens for `level:loaded` and clears. Deterministic by law: the seeded `context.drawing` stream and `context.time` only — one draw per effect whatever its options say, so adding a visual cannot shift what the game rolls next.

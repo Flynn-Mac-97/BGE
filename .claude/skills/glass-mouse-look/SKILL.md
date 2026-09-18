@@ -4,6 +4,12 @@ description: First-person pointer look: pointer lock, sensitivity, yaw and pitch
 ---
 <!-- generated from plugins/builtin/mouse-look.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/mouse-look.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/mouse-look.js"]}'
+```
+
 # Mouse Look
 
 - Extends `context.input` rather than replacing it. Two input plugins would

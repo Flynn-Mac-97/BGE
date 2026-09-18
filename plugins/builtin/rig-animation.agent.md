@@ -31,7 +31,6 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 
 - Type keys: `rig.clips` (name → file), `rig.default` (first clip), `rig.rootMotion` (false: the clip's travel is not added). Choose by assigning `entity.rigClip`; there is no `play()`.
 
-- Commands: `rig.clips` · `rig.load` · `rig.play '{"entity":"player","clip":"run"}'` · `rig.sources` · `rig.retarget` · `rig.check` · `rig.compare` (last four headless).
 - Clips load asynchronously (a headless test awaits `rig.load`). A playing clip owns `entity.pose`. Unknown names hold the last pose. No blending.
 
 ## Detail

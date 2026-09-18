@@ -4,6 +4,12 @@ description: Hides marker entities — spawn points, patrol nodes, camera hints 
 ---
 <!-- generated from plugins/builtin/editor-markers.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/editor-markers.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/editor-markers.js"]}'
+```
+
 # Editor Markers
 
 - A spawn point, a patrol node, a trigger volume or a camera hint is a real
@@ -27,7 +33,6 @@ marker: true,
 
 ## Commands
 
-- `markers.list` — every marker id, and how many are hidden right now.
 - `markers.reveal` — show markers during play. Takes `true` or `false`,
   defaults to `true`. It is the one thing worth having while debugging a spawn.
 

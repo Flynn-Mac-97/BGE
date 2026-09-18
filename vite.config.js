@@ -1,6 +1,7 @@
 import { listDocuments, readDocument, writeDocument } from './engine/document-store.mjs'
 import { readSource, sourceCatalog, writeSource } from './engine/source-files.mjs'
 import { defineConfig } from 'vite'
+import { makeInterfaceReader } from './plugins/builtin/plugin-master/interface-block.js'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 // The index builder and the determinism lint live in the engine, not in this
@@ -12,6 +13,7 @@ import { chooseClient, describeClient, explainClientError, isLive, mergeClient, 
 import { readLaneBrowsers } from './engine/lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
 import { PROJECT_PREFIX } from './engine/asset-path.js'
+import { pluginGuides } from './engine/plugin-guides.mjs'
 import { ensureProject, isUntitled, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './engine/project-path.mjs'
 
 const ROOT = process.cwd()
@@ -175,8 +177,8 @@ function safeAgent(scope, rel) {
   const base = scope === 'engine' ? ROOT : scope === 'project' ? PROJECT : null
   const clean = slash(String(rel || '')).replace(/^\.\//, '')
   const allowed = scope === 'engine'
-    ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent\.md$/.test(clean)
-    : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent\.md$/.test(clean)
+    ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+    : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
   if (!base || !allowed) return null
   const abs = path.resolve(base, clean)
   return abs.startsWith(base + path.sep) ? abs : null
@@ -209,53 +211,14 @@ const refusedFileWrite = request => {
 
 /** One project, one index. Rebuilt on every write, never cached. */
 const buildIndex = () => buildProjectIndex(PROJECT, ROOT)
-
-async function agentPlugins() {
-  // Optional: a new project has no game.json, and refusing to list the plugin
-  // guides would leave the first agent in it with no packet.
-  const game = JSON.parse(
-    await fs.readFile(path.join(PROJECT, 'game.json'), 'utf8').catch(() => '{}'))
-  const disabled = new Set(game.plugins?.disabled || [])
-  const places = [
-    { scope: 'engine', directory: path.join(ROOT, 'plugins/builtin'), prefix: 'plugins/builtin' },
-    { scope: 'project', directory: path.join(PROJECT, 'plugins'), prefix: 'plugins' }
-  ]
-  const found = []
-  for (const place of places) {
-    let names = []
-    try { names = await fs.readdir(place.directory) } catch { continue }
-    for (const name of names.filter(name => name.endsWith('.agent.md')).sort()) {
-      const stem = name.slice(0, -'.agent.md'.length)
-      const source = await fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => '')
-      const plugin = source.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
-      // A guide applies to its own plugin by default. A leading frontmatter
-      // `match:` (space-separated paths) adds more — Plugin Master uses it to
-      // ride along with every plugin task.
-      const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
-      const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
-      const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
-      // A guide may declare its own trigger words (comma-separated), so a task
-      // that says "look at x" pulls the plugin that answers looking — and a
-      // disabled plugin's words pull nothing, because the node is disabled
-      // with it. This is what makes a guide a skill.
-      const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
-      // `project/` is the one name for a file in the open project — the same
-      // rule the headless twin follows, or the two disagree about which file a
-      // project plugin's guide belongs to.
-      const match = [...new Set([
-        `${place.scope === 'project' ? PROJECT_PREFIX + '/' : ''}${place.prefix}/${stem}.js`,
-        ...extra
-      ])]
-      found.push({
-        id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
-        scope: place.scope, file: `${place.prefix}/${name}`,
-        match,
-        triggers: [...new Set([stem.replaceAll('-', ' '), plugin.toLowerCase(), ...saidTriggers])],
-        enabled: !disabled.has(plugin), plugin
-      })
-    }
+let interfaceReader
+let interfaceProject
+async function agentInterface(scope, file) {
+  if (!interfaceReader || interfaceProject !== PROJECT) {
+    interfaceProject = PROJECT
+    interfaceReader = makeInterfaceReader({ root: ROOT, projectDirectory: PROJECT })
   }
-  return found
+  return (await interfaceReader)(scope, file)
 }
 
 /**
@@ -295,6 +258,198 @@ function serveProject() {
   }
 }
 
+/**
+ * The dev server's API, one handler per path.
+ *
+ * A handler answers with `{ status, body }`, or with `null` for a method that
+ * path does not serve — the 404 then comes from one place. Everything a handler
+ * needs beyond the request comes from module scope, which is where PROJECT, the
+ * index builder and the file guards already live, so a route states what it
+ * answers rather than how it is reached.
+ */
+const API_ROUTES = {
+  '/api/index': async () => ({ status: 200, body: await buildIndex() }),
+
+  // Answers "is what I just wrote valid?" without a reload: broken imports,
+  // unreadable levels, and anything that breaks determinism.
+  '/api/check': async () => {
+    const problems = problemsIn(await buildIndex())
+    // `ok` follows the fatal ones. A warning is worth reading and never worth
+    // failing on, and both callers of `problemsIn` agree on that through the
+    // same function.
+    return { status: 200, body: { ok: fatal(problems).length === 0, problems } }
+  },
+
+  '/api/tree': async () => {
+    const files = await walk(PROJECT)
+    return {
+      status: 200,
+      body: files.filter(f => !f.startsWith('.engine')).map(f => ({ path: f, kind: KIND(f) }))
+    }
+  },
+
+  '/api/agent-plugins': async () => ({ status: 200, body: await pluginGuides(ROOT, PROJECT) }),
+
+  '/api/agent-interface': async ({ url }) => ({
+    status: 200,
+    body: { text: await agentInterface(url.searchParams.get('scope'), url.searchParams.get('path')) }
+  }),
+
+  // Which project this server serves. A page is built with that name baked in,
+  // so a server restarted onto a different project leaves a live tab reading one
+  // project's index and fetching another project's textures — and nothing on
+  // screen says so. This is how the tab asks.
+  '/api/project': async () => ({
+    status: 200,
+    body: {
+      project: PROJECT_NAME,
+      directory: PROJECT,
+      projects: projectsRoot(ROOT),
+      // The page holds edits instead of writing them while this is true.
+      untitled: isUntitled(PROJECT)
+    }
+  }),
+
+  // Every project directory beside the open one. The untitled project is
+  // skipped: it is a working directory, not a project you pick.
+  '/api/project/list': async () => {
+    const home = projectsRoot(ROOT)
+    const entries = await fs.readdir(home, { withFileTypes: true }).catch(() => [])
+    return {
+      status: 200,
+      body: {
+        projects: home,
+        names: entries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name).sort()
+      }
+    }
+  },
+
+  // Repoint this server. A page cannot restart the server that serves it, so the
+  // server does it and the page reloads.
+  '/api/project/open': async ({ server, req }) => {
+    if (req.method !== 'POST') return null
+    const refused = refusedFileWrite(req)
+    if (refused) return { status: 423, body: refused }
+    const said = String((await readBody(req)).path || '').trim()
+    if (!said) return { status: 400, body: { error: 'which project? a directory path' } }
+    const wanted = path.resolve(ROOT, said)
+    const there = await fs.stat(wanted).then(s => s.isDirectory(), () => false)
+    if (!there) return { status: 404, body: { error: `no project directory at ${wanted}` } }
+    const opened = await openProject(server, wanted)
+    await buildIndex()
+    return { status: 200, body: { ...opened, opened: true } }
+  },
+
+  // Leave the open project for a blank one. Closing has to leave you somewhere,
+  // so the untitled project is created if it is not there.
+  '/api/project/close': async ({ server, req }) => {
+    if (req.method !== 'POST') return null
+    const refused = refusedFileWrite(req)
+    if (refused) return { status: 423, body: refused }
+    const blank = await ensureProject(untitledProject(ROOT))
+    const opened = await openProject(server, blank)
+    await buildIndex()
+    return { status: 200, body: { ...opened, closed: true } }
+  },
+
+  // Give the untitled project a name. A rename, not a copy: the files are
+  // already the project, so naming it is moving the directory.
+  '/api/project/save-as': async ({ server, req }) => {
+    if (req.method !== 'POST') return null
+    const refused = refusedFileWrite(req)
+    if (refused) return { status: 423, body: refused }
+    const name = String((await readBody(req)).name || '').trim()
+    if (!/^[A-Za-z0-9._-]+$/.test(name) || name.startsWith('.')) {
+      return { status: 400, body: { error: `"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot` } }
+    }
+    const target = path.join(projectsRoot(ROOT), name)
+    if (await fs.stat(target).then(() => true, () => false)) {
+      return { status: 409, body: { error: `${target} already exists — pick another name` } }
+    }
+    await fs.mkdir(path.dirname(target), { recursive: true })
+    await renameWhenFree(PROJECT, target)
+    // The title is the project's own, so it travels with the files. It is
+    // written before the server reads the name back.
+    const game = JSON.parse(await fs.readFile(path.join(target, 'game.json'), 'utf8').catch(() => '{}'))
+    await fs.writeFile(path.join(target, 'game.json'), JSON.stringify({ ...game, title: name }, null, 2) + '\n', 'utf8')
+    const opened = await openProject(server, target)
+    await buildIndex()
+    return { status: 200, body: { ...opened, saved: true } }
+  },
+
+  '/api/systems/catalog': async ({ url, req }) => req.method === 'GET'
+    ? { status: 200, body: await sourceCatalog(ROOT, PROJECT, url.searchParams.get('selection') || 'core') }
+    : null,
+
+  '/api/systems/documents': async ({ req }) => req.method === 'GET'
+    ? { status: 200, body: await listDocuments(PROJECT) }
+    : null,
+
+  '/api/systems/document': async ({ url, req }) => {
+    if (req.method === 'GET') {
+      const id = url.searchParams.get('id')
+      const backup = url.searchParams.get('backup') === 'true'
+      return { status: 200, body: await readDocument(PROJECT, id, backup) }
+    }
+    if (req.method !== 'POST') return null
+    const refused = refusedFileWrite(req)
+    if (refused) return { status: 423, body: refused }
+    const body = await readBody(req)
+    return { status: 200, body: await writeDocument(PROJECT, body.id, body.data, body.revision) }
+  },
+
+  '/api/systems/source': async ({ url, req }) => {
+    if (req.method === 'POST') {
+      const refused = refusedFileWrite(req)
+      if (refused) return { status: 423, body: refused }
+      const body = await readBody(req)
+      return { status: 200, body: await writeSource(ROOT, PROJECT, body.scope, body.file, body.text, body.expectedHash) }
+    }
+    if (req.method !== 'GET') return null
+    const scope = url.searchParams.get('scope')
+    const file = url.searchParams.get('path')
+    return { status: 200, body: await readSource(ROOT, PROJECT, scope, file) }
+  },
+
+  '/api/file': async ({ url, req }) => {
+    if (req.method === 'GET') {
+      const abs = safe(url.searchParams.get('path') || '')
+      if (!abs) return { status: 400, body: { error: 'path outside project' } }
+      return { status: 200, body: { text: await fs.readFile(abs, 'utf8') } }
+    }
+    if (req.method !== 'POST') return null
+    const refused = refusedFileWrite(req)
+    if (refused) return { status: 423, body: refused }
+    const { path: rel, text } = await readBody(req)
+    const abs = safe(rel || '')
+    if (!abs) return { status: 400, body: { error: 'path outside project' } }
+    await fs.mkdir(path.dirname(abs), { recursive: true })
+    lastWritten.set(rel, text)
+    await fs.writeFile(abs, text, 'utf8')
+    await buildIndex()
+    return { status: 200, body: { ok: true } }
+  },
+
+  '/api/agent-file': async ({ url, req }) => {
+    if (req.method === 'GET') {
+      const abs = safeAgent(url.searchParams.get('scope'), url.searchParams.get('path'))
+      if (!abs) return { status: 400, body: { error: 'bad agent file path' } }
+      return { status: 200, body: { text: await fs.readFile(abs, 'utf8') } }
+    }
+    if (req.method !== 'POST') return null
+    const refused = refusedFileWrite(req)
+    if (refused) return { status: 423, body: refused }
+    const { scope, path: rel, text } = await readBody(req)
+    const abs = safeAgent(scope, rel)
+    if (!abs) return { status: 400, body: { error: 'bad agent file path' } }
+    await fs.mkdir(path.dirname(abs), { recursive: true })
+    await fs.writeFile(abs, text, 'utf8')
+    if (scope === 'project') await buildIndex()
+    if (scope === 'engine' && rel === 'agents/bootstrap.md') await writeAgentDoc()
+    return { status: 200, body: { ok: true } }
+  }
+}
+
 function api() {
   return {
     name: 'engine-api',
@@ -304,156 +459,10 @@ function api() {
         if (!url.pathname.startsWith('/api/')) return next()
 
         try {
-          if (url.pathname === '/api/index') return send(res, 200, await buildIndex())
-
-          // Answers "is what I just wrote valid?" without a reload: broken
-          // imports, unreadable levels, and anything that breaks determinism.
-          if (url.pathname === '/api/check') {
-            const problems = problemsIn(await buildIndex())
-            // `ok` follows the fatal ones. A warning is worth reading and never
-            // worth failing on, and both callers of `problemsIn` agree on that
-            // through the same function.
-            return send(res, 200, { ok: fatal(problems).length === 0, problems })
-          }
-
-          if (url.pathname === '/api/tree') {
-            const files = await walk(PROJECT)
-            return send(res, 200, files.filter(f => !f.startsWith('.engine')).map(f => ({ path: f, kind: KIND(f) })))
-          }
-
-          if (url.pathname === '/api/agent-plugins') return send(res, 200, await agentPlugins())
-
-          // Which project this server serves. A page is built with that name
-          // baked in, so a server restarted onto a different project leaves a
-          // live tab reading one project's index and fetching another project's
-          // textures — and nothing on screen says so. This is how the tab asks.
-          if (url.pathname === '/api/project') {
-            return send(res, 200, {
-              project: PROJECT_NAME,
-              directory: PROJECT,
-              projects: projectsRoot(ROOT),
-              // The page holds edits instead of writing them while this is true.
-              untitled: isUntitled(PROJECT)
-            })
-          }
-
-          // Every project directory beside the open one. The untitled project
-          // is skipped: it is a working directory, not a project you pick.
-          if (url.pathname === '/api/project/list') {
-            const home = projectsRoot(ROOT)
-            const entries = await fs.readdir(home, { withFileTypes: true }).catch(() => [])
-            return send(res, 200, {
-              projects: home,
-              names: entries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name).sort()
-            })
-          }
-
-          // Repoint this server. A page cannot restart the server that serves
-          // it, so the server does it and the page reloads.
-          if (url.pathname === '/api/project/open' && req.method === 'POST') {
-            const refused = refusedFileWrite(req)
-            if (refused) return send(res, 423, refused)
-            const said = String((await readBody(req)).path || '').trim()
-            if (!said) return send(res, 400, { error: 'which project? a directory path' })
-            const wanted = path.resolve(ROOT, said)
-            const there = await fs.stat(wanted).then(s => s.isDirectory(), () => false)
-            if (!there) return send(res, 404, { error: `no project directory at ${wanted}` })
-            const opened = await openProject(server, wanted)
-            await buildIndex()
-            return send(res, 200, { ...opened, opened: true })
-          }
-
-          // Leave the open project for a blank one. Closing has to leave you
-          // somewhere, so the untitled project is created if it is not there.
-          if (url.pathname === '/api/project/close' && req.method === 'POST') {
-            const refused = refusedFileWrite(req)
-            if (refused) return send(res, 423, refused)
-            const blank = await ensureProject(untitledProject(ROOT))
-            const opened = await openProject(server, blank)
-            await buildIndex()
-            return send(res, 200, { ...opened, closed: true })
-          }
-
-          // Give the untitled project a name. A rename, not a copy: the files
-          // are already the project, so naming it is moving the directory.
-          if (url.pathname === '/api/project/save-as' && req.method === 'POST') {
-            const refused = refusedFileWrite(req)
-            if (refused) return send(res, 423, refused)
-            const name = String((await readBody(req)).name || '').trim()
-            if (!/^[A-Za-z0-9._-]+$/.test(name) || name.startsWith('.')) {
-              return send(res, 400, { error: `"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot` })
-            }
-            const target = path.join(projectsRoot(ROOT), name)
-            if (await fs.stat(target).then(() => true, () => false)) {
-              return send(res, 409, { error: `${target} already exists — pick another name` })
-            }
-            await fs.mkdir(path.dirname(target), { recursive: true })
-            await renameWhenFree(PROJECT, target)
-            // The title is the project's own, so it travels with the files. It
-            // is written before the server reads the name back.
-            const game = JSON.parse(await fs.readFile(path.join(target, 'game.json'), 'utf8').catch(() => '{}'))
-            await fs.writeFile(path.join(target, 'game.json'), JSON.stringify({ ...game, title: name }, null, 2) + '\n', 'utf8')
-            const opened = await openProject(server, target)
-            await buildIndex()
-            return send(res, 200, { ...opened, saved: true })
-          }
-
-          if (url.pathname === '/api/systems/catalog' && req.method === 'GET') return send(res, 200, await sourceCatalog(ROOT, PROJECT, url.searchParams.get('selection') || 'core'))
-          if (url.pathname === '/api/systems/documents' && req.method === 'GET') return send(res,200,await listDocuments(PROJECT))
-          if (url.pathname === '/api/systems/document' && req.method === 'GET') return send(res,200,await readDocument(PROJECT,url.searchParams.get('id'),url.searchParams.get('backup') === 'true'))
-          if (url.pathname === '/api/systems/document' && req.method === 'POST') {
-            const refused = refusedFileWrite(req); if (refused) return send(res,423,refused)
-            const body = await readBody(req)
-            return send(res,200,await writeDocument(PROJECT,body.id,body.data,body.revision))
-          }
-          if (url.pathname === '/api/systems/source' && req.method === 'POST') {
-            const refused = refusedFileWrite(req); if (refused) return send(res,423,refused)
-            const body = await readBody(req)
-            return send(res,200,await writeSource(ROOT,PROJECT,body.scope,body.file,body.text,body.expectedHash))
-          }
-          if (url.pathname === '/api/systems/source' && req.method === 'GET') {
-            return send(res, 200, await readSource(ROOT, PROJECT, url.searchParams.get('scope'), url.searchParams.get('path')))
-          }
-
-          if (url.pathname === '/api/file' && req.method === 'GET') {
-            const abs = safe(url.searchParams.get('path') || '')
-            if (!abs) return send(res, 400, { error: 'path outside project' })
-            return send(res, 200, { text: await fs.readFile(abs, 'utf8') })
-          }
-
-          if (url.pathname === '/api/file' && req.method === 'POST') {
-            const refused = refusedFileWrite(req)
-            if (refused) return send(res, 423, refused)
-            const { path: rel, text } = await readBody(req)
-            const abs = safe(rel || '')
-            if (!abs) return send(res, 400, { error: 'path outside project' })
-            await fs.mkdir(path.dirname(abs), { recursive: true })
-            lastWritten.set(rel, text)
-            await fs.writeFile(abs, text, 'utf8')
-            await buildIndex()
-            return send(res, 200, { ok: true })
-          }
-
-          if (url.pathname === '/api/agent-file' && req.method === 'GET') {
-            const abs = safeAgent(url.searchParams.get('scope'), url.searchParams.get('path'))
-            if (!abs) return send(res, 400, { error: 'bad agent file path' })
-            return send(res, 200, { text: await fs.readFile(abs, 'utf8') })
-          }
-
-          if (url.pathname === '/api/agent-file' && req.method === 'POST') {
-            const refused = refusedFileWrite(req)
-            if (refused) return send(res, 423, refused)
-            const { scope, path: rel, text } = await readBody(req)
-            const abs = safeAgent(scope, rel)
-            if (!abs) return send(res, 400, { error: 'bad agent file path' })
-            await fs.mkdir(path.dirname(abs), { recursive: true })
-            await fs.writeFile(abs, text, 'utf8')
-            if (scope === 'project') await buildIndex()
-            if (scope === 'engine' && rel === 'agents/bootstrap.md') await writeAgentDoc()
-            return send(res, 200, { ok: true })
-          }
-
-          return send(res, 404, { error: 'no such endpoint' })
+          const route = API_ROUTES[url.pathname]
+          const answer = route ? await route({ server, url, req }) : null
+          if (!answer) return send(res, 404, { error: 'no such endpoint' })
+          return send(res, answer.status, answer.body)
         } catch (e) {
           return send(res, 500, { error: String(e.message || e) })
         }
@@ -540,6 +549,15 @@ function bridge() {
        * the signal has to come from the filesystem, not from a save endpoint.
        */
       server.watcher.on('all', async (event, abs) => {
+        const engineFile = path.relative(ROOT, abs).replaceAll('\\', '/')
+        const projectFile = path.relative(PROJECT, abs).replaceAll('\\', '/')
+        const scope = /^plugins\/builtin\/[^/]+\.js$/.test(engineFile) ? 'engine'
+          : /^plugins\/[^/]+\.js$/.test(projectFile) ? 'project' : null
+        if (scope && event !== 'unlink') {
+          try { await agentInterface(scope, scope === 'engine' ? engineFile : projectFile) }
+          catch (error) { console.warn(`[engine] could not update plugin interface: ${error.message}`) }
+        }
+        if (abs.includes('interface.generated.md')) return
         if (!inProject(abs)) {
           if (slash(abs) === slash(path.join(ROOT, 'agents/bootstrap.md')) && event !== 'unlink') await writeAgentDoc()
           return
@@ -884,7 +902,14 @@ function serverRegistry() {
 // Returns nothing on purpose: Vite treats whatever `configureServer` resolves
 // to as a hook to call after its middlewares, and the writer answers the list
 // of paths it wrote.
-const writeAgentDoc = async () => { await writeGeneratedAgentFiles(ROOT, PROJECT) }
+const writeAgentDoc = async () => {
+  await writeGeneratedAgentFiles(ROOT, PROJECT)
+  for (const node of await pluginGuides(ROOT, PROJECT)) {
+    if (!node.source) continue
+    try { await agentInterface(node.scope, node.source) }
+    catch (error) { console.warn(`[engine] could not update plugin interface: ${error.message}`) }
+  }
+}
 
 export default defineConfig({
   plugins: [

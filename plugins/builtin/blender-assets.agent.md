@@ -32,7 +32,6 @@ Blender is a program, and only a headless run can start one.
 | `blender.import '{"file":"..."}'` | builds one; `{"all":true}` every stale one; `"force":true` fresh ones too |
 | `blender.settings '{"file":"...","scale":0.01}'` | writes an import setting |
 
-Every one refuses in the browser and answers with the terminal line instead.
 The panel is called **Blender** and shows state only, for the same reason.
 
 ## What it writes

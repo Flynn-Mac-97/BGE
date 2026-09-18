@@ -313,50 +313,7 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline:2p
 .stackmenu .mrow:hover { background:var(--sel); color:var(--ink); border-left-color:var(--ink); }
 .stackmenu .mrow .z { margin-left:auto; font:9px var(--mono); color:var(--ink-5); }
 
-/* Diagram and source viewer; presentation shared by inspection plugins. */
-.u-flow-inspector { display:flex; flex-direction:column; height:100%; min-height:320px; overflow:hidden; }
-.u-flow-controls { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--rule); }
-.u-flow-controls [aria-pressed=true] { background:var(--ink); color:var(--paper); }
 .u-flow-basis { font-size:11px; color:var(--ink-3); margin:8px 10px; }
-.u-flow-split { display:grid; grid-template-columns:minmax(180px, 40%) minmax(200px, 60%); flex:1; min-height:0; }
-.u-flow-graph { padding:12px; overflow:auto; border-right:1px solid var(--rule); background:var(--sunk); }
-.u-flow-node { padding:9px; border:1px solid var(--rule); background:var(--surface); border-radius:5px; }
-.u-flow-node.selected { border:2px solid var(--ink); padding:8px; }
-.u-flow-node > .u-btn { display:block; width:100%; text-align:left; margin-top:5px; white-space:normal; }
-.u-flow-group { font:10px var(--mono); text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); }
-.u-flow-arrow { text-align:center; font:11px var(--mono); color:var(--ink-3); padding:6px 0; }
-.u-flow-condition { font-size:11px; color:var(--ink-2); margin:8px 0; }
-.u-flow-children { margin-top:10px; padding-left:8px; border-left:2px solid var(--rule); }
-.u-flow-source { min-width:0; min-height:0; display:flex; flex-direction:column; padding:12px; }
-.u-flow-source h3 { margin:0 0 6px; font-size:14px; }
-.u-flow-detail { font-size:12px; margin:0 0 10px; }
-.u-flow-file { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font:11px var(--mono); overflow-wrap:anywhere; }
-.u-flow-code { position:relative; margin:8px 0 0; padding:8px 0; overflow:auto; flex:1; min-height:150px; background:var(--code-bg); font:11px/1.7 var(--mono); tab-size:2; }
-.u-flow-code-line { display:block; min-height:1.7em; width:max-content; min-width:100%; }
-.u-flow-code-line.current { background:var(--sel); }
-.u-flow-line-number { display:inline-block; width:4.5em; padding-right:1em; text-align:right; user-select:none; color:var(--ink-4); }
-
-.u-flow-inspector.is-fullscreen { position:fixed; inset:0; z-index:10000; height:100dvh; width:100vw; min-height:0; background:var(--paper); }
-.u-flow-inspector.is-fullscreen > .u-flow-controls { min-height:54px; padding:10px 20px; }
-.u-flow-heading { font-size:14px; align-self:center; margin-right:20px; }
-.u-flow-inspector.is-fullscreen > .u-flow-split { grid-template-columns:minmax(450px, 1fr) minmax(340px, 32%); }
-.u-flow-graph.architecture { padding:12px 20px; background:var(--paper); }
-.u-systems-map svg { display:block; width:100%; min-width:650px; color:var(--ink-3); }
-.u-map-boundary { fill:var(--sunk); stroke:var(--rule); stroke-width:1; stroke-dasharray:6 5; }
-.u-map-group { font:14px var(--mono); fill:var(--ink-3); letter-spacing:.04em; }
-.u-map-title { font:600 18px var(--sans); fill:var(--ink); }
-.u-map-node { cursor:pointer; }
-.u-map-node rect { fill:var(--surface); stroke:var(--rule); stroke-width:1.5; }
-.u-map-node.selected rect, .u-map-node:focus rect { stroke:var(--ink); stroke-width:3; }
-.u-map-edge path { stroke:var(--ink-3); stroke-width:1.4; }
-.u-map-edge-label { font:15px var(--sans); fill:var(--ink-2); paint-order:stroke; stroke:var(--paper); stroke-width:5px; stroke-linejoin:round; }
-.u-map-plugin-list { padding:14px; border-top:1px solid var(--rule); }
-.u-map-plugin-list summary { cursor:pointer; margin-bottom:10px; }
-.u-map-plugin-list button { margin:4px; }
-.u-flow-dependencies { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:12px; }
-.is-fullscreen .u-flow-source { padding:20px; }
-.is-fullscreen .u-flow-code { font-size:12px; }
-@media(max-width:800px) { .u-flow-inspector.is-fullscreen > .u-flow-split { grid-template-columns:1fr; grid-template-rows:55% 45%; } }
 
 .u-call-browser { padding: 12px; }
 .u-call-picker { width: 100%; padding: 10px; background: var(--paper, #151517); color: inherit; border: 1px solid #444; }
@@ -366,13 +323,4 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline:2p
 .u-call-item { padding: 9px; border: 1px solid #353538; border-radius: 5px; }
 .u-call-item .u-btn { white-space: normal; overflow-wrap: anywhere; text-align: left; margin: 2px; }
 .u-call-item small { display: block; opacity: .65; margin-top: 5px; }
-button.u-flow-line-number { background: transparent; border: 0; cursor: pointer; font: inherit; }
-button.u-flow-line-number:hover { color: #eee; text-decoration: underline; }
-
-.u-map-edge[role="button"] { cursor: pointer; }
-.u-map-edge.unresolved > path:first-child { stroke-dasharray: 5 5; }
-.u-map-edge .u-map-edge-hit { stroke: transparent; pointer-events: stroke; }
-.u-map-edge[role="button"]:hover > path:first-child, .u-map-edge[role="button"]:focus > path:first-child { stroke: #8ccaff; stroke-width: 3; }
-.u-map-sites { position: sticky; top: 0; background: #151517; z-index: 1; }
-.u-map-edge .u-map-edge-hit { stroke-width: 18px; }
 

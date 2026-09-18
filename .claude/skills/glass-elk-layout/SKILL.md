@@ -4,6 +4,12 @@ description: Reusable ELK graph arrangement service for browser and headless plu
 ---
 <!-- generated from plugins/builtin/elk-layout.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/elk-layout.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/elk-layout.js"]}'
+```
+
 # ELK Graph Layout
 
 - Declare `requires: ['graph.layout']`; get it with `scope.require('graph.layout')`.

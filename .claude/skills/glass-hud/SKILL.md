@@ -4,6 +4,12 @@ description: The readouts over live play — score, health bar, ammo, timer — 
 ---
 <!-- generated from plugins/builtin/hud.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/hud.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/hud.js"]}'
+```
+
 # Heads Up Display
 
 - Declared in the level, not in code, so the readout is visible in the file:

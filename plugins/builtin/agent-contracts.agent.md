@@ -3,7 +3,6 @@ description: Discover live plugin dependencies, service owners, execution schedu
 ---
 # Agent Contracts
 
-- `agent.contracts` reports active plugins, owned services, fixed/frame schedules and lifecycle coverage.
 - `agent.commands` finds commands with their input schemas; `undeclared` means no schema exists.
 - Both accept `{query, plugin, offset, limit}`; plugin is an exact display name, query is a substring, limit is 1–50 (default 20).
 - Follow `nextOffset` to read more. A null nextOffset means the list is complete.

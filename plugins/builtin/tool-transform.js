@@ -58,6 +58,22 @@ function bounds(context, list) {
   return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }
 }
 
+/**
+ * The closest of one box's three centres to any of the moving box's three
+ * positions, within `tol`, or the best found so far.
+ *
+ * Nine comparisons an axis: two edges and a centre on each side. `best` is
+ * carried across every other box, so the nearest of all of them wins.
+ */
+function nearestSnap(best, centres, targets, tol, other) {
+  for (const centre of centres)
+    for (const target of targets) {
+      const d = centre - target
+      if (Math.abs(d) < tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, c: centre, o: other }
+    }
+  return best
+}
+
 function attach(context) {
   const { renderer, world, editor, bus } = context
   const viewport = context.shell.viewport
@@ -143,16 +159,8 @@ function attach(context) {
     let bX = null, bY = null
     for (const o of others) {
       const { w, h } = renderer.bounds(o)
-      for (const c of [o.x - w / 2, o.x, o.x + w / 2])
-        for (const v of [mb.x0, (mb.x0 + mb.x1) / 2, mb.x1]) {
-          const d = c - v
-          if (Math.abs(d) < tol && (!bX || Math.abs(d) < Math.abs(bX.d))) bX = { d, c, o }
-        }
-      for (const c of [o.y - h / 2, o.y, o.y + h / 2])
-        for (const v of [mb.y0, (mb.y0 + mb.y1) / 2, mb.y1]) {
-          const d = c - v
-          if (Math.abs(d) < tol && (!bY || Math.abs(d) < Math.abs(bY.d))) bY = { d, c, o }
-        }
+      bX = nearestSnap(bX, [o.x - w / 2, o.x, o.x + w / 2], [mb.x0, (mb.x0 + mb.x1) / 2, mb.x1], tol, o)
+      bY = nearestSnap(bY, [o.y - h / 2, o.y, o.y + h / 2], [mb.y0, (mb.y0 + mb.y1) / 2, mb.y1], tol, o)
     }
 
     let ndx = dx, ndy = dy

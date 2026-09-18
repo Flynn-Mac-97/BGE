@@ -20,30 +20,72 @@ export function yawOf(entity) {
   return (Number(declared) || 0) * Math.PI / 180
 }
 
-/** The drawn extents of an entity, in world units: width, height, length. */
-export function boundsOf(entity) {
-  const mesh = entity.mesh || entity._definition?.mesh
-  if (mesh?.box) {
-    // A model's box is in model units; the renderer multiplies it by `mesh.scale`.
-    const scale = (entity.scale ?? 1) * (mesh.model ? Number(mesh.scale) || 1 : 1)
-    return { w: mesh.box[0] * scale, h: mesh.box[1] * scale, l: (mesh.box[2] || 0) * scale }
+/** What the entity has, or what its definition declares when the entity has none. */
+function declared(entity, name) {
+  return entity[name] || entity._definition?.[name]
+}
+
+/** A model's box in world units, or nothing when the mesh declares none. */
+function meshBox(entity, mesh) {
+  if (!mesh?.box) return null
+  // A model's box is in model units; the renderer multiplies it by `mesh.scale`.
+  const scale = (entity.scale ?? 1) * (mesh.model ? Number(mesh.scale) || 1 : 1)
+  return { w: mesh.box[0] * scale, h: mesh.box[1] * scale, l: (mesh.box[2] || 0) * scale }
+}
+
+/** How far one part reaches from the entity's own origin, in each axis. */
+function partReach(part) {
+  return {
+    w: Math.abs(part.at?.[0] || 0) * 2 + part.box[0],
+    h: (part.at?.[1] || 0) + part.box[1],
+    l: Math.abs(part.at?.[2] || 0) * 2 + (part.box[2] || 0)
   }
-  if (Array.isArray(mesh?.parts)) {
-    let w = 0, h = 0, l = 0
-    for (const part of mesh.parts) {
-      if (!part.box) continue
-      w = Math.max(w, Math.abs(part.at?.[0] || 0) * 2 + part.box[0])
-      h = Math.max(h, (part.at?.[1] || 0) + part.box[1])
-      l = Math.max(l, Math.abs(part.at?.[2] || 0) * 2 + (part.box[2] || 0))
-    }
-    if (w || h) return { w, h, l }
+}
+
+/**
+ * The extents of a part list, or nothing when it is not a list or holds no
+ * boxes. Parts are not scaled: the renderer places each one by its own `at`.
+ */
+function partsBox(parts) {
+  if (!Array.isArray(parts)) return null
+  let w = 0, h = 0, l = 0
+  for (const part of parts) {
+    if (!part.box) continue
+    const reach = partReach(part)
+    w = Math.max(w, reach.w)
+    h = Math.max(h, reach.h)
+    l = Math.max(l, reach.l)
   }
-  const sprite = entity.sprite || entity._definition?.sprite
-  if (sprite?.width || sprite?.height) return { w: sprite.width || 1, h: sprite.height || 1, l: 0 }
-  const collider = entity.collider || entity._definition?.collider
+  return w || h ? { w, h, l } : null
+}
+
+/** The size a sprite is drawn at, or nothing when it declares neither side. */
+function spriteBox(sprite) {
+  if (!sprite?.width && !sprite?.height) return null
+  return { w: sprite.width || 1, h: sprite.height || 1, l: 0 }
+}
+
+/** A collider's box or circle as drawn extents, or nothing when it has neither. */
+function colliderBox(collider) {
   if (collider?.box) return { w: collider.box[0], h: collider.box[1], l: collider.box[2] || 0 }
   if (collider?.circle) return { w: collider.circle * 2, h: collider.circle * 2, l: collider.circle * 2 }
-  return { w: 1, h: 1, l: 1 }
+  return null
+}
+
+/**
+ * The drawn extents of an entity, in world units: width, height, length.
+ *
+ * The shapes are tried in the order the renderer would draw them, and each one
+ * answers with the extents it implies or with nothing. An entity nothing can
+ * describe is a unit cube rather than a missing measurement.
+ */
+export function boundsOf(entity) {
+  const mesh = declared(entity, 'mesh')
+  return meshBox(entity, mesh)
+    || partsBox(mesh?.parts)
+    || spriteBox(declared(entity, 'sprite'))
+    || colliderBox(declared(entity, 'collider'))
+    || { w: 1, h: 1, l: 1 }
 }
 
 /** The type's hash-derived hue and brightness — the raw material of its colour. */

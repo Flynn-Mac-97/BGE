@@ -26,6 +26,11 @@ agent-runs/*
 !agent-runs/painpoints.jsonl
 !agent-runs/insights.jsonl
 
+# Plugins and tests taken out of the engine and kept for reference. Engine
+# discovery globs `plugins/builtin/*.js` and the test runner globs
+# `test/*.test.mjs`, so nothing under here is loaded or run.
+archive/
+
 # Codemap's working state: what was asked, what was briefed, what it noticed.
 # A record of one machine's session, not of the engine, and it changes under
 # every question.

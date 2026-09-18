@@ -239,7 +239,64 @@ test('a moment from another version of the engine is refused, not misread', asyn
   })
 })
 
+test('restoring a checkpoint discards timers created after capture', async () => {
+  await withProject(context => {
+    const mark = context.capture()
+    let calls = 0
+    context.after(0.1, () => calls++)
+    context.every(0.1, () => calls++)
+    context.restore(mark)
+    context.loop.step(60)
+    assert.equal(calls, 0)
+    assert.equal(context.capture().loop.scheduled, 0)
+    assert.deepEqual(mark.lost, [])
+  })
+})
+
+test('restoring a checkpoint reports captured timers as lost and removes them', async () => {
+  await withProject(context => {
+    let calls = 0
+    context.after(0.1, () => calls++)
+    const mark = context.capture()
+    const result = context.restore(mark)
+    context.loop.step(60)
+    assert.equal(calls, 0)
+    assert.match(result.lost.join(' '), /scheduled callback/)
+  })
+})
+
 for (const { plugin, name, files } of SOLVERS) {
+  test(`${name} restores body membership after removal and spawning`, async () => {
+    const project = await temporaryProject(files, 'checkpoint-membership-')
+    try {
+      const context = await boot(project)
+      context.loop.step(30)
+      const mark = context.capture()
+      context.loop.step(50)
+      const expected = stateHash(context.world)
+      context.restore(mark)
+      const victim = context.world.entities.find(entity => entity.properties.body === 'dynamic')
+      const type = victim.type
+      context.world.destroy(victim)
+      context.loop.step(1)
+      context.spawn(type, { at: [4, 10, 0] })
+      context.loop.step(10)
+      assert.deepEqual(context.restore(mark).refused, [])
+      context.loop.step(50)
+      assert.equal(stateHash(context.world), expected)
+      const service = name === '3D' ? context.rapier3d : context.rapier2d
+      const RAPIER = await import(name === '3D' ? '@dimforge/rapier3d-deterministic-compat' : '@dimforge/rapier2d-deterministic-compat')
+      const solver = RAPIER.World.restoreSnapshot(service.snapshot())
+      let count = 0
+      solver.forEachRigidBody(() => count++)
+      solver.free()
+      assert.equal(count, mark.plugins[plugin].bodies.length)
+      // A second restore checks that replay did not mutate the captured mapping.
+      context.restore(mark)
+      context.loop.step(50)
+      assert.equal(stateHash(context.world), expected)
+    } finally { await fs.rm(project, { recursive: true, force: true }) }
+  })
   test(`a checkpoint of a simulated world carries ${name} too`, async () => {
     const { atMark, carriedOn, back, afterRewind, replayed } = await rewindThrough(files)
 

@@ -16,4 +16,3 @@ description: Stacks named stat changes onto an entity's properties and recompute
   `base(entity, key)`, `recompute(entity)`.
 - Re-applies itself on `type:changed`, so editing a type file mid-run does not
   quietly reset a modified stat.
-- Announces `modifiers:changed`. Command: `modifiers.list <entityId>`.

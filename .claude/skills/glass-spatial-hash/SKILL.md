@@ -4,6 +4,12 @@ description: Who is near whom, over entities that move every step. Use for any n
 ---
 <!-- generated from plugins/builtin/spatial-hash.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/spatial-hash.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/spatial-hash.js"]}'
+```
+
 # Spatial Hash
 
 - "Who is near whom", over entities that move every step. `context.spatial`.

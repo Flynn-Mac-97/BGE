@@ -4,6 +4,12 @@ description: The figure that lifts off a hit, drifts and fades. Use to show dama
 ---
 <!-- generated from plugins/builtin/damage-numbers.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/damage-numbers.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/damage-numbers.js"]}'
+```
+
 # Damage Numbers
 
 - The figure that lifts off a hit, drifts, and fades. Automatic: it listens to `entity:hurt` and shows `dealt`, rounded.

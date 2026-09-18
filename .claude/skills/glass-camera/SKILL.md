@@ -4,6 +4,12 @@ description: What the player sees and how it follows — orthographic follow, fi
 ---
 <!-- generated from plugins/builtin/camera.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/camera.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/camera.js"]}'
+```
+
 # Camera
 
 - Put camera rules in the level's `camera` block; the editor's viewport is saved on play and put back on stop.
@@ -14,4 +20,4 @@ description: What the player sees and how it follows — orthographic follow, fi
 - Follow, move, and shake through `context.camera`. A shake turns the aim in first person and knocks the eye in third.
 - Check state with `camera.state` — it reports the eye, the focus, and why it is not following anything.
 - `view.follows` carries the followed entity's id, or null. It is the only kernel-visible answer to "which body is the player's"; the renderer reads it to place the ground ring.
-- It steps on the fixed clock. For a mouse-driven 3D camera use **Live Camera** (a level `cameras` list), which updates every drawn frame; give a level one or the other.
+- For a mouse-driven 3D camera use **Live Camera** (a level `cameras` list), which updates every drawn frame; give a level one or the other.

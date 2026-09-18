@@ -4,9 +4,14 @@ description: Undo and redo of editor edits, as a list of level snapshots. Use fo
 ---
 <!-- generated from plugins/builtin/history.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/history.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/history.js"]}'
+```
+
 # History
 
-- Photoshop's history palette: `history.undo` (ctrl+z), `history.redo` (ctrl+shift+z), `history.jump <index>`, `history.list`, `history.clear`.
 - An entry is a snapshot of `world.toLevel()`, not a diff — nothing routes edits through a command.
 - Captured on `world:changed` and on `files:written` for the open level; a drag and an arrow nudge only save, so both signals are needed.
 - Never captured while playing, simulated, or loading. Three flags, not one: `play:started` fires and every `start` hook runs BEFORE the loop starts and before `world.simulated` is set, so a hook that spawns would otherwise file one entry per spawn.

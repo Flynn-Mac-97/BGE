@@ -4,6 +4,12 @@ description: Builds the instruction tree and small task packets, claims files, a
 ---
 <!-- generated from plugins/builtin/agent-workspace.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/agent-workspace.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/agent-workspace.js"]}'
+```
+
 # Agent Workspace
 
 - Use this to build the instruction tree and small task packets.

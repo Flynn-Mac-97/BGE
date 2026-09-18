@@ -4,9 +4,14 @@ description: Play sound — effects a type declares and the game triggers by nam
 ---
 <!-- generated from plugins/builtin/audio.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/audio.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/audio.js"]}'
+```
+
 # Sound
 
-- Plugin name is **Sound**; the file is `audio.js` and the context key is `context.audio`.
 - A type declares what it can make a noise with; game code plays one by name:
 
 ```js
@@ -37,8 +42,7 @@ A name resolves in three steps: the entity's own `_definition.sounds`, then as a
 | `audible` | false when muted, and false in a headless run — the play is still recorded |
 
 - `context.audio`: `play` · `mute(on = true)` · `muted` · `recent(n = 20)` · `loaded()`.
-- Commands: `audio.recent` · `audio.mute`.
-- **Emits `sound:played`** with the record, on every play. Listens for `level:loaded` and clears the log, so "what played" answers about this run.
+- Listens for `level:loaded` and clears the log, so "what played" answers about this run.
 - The last **60** plays are kept. Older ones are dropped.
 - The `AudioContext` is created on the first `pointerdown` or `keydown`, because browsers refuse audio before a gesture. Nothing before that is audible; all of it is recorded.
 - Files resolve through `assetURL`, the same call the renderer uses for a texture. A file that will not load is reported once and cached as a miss.

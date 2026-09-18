@@ -7,11 +7,10 @@
  * shell, and none of it can be composed from `ui.stack` and `ui.field`.
  *
  * Before this, every screen in the checkout invented the same private canvas
- * layer and then hand-wrote its own rounded rectangles and text metrics — the
- * identical `ensureLayer` sits in four files, and the drawing under it is
- * another sixty lines each time. Worse, none of it could be read without a
- * screenshot, so an agent working headless could not tell whether the screen it
- * had just written said anything at all.
+ * layer and then hand-wrote its own rounded rectangles and text metrics — that
+ * layer and those sixty lines, in file after file. Worse, none of it could be
+ * read without a screenshot, so an agent working headless could not tell whether
+ * the screen it had just written said anything at all.
  *
  * So a screen is a list of plain items:
  *
@@ -35,6 +34,11 @@
  *   adds an item kind, which is how `Screen Card` adds cards without this file
  *   knowing what a card is. Add a painter; never add an escape hatch.
  */
+
+import { canvasLayer } from './render/canvas-layer.js'
+
+/** This plugin's canvas over the frame. */
+const LAYER = { owner: 'screen', className: 'screen-layer' }
 
 /** The box every screen is laid out in. Scaled to fit the viewport, never stretched. */
 const DESIGN = { width: 1280, height: 720 }
@@ -166,7 +170,7 @@ export default {
     // Frame, because it only draws. Nothing here may change the simulation.
     phase: 'frame',
     run(world, seconds, context) {
-      const layer = ensureLayer(context)
+      const layer = canvasLayer(context, LAYER)
       if (!layer) return
       // Measured BEFORE the screens are asked what they hold, so a screen that
       // sizes itself from `screen.box` is laying out in this frame's box rather
@@ -195,37 +199,6 @@ function safeCount(entry, context) {
     const list = typeof entry.draw === 'function' ? entry.draw(context) : entry.draw
     return [].concat(list || []).filter(Boolean).length
   } catch { return 0 }
-}
-
-// ------------------------------------------------------------------ the layer
-/**
- * A 2D canvas sitting exactly on the viewport, and its own — never shared.
- *
- * Its own element because the Transform Tool rewrites the shell's overlay
- * wholesale, so anything drawn into a shared container disappears. No document
- * means no drawing, and that is not an error: a headless world builds every
- * item above this line and simply has nothing to show them on.
- */
-function ensureLayer(context) {
-  if (typeof document === 'undefined') return null
-
-  const existing = context.screen._layer
-  if (existing && document.contains(existing.canvas)) return existing
-
-  const host = context.shell?.viewport
-  if (!host) return null
-
-  const canvas = existing?.canvas || document.createElement('canvas')
-  canvas.className = 'screen-layer'
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none'
-  host.prepend(canvas)
-  // The GL canvas is first, the HUD after it, and a screen sits over both.
-  const gl = host.querySelector('#gl')
-  if (gl) gl.after(canvas)
-
-  const layer = { canvas, g: canvas.getContext('2d'), last: null }
-  context.screen._layer = layer
-  return layer
 }
 
 // ------------------------------------------------------------------- painting

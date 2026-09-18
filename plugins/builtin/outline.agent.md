@@ -54,8 +54,7 @@ outline that is already on.
 
 - **It does not outline what a level declared.** A `keyline` written on a mesh
   is the level's, and hiding gives that back rather than deleting it.
-- **It has no hover of its own.** The editor's selection is the only signal it
-  listens to. A game says when, from its own input.
+- **It has no hover of its own.** A game says when, from its own input.
 - **An outlined entity leaves its merge batch**, so a field of five hundred
   outlined tufts costs five hundred draw calls. Outline the few things a player
   is looking at.

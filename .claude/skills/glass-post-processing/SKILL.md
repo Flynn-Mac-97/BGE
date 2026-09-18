@@ -4,6 +4,12 @@ description: Screen-wide image effects and the chain that runs them — bloom, c
 ---
 <!-- generated from plugins/builtin/post-processing.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/post-processing.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/post-processing.js"]}'
+```
+
 # Post Processing
 
 Declared in the level beside the sky and the fog, because how a place is graded

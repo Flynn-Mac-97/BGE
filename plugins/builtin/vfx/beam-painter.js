@@ -66,6 +66,8 @@ function beamMaterial(THREE, TSL, blend) {
 }
 
 
+import { grownQuads, quadIndices } from './quad-group.js'
+
 export function makePainter(THREE, TSL, scene) {
   const groups = new Map()   // blend -> { geometry, mesh, capacity }
 
@@ -75,7 +77,7 @@ export function makePainter(THREE, TSL, scene) {
     if (group && group.capacity >= quads) return group
     if (group) { scene.remove(group.mesh); group.geometry.dispose() }
 
-    const size = Math.max(128, 1 << Math.ceil(Math.log2(Math.max(1, quads))))
+    const size = grownQuads(quads, 128)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 4 * 3), 3))
     geometry.setAttribute('along', new THREE.BufferAttribute(new Float32Array(size * 4 * 3), 3))
@@ -86,12 +88,7 @@ export function makePainter(THREE, TSL, scene) {
 
     // The index buffer never changes — two triangles for every quad that will
     // ever be drawn in this group.
-    const index = new Uint32Array(size * 6)
-    for (let quad = 0; quad < size; quad++) {
-      const v = quad * 4
-      index.set([v, v + 1, v + 2, v, v + 2, v + 3], quad * 6)
-    }
-    geometry.setIndex(new THREE.BufferAttribute(index, 1))
+    geometry.setIndex(new THREE.BufferAttribute(quadIndices(size), 1))
 
     const material = beamMaterial(THREE, TSL, blend)
 

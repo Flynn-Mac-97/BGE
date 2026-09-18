@@ -4,6 +4,12 @@ description: Watches one parallel lane from the person's tab: a schematic from i
 ---
 <!-- generated from plugins/builtin/lane-view.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/lane-view.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/lane-view.js"]}'
+```
+
 # Lane View
 
 - Watches one lane from the person's tab. Read only: it sends `snapshot` and `see.describe` and nothing else, so it works while the work lock holds.

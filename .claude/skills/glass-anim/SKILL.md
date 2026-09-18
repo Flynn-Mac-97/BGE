@@ -4,6 +4,12 @@ description: Frame animation for sprite sheets: clips declared on the type, chos
 ---
 <!-- generated from plugins/builtin/anim.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/anim.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/anim.js"]}'
+```
+
 # Sprite Animation
 
 - Owns one job: on every fixed step it reads `entity.animation`, finds that clip on the type, and writes `entity.frame`. It draws nothing — `render.js` maps `frame` onto `sprite.sheet`.
@@ -43,7 +49,6 @@ A clip may be written three ways, and each widens to the same shape:
 | `entity.animationDone` | written here | `false` | true once a non-looping clip reaches its last frame |
 
 - Command: `animation.list` — every type that declares clips, each as `walk: 1,2 @8framesPerSecond`.
-- **Emits no events and listens for none.**
 - Assignment, not `play()`: setting the same name every frame does nothing, so an update hook can state what the entity *is* doing without tracking what it was doing. Changing the name restarts the clip at time zero.
 - A non-looping clip holds its last frame and sets `animationDone`. A looping one wraps with `%`.
 - **An unknown clip name does nothing and says nothing** — `entity.frame` keeps its last value. Check the spelling against `animation.list`.

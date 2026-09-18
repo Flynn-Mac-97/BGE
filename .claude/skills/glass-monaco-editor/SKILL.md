@@ -4,6 +4,12 @@ description: Reusable lazy-loaded Monaco editor service for plugin panels.
 ---
 <!-- generated from plugins/builtin/monaco-editor.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/monaco-editor.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/monaco-editor.js"]}'
+```
+
 # Monaco Code Editor
 
 - Declare `requires: ['editor.code']`; get it with `scope.require('editor.code')`.

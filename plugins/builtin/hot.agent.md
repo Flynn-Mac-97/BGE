@@ -17,10 +17,9 @@ description: Project file edits reach the running editor without a page reload. 
 | image, sound, model | the renderer forgets the file so it is fetched again |
 | plugin | a full page reload — a plugin owns DOM and listeners |
 
-- A plugin reload is announced first as `reload:before` on the bus, carrying
-  the file and why. Listeners must be synchronous; the page goes on the next
-  line. Anything keeping world state across reloads writes it down there.
-- A successful apply emits `hot:applied`. A failed one emits `hot:failed`.
+- A plugin reload is announced first as `reload:before` on the bus. Listeners
+  must be synchronous; the page goes on the next line. Anything keeping world
+  state across reloads writes it down there.
 
 ## What it refuses, and says
 

@@ -2,9 +2,10 @@
  * The machinery every texture generator needs, and none of the art direction.
  *
  * Both texture tools grew their own copy: 250 substantive lines were identical
- * between `make-counter-strike-textures.mjs` and `make-kitten-survivors-textures.mjs`
- * — the same seeded random, the same hashes, the same noise, the same encoder.
- * Copying is how one thing ends up with three owners and no fixes.
+ * between the counter-strike and kitten-survivors generators — the same seeded
+ * random, the same hashes, the same noise, the same encoder. Copying is how one
+ * thing ends up with three owners and no fixes. Those tools now live in their
+ * own projects and import this file.
  *
  * Where the two copies had drifted, this file takes the newer spelling, because
  * every difference but one was a rename the house style asked for (`i` to

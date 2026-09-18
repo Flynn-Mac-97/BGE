@@ -4,6 +4,12 @@ description: The sample shelf of shaders — edges, grass, aura, waves, hologram
 ---
 <!-- generated from plugins/builtin/shaders.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/shaders.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/shaders.js"]}'
+```
+
 # Shaders
 
 - Seven shaders, described once and implemented through the door a game's own

@@ -4,6 +4,12 @@ description: Stacks named stat changes onto an entity's properties and recompute
 ---
 <!-- generated from plugins/builtin/modifiers.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/modifiers.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/modifiers.js"]}'
+```
+
 # Modifiers
 
 - Stacks named stat changes onto an entity's `properties` and recomputes from
@@ -18,4 +24,3 @@ description: Stacks named stat changes onto an entity's properties and recompute
   `base(entity, key)`, `recompute(entity)`.
 - Re-applies itself on `type:changed`, so editing a type file mid-run does not
   quietly reset a modified stat.
-- Announces `modifiers:changed`. Command: `modifiers.list <entityId>`.

@@ -14,6 +14,7 @@
  * picture of it.
  */
 import { assetURL } from '../../engine/asset-path.js'
+import { grownQuads, quadIndices } from './vfx/quad-group.js'
 
 let painter = null
 let field = null
@@ -143,23 +144,18 @@ function makePainter(THREE, TSL, scene, context) {
 
     // Doubling rather than allocating the ceiling up front: most groups hold
     // a handful of sparks and only one ever holds a screen of smoke.
-    const size = Math.max(64, 1 << Math.ceil(Math.log2(Math.max(1, capacity))))
+    const size = grownQuads(capacity, 64)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 4 * 3), 3))
     geometry.setAttribute('particleSize', new THREE.BufferAttribute(new Float32Array(size * 4), 1))
     geometry.setAttribute('particleColour', new THREE.BufferAttribute(new Float32Array(size * 4 * 4), 4))
 
-    // The corner and index buffers never change — the same four offsets and
-    // two triangles for every particle that will ever live in this group.
+    // The corner buffer never changes — the same four offsets for every
+    // particle that will ever live in this group.
     const corner = new Float32Array(size * 4 * 2)
-    const index = new Uint32Array(size * 6)
-    for (let quad = 0; quad < size; quad++) {
-      corner.set([-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5], quad * 8)
-      const v = quad * 4
-      index.set([v, v + 1, v + 2, v, v + 2, v + 3], quad * 6)
-    }
+    for (let quad = 0; quad < size; quad++) corner.set([-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5], quad * 8)
     geometry.setAttribute('corner', new THREE.BufferAttribute(corner, 2))
-    geometry.setIndex(new THREE.BufferAttribute(index, 1))
+    geometry.setIndex(new THREE.BufferAttribute(quadIndices(size), 1))
 
     const material = particleMaterial(THREE, TSL, texture ? textureFor(texture) : null, blend, context)
 

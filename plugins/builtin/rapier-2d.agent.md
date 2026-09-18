@@ -50,13 +50,6 @@ own Rapier world; only the compiled WebAssembly is shared between them.
 **A level reload starts the solver again from nothing**, so a level played,
 reloaded and played again is the level played once.
 
-## Commands
-
-- `rapier2d.use` — switch solver, and write the choice to `game.json`.
-- `rapier2d.bodies` — every dynamic body: position, velocity, spin, grounded,
-  asleep.
-- `rapier2d.snapshot` — the hash two runs are compared by.
-
 ## Detail
 
 The engine-facing half of both dimensions is one file,

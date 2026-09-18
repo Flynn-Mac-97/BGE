@@ -4,6 +4,12 @@ description: Solid bodies, collision and gravity in a 2D side-on or top-down gam
 ---
 <!-- generated from plugins/builtin/physics-2d.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/physics-2d.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/physics-2d.js"]}'
+```
+
 # Physics 2D
 
 - **There is a second solver.** Rapier 2D fills this same contract and adds

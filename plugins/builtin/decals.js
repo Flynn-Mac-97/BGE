@@ -32,7 +32,10 @@
  * `node bin/engine.mjs run decals.recent` — the same way the audio plugin
  * answers "did that make a noise".
  */
+
+import { asVector, normalise } from '../../engine/vector.js'
 import { assetURL } from '../../engine/asset-path.js'
+import { grownQuads, quadIndices } from './vfx/quad-group.js'
 
 /**
  * How many marks exist at once.
@@ -310,7 +313,7 @@ function makePainter(THREE, scene) {
       group.geometry.dispose()
     }
 
-    const size = Math.max(32, 1 << Math.ceil(Math.log2(Math.max(1, capacity))))
+    const size = grownQuads(capacity, 32)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 4 * 3), 3))
     // A Lambert material with no normals is lit by nothing but ambient, and the
@@ -320,12 +323,7 @@ function makePainter(THREE, scene) {
     // Four components, so alpha travels with the tint and a decal can fade out
     // without needing a material of its own.
     geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(size * 4 * 4), 4))
-    const index = new Uint32Array(size * 6)
-    for (let quad = 0; quad < size; quad++) {
-      const v = quad * 4
-      index.set([v, v + 1, v + 2, v, v + 2, v + 3], quad * 6)
-    }
-    geometry.setIndex(new THREE.BufferAttribute(index, 1))
+    geometry.setIndex(new THREE.BufferAttribute(quadIndices(size), 1))
 
     const material = new THREE.MeshLambertMaterial({
       map: src ? textureFor(src) : null,
@@ -445,20 +443,6 @@ const cross = (a, b) => ({
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x
 })
-
-function normalise(vector) {
-  if (!vector) return null
-  const length = Math.hypot(vector.x, vector.y, vector.z)
-  if (!(length > 0)) return null
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length }
-}
-
-/** A point written as {x,y,z} or [x,y,z] — an argument typed at a terminal is an array. */
-function asVector(value) {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object') return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  return null
-}
 
 const sizeOf = size => (Array.isArray(size)
   ? [Number(size[0]) || 0, Number(size[1]) || 0]

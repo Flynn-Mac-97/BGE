@@ -21,6 +21,12 @@
 /** A number an input can use, or its default. */
 const number = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback)
 
+/** The mesh a request names, or nothing, so a binding's lookup needs no guard of its own. */
+const meshOf = request => request.mesh || {}
+
+/** What the record declared for one key, in the form the level writes it. */
+const declaredOf = (record, key) => (record.parameters || {})[key]
+
 /**
  * Where each slot's answer is assigned, and what it must return.
  *
@@ -77,64 +83,77 @@ export function binderFor(THREE, TSL) {
   /**
    * Every input a shader may name, and the node it becomes.
    *
+   * One entry per input, all of one shape: `(request, key, record, say)`. An
+   * input that needs the mesh, the record's declared parameters and the warning
+   * line is therefore not a special case, and the list stays the whole list of
+   * what can be named — which is what a shader author reads to find out.
+   *
    * `request` is what the renderer hands a material builder, plus anything a
    * painter added for a program of its own.
    */
-  function nodeFor(binding, record, request, say) {
-    const { mesh = {}, tint, uv, texture: map } = request
-    const defaults = record.parameters || {}
-    const [kind, key] = String(binding).split(':')
-
-    switch (kind) {
-      // The two UV sets, named by what the number means. Three's own `uv()` is
-      // in metres here, so a shader that asks for it by name cannot be wrong
-      // about which one it got.
-      case 'uv.face': return uv?.face ? uv.face() : vec2(0, 0)
-      case 'uv.metres': return uv?.metres ? uv.metres() : vec2(0, 0)
-      case 'time': return time
-      case 'normal': return normalView
-      case 'viewDirection': return positionViewDirection
-      case 'position.world': return positionWorld
-      case 'position.local': return positionLocal
-      case 'position.geometry': return positionGeometry
-      case 'cameraPosition': return cameraPosition
-      case 'screen': return screenCoordinate
-      // Only a `vertex` slot needs these, and only because filling that slot
-      // means doing the projection the renderer would have done.
-      case 'matrix.projection': return cameraProjectionMatrix
-      case 'matrix.view': return cameraViewMatrix
-      case 'matrix.model': return modelWorldMatrix
-      // The quad's declared size. Structural, so it is not a parameter and
-      // cannot be read with `number:`, and a shader that rebuilds where a tuft
-      // stands has to know it.
-      case 'quad.wide': return float(quadSize(mesh)[0])
-      case 'quad.tall': return float(quadSize(mesh)[1])
-      case 'tint': return vec3(...colourOf(THREE, tint, '#ffffff'))
-      // Already sampled, so GLSL never needs a sampler argument and an
-      // untextured mesh gets white rather than a compile error.
-      case 'texture':
-        return map && uv?.face ? texture(map, uv.face()) : vec4(1, 1, 1, 1)
-      case 'colour': return vec3(...colourOf(THREE, mesh[key], defaults[key]))
-      case 'number': return float(number(mesh[key], number(defaults[key], 0)))
-      // 1 where the level wrote the key, 0 where it did not. A shader cannot
-      // branch on a key being absent otherwise, and an optional colour has no
-      // value that means "off".
-      case 'declared':
-        return float(mesh[key] === undefined || mesh[key] === null ? 0 : 1)
-      // A program's painter supplies its own nodes — the surface coordinate of
-      // a particle, the colour it was painted. Only the painter knows them.
-      case 'given': {
-        const given = request[key]
-        if (given === undefined) {
-          say(`[GLSL] "${record.name}" asks for given:${key} and the caller passed none — it receives zero`)
-          return float(0)
-        }
-        return given
-      }
-      default:
-        say(`[GLSL] "${record.name}" asks for the input "${binding}", which does not exist — it receives zero`)
+  const inputs = {
+    // The two UV sets, named by what the number means. Three's own `uv()` is
+    // in metres here, so a shader that asks for it by name cannot be wrong
+    // about which one it got.
+    'uv.face': request => request.uv?.face ? request.uv.face() : vec2(0, 0),
+    'uv.metres': request => request.uv?.metres ? request.uv.metres() : vec2(0, 0),
+    time: () => time,
+    normal: () => normalView,
+    viewDirection: () => positionViewDirection,
+    'position.world': () => positionWorld,
+    'position.local': () => positionLocal,
+    'position.geometry': () => positionGeometry,
+    cameraPosition: () => cameraPosition,
+    screen: () => screenCoordinate,
+    // Only a `vertex` slot needs these, and only because filling that slot
+    // means doing the projection the renderer would have done.
+    'matrix.projection': () => cameraProjectionMatrix,
+    'matrix.view': () => cameraViewMatrix,
+    'matrix.model': () => modelWorldMatrix,
+    // The quad's declared size. Structural, so it is not a parameter and
+    // cannot be read with `number:`, and a shader that rebuilds where a tuft
+    // stands has to know it.
+    'quad.wide': request => float(quadSize(meshOf(request))[0]),
+    'quad.tall': request => float(quadSize(meshOf(request))[1]),
+    tint: request => vec3(...colourOf(THREE, request.tint, '#ffffff')),
+    // Already sampled, so GLSL never needs a sampler argument and an
+    // untextured mesh gets white rather than a compile error.
+    texture: request => request.texture && request.uv?.face
+      ? texture(request.texture, request.uv.face())
+      : vec4(1, 1, 1, 1),
+    colour: (request, key, record) =>
+      vec3(...colourOf(THREE, meshOf(request)[key], declaredOf(record, key))),
+    number: (request, key, record) =>
+      float(number(meshOf(request)[key], number(declaredOf(record, key), 0))),
+    // 1 where the level wrote the key, 0 where it did not. A shader cannot
+    // branch on a key being absent otherwise, and an optional colour has no
+    // value that means "off".
+    declared: (request, key) => float(meshOf(request)[key] === undefined || meshOf(request)[key] === null ? 0 : 1),
+    // A program's painter supplies its own nodes — the surface coordinate of
+    // a particle, the colour it was painted. Only the painter knows them.
+    given: (request, key, record, say) => {
+      const given = request[key]
+      if (given === undefined) {
+        say(`[GLSL] "${record.name}" asks for given:${key} and the caller passed none — it receives zero`)
         return float(0)
+      }
+      return given
     }
+  }
+
+  /**
+   * The node for one named input.
+   *
+   * An input nobody supplies is reported by name and receives zero: a shader
+   * that silently gets a wrong value is the failure this whole file avoids.
+   */
+  function nodeFor(binding, record, request, say) {
+    const [kind, key] = String(binding).split(':')
+    if (!Object.hasOwn(inputs, kind)) {
+      say(`[GLSL] "${record.name}" asks for the input "${binding}", which does not exist — it receives zero`)
+      return float(0)
+    }
+    return inputs[kind](request, key, record, say)
   }
 
   /** The material a shader hangs its node on, with the options it declared. */

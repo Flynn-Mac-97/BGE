@@ -4,6 +4,12 @@ description: Which game the editor has open, and how to open, name or leave one.
 ---
 <!-- generated from plugins/builtin/project.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/project.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/project.js"]}'
+```
+
 # Project Switcher
 
 - A project is a directory anywhere on disk. `ENGINE_PROJECT=path npm run dev`

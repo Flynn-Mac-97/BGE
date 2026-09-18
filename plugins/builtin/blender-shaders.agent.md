@@ -27,11 +27,6 @@ never makes a surface worse.
 
 `blender.shaders` names what each material still needs.
 
-## Commands
-
-- `blender.shaders` — every material graph, whether it translates, and what it needs.
-- `blender.shaders.apply` — re-read the graphs and rebuild every material.
-
 ## What translates
 
 56 node types. Textures: Image, Noise, White Noise, Voronoi (F1, F2, edge),

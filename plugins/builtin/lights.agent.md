@@ -17,7 +17,6 @@ description: Light a scene: point, spot, directional, area and hemisphere lights
 - **Aim a shadow-casting key from the SIDE.** Aimed away down the view axis it throws every shadow directly behind the thing that cast it: full cost, nothing visible.
 - `world.sun` in the level's `world` block is a separate directional light that **cannot cast a shadow**. Use it as fill and make the light entity the key.
 - Also reads the level's top-level `lightmaps` block, and writes `mesh.lightmap` onto the entities it names. Nothing here bakes — `run lights.bake '{"surfaces":true}'` emits the manifest for an external bake.
-- `lights.list` · `lights.bake` · `lights.flash`. Check warnings in `errors`.
 
 ## Detail
 

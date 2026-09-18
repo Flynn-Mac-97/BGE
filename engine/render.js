@@ -2116,25 +2116,44 @@ export async function makeRenderer(canvas, view, viewport) {
 
   const shadowMatrix = new THREE.Matrix4()
 
-  /** Write the frame's shadows into the instanced mesh. Called once per sync. */
-  function placeContactShadows() {
-    if (!shadowPlaces.length) {
-      if (contactShadows) contactShadows.count = 0
+  /**
+   * Write this frame's marks into an instanced quad mesh: a disc of the mark's
+   * own radius, lifted to `height` above the floor, then whatever per-instance
+   * values the mark carries.
+   *
+   * Both floor marks are the same kind of thing — a flat disc occluded by
+   * whatever stands in front of it — and each keeps its own geometry, because an
+   * instanced attribute belongs to the geometry.
+   */
+  function placeMarks(places, { mesh, matrix, height, grow, write, attributes = [] }) {
+    if (!places.length) {
+      if (mesh) mesh.count = 0
       return
     }
-    growContactShadows(shadowPlaces.length)
-    // Just clear of the floor, or the two surfaces fight for the same pixels.
-    const y = readability.groundY + 0.015
-    for (let i = 0; i < shadowPlaces.length; i++) {
-      const place = shadowPlaces[i]
-      shadowMatrix.makeScale(place.radius * 2, 1, place.radius * 2)
-      shadowMatrix.setPosition(place.x, y, place.z)
-      contactShadows.setMatrixAt(i, shadowMatrix)
-      contactStrengths.setX(i, place.strength)
+    grow(places.length)
+    for (let i = 0; i < places.length; i++) {
+      const place = places[i]
+      matrix.makeScale(place.radius * 2, 1, place.radius * 2)
+      matrix.setPosition(place.x, height, place.z)
+      mesh.setMatrixAt(i, matrix)
+      write(place, i)
     }
-    contactShadows.count = shadowPlaces.length
-    contactShadows.instanceMatrix.needsUpdate = true
-    contactStrengths.needsUpdate = true
+    mesh.count = places.length
+    mesh.instanceMatrix.needsUpdate = true
+    for (const attribute of attributes) attribute.needsUpdate = true
+  }
+
+  /** Write the frame's shadows into the instanced mesh. Called once per sync. */
+  function placeContactShadows() {
+    placeMarks(shadowPlaces, {
+      mesh: contactShadows,
+      matrix: shadowMatrix,
+      // Just clear of the floor, or the two surfaces fight for the same pixels.
+      height: readability.groundY + 0.015,
+      grow: growContactShadows,
+      attributes: [contactStrengths],
+      write: (place, i) => contactStrengths.setX(i, place.strength)
+    })
   }
 
   /**
@@ -2243,26 +2262,19 @@ export async function makeRenderer(canvas, view, viewport) {
 
   /** Write the frame's rings into the instanced mesh. Called once per sync. */
   function placeGroundRings() {
-    if (!ringPlaces.length) {
-      if (groundRings) groundRings.count = 0
-      return
-    }
-    growGroundRings(ringPlaces.length)
-    // Above the contact shadow's 0.015, so the colour wins where they meet.
-    const y = readability.groundY + 0.02
-    for (let i = 0; i < ringPlaces.length; i++) {
-      const place = ringPlaces[i]
-      ringMatrix.makeScale(place.radius * 2, 1, place.radius * 2)
-      ringMatrix.setPosition(place.x, y, place.z)
-      groundRings.setMatrixAt(i, ringMatrix)
-      const colour = ringColour(place.colour)
-      ringTints.setXYZ(i, colour.r, colour.g, colour.b)
-      ringStrengths.setX(i, place.strength)
-    }
-    groundRings.count = ringPlaces.length
-    groundRings.instanceMatrix.needsUpdate = true
-    ringTints.needsUpdate = true
-    ringStrengths.needsUpdate = true
+    placeMarks(ringPlaces, {
+      mesh: groundRings,
+      matrix: ringMatrix,
+      // Above the contact shadow's 0.015, so the colour wins where they meet.
+      height: readability.groundY + 0.02,
+      grow: growGroundRings,
+      attributes: [ringTints, ringStrengths],
+      write: (place, i) => {
+        const colour = ringColour(place.colour)
+        ringTints.setXYZ(i, colour.r, colour.g, colour.b)
+        ringStrengths.setX(i, place.strength)
+      }
+    })
   }
 
   // ------------------------------------------------------ merging static work

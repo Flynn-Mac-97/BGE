@@ -4,9 +4,14 @@ description: Discover live plugin dependencies, service owners, execution schedu
 ---
 <!-- generated from plugins/builtin/agent-contracts.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/agent-contracts.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/agent-contracts.js"]}'
+```
+
 # Agent Contracts
 
-- `agent.contracts` reports active plugins, owned services, fixed/frame schedules and lifecycle coverage.
 - `agent.commands` finds commands with their input schemas; `undeclared` means no schema exists.
 - Both accept `{query, plugin, offset, limit}`; plugin is an exact display name, query is a substring, limit is 1–50 (default 20).
 - Follow `nextOffset` to read more. A null nextOffset means the list is complete.

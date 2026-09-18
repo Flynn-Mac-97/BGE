@@ -21,7 +21,6 @@ terminal  ->  bin/engine.mjs  ->  POST /api/engine  ->  ws  ->  here
 - Two ops are its own: `ping` says whether the page has finished booting and
   which level is open, and `eval` runs a string of JavaScript in the page —
   the escape hatch for anything the surface does not cover.
-- Emits `bridge:ready` on the bus once the socket is listening.
 
 ## What it refuses, and how
 
@@ -41,5 +40,3 @@ Headless is the other half: `--headless` runs a private world in the calling
 process with no server, no browser and no port. Many run at once and never see
 each other. Use the bridge only when the question is about live editor state or
 what is actually drawn.
-
-- `bridge.status` — whether the socket is open, and the transport.

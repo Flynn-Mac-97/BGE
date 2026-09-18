@@ -290,6 +290,46 @@ export function makeBridge({ RAPIER, tag, claims, flat, gravity }) {
     /** The same bytes on every machine, which is what makes a replay provable. */
     snapshot() { return world?.takeSnapshot() || null },
 
+    /** Solver handles must travel with entity ids because either can be removed. */
+    capture() {
+      if (!world) return null
+      return {
+        bytes: world.takeSnapshot(),
+        bodies: [...tracked].map(([entity, entry]) => ({
+          id: entity.id, body: entry.body.handle, collider: entry.collider.handle,
+          signature: entry.signature, wrote: structuredClone(entry.wrote)
+        }))
+      }
+    },
+
+    /** Bind the captured bodies to the entities the world has just restored. */
+    restoreCapture(capture, gameWorld) {
+      if (!capture?.bytes || !Array.isArray(capture.bodies)) return false
+      let restored
+      try { restored = RAPIER.World.restoreSnapshot(capture.bytes) } catch { return false }
+      const resolved = capture.bodies.map(record => ({
+        record, entity: gameWorld.byId(record.id),
+        body: restored.getRigidBody(record.body), collider: restored.getCollider(record.collider)
+      }))
+      if (resolved.some(one => !one.entity || !one.body || !one.collider)) {
+        restored.free()
+        return false
+      }
+      world?.free()
+      events?.free()
+      world = restored
+      events = new RAPIER.EventQueue(true)
+      tracked.clear()
+      byCollider.clear()
+      for (const { record, entity, body, collider } of resolved) {
+        tracked.set(entity, {
+          body, collider, signature: record.signature, wrote: structuredClone(record.wrote)
+        })
+        byCollider.set(record.collider, entity)
+      }
+      return true
+    },
+
     /**
      * Put the solver back to the moment a snapshot was taken.
      *

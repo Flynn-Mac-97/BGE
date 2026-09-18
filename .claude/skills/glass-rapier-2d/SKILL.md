@@ -4,6 +4,12 @@ description: Rigid body physics in 2D solved by Rapier — rotation, mass, frict
 ---
 <!-- generated from plugins/builtin/rapier-2d.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/rapier-2d.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/rapier-2d.js"]}'
+```
+
 # Rapier 2D
 
 - **Same contract as Physics 2D.** The collider shape still decides who owns an
@@ -52,13 +58,6 @@ own Rapier world; only the compiled WebAssembly is shared between them.
 
 **A level reload starts the solver again from nothing**, so a level played,
 reloaded and played again is the level played once.
-
-## Commands
-
-- `rapier2d.use` — switch solver, and write the choice to `game.json`.
-- `rapier2d.bodies` — every dynamic body: position, velocity, spin, grounded,
-  asleep.
-- `rapier2d.snapshot` — the hash two runs are compared by.
 
 ## Detail
 

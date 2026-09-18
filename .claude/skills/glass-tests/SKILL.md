@@ -4,6 +4,12 @@ description: Lasting checks for a game, run headless and repeatably: arrange a s
 ---
 <!-- generated from plugins/builtin/tests.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/tests.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/tests.js"]}'
+```
+
 # Tests
 
 - Runs lasting checks from `project/tests/`. One file, `export default { name, level, run(test) }`.

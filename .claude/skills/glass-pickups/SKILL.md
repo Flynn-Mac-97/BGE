@@ -4,6 +4,12 @@ description: Pickups any entity can drop and a collector magnets in. Use for coi
 ---
 <!-- generated from plugins/builtin/pickups.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/pickups.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/pickups.js"]}'
+```
+
 # Pickups
 
 - A pickup is any entity with `properties.pickup` set. The value is the kind —
@@ -18,7 +24,5 @@ description: Pickups any entity can drop and a collector magnets in. Use for coi
   a collector's own `properties.pickupRadius` beats the setting.
 - `properties.bobHeight` / `bobSpeed` make an untouched pickup bob so a field of
   them reads as loot. Silent when unset.
-- Announces `pickup:latched` and `pickup:collected` with `{ entity, collector, kind, value }`.
-  What a kind *means* is the game's business — wire it in one line.
+- What a kind *means* is the game's business — wire it in one line.
 - `attractAll()` latches everything now. Pickups are cleared on `level:loaded`.
-- Commands: `pickups.list`, `pickups.attract`.

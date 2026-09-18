@@ -25,7 +25,6 @@ marker: true,
 
 ## Commands
 
-- `markers.list` — every marker id, and how many are hidden right now.
 - `markers.reveal` — show markers during play. Takes `true` or `false`,
   defaults to `true`. It is the one thing worth having while debugging a spawn.
 

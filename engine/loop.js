@@ -663,14 +663,18 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
      * @param {Array} [where.input] Input events as `{ at, code, down }`.
      * @param {string[]} [where.holds] The names time was being held under.
      * @param {number} [where.hitStop] Fixed steps of hit stop left.
+     * @param {number} [where.scheduled] Captured callback count; clears the schedule when present.
      */
-    resume({ steps: to = 0, seed, draws = 0, input, holds: holdNames, hitStop } = {}) {
+    resume({ steps: to = 0, seed, draws = 0, input, holds: holdNames, hitStop, scheduled } = {}) {
       const target = Math.max(0, Math.round(to))
       const shift = (target - steps) * STEP
       steps = target
       fixed = steps * STEP
       acc = 0
-      for (const t of timers) { t.start += shift; t.at += shift }
+      // Full checkpoints cannot carry closures. A clock-only reload retains
+      // its rebuilt schedule; a checkpoint discards the abandoned schedule.
+      if (scheduled !== undefined) timers = []
+      else for (const t of timers) { t.start += shift; t.at += shift }
       random.resume(seed ?? random.seed, draws)
       if (holdNames) { holds.clear(); for (const reason of holdNames) holds.add(reason) }
       if (hitStop !== undefined) held = Math.max(0, Math.round(hitStop))

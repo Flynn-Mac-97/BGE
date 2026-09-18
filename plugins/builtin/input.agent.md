@@ -3,11 +3,11 @@ description: Read the keyboard as named actions, so a test drives the same actio
 ---
 # Keyboard Input
 
-- Owns `context.input`. Game code names an **action**, never a key code, so
+- Game code names an **action**, never a key code, so
   rebinding is a config change rather than a code change.
 - Six actions ship: `left` `right` `up` `down` `jump` `fire`. Each maps to a
   list of physical `KeyboardEvent.code` values.
-- Registers no command. It is driven from code and from tests.
+- It is driven from code and from tests.
 
 | verb | answers |
 |---|---|
@@ -19,8 +19,7 @@ description: Read the keyboard as named actions, so a test drives the same actio
 | `actions()` | every action name |
 | `codes(action)` | the physical keys one action means |
 
-- `pressed` means this step only. It is cleared on `step:end`, which this
-  plugin emits once per frame.
+- `pressed` means this step only. It is cleared on `step:end`.
 - A test calls `press` and `release` with a real code from `codes(action)`, so
   the same path runs with no window to type into and rebinding stays covered.
 - Keys pressed while an `INPUT` or `TEXTAREA` has focus are ignored, so typing

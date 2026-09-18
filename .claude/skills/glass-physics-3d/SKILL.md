@@ -4,6 +4,12 @@ description: Solid bodies, collision, gravity, step-up and raycasts in 3D. Use w
 ---
 <!-- generated from plugins/builtin/physics-3d.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/physics-3d.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/physics-3d.js"]}'
+```
+
 # Physics 3D
 
 - **There is a second solver.** Rapier 3D fills this same contract and adds
@@ -68,7 +74,6 @@ level reload forgets them.
 
 - `physics3d.raycast` — a sightline in one call. Takes a point or an entity id
   at each end.
-- `physics3d.bodies` — what is being simulated right now.
 
 ## What it costs
 

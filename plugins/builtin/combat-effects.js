@@ -17,6 +17,8 @@
  * `context.particles.art`, which a game names in its own plugin.
  */
 
+import { normalise, asWrittenVector } from '../../engine/vector.js'
+
 export default {
   name: 'Combat Effects',
   category: 'game',
@@ -36,8 +38,8 @@ export default {
 
     context.bus.on('weapon:fired', event => {
       const shooter = event?.entity
-      const direction = normalise(asVector(event?.direction))
-      const origin = asVector(event?.origin) || (shooter ? { x: shooter.x, y: shooter.y, z: shooter.z } : null)
+      const direction = normalise(asWrittenVector(event?.direction))
+      const origin = asWrittenVector(event?.origin) || (shooter ? { x: shooter.x, y: shooter.y, z: shooter.z } : null)
       if (!origin || !direction) return
 
       if (shooter?.id) muzzles.set(shooter.id, origin)
@@ -60,14 +62,14 @@ export default {
     // the naming the weapon plugins use throughout. The other way round
     // would put a bullet hole on the shooter.
     context.bus.on('weapon:hit', event => {
-      const point = asVector(event?.point) || asVector(event?.at)
+      const point = asWrittenVector(event?.point) || asWrittenVector(event?.at)
       if (!point) return
-      const normal = normalise(asVector(event?.normal)) || { x: 0, y: 1, z: 0 }
+      const normal = normalise(asWrittenVector(event?.normal)) || { x: 0, y: 1, z: 0 }
       const target = event?.target
 
       // A tracer from muzzle to where the bullet stopped. The hit carries no
       // origin, so it comes from the shot that announced itself a moment ago.
-      const from = asVector(event?.origin) || muzzles.get(event?.entity?.id)
+      const from = asWrittenVector(event?.origin) || muzzles.get(event?.entity?.id)
       if (from) particles.effect('tracer', { at: from, to: point })
 
       if (isAlive(target)) {
@@ -109,7 +111,7 @@ export default {
       if (!victim || !isAlive(victim)) return
       // No hit point on this event, so it goes at the chest — the one place
       // that is right for a hit from any direction.
-      const direction = normalise(asVector(event?.direction))
+      const direction = normalise(asWrittenVector(event?.direction))
       particles.effect('blood', {
         at: { x: victim.x, y: victim.y + 0.25, z: victim.z },
         count: 6,
@@ -131,7 +133,7 @@ export default {
     })
 
     context.bus.on('grenade:detonated', event => {
-      const at = asVector(event?.at) || asVector(event?.point)
+      const at = asWrittenVector(event?.at) || asWrittenVector(event?.point)
       if (!at) return
       const kind = String(event?.kind || event?.weapon || '')
       if (kind.includes('smoke')) { particles.effect('smoke', { at }); return }
@@ -140,7 +142,7 @@ export default {
     })
 
     context.bus.on('explosion', event => {
-      const at = asVector(event?.at) || asVector(event?.point) || asVector(event?.entity)
+      const at = asWrittenVector(event?.at) || asWrittenVector(event?.point) || asWrittenVector(event?.entity)
       if (!at) return
       particles.effect('explosion', { at })
       context.decals?.place({
@@ -198,19 +200,3 @@ const cross = (a, b) => ({
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x
 })
-
-function normalise(vector) {
-  if (!vector) return null
-  const length = Math.hypot(vector.x, vector.y, vector.z)
-  if (!(length > 0)) return null
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length }
-}
-
-/** A point written as {x,y,z} or [x,y,z]. */
-function asVector(value) {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object' && (typeof value.x === 'number' || typeof value.y === 'number' || typeof value.z === 'number')) {
-    return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  }
-  return null
-}

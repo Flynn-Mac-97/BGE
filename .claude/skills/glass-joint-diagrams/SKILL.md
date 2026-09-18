@@ -4,6 +4,12 @@ description: Reusable lazy-loaded JointJS diagram service for plugin panels.
 ---
 <!-- generated from plugins/builtin/joint-diagrams.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/joint-diagrams.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/joint-diagrams.js"]}'
+```
+
 # JointJS Diagrams
 
 - Declare `requires: ['editor.diagram']`; get it with `scope.require('editor.diagram')`.

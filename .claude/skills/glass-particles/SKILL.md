@@ -4,6 +4,12 @@ description: Sparks, smoke, dust, trails and clouds — the deterministic partic
 ---
 <!-- generated from plugins/builtin/particles.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/particles.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/particles.js"]}'
+```
+
 # Particles
 
 - Owns `context.particles`: the deterministic particle field — one-shot bursts, trails that follow an entity, and clouds that block sight. Simulation only. **Particle Painter draws it, Combat Effects wires game events onto it.**
@@ -21,8 +27,7 @@ context.particles.blocked(eye, target)                 // true if smoke is on th
 - `blocked(from, to)` tests the line against the **cloud a burst declared**, not the particles in it, so the smoke you see and the smoke a bot reasons about are one thing. A cloud dies when the longest life in its burst runs out.
 - Named effects, all restylable: `muzzle-flash` `tracer` `brass` `wall-hit` `sparks` `blood` `smoke` (declares `blocks: 4`) `flash` `explosion`. `particles.define(name, overrides)` merges over one or adds a new one — that is the game's tuning door, never an edit to the table in the file. `context.particles.art.bulletHole` and `.art.blood` name the decal pictures; the engine ships none.
 - Read it back: `.recent(n)` (default 20), `.state` → `{ alive, cap, dropped, clouds, trails, bursts }`, `.count`, `.all`, `.clouds`, `.clear()`.
-- Commands: `particles.effect '["smoke", {"at": [0, 1, 0]}]'` · `particles.state` · `particles.recent` · `particles.clear`.
-- **Emits no events.** Listens for `level:loaded` and clears — old smoke would be at coordinates that now mean somewhere else, on a clock that went back to zero. **Combat Effects** is what listens to `weapon:fired`, `weapon:hit`, `entity:hurt`, `entity:killed`, `grenade:detonated` and `explosion`, and calls `effect()` for each.
+- Listens for `level:loaded` and clears — old smoke would be at coordinates that now mean somewhere else, on a clock that went back to zero. **Combat Effects** is what listens to `weapon:fired`, `weapon:hit`, `entity:hurt`, `entity:killed`, `grenade:detonated` and `explosion`, and calls `effect()` for each.
 - 3000 particles live at most. Over that the oldest go, counted in `state.dropped`.
 - The last 40 bursts are recorded whether or not anything drew them, so a headless test asserts an effect without a browser.
 - Deterministic by law: the seeded `context.drawing` stream and `context.time` only — never `Math.random`, `Date.now` or a wall-clock timer. Draws come from the drawing stream, not the simulation's, so adding a visual burst cannot shift what the game rolls next.

@@ -18,6 +18,8 @@
  * the wall is the thing knockback is most fun against.
  */
 
+import { asVector } from '../../engine/vector.js'
+
 /** Seconds a hit stays white. Long enough to see at sixty frames, short enough to strobe. */
 const FLASH = 0.09
 
@@ -50,12 +52,6 @@ function untint(entity, remembered) {
   if (remembered.had) mesh.tint = remembered.tint
   else delete mesh.tint
   entity.mesh = mesh
-}
-
-const asVector = value => {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object') return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  return null
 }
 
 export default {

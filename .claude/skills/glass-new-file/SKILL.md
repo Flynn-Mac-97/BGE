@@ -4,6 +4,12 @@ description: Creates a project file of a known kind — type, behaviour, level, 
 ---
 <!-- generated from plugins/builtin/new-file.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/new-file.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/new-file.js"]}'
+```
+
 # New File
 
 - Five kinds, each with a fixed folder and extension:

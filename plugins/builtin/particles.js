@@ -11,6 +11,8 @@
  * with `particles.define`.
  */
 
+import { normalise, asWrittenVector } from '../../engine/vector.js'
+
 /**
  * The ceiling for live particles. Two overlapping smoke screens are normal
  * play, so it sits well clear of that; at the ceiling the oldest go, because
@@ -68,7 +70,7 @@ export function makeParticleField() {
 
   /** Everything a burst decides once, so the per-particle loop only draws randoms. */
   function readOptions(options) {
-    const direction = normalise(asVector(options.direction))
+    const direction = normalise(asWrittenVector(options.direction))
     return {
       direction,
       // A burst that named a direction meant a spray; one that did not, a puff.
@@ -131,11 +133,11 @@ export function makeParticleField() {
      */
     burst(options = {}) {
       if (!random) { report('unbound', 'a burst was asked for before the field had a random stream — nothing was made'); return null }
-      const at = asVector(options.at)
+      const at = asWrittenVector(options.at)
       if (!at) { report('at', 'particles.burst needs an "at" of { x, y, z } — nothing was made'); return null }
 
       const count = Math.max(0, Math.min(MAX_PARTICLES, Math.round(Number(options.count) || 0)))
-      const to = asVector(options.to)
+      const to = asWrittenVector(options.to)
       const shape = readOptions(options)
 
       makeRoom(count)      // once for the whole burst, not once per particle
@@ -197,8 +199,8 @@ export function makeParticleField() {
      * whether they can see.
      */
     blocked(from, to) {
-      const a = asVector(from)
-      const b = asVector(to)
+      const a = asWrittenVector(from)
+      const b = asWrittenVector(to)
       if (!a || !b) { report('blocked', 'particles.blocked needs two points of { x, y, z }'); return false }
       const now = clock()
       for (const cloud of clouds) {
@@ -374,21 +376,6 @@ function segmentReaches(a, b, point) {
 }
 
 const cross = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x })
-
-function normalise(vector) {
-  if (!vector) return null
-  const length = Math.hypot(vector.x, vector.y, vector.z)
-  if (!(length > 0)) return null
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length }
-}
-
-/** A point written as {x,y,z} or [x,y,z] — an argument typed at a terminal is an array. */
-function asVector(value) {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (!value || typeof value !== 'object') return null
-  if (typeof value.x !== 'number' && typeof value.y !== 'number' && typeof value.z !== 'number') return null
-  return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-}
 
 /** Say each mistake once, not sixty times a second. */
 const said = new Set()

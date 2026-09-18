@@ -30,7 +30,6 @@ description: Play cameras that update on every drawn frame, so mouse turn and fo
 - `context.cameras.forward()` / `.right()` — ground directions of the live view. Move a player with these, in its fixed `update`.
 - `context.cameras.activate(id)` — live regardless of priority; `null` returns to priority. `.add(definition)`, `.remove(id)`, `.list()`, `.kinds()`, `.state()`.
 - `cameras.state` — live camera, what it follows, the view, `frameSeconds`, `blend`, and `problem` when it cannot follow.
-- `cameras.activate '{"id":"follow"}'` · `cameras.kinds`.
 - Panel **Cameras** shows the live camera and a button per camera.
 
 ## Refuses

@@ -4,9 +4,15 @@ description: Moves many entities as one mass and stops them stacking. Use for ho
 ---
 <!-- generated from plugins/builtin/crowd.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/crowd.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/crowd.js"]}'
+```
+
 # Crowd
 
-- Moves many entities as one mass and stops them stacking. `context.crowd`.
+- Moves many entities as one mass and stops them stacking.
   The "who is near whom" half is Spatial Hash; this is the pass that moves them.
 - `context.crowd.group(name, { cellSize, radius, speed })` wraps the Spatial Hash
   group of the same name, so `context.spatial.group('horde')` is the same index.

@@ -63,6 +63,22 @@ test('a JSON argument is sent as JSON, not a string', () => {
 })
 
 /**
+ * The same request with its quotes removed, which is how PowerShell hands it over.
+ *
+ * Every quoted argument arrives as `{task:fix the bug,files:[a.js]}`, so a
+ * request read as plain text becomes one long filename and the packet that comes
+ * back is empty with no error. The invocation in AGENTS.md runs on that shell,
+ * so the quotes are put back.
+ */
+test('a JSON argument a shell stripped of its quotes is still a request', () => {
+  const stripped = run(['agent.context', '{task:fix the bug in world.js,files:[engine/world.js]}'])
+  assert.equal(stripped.code, 0, stripped.stderr)
+  const packet = JSON.parse(stripped.stdout)
+  assert.equal(packet.task, 'fix the bug in world.js', 'the task survives the missing quotes')
+  assert.deepEqual(packet.files, ['engine/world.js'], 'and so does the file list')
+})
+
+/**
  * A list reply can name its columns instead of repeating them on every row.
  *
  * The dump of a level is the one read an agent pays real tokens for: the fixture's

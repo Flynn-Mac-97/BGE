@@ -4,6 +4,12 @@ description: The punch of a hit: hit stop and camera shake by weight. Use for th
 ---
 <!-- generated from plugins/builtin/impact.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/impact.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/impact.js"]}'
+```
+
 # Impact
 
 - The punch of a hit: the frames the world freezes on, and the shake after it.
@@ -12,5 +18,4 @@ description: The punch of a hit: hit stop and camera shake by weight. Use for th
 - Hit stop is `context.loop.holdFor(seconds)` in the kernel: the clock and the schedule keep running, the simulation does not, and the frame still draws. Whole fixed steps only — a fraction of a step is not a step.
 - A budget of 0.34s of freeze per second of play stops a screen full of deaths from stopping the game. A lone big hit gets its full pause.
 - Shake goes through `context.camera.shake`; sound through `context.play`. Both are optional — with neither loaded, `hit` still freezes and still announces.
-- Announces `impact` on the bus with `{ weight, hold, shake, at }`.
 - Check with `impact.state`; try one with `impact.hit 0.8`.

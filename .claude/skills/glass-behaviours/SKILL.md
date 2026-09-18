@@ -4,9 +4,15 @@ description: Attach a shared trait to an entity — a behaviour file that runs a
 ---
 <!-- generated from plugins/builtin/behaviours.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/behaviours.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/behaviours.js"]}'
+```
+
 # Behaviours
 
-- This plugin owns the **verbs only** — attach, detach, list. The runtime is the kernel, `engine/world.js`, because the world is what runs hooks.
+- This plugin owns the **verbs only**. The runtime is the kernel, `engine/world.js`, because the world is what runs hooks.
 - A behaviour is one file, `project/behaviours/<name>.js`, shaped like a type with no art:
 
 ```js

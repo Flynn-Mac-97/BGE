@@ -304,51 +304,8 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
   world.clear()
 
   for (const held of capture.entities) {
-    const attached = placementBehaviours(held)
-    const placement = {
-      id: held.id,
-      at: held.at,
-      ...(held.rotation ? { rotation: held.rotation } : {}),
-      ...(held.scale !== 1 ? { scale: held.scale } : {}),
-      // The placement flags decide what a later type reload is allowed to
-      // overwrite, so they are restored as flags and the live values are written
-      // over the top afterwards.
-      ...(held.setByPlacement?.sprite && held.sprite ? { sprite: held.sprite } : {}),
-      ...(held.setByPlacement?.mesh && held.mesh ? { mesh: {} } : {}),
-      ...(held.setByPlacement?.collider && held.collider ? { collider: held.collider } : {}),
-      // Only the overrides whose value actually survived. An override naming a
-      // key with nothing behind it would write `undefined` into the level on the
-      // next save, which reads as a decision somebody made.
-      properties: Object.fromEntries(held.overrides
-        .filter(key => held.properties[key] !== undefined)
-        .map(key => [key, held.properties[key]])),
-      ...(attached ? { behaviours: attached } : {}),
-      ...held.extra
-    }
-
-    const entity = world.spawn(held.type, placement)
-
-    entity.x = held.at[0]
-    entity.y = held.at[1]
-    entity.z = held.at[2]
-    entity.rotation = held.rotation
-    entity.scale = held.scale
-    entity.hidden = held.hidden
-    // Restored rather than inferred from the placement above. An entity spawned
-    // mid-run carried no id of its own, and giving it back through a placement
-    // would add one — which the next save would then write into the level file
-    // as though the author had put it there.
-    entity._extraKeys = { ...held.extra }
-    if (held.sprite) entity.sprite = held.sprite
-    if (held.mesh) entity.mesh = held.mesh
-    if (held.collider) entity.collider = held.collider
-    // Assigned over the type's defaults rather than replacing them, so a value
-    // that could not be captured keeps the file's answer instead of vanishing.
-    Object.assign(entity.properties, fromData(held.properties, world, missing, `${held.id}.properties`))
-
-    for (const [key, value] of Object.entries(held.fields)) {
-      entity[key] = fromData(value, world, missing, `${held.id}.${key}`)
-    }
+    const entity = world.spawn(held.type, placementOf(held))
+    applyLiveValues(entity, held, world, missing)
 
     for (const bag of held.behaviours) {
       const record = entity.behaviours.find(b => b.name === bag.name)
@@ -396,39 +353,13 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
   bus.emit('world:restored', { level: editor.levelName, entities: world.entities.length, capture })
   context?.redraw?.()
 
-  notRestored.push(...missing)
-  const lostTypes = (capture.types || []).filter(name => !world.types.has(name))
-  if (lostTypes.length) notRestored.push(`the type${lostTypes.length === 1 ? '' : 's'} ${lostTypes.join(', ')}, whose file the project no longer has — entities of that name came back with no definition behind them`)
-  // Claimed only when true. The clock and the stream are restored now, and a
-  // notice that went on saying they were not would be the same silence in a
-  // different voice.
-  if (loop.steps !== (capture.steps ?? 0)) notRestored.push(`the clock, which was ${capture.time}s and is now ${round(loop.time)}s`)
-  if (loop.random.seed !== capture.seed || loop.random.draws !== (capture.draws ?? 0)) {
-    notRestored.push(`the random stream, which was ${capture.draws ?? 0} draws into seed ${capture.seed} and is now ${loop.random.draws} into seed ${loop.random.seed}`)
-  }
-  if (capture.timers) notRestored.push(`${capture.timers} scheduled ${capture.timers === 1 ? 'callback' : 'callbacks'}, which are closures and cannot be written down`)
-  if (capture.dropped?.length) notRestored.push(`${capture.dropped.length} field${capture.dropped.length === 1 ? '' : 's'} that held something other than data: ${capture.dropped.slice(0, 8).join(', ')}`)
-
-  // The vague half of this used to be the whole of it, and a vague loss is one
-  // nobody acts on. The entities a plugin made are countable, so count them and
-  // say what the consequence is.
-  //
-  // The consequence is the whole point. Those entities are back and standing in
+  const { losses, hold } = restoreLosses(capture, { world, loop, missing, fromLevel })
+  notRestored.push(...losses)
+  // Held by name, not merely reported: those entities are back and standing in
   // the right places, so the world LOOKS exactly like the one that was lost —
   // and it will not run like it, because whatever list drove them was rebuilt
-  // empty. A world that looks right and moves wrong is the failure this file
-  // exists to end, so it is not merely reported: the loop is held, by name, and
-  // nothing moves until somebody says it may.
-  const madeInTheRun = capture.entities.filter(held => !fromLevel.has(held.id)).length
-  if (madeInTheRun) {
-    loop.hold(LOOK_ONLY)
-    notRestored.push(
-      `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${capture.entities.length} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. `
-      + `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. `
-      + `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`)
-  } else {
-    notRestored.push('anything a plugin holds outside the world, which was rebuilt from boot')
-  }
+  // empty. Nothing moves until somebody says it may.
+  if (hold) loop.hold(LOOK_ONLY)
 
   return {
     level: editor.levelName,
@@ -438,6 +369,98 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
     lookOnly: loop.holds.includes(LOOK_ONLY),
     notRestored
   }
+}
+
+/**
+ * The placement a restored entity is spawned from.
+ *
+ * The placement flags decide what a later type reload is allowed to overwrite,
+ * so they are restored as flags and the live values are written over the top
+ * afterwards. Only the overrides whose value survived are kept: an override
+ * naming a key with nothing behind it would write `undefined` into the level on
+ * the next save, which reads as a decision somebody made.
+ */
+function placementOf(held) {
+  const attached = placementBehaviours(held)
+  return {
+    id: held.id,
+    at: held.at,
+    ...(held.rotation ? { rotation: held.rotation } : {}),
+    ...(held.scale !== 1 ? { scale: held.scale } : {}),
+    ...(held.setByPlacement?.sprite && held.sprite ? { sprite: held.sprite } : {}),
+    ...(held.setByPlacement?.mesh && held.mesh ? { mesh: {} } : {}),
+    ...(held.setByPlacement?.collider && held.collider ? { collider: held.collider } : {}),
+    properties: Object.fromEntries(held.overrides
+      .filter(key => held.properties[key] !== undefined)
+      .map(key => [key, held.properties[key]])),
+    ...(attached ? { behaviours: attached } : {}),
+    ...held.extra
+  }
+}
+
+/**
+ * The live values of one restored entity, written over what the level placed.
+ *
+ * The id is restored rather than inferred from the placement: an entity spawned
+ * mid-run carried no id of its own, and giving it back through a placement would
+ * add one — which the next save would then write into the level file as though
+ * the author had put it there. Properties are assigned over the type's defaults
+ * rather than replacing them, so a value that could not be captured keeps the
+ * file's answer instead of vanishing.
+ */
+function applyLiveValues(entity, held, world, missing) {
+  entity.x = held.at[0]
+  entity.y = held.at[1]
+  entity.z = held.at[2]
+  entity.rotation = held.rotation
+  entity.scale = held.scale
+  entity.hidden = held.hidden
+  entity._extraKeys = { ...held.extra }
+  if (held.sprite) entity.sprite = held.sprite
+  if (held.mesh) entity.mesh = held.mesh
+  if (held.collider) entity.collider = held.collider
+  Object.assign(entity.properties, fromData(held.properties, world, missing, `${held.id}.properties`))
+  for (const [key, value] of Object.entries(held.fields)) {
+    entity[key] = fromData(value, world, missing, `${held.id}.${key}`)
+  }
+}
+
+/**
+ * What the restore could not carry, and whether the world may run on.
+ *
+ * Read once the world is built, because every claim is about what came back: a
+ * type whose file is gone, a clock or stream that did not land where the capture
+ * left it, and the entities a plugin made, whose driving list came back empty.
+ * Apart from the restore so the report is a value the caller acts on, and the
+ * hold stays with the caller that owns the loop.
+ */
+function restoreLosses(capture, { world, loop, missing, fromLevel }) {
+  const losses = [...missing]
+  const lostTypes = (capture.types || []).filter(name => !world.types.has(name))
+  if (lostTypes.length) losses.push(`the type${lostTypes.length === 1 ? '' : 's'} ${lostTypes.join(', ')}, whose file the project no longer has — entities of that name came back with no definition behind them`)
+  // Claimed only when true. The clock and the stream are restored now, and a
+  // notice that went on saying they were not would be the same silence in a
+  // different voice.
+  if (loop.steps !== (capture.steps ?? 0)) losses.push(`the clock, which was ${capture.time}s and is now ${round(loop.time)}s`)
+  if (loop.random.seed !== capture.seed || loop.random.draws !== (capture.draws ?? 0)) {
+    losses.push(`the random stream, which was ${capture.draws ?? 0} draws into seed ${capture.seed} and is now ${loop.random.draws} into seed ${loop.random.seed}`)
+  }
+  if (capture.timers) losses.push(`${capture.timers} scheduled ${capture.timers === 1 ? 'callback' : 'callbacks'}, which are closures and cannot be written down`)
+  if (capture.dropped?.length) losses.push(`${capture.dropped.length} field${capture.dropped.length === 1 ? '' : 's'} that held something other than data: ${capture.dropped.slice(0, 8).join(', ')}`)
+
+  // The vague half of this used to be the whole of it, and a vague loss is one
+  // nobody acts on. The entities a plugin made are countable, so count them and
+  // say what the consequence is.
+  const madeInTheRun = capture.entities.filter(held => !fromLevel.has(held.id)).length
+  if (madeInTheRun) {
+    losses.push(
+      `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${capture.entities.length} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. `
+      + `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. `
+      + `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`)
+  } else {
+    losses.push('anything a plugin holds outside the world, which was rebuilt from boot')
+  }
+  return { losses, hold: madeInTheRun > 0 }
 }
 
 /** What this placement said about behaviours, in the form a level file writes. */
@@ -454,6 +477,76 @@ function placementBehaviours(held) {
 }
 
 /**
+ * What caused the reload, in the words the sentence opens with.
+ *
+ * The instant is kept whole for the detail record and clipped to the clock for
+ * the sentence, so both readings come from one place.
+ */
+function reloadCause(capture) {
+  const file = capture.cause?.file
+  const at = capture.cause?.at || null
+  const clock = String(at || '').slice(11, 19)
+  return {
+    file: file || null,
+    at,
+    trigger: file ? `a hot reload of ${file} reloaded the page` : 'the page reloaded',
+    when: clock ? ` at ${clock} UTC` : ''
+  }
+}
+
+/** What the page held when it went, in the shape the notice reports. */
+function reloadFrom(capture) {
+  return {
+    level: capture.level,
+    entities: capture.entityCount ?? capture.entities?.length ?? 0,
+    simulated: !!capture.simulated,
+    playing: !!capture.playing,
+    time: capture.time ?? null,
+    seed: capture.seed ?? null
+  }
+}
+
+/**
+ * The sentence for a world that came back.
+ *
+ * Two different claims, because they are two different worlds to be handed.
+ * One can be run on and the other cannot, and saying "restored" for both would
+ * make the word worthless.
+ */
+function restoredSentence(reload, restored) {
+  const was = `level "${restored.level}", ${restored.entities} ${restored.entities === 1 ? 'entity' : 'entities'}`
+      + `${restored.simulated ? ', simulated' : ''}${restored.playing ? ', playing' : ''}`
+  const opening = restored.lookOnly
+    ? `${reload.trigger}${reload.when}; the world was put back to LOOK at, not to run on — ${was}, and time is held still. `
+    : `${reload.trigger}${reload.when}; the world was put back as it was — ${was}. `
+  const closing = restored.lookOnly
+    ? 'engine.reloadNotice() repeats this.'
+    : 'engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.'
+  return opening
+    + 'A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. '
+    + `NOT restored: ${restored.notRestored.join('; ')}. `
+    + closing
+}
+
+/** The sentence for a world rebuilt from the level with nothing lost. */
+function unchangedSentence(reload, capture) {
+  return `${reload.trigger}${reload.when}; the world was rebuilt from level "${capture.level}" and nothing was lost — `
+    + 'it had not been simulated and held only what the level holds. engine.reloadNotice() repeats this.'
+}
+
+/** The sentence for a world rebuilt from the level, with the simulated moment gone. */
+function resetSentence(reload, capture, from, outcome) {
+  const moment = capture.level
+    ? `It was level "${capture.level}", ${from.entities} ${from.entities === 1 ? 'entity' : 'entities'} at ${capture.time ?? 0}s`
+      + `${capture.simulated ? ', simulated' : ''}. `
+    : ''
+  return `${reload.trigger}${reload.when}; the world was rebuilt from the level and your simulated moment is gone`
+    + `${outcome.why ? ` (${outcome.why})` : ''}. `
+    + moment
+    + 'Re-simulate before you look again. engine.reloadNotice() repeats this.'
+}
+
+/**
  * The reload, in one sentence a person or an agent reads the same way.
  *
  * Plain words and no jargon, because the whole point is that it cannot be
@@ -462,25 +555,13 @@ function placementBehaviours(held) {
  * name.
  */
 export function describeReload(capture, outcome) {
-  const file = capture.cause?.file
-  const clock = String(capture.cause?.at || '').slice(11, 19)
-  const trigger = file
-    ? `a hot reload of ${file} reloaded the page`
-    : 'the page reloaded'
-  const when = clock ? ` at ${clock} UTC` : ''
-  const held = capture.entityCount ?? capture.entities?.length ?? 0
+  const reload = reloadCause(capture)
+  const from = reloadFrom(capture)
   const detail = {
-    file: file || null,
-    at: capture.cause?.at || null,
+    file: reload.file,
+    at: reload.at,
     cause: capture.cause?.kind || 'reload',
-    from: {
-      level: capture.level,
-      entities: held,
-      simulated: !!capture.simulated,
-      playing: !!capture.playing,
-      time: capture.time ?? null,
-      seed: capture.seed ?? null
-    },
+    from,
     restored: null,
     notRestored: []
   }
@@ -494,46 +575,15 @@ export function describeReload(capture, outcome) {
       lookOnly: !!outcome.restored.lookOnly
     }
     detail.notRestored = outcome.restored.notRestored
-    const was = `level "${outcome.restored.level}", ${outcome.restored.entities} ${outcome.restored.entities === 1 ? 'entity' : 'entities'}`
-        + `${outcome.restored.simulated ? ', simulated' : ''}${outcome.restored.playing ? ', playing' : ''}`
-    return {
-      key: 'worldWasRestored',
-      // Two different claims, because they are two different worlds to be
-      // handed. One can be run on and the other cannot, and saying "restored"
-      // for both would make the word worthless.
-      sentence: (outcome.restored.lookOnly
-        ? `${trigger}${when}; the world was put back to LOOK at, not to run on — ${was}, and time is held still. `
-        : `${trigger}${when}; the world was put back as it was — ${was}. `)
-        + `A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. `
-        + `NOT restored: ${outcome.restored.notRestored.join('; ')}. `
-        + (outcome.restored.lookOnly
-          ? 'engine.reloadNotice() repeats this.'
-          : 'engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.'),
-      detail
-    }
+    return { key: 'worldWasRestored', sentence: restoredSentence(reload, outcome.restored), detail }
   }
 
   if (outcome.unchanged) {
-    return {
-      key: 'worldWasReset',
-      sentence: `${trigger}${when}; the world was rebuilt from level "${capture.level}" and nothing was lost — `
-        + `it had not been simulated and held only what the level holds. engine.reloadNotice() repeats this.`,
-      detail
-    }
+    return { key: 'worldWasReset', sentence: unchangedSentence(reload, capture), detail }
   }
 
   detail.notRestored = outcome.notRestored || []
-  return {
-    key: 'worldWasReset',
-    sentence: `${trigger}${when}; the world was rebuilt from the level and your simulated moment is gone`
-      + `${outcome.why ? ` (${outcome.why})` : ''}. `
-      + (capture.level
-        ? `It was level "${capture.level}", ${held} ${held === 1 ? 'entity' : 'entities'} at ${capture.time ?? 0}s`
-          + `${capture.simulated ? ', simulated' : ''}. `
-        : '')
-      + `Re-simulate before you look again. engine.reloadNotice() repeats this.`,
-    detail
-  }
+  return { key: 'worldWasReset', sentence: resetSentence(reload, capture, from, outcome), detail }
 }
 
 // ------------------------------------------------------------------ delivery

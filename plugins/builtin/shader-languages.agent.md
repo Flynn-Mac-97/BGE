@@ -52,7 +52,6 @@ a built material must drop it there. The particle painter does.
 
 ## Commands
 
-- `shader.languages` — every language, whether it can build now, and why not.
 - `shader.list` — every shader, the languages it is written in, and the one it
   will be built from. Null means nothing can build it, which is every shader in
   a headless run.

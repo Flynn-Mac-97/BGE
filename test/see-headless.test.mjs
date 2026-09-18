@@ -9,8 +9,7 @@
  * `renderer: 'null'` answers the renderer surface and draws nothing, so that
  * path runs here with no GL and no browser, and every frame comes back blank.
  *
- * Not in `npm run test:offline` — that script names its files in package.json,
- * and this lane's claim does not include it. Run directly:
+ * Run directly:
  *   node --test test/see-headless.test.mjs
  */
 import test from 'node:test'
@@ -20,7 +19,7 @@ import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { FIXTURE, FIXTURE_LEVEL } from './fixture-project.mjs'
 
 /** The demo level: nine entities, a fixed camera, no plugin's own scenery. */
-const LEVEL = 'level1'
+const LEVEL = FIXTURE_LEVEL
 
 const started = await startWorldInNode({ project: FIXTURE, renderer: 'null' })
 const { context, engine } = started
@@ -134,9 +133,10 @@ test('a moment sheet steps the world, hands the camera back, and says it drew no
 })
 
 test('a capture pointed away from the level warns that the frame is not one anybody plays', async () => {
-  await context.editor.loadLevel('de_dust2')
+  await context.editor.loadLevel(LEVEL)
+  for (let index = 0; index < 25; index++) context.spawn('prop', { at: [7 + index / 10, 3, 0] })
   const populated = context.world.entities.length
-  assert.ok(populated >= 20, `de_dust2 holds ${populated} entities`)
+  assert.ok(populated >= 20, `the fixture holds ${populated} entities`)
 
   const inTheLevel = await engine.run('see.capture', { ui: false })
   assert.equal(inTheLevel.framing, undefined, 'the level camera frames the level')
@@ -151,7 +151,8 @@ test('a capture pointed away from the level warns that the frame is not one anyb
 })
 
 test('a subject shot frames one thing on purpose and is never called unrepresentative', async () => {
-  await context.editor.loadLevel('de_dust2')
+  await context.editor.loadLevel(LEVEL)
+  for (let index = 0; index < 25; index++) context.spawn('prop', { at: [7 + index / 10, 3, 0] })
   const subject = firstEntity()
 
   const answer = await engine.run('see.capture', { subject, alone: true })

@@ -16,7 +16,5 @@ description: Pickups any entity can drop and a collector magnets in. Use for coi
   a collector's own `properties.pickupRadius` beats the setting.
 - `properties.bobHeight` / `bobSpeed` make an untouched pickup bob so a field of
   them reads as loot. Silent when unset.
-- Announces `pickup:latched` and `pickup:collected` with `{ entity, collector, kind, value }`.
-  What a kind *means* is the game's business — wire it in one line.
+- What a kind *means* is the game's business — wire it in one line.
 - `attractAll()` latches everything now. Pickups are cleared on `level:loaded`.
-- Commands: `pickups.list`, `pickups.attract`.

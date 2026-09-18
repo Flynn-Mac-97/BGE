@@ -4,6 +4,12 @@ description: The shelf of generator tools under tools/ and the shared helpers in
 ---
 <!-- generated from plugins/builtin/agent-tools.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/agent-tools.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/agent-tools.js"]}'
+```
+
 # Agent Tools
 
 - `tools/` is the shelf: one file per job, run with `node tools/<file>`.

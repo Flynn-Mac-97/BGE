@@ -34,6 +34,20 @@ function colourOf(THREE, value, fallback) {
   return [colour.r, colour.g, colour.b]
 }
 
+/**
+ * The material an additive effect draws on.
+ *
+ * Fog is mixed into every fragment, and an additive pass ADDS what it returns —
+ * so in a level with fog the fog colour is added across the quad's whole square
+ * and the square shows wherever the effect does not.
+ */
+function additiveMaterial(THREE) {
+  const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
+  material.blending = THREE.AdditiveBlending
+  material.fog = false
+  return material
+}
+
 /** A quad's declared width and height, whichever form the level wrote. */
 function quadSize(mesh) {
   const declared = mesh.quad
@@ -195,12 +209,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const least = held(mesh.least, defaults.least, 0, 1)
       const detail = held(mesh.detail, defaults.detail, 0.1, 32)
       const strength = held(mesh.strength, defaults.strength, 0, 8)
-      const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
-      material.blending = THREE.AdditiveBlending
-      // Fog is mixed into every fragment, and an additive pass ADDS what it
-      // returns — so in a level with fog the fog colour is added across the
-      // quad's whole square and the square shows wherever the effect does not.
-      material.fog = false
+      const material = additiveMaterial(THREE)
       const middle = uv.face().sub(0.5)
       // Soft from the middle of the face outward. A silhouette rim is zero
       // across a face pointed at the camera, which is how a sprite is arranged.
@@ -275,12 +284,7 @@ export function buildersFor(THREE, TSL, SHADERS) {
       const speed = held(mesh.speed, defaults.speed, 0, 20)
       const flicker = held(mesh.flicker, defaults.flicker, 0, 1)
       const glitch = held(mesh.glitch, defaults.glitch, 0, 0.5)
-      const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
-      material.blending = THREE.AdditiveBlending
-      // Fog is mixed into every fragment, and an additive pass ADDS what it
-      // returns — so in a level with fog the fog colour is added across the
-      // quad's whole square and the square shows wherever the effect does not.
-      material.fog = false
+      const material = additiveMaterial(THREE)
 
       // Whole rows jump sideways for a moment. The noise is keyed on the row
       // and on the clock, so the same second always tears the same rows.

@@ -4,6 +4,12 @@ description: What an object IS, in its author's own words — the sentence writt
 ---
 <!-- generated from plugins/builtin/object-descriptions.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/object-descriptions.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/object-descriptions.js"]}'
+```
+
 # Object Descriptions
 
 An object's identity cannot be measured. Its name, box, colour and position do

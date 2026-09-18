@@ -9,3 +9,8 @@
 - Headless projection and the renderer derive the camera from the same view
   fields (engine/camera-project.js beside render.js `updateCamera` — change
   both together).
+
+`see/describe.js` assembles the shared description. `describe-facts.js` measures
+projection and world relations; `describe-marks.js` selects marks, colours and
+hulls. Preserve their order: relations need world boxes before the reply removes
+them, and brief output must not reduce the counts for the full frame.

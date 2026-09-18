@@ -4,6 +4,12 @@ description: The fog and global light of a level: fog, ambient and sun, declared
 ---
 <!-- generated from plugins/builtin/world-look.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/world-look.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/world-look.js"]}'
+```
+
 # World Look
 
 - Owns the fog and the global light of a level: `fog`, `ambient`, `sun`, declared in the level's `world` block. Keep it as declared data.

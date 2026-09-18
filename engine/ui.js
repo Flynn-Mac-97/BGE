@@ -19,7 +19,6 @@
 // forwards the name without creating a local binding, so `ui.thumb` and
 // `ui.preview` called an `assetURL` that was not in scope and threw for any
 // image. Silently — the loader catches a panel's error and disables it.
-import { makeFlowInspector } from './ui-flow-inspector.js'
 import { assetURL } from './asset-path.js'
 export { assetURL }
 
@@ -66,8 +65,6 @@ export function makeUI(state, redraw) {
   }
 
   const ui = {
-    flowInspector: options => makeFlowInspector(options),
-
     // ---- layout ----
     stack: (children, o = {}) => append(h('div', 'u-stack' + (o.pad ? ' pad' : '')), children),
     row:   (children, o = {}) => append(h('div', 'u-row' + (o.pad ? ' pad' : '')), children),

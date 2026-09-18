@@ -189,8 +189,18 @@ function withheldReason(node, replaced) {
  *
  * A packet that lists only what it holds looks complete, so the withheld list
  * and the no-files notice are part of the answer, not decoration.
+ *
+ * `interfaceText` is injected rather than imported: it parses source, which
+ * needs the node-only reader, and this module runs in the browser too. Absent,
+ * the packet carries the guide alone.
+ *
+ * @param {Function} read `(scope, file)`, where scope is `engine` or `project`.
+ * @param {object} requestValue The task, files and nodes asked for.
+ * @param {Array} pluginNodes One node per plugin guide, read off disk.
+ * @param {string} projectPath The open project, as the tree spells it.
+ * @param {Function} interfaceText `(scope, file)`, answering the parsed block.
  */
-export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectPath = PROJECT_PREFIX) {
+export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectPath = PROJECT_PREFIX, interfaceText = null) {
   const request = normaliseAgentRequest(requestValue)
   const workspace = await loadAgentGraph(read, pluginNodes)
   if (workspace.problems.length) throw new Error(`bad agent tree: ${workspace.problems.join('; ')}`)
@@ -222,7 +232,18 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
     .filter(node => node.scope === 'engine' && node.override && !node.always && projectOverrides.has(node.override))
     .map(node => node.id))
   const resolved = selected.filter(node => !replaced.has(node.id))
-  const entries = await Promise.all(resolved.map(async node => ({ ...node, text: await read(node.scope, node.file) })))
+  // A guide arrives with the interface its plugin declares right now. Read per
+  // selected node, not for every plugin in the tree: a packet holds four guides
+  // and parsing the other seventy-seven would cost more than the packet.
+  const entries = await Promise.all(resolved.map(async node => {
+    const text = await read(node.scope, node.file)
+    let parsed = null
+    if (node.source) {
+      try { parsed = await interfaceText?.(node.scope, node.source) } catch { /* Report the missing interface below. */ }
+      parsed ||= `Interface unavailable. Read \`${node.source}\` for commands and arguments before calling this plugin.`
+    }
+    return { ...node, text, interface: parsed }
+  }))
 
   const sent = new Set(resolved.map(node => node.id))
   const missing = workspace.nodes.filter(node => selectableKind(node) && !sent.has(node.id))
@@ -265,7 +286,10 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const parts = [
     request.task ? `# Task\n\n${request.task}` : null,
     noFilesNotice,
-    ...entries.map(node => `# ${node.title || node.id}\n\n${withoutFirstHeading(node.text)}`),
+    ...entries.map(node => `# ${node.title || node.id}\n\n${[
+      node.interface,
+      withoutFirstHeading(node.text)
+    ].filter(Boolean).join('\n\n')}`),
     tests.length ? `# Required checks\n\n${tests.map(test => `- ${test}`).join('\n')}` : null,
     withheldNotice
   ].filter(Boolean)
@@ -276,7 +300,7 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
     task: request.task,
     files: request.files,
     parallel: request.parallel,
-    nodes: entries.map(({ text, characters, enabled, ...node }) => node),
+    nodes: entries.map(({ text, characters, enabled, interface: parsed, ...node }) => node),
     lanes: entries.map(node => ({ id: node.id, title: node.title, file: node.file, tests: node.tests || [] })),
     tests,
     overrides: [...projectOverrides],

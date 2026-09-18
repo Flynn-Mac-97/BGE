@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { planRetarget, retargetFrame, captureWorldTurns, meanHeading, retargetOrder, neutralFor } from './retarget.mjs'
+import { planRetarget, retargetFrame, captureWorldTurns, meanHeading, retargetOrder, neutralFor, multiply } from './retarget.mjs'
 
 /**
  * The skeletons kimodo.cpp emits: joint names, parent indices and bind-pose
@@ -33,16 +33,6 @@ export const skeletonFor = joints =>
 export function readFloats(file) {
   const bytes = fs.readFileSync(file)
   return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4)
-}
-
-/** Quaternion product, both x,y,z,w. */
-export function multiply(a, b) {
-  return [
-    a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
-    a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
-    a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
-    a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]
-  ]
 }
 
 /** A quarter turn about X, which is the whole of a Z-up to Y-up conversion. */

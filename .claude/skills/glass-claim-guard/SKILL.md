@@ -4,6 +4,12 @@ description: Refuses a write to a file another active agent run claimed. Use whe
 ---
 <!-- generated from plugins/builtin/claim-guard.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/claim-guard.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/claim-guard.js"]}'
+```
+
 # Claim Guard
 
 - Refuses a write to a file another **active** agent run claimed with `agent.prepare`. Without it the run registry is advice nothing reads.

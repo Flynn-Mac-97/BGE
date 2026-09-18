@@ -172,6 +172,51 @@ async function typesRegisteredByPlugins(projectDirectory, checkout) {
 }
 
 /**
+ * What the agent view keeps of each record kind, and in the order it writes it.
+ *
+ * The fields are named here rather than copied one by one, so the shape of a
+ * record lives in one place: the entry built above. `always` names the fields an
+ * agent must see even when they are empty, because "none" and "not asked" are
+ * different facts — `properties: []` says the type has no properties, and a
+ * missing `properties` says the type never loaded.
+ */
+const AGENT_VIEW = {
+  types: {
+    keep: ['file', 'about', 'appearance', 'looksWrongWhen', 'invariant', 'properties', 'hooks', 'uses', 'behaviours', 'error'],
+    always: ['file', 'properties', 'hooks']
+  },
+  behaviours: {
+    keep: ['file', 'about', 'properties', 'hooks', 'error'],
+    always: ['file', 'properties', 'hooks']
+  },
+  levels: {
+    keep: ['file', 'entities', 'types', 'behaviours', 'error'],
+    always: ['file', 'entities', 'types', 'behaviours']
+  },
+  tests: {
+    keep: ['file', 'title', 'level', 'error'],
+    always: ['file']
+  }
+}
+
+/** One record cut down to the fields the agent view names, in that order. */
+function agentRecord(record, { keep, always }) {
+  const out = {}
+  for (const field of keep) {
+    const value = record[field]
+    if (value === undefined) continue
+    if (!always.includes(field) && (value === '' || (Array.isArray(value) && !value.length))) continue
+    out[field] = value
+  }
+  return out
+}
+
+/** Every record of one kind, cut down for an agent. */
+function agentRecords(records, view) {
+  return Object.fromEntries(Object.entries(records).map(([name, record]) => [name, agentRecord(record, view)]))
+}
+
+/**
  * Build the index — the one artifact both the browser UI and the AI read.
  * Types are imported rather than parsed so `properties` and asset references
  * are exact.
@@ -203,127 +248,9 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
       index.warnings.push(...lint(f, await fs.readFile(inside(f), 'utf8')))
     }
 
-    if (kind === 'type') {
-      const name = path.basename(f, '.js')
-      const entry = { file: f, properties: [], uses: [], inLevels: 0 }
-      try {
-        const loaded = await importFresh(inside(f))
-        entry.properties = Object.keys(loaded.properties || {})
-        // Every way a type can name a file — see assetReferences, which the
-        // level placements go through too. Miss any of these and "used by"
-        // quietly goes empty, which reads as "nothing uses this, safe to
-        // delete", and a missing file goes unreported by `check`.
-        const references = assetReferences(loaded)
-        entry.uses = references.map(r => r.reference)
-        // Which key named which file, so a missing one can be reported with the
-        // line the author would have to go and fix.
-        entry.usesBy = Object.fromEntries(references.map(r => [r.reference, r.where]))
-        entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
-        // What the author says this type is, how a correct one reads on screen,
-        // and how a broken one reads. Carried here so reading the index answers
-        // "what is a brush" with no call and no guess from the name.
-        if (loaded.about) entry.about = String(loaded.about)
-        if (loaded.appearance) entry.appearance = String(loaded.appearance)
-        if (loaded.looksWrongWhen) entry.looksWrongWhen = String(loaded.looksWrongWhen)
-        // A rule `check` enforces against every placement of this type. Kept
-        // beside `about`/`appearance` because it is the same kind of fact —
-        // written once next to the type, read by every level that places it.
-        // `meshBox`/`colliderBox` are the type's own defaults, stored only
-        // when an invariant is declared, so a type that never opts in pays
-        // nothing: see `placedHeight` below for why both are needed.
-        if (loaded.invariant) {
-          entry.invariant = loaded.invariant
-          if (Array.isArray(loaded.mesh?.box)) entry.meshBox = loaded.mesh.box
-          if (Array.isArray(loaded.collider?.box)) entry.colliderBox = loaded.collider.box
-        }
-        // A tint on a type multiplies into every textured placement that did not
-        // state its own — see `tintProblems`, which is the only reader.
-        if (loaded.mesh?.tint != null) entry.meshTint = loaded.mesh.tint
-        if (loaded.animation) entry.animation = Object.keys(loaded.animation)
-        // What this type composes. Listed here so "what does a crate do" is one
-        // index lookup rather than opening the type and then every behaviour.
-        const attached = attachedNames(loaded.behaviours)
-        if (attached.length) entry.behaviours = attached
-      } catch (e) {
-        entry.error = String(e.message || e)
-      }
-      index.types[name] = entry
-    }
-
-    else if (kind === 'behaviour') {
-      const name = path.basename(f, '.js')
-      const entry = { file: f, properties: {}, hooks: [], usedBy: [] }
-      try {
-        const loaded = await importFresh(inside(f))
-        // Values, not just keys, unlike a type. A behaviour is attached from a
-        // list without ever opening it, so its defaults have to be readable
-        // from here or nobody knows what they are agreeing to.
-        entry.properties = loaded.properties || {}
-        entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
-        if (loaded.about) entry.about = String(loaded.about)
-      } catch (e) {
-        entry.error = String(e.message || e)
-      }
-      index.behaviours[name] = entry
-    }
-
-    else if (kind === 'level') {
-      const name = path.basename(f, '.json')
-      try {
-        const raw = JSON.parse(await fs.readFile(inside(f), 'utf8'))
-        const placed = raw.entities || []
-        levelPlacements[name] = placed
-
-        /**
-         * Every asset the level itself names, deduped, with how many placements
-         * named it and the first one that did.
-         *
-         * Deduped because a 281-brush map names the same texture forty times and
-         * a missing one should be one line with a count, not forty lines.
-         * Counted because "231 references" and "one reference" are different
-         * problems and an agent needs to know which it is reading.
-         */
-        const assets = {}
-        const note = (reference, where) => {
-          const seen = assets[reference] || (assets[reference] = { count: 0, first: where })
-          seen.count++
-        }
-        placed.forEach((placement, at) => {
-          const named = placement?.type ? `entity ${at} (type "${placement.type}")` : `entity ${at}`
-          for (const r of assetReferences(placement)) note(r.reference, `${named} ${r.where}`)
-        })
-        // The level's own world block names one too, and a sky that is not there
-        // is exactly as invisible as a texture that is not there.
-        if (typeof raw.world?.skyTexture === 'string') note(raw.world.skyTexture, 'the level\'s world.skyTexture')
-
-        index.levels[name] = {
-          file: f,
-          entities: placed.length,
-          types: [...new Set(placed.map(e => e.type))],
-          // Behaviours attached per placement rather than by the type. Without
-          // this, a behaviour used only in a level reads as unreferenced.
-          behaviours: [...new Set(placed.flatMap(e => attachedNames(e.behaviours)))],
-          assets
-        }
-      } catch (e) {
-        index.levels[name] = { file: f, error: String(e.message || e) }
-      }
-    }
-
-    else if (kind === 'test') {
-      const name = path.basename(f, '.js')
-      const entry = { file: f }
-      try {
-        const loaded = await importFresh(inside(f))
-        if (loaded.name) entry.title = loaded.name
-        if (loaded.level) entry.level = loaded.level
-      } catch (e) {
-        entry.error = String(e.message || e)
-      }
-      index.tests[name] = entry
-    }
-
-    else if (kind === 'config') index.config.push(f)
+    const reader = READERS[kind]
+    // A file no reader names is data a level may reference, so it is an asset.
+    if (reader) await reader(index, f, inside, levelPlacements)
     else index.assets[path.basename(f)] = { file: f, kind, usedBy: [] }
   }
 
@@ -360,37 +287,168 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT) {
   // the instructions tell an agent to read first — the full index is several
   // times larger for nothing an agent does.
   const agent = {
-    types: Object.fromEntries(Object.entries(index.types).map(([name, t]) => [name, {
-      file: t.file,
-      ...(t.about ? { about: t.about } : {}),
-      ...(t.appearance ? { appearance: t.appearance } : {}),
-      ...(t.looksWrongWhen ? { looksWrongWhen: t.looksWrongWhen } : {}),
-      ...(t.invariant ? { invariant: t.invariant } : {}),
-      properties: t.properties, hooks: t.hooks,
-      ...(t.uses?.length ? { uses: t.uses } : {}),
-      ...(t.behaviours?.length ? { behaviours: t.behaviours } : {}),
-      ...(t.error ? { error: t.error } : {})
-    }])),
-    behaviours: Object.fromEntries(Object.entries(index.behaviours).map(([name, b]) => [name, {
-      file: b.file, about: b.about, properties: b.properties, hooks: b.hooks,
-      ...(b.error ? { error: b.error } : {})
-    }])),
-    levels: Object.fromEntries(Object.entries(index.levels).map(([name, l]) => [name, {
-      file: l.file, entities: l.entities, types: l.types, behaviours: l.behaviours,
-      ...(l.error ? { error: l.error } : {})
-    }])),
-    tests: Object.fromEntries(Object.entries(index.tests).map(([name, t]) => [name, {
-      file: t.file,
-      ...(t.title ? { title: t.title } : {}),
-      ...(t.level ? { level: t.level } : {}),
-      ...(t.error ? { error: t.error } : {})
-    }])),
+    types: agentRecords(index.types, AGENT_VIEW.types),
+    behaviours: agentRecords(index.behaviours, AGENT_VIEW.behaviours),
+    levels: agentRecords(index.levels, AGENT_VIEW.levels),
+    tests: agentRecords(index.tests, AGENT_VIEW.tests),
     // Keyed by path, not basename, so "what kind is this file" is an exact
     // lookup rather than a guess across folders.
     assets: Object.fromEntries(Object.values(index.assets).map(a => [a.file, a.kind]))
   }
   await writeAtomic(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent, null, 2))
   return index
+}
+
+/**
+ * One reader per file kind, each writing into the index it is handed.
+ *
+ * The readers share nothing but the index and the file they read, so a kind is
+ * added in one place: a function, and its row here. Everything no reader names
+ * is data a level may reference, and is filed as an asset.
+ */
+const READERS = {
+  type: async (index, file, inside) => {
+    index.types[path.basename(file, '.js')] = await readType(inside(file), file)
+  },
+  behaviour: async (index, file, inside) => {
+    index.behaviours[path.basename(file, '.js')] = await readBehaviour(inside(file), file)
+  },
+  level: async (index, file, inside, levelPlacements) => {
+    const level = await readLevel(inside(file), file)
+    index.levels[level.name] = level.entry
+    // Kept out of the index: a level of nine hundred entities copied onto it
+    // would double what `.engine/index.json` costs to write and read on every
+    // check, for data only the invariant pass needs.
+    if (level.placements) levelPlacements[level.name] = level.placements
+  },
+  test: async (index, file, inside) => {
+    index.tests[path.basename(file, '.js')] = await readTest(inside(file), file)
+  },
+  config: async (index, file) => { index.config.push(file) }
+}
+
+/** One type file: what it declares, what it names, and how it reads on screen. */
+async function readType(file, relative) {
+  const entry = { file: relative, properties: [], uses: [], inLevels: 0 }
+  try {
+    const loaded = await importFresh(file)
+    entry.properties = Object.keys(loaded.properties || {})
+    // Every way a type can name a file — see assetReferences, which the
+    // level placements go through too. Miss any of these and "used by"
+    // quietly goes empty, which reads as "nothing uses this, safe to
+    // delete", and a missing file goes unreported by `check`.
+    const references = assetReferences(loaded)
+    entry.uses = references.map(r => r.reference)
+    // Which key named which file, so a missing one can be reported with the
+    // line the author would have to go and fix.
+    entry.usesBy = Object.fromEntries(references.map(r => [r.reference, r.where]))
+    entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
+    // What the author says this type is, how a correct one reads on screen,
+    // and how a broken one reads. Carried here so reading the index answers
+    // "what is a brush" with no call and no guess from the name.
+    if (loaded.about) entry.about = String(loaded.about)
+    if (loaded.appearance) entry.appearance = String(loaded.appearance)
+    if (loaded.looksWrongWhen) entry.looksWrongWhen = String(loaded.looksWrongWhen)
+    // A rule `check` enforces against every placement of this type. Kept
+    // beside `about`/`appearance` because it is the same kind of fact —
+    // written once next to the type, read by every level that places it.
+    // `meshBox`/`colliderBox` are the type's own defaults, stored only
+    // when an invariant is declared, so a type that never opts in pays
+    // nothing: see `placedHeight` for why both are needed.
+    if (loaded.invariant) {
+      entry.invariant = loaded.invariant
+      if (Array.isArray(loaded.mesh?.box)) entry.meshBox = loaded.mesh.box
+      if (Array.isArray(loaded.collider?.box)) entry.colliderBox = loaded.collider.box
+    }
+    // A tint on a type multiplies into every textured placement that did not
+    // state its own — see `tintProblems`, which is the only reader.
+    if (loaded.mesh?.tint != null) entry.meshTint = loaded.mesh.tint
+    if (loaded.animation) entry.animation = Object.keys(loaded.animation)
+    // What this type composes. Listed here so "what does a crate do" is one
+    // index lookup rather than opening the type and then every behaviour.
+    const attached = attachedNames(loaded.behaviours)
+    if (attached.length) entry.behaviours = attached
+  } catch (e) {
+    entry.error = String(e.message || e)
+  }
+  return entry
+}
+
+/** One behaviour file. Values, not just keys, because a behaviour is attached from a list. */
+async function readBehaviour(file, relative) {
+  const entry = { file: relative, properties: {}, hooks: [], usedBy: [] }
+  try {
+    const loaded = await importFresh(file)
+    // Values, not just keys, unlike a type. A behaviour is attached from a
+    // list without ever opening it, so its defaults have to be readable
+    // from here or nobody knows what they are agreeing to.
+    entry.properties = loaded.properties || {}
+    entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
+    if (loaded.about) entry.about = String(loaded.about)
+  } catch (e) {
+    entry.error = String(e.message || e)
+  }
+  return entry
+}
+
+/** One level file: its placements, and every asset it names with a count. */
+async function readLevel(file, relative) {
+  const name = path.basename(relative, '.json')
+  try {
+    const raw = JSON.parse(await fs.readFile(file, 'utf8'))
+    const placed = raw.entities || []
+
+    /**
+     * Every asset the level itself names, deduped, with how many placements
+     * named it and the first one that did.
+     *
+     * Deduped because a 281-brush map names the same texture forty times and
+     * a missing one should be one line with a count, not forty lines.
+     * Counted because "231 references" and "one reference" are different
+     * problems and an agent needs to know which it is reading.
+     */
+    const assets = {}
+    const note = (reference, where) => {
+      const seen = assets[reference] || (assets[reference] = { count: 0, first: where })
+      seen.count++
+    }
+    placed.forEach((placement, at) => {
+      const named = placement?.type ? `entity ${at} (type "${placement.type}")` : `entity ${at}`
+      for (const r of assetReferences(placement)) note(r.reference, `${named} ${r.where}`)
+    })
+    // The level's own world block names one too, and a sky that is not there
+    // is exactly as invisible as a texture that is not there.
+    if (typeof raw.world?.skyTexture === 'string') note(raw.world.skyTexture, 'the level\'s world.skyTexture')
+
+    return {
+      name,
+      placements: placed,
+      entry: {
+        file: relative,
+        entities: placed.length,
+        types: [...new Set(placed.map(e => e.type))],
+        // Behaviours attached per placement rather than by the type. Without
+        // this, a behaviour used only in a level reads as unreferenced.
+        behaviours: [...new Set(placed.flatMap(e => attachedNames(e.behaviours)))],
+        assets
+      }
+    }
+  } catch (e) {
+    return { name, placements: null, entry: { file: relative, error: String(e.message || e) } }
+  }
+}
+
+/** One test file: its title and the level it plays, when it declares them. */
+async function readTest(file, relative) {
+  const entry = { file: relative }
+  try {
+    const loaded = await importFresh(file)
+    if (loaded.name) entry.title = loaded.name
+    if (loaded.level) entry.level = loaded.level
+  } catch (e) {
+    entry.error = String(e.message || e)
+  }
+  return entry
 }
 
 /** A counter making each atomic write's temporary name unique within this process. */
@@ -853,6 +911,18 @@ function describedProblems(index) {
 }
 
 /**
+ * Every record of one kind that failed to load, as a problem naming it.
+ *
+ * A type and a behaviour carry the loader's own message; a level carries the
+ * parser's. `reason` is the half of the sentence that differs.
+ */
+function failedRecords(records, label, reason) {
+  return Object.entries(records)
+    .filter(([, record]) => record.error)
+    .map(([name, record]) => ({ file: record.file, why: `${label} "${name}" ${reason} — ${record.error}` }))
+}
+
+/**
  * Everything wrong with the project right now.
  *
  * The same list `/api/check` returns, built here so it is available with no
@@ -862,12 +932,9 @@ function describedProblems(index) {
 export function problemsIn(index) {
   const missing = missingAssets(index)
   return [
-    ...Object.entries(index.types).filter(([, t]) => t.error)
-      .map(([name, t]) => ({ file: t.file, why: `type "${name}" failed to load — ${t.error}` })),
-    ...Object.entries(index.behaviours).filter(([, b]) => b.error)
-      .map(([name, b]) => ({ file: b.file, why: `behaviour "${name}" failed to load — ${b.error}` })),
-    ...Object.entries(index.levels).filter(([, l]) => l.error)
-      .map(([name, l]) => ({ file: l.file, why: `level "${name}" is not valid JSON — ${l.error}` })),
+    ...failedRecords(index.types, 'type', 'failed to load'),
+    ...failedRecords(index.behaviours, 'behaviour', 'failed to load'),
+    ...failedRecords(index.levels, 'level', 'is not valid JSON'),
     // An attachment naming a file that is not there is silent at runtime except
     // for one console line, and the symptom is an entity that simply does not
     // do the thing. Catch it here.

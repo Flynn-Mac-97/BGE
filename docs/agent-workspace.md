@@ -59,6 +59,13 @@ handed the check that proves its own game rather than the default one.
 
 `engine/agent-workspace.js` is the shared resolver. It receives a file reader,
 so the Agent Workspace plugin and the offline CLI return the same packet.
+Each plugin's parsed interface is stored in `<plugin>.agent/interface.generated.md`.
+The server generates these at startup and refreshes them on plugin edits. Packet
+creation checks source and generator hashes, refreshes stale files, and reads the
+stored text. The browser requests this through the file transport. Commands,
+arguments, declared input schemas, context keys and events are generated; usage
+rules and detail links remain in the authored guide. A missing interface is named
+in the packet with the source to read.
 `plugins/builtin/agent-workspace.js` contributes the **AGENTS** panel and agent
 commands. The panel can add instruction or skill branches. It opens their files
 in the Code panel. `project/agents/settings.json` stores optional skill state.

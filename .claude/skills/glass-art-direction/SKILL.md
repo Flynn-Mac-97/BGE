@@ -4,6 +4,12 @@ description: Set a game's visual direction from gathered references instead of t
 ---
 <!-- generated from plugins/builtin/art-direction.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/art-direction.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/art-direction.js"]}'
+```
+
 # Art Direction
 
 An art document written from nothing is one agent's taste in the shape of a

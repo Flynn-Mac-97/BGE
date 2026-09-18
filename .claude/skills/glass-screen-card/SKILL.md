@@ -4,6 +4,12 @@ description: The card item for Screen: a numbered, glyphed, ranked choice with o
 ---
 <!-- generated from plugins/builtin/screen-card.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/screen-card.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/screen-card.js"]}'
+```
+
 # Screen Card
 
 - Adds the `card` item to **Screen**: a number you can press, a glyph, a name,

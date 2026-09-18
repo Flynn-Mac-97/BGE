@@ -6,6 +6,8 @@
  * Runs on the fixed step, so `onCollide` fires deterministically and game code
  * never has to learn what a fixed step is.
  */
+
+import { CELL, cellKey, fillCells } from './physics/cells.js'
 const GRAVITY = -22
 
 /**
@@ -51,13 +53,7 @@ function extent(entity) {
  * overlapping two solids is pushed out of them in the same sequence a full
  * scan would have used.
  */
-const CELL = 4
-
-/** An entity spanning more cells than this is kept aside and always tested. */
-const MAX_CELLS = 64
-
 const cellOf = value => Math.floor(value / CELL)
-const cellKey = (ix, iy) => `${ix},${iy}`
 
 function bin(entities) {
   const cells = new Map()
@@ -67,14 +63,7 @@ function bin(entities) {
     const { width, height } = extent(entity)
     const x0 = cellOf(entity.x - width / 2), x1 = cellOf(entity.x + width / 2)
     const y0 = cellOf(entity.y - height / 2), y1 = cellOf(entity.y + height / 2)
-    if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) { everywhere.push(at); return }
-    for (let ix = x0; ix <= x1; ix++) {
-      for (let iy = y0; iy <= y1; iy++) {
-        const list = cells.get(cellKey(ix, iy))
-        if (list) list.push(at)
-        else cells.set(cellKey(ix, iy), [at])
-      }
-    }
+    fillCells(cells, everywhere, at, { x0, x1, y0, y1 })
   })
 
   return {

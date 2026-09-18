@@ -57,6 +57,8 @@ const HALF_WASH = Math.sqrt(Math.LN2)
 const DEFAULT_AMBIENT = { intensity: 0.55, color: '#93a7c4' }
 const DEFAULT_SUN = { direction: [-0.4, -1, -0.3], intensity: 0.9, color: '#fff2d8' }
 
+import { lookColour } from './render/look-colour.js'
+
 export default {
   name: 'World Look',
   category: 'visuals',
@@ -268,7 +270,7 @@ function resolveLook(declared, overrides, say) {
     : { density: 0, color: DEFAULT_AMBIENT.color }
 
   return {
-    fog: { density: Math.max(0, Number(fog.density) || 0), color: colour(fog.color, DEFAULT_AMBIENT.color, 'fog', say) },
+    fog: { density: Math.max(0, Number(fog.density) || 0), color: lookColour(fog.color, DEFAULT_AMBIENT.color, 'fog', say, 'World Look') },
     ambient: { ...DEFAULT_AMBIENT, ...parts('ambient', readLight) },
     sun: { ...DEFAULT_SUN, ...parts('sun', readLight), ...parts('sun', readDirection) }
   }
@@ -320,16 +322,6 @@ const pick = object => Object.fromEntries(Object.entries(object).filter(([, v]) 
  * level goes dark, the log stays empty, and the author reads their own file
  * three times looking for the missing hash.
  */
-function colour(value, fallback, what, say) {
-  if (value == null) return fallback
-  if (typeof value === 'number') return value
-  const text = String(value).trim()
-  if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text)) return text
-  if (COLOUR_NAMES.has(text.toLowerCase())) return text
-  say(`[World Look] "${text}" is not a colour the ${what} can use — it is neither a #hex value nor one of the CSS colour names — falling back to ${fallback}`)
-  return fallback
-}
-
 /**
  * Every colour name the renderer will actually take.
  *
@@ -339,21 +331,6 @@ function colour(value, fallback, what, say) {
  * stays empty, and the author reads their own file three times. That is the
  * precise failure this function exists to prevent, so the list is written out.
  */
-const COLOUR_NAMES = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond ' +
-  'blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan ' +
-  'darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange ' +
-  'darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet ' +
-  'deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite ' +
-  'gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush ' +
-  'lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey ' +
-  'lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime ' +
-  'limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen ' +
-  'mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin ' +
-  'navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise ' +
-  'palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue ' +
-  'saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow ' +
-  'springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen').split(' '))
-
 // ------------------------------------------------------------------ the renderer
 /**
  * Call one renderer setter, and never take a level load down with it.

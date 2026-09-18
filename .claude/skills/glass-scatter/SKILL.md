@@ -4,6 +4,12 @@ description: Bulk placement declared in the level: this many of these types over
 ---
 <!-- generated from plugins/builtin/scatter.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/scatter.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/scatter.js"]}'
+```
+
 # Scatter
 
 - Bulk placement, declared in the level: **this many of these types, over this

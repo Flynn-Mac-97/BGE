@@ -4,6 +4,12 @@ description: The look of a surface — colour, roughness, metal, texture, transp
 ---
 <!-- generated from plugins/builtin/materials.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/materials.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/materials.js"]}'
+```
+
 # Materials
 
 - The library of surfaces, and the door a game adds its own through. Named on a `mesh`, on a type or on a placement.

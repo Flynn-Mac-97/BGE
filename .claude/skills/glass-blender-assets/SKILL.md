@@ -4,6 +4,12 @@ description: Keeps a .blend file in the project and builds the .glb a type uses 
 ---
 <!-- generated from plugins/builtin/blender-assets.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/blender-assets.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/blender-assets.js"]}'
+```
+
 # Blender Assets
 
 A `.blend` in the project is the source. The `.glb` beside it is built from it.
@@ -33,7 +39,6 @@ Blender is a program, and only a headless run can start one.
 | `blender.import '{"file":"..."}'` | builds one; `{"all":true}` every stale one; `"force":true` fresh ones too |
 | `blender.settings '{"file":"...","scale":0.01}'` | writes an import setting |
 
-Every one refuses in the browser and answers with the terminal line instead.
 The panel is called **Blender** and shows state only, for the same reason.
 
 ## What it writes

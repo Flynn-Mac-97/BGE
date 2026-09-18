@@ -14,7 +14,11 @@
  * `rapier3d.snapshot` on any machine. That is what makes a replay provable
  * rather than hoped for.
  */
+
+import { asFiniteVector } from '../../engine/vector.js'
 import { makeBridge, GRAVITY_3D } from './rapier/bridge.js'
+import { makeLoader } from './rapier/loading.js'
+import { installSolver } from './rapier/solver-context.js'
 
 const REPLACES = 'Physics 3D'
 
@@ -31,86 +35,13 @@ const round = value => Math.round(value * 1000) / 1000
 // Held for the two shapes `raycast` and `canStand` build themselves — a Ray and a
 // Cuboid. Everything else reaches Rapier through this world's bridge.
 let RAPIER = null
-let loading = null
-
-/**
- * This world's solver, by its context.
- *
- * The compiled module is shared — two megabytes, and compiling it twice for two
- * worlds costs seconds for nothing. The Rapier world and the entity-to-body map
- * are not: a bridge reconciles against one entity list and drops every body that
- * is not in it, so one bridge over two worlds made each step tear the other
- * world's bodies down and build them again from the entities. Two worlds in one
- * process then answered differently from the same worlds run one at a time, which
- * is the whole promise a headless fan-out rests on.
- */
-const solvers = new WeakMap()
-
-/** This world's bridge, or null while the WebAssembly is still compiling. */
-const bridgeOf = context => solvers.get(context)?.bridge || null
-
-/** What the panel remembers between renders, per world. */
-const panelHashes = new WeakMap()
-
-/**
- * The module is 2 MB of WebAssembly, so it is fetched once for the process.
- *
- * The timer holds the event loop open. Neither the import nor Rapier's `init`
- * counts as pending work in node, so a headless process with nothing else to do
- * exits part-way through the load and reports success.
- */
-async function loadModule() {
-  if (!loading) {
-    const hold = setInterval(() => {}, 50)
-    loading = import('@dimforge/rapier3d-deterministic-compat').then(async module => {
-      const loaded = module.default ?? module
-      await loaded.init()
-      RAPIER = loaded
-      return loaded
-    }).finally(() => clearInterval(hold))
-  }
-  return loading
-}
-
-/**
- * Start the WebAssembly, build this world's solver, and hold the world until it
- * lands.
- *
- * The hold is what makes the wait safe. A step taken while the solver is still
- * compiling moves a world with no physics in it and answers as though it had,
- * and two runs of the same level then disagree by however long the load took.
- * The hold is named, so `snapshot().paused` and a `simulate` reply say what the
- * world is waiting for.
- *
- * The promise is held rather than the bridge, so a step that arrives while the
- * module is still compiling waits on the first load instead of building a second
- * solver under the same world.
- *
- * A world from the kernel has a loop to hold and a startup registry the caller
- * waits on. A bare context in a unit test has neither, and there the load starts
- * unannounced, which is how it behaved before.
- */
-function startLoading(context) {
-  let solver = solvers.get(context)
-  if (!solver) { solver = { bridge: null, started: null }; solvers.set(context, solver) }
-  if (solver.started) return solver.started
-  context.loop?.hold(HOLD)
-  solver.started = loadModule().then(module => {
-    solver.bridge = makeBridge({ RAPIER: module, tag: 'rapier-3d', claims: is3D, flat: false, gravity: GRAVITY_3D })
-    solver.bridge.start()
-    return solver.bridge
-  }).finally(() => context.loop?.release(HOLD))
-  context.startup?.add(NAME, solver.started)
-  return solver.started
-}
-
-const asVector = value => {
-  if (Array.isArray(value)) return { x: Number(value[0]), y: Number(value[1]), z: Number(value[2]) }
-  if (value && typeof value === 'object') return { x: Number(value.x), y: Number(value.y), z: Number(value.z) }
-  return null
-}
-
-const real = vector => vector && [vector.x, vector.y, vector.z].every(Number.isFinite)
+const { startLoading, bridgeOf } = makeLoader({
+  name: NAME,
+  hold: HOLD,
+  load: () => import('@dimforge/rapier3d-deterministic-compat'),
+  loaded: toolkit => { RAPIER = toolkit },
+  solver: module => makeBridge({ RAPIER: module, tag: 'rapier-3d', claims: is3D, flat: false, gravity: GRAVITY_3D })
+})
 
 /**
  * The nearest thing a ray hits, in the shape Physics 3D answers in.
@@ -122,9 +53,9 @@ const real = vector => vector && [vector.x, vector.y, vector.z].every(Number.isF
 function raycast(context, origin, direction, maxDistance = 1000, options = {}) {
   const bridge = bridgeOf(context)
   if (!bridge?.ready) return null
-  const from = asVector(origin)
-  const along = asVector(direction)
-  if (!real(from) || !real(along)) {
+  const from = asFiniteVector(origin)
+  const along = asFiniteVector(direction)
+  if (!from || !along) {
     console.error('[rapier-3d] raycast needs an origin and a direction of three real numbers')
     return null
   }
@@ -178,21 +109,18 @@ function canStand(context, entity, height) {
 /**
  * Put this world's solver back to the moment a checkpoint holds.
  *
- * `bytes` null means the checkpoint was taken while the solver held nothing — it
- * was still compiling, or nothing had stepped yet. Holding nothing is what it was,
- * so the bodies are dropped and built again from the entities on the next step.
- * Keeping them would leave the bodies of the later run standing in a world rewound
- * to an earlier one, with the entities looking right and the velocities wrong.
+ * A null capture resets the solver. Otherwise restore bytes and entity bindings
+ * after the world has restored its entities.
  *
  * @param {object} context The world's context.
- * @param {Uint8Array|null} bytes A snapshot, or null.
+ * @param {object|null} capture Solver bytes and entity bindings, or null.
  * @returns {boolean} Whether the solver is where the checkpoint says it was.
  */
-function restoreSolver(context, bytes) {
+function restoreSolver(context, capture) {
   const bridge = bridgeOf(context)
   // Not loaded yet, so it holds nothing and there is nothing to put back.
   if (!bridge) return true
-  if (bytes) return bridge.restore(bytes) === true
+  if (capture) return bridge.restoreCapture(capture, context.world) === true
   bridge.forget()
   return true
 }
@@ -239,26 +167,7 @@ export default {
   about: 'Rigid body physics in three dimensions, solved by Rapier. Adds rotation, mass, friction and sleeping to the Physics 3D contract, and replays identically on any machine.',
 
   onLoad(context) {
-    context.rapier3d = {
-      snapshot: () => bridgeOf(context)?.snapshot() || null,
-      /** Put the solver back to a snapshot's moment. False when it would not go. */
-      restore: bytes => bridgeOf(context)?.restore(bytes) === true,
-      raycast: (origin, direction, maxDistance, options) =>
-        raycast(context, origin, direction, maxDistance, options || {}),
-      canStand: (entity, height) => canStand(context, entity, height)
-    }
-    // What this solver holds, so a checkpoint of the run carries the bodies. The
-    // entities alone are not enough: a box restored to where it was with no
-    // velocity behind it is a world that stands still and looks right. Null is a
-    // moment taken before the solver had bodies, and putting that back means
-    // holding none — otherwise the rewind replays the later run's velocities.
-    context.checkpoints?.add(NAME, {
-      capture: () => bridgeOf(context)?.snapshot() || null,
-      restore: bytes => restoreSolver(context, bytes)
-    })
-    // A level reload builds new entities under the same ids, so every body
-    // belongs to the level that is gone.
-    context.bus.on('level:loaded', () => bridgeOf(context)?.forget())
+    installSolver(context, { key: 'rapier3d', name: NAME, bridgeOf, restore: restoreSolver })
 
     // Started here, before anything can step, so no run begins without its
     // solver. The choice is already readable: this stands down while Physics 3D

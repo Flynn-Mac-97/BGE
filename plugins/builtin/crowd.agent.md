@@ -4,7 +4,7 @@ description: Moves many entities as one mass and stops them stacking. Use for ho
 
 # Crowd
 
-- Moves many entities as one mass and stops them stacking. `context.crowd`.
+- Moves many entities as one mass and stops them stacking.
   The "who is near whom" half is Spatial Hash; this is the pass that moves them.
 - `context.crowd.group(name, { cellSize, radius, speed })` wraps the Spatial Hash
   group of the same name, so `context.spatial.group('horde')` is the same index.

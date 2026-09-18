@@ -28,7 +28,7 @@
  */
 
 /** Bumped when the shape of a moment changes, so an older one is refused rather than misread. */
-export const MOMENT_VERSION = 1
+export const MOMENT_VERSION = 2
 
 /**
  * What each plugin holds, by its own name.
@@ -161,9 +161,9 @@ export function captureMoment({ world, loop, checkpoints }) {
  *
  * The order is the part that has to be right.
  *
- * A plugin goes first, because a solver writes its own places out onto the
- * entities as it goes back, and the entities are then written from the checkpoint
- * exactly as they were captured rather than as the solver rounded them.
+ * Restore entities before plugins so a plugin can resolve captured entity ids,
+ * including entities that were removed after capture. Plugin restores must not
+ * overwrite the captured entity fields.
  *
  * The loop goes last, because everything above can draw from the random stream or
  * schedule a timer while it rebuilds — a body built at the moment of restoration
@@ -184,8 +184,8 @@ export function restoreMoment(moment, { world, loop, checkpoints }, { input } = 
   if (moment?.version !== MOMENT_VERSION) {
     throw new Error(`checkpoint version ${moment?.version} is not ${MOMENT_VERSION}`)
   }
-  const put = checkpoints.put(moment.plugins)
   const back = world.restore(moment.world)
+  const put = checkpoints.put(moment.plugins)
   loop.resume(input ? { ...moment.loop, input } : moment.loop)
   return {
     entities: back.entities,

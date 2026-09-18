@@ -4,6 +4,12 @@ description: Rebuilds a Blender material's node graph as a live TSL shader, so a
 ---
 <!-- generated from plugins/builtin/blender-shaders.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/blender-shaders.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/blender-shaders.js"]}'
+```
+
 # Blender Shaders
 
 Design the material in Blender. The engine rebuilds the node graph as a TSL
@@ -27,11 +33,6 @@ right for plain values and image textures, and is why an untranslatable graph
 never makes a surface worse.
 
 `blender.shaders` names what each material still needs.
-
-## Commands
-
-- `blender.shaders` — every material graph, whether it translates, and what it needs.
-- `blender.shaders.apply` — re-read the graphs and rebuild every material.
 
 ## What translates
 

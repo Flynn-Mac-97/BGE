@@ -15,6 +15,10 @@
  * fires deterministically and a ray fired from an update hook sees the same
  * world on every replay.
  */
+
+import { CELL, MAX_CELLS, cellKey, fillCells } from './physics/cells.js'
+
+import { asFiniteVector, normalise } from '../../engine/vector.js'
 const GRAVITY = -20.32
 const STEP_HEIGHT = 0.46
 
@@ -86,20 +90,13 @@ function report(key, message) {
  * selectivity for twice the bookkeeping, and the box test that follows checks Y
  * anyway.
  */
-const CELL = 4
-
-/** A solid spanning more cells than this is kept aside and always tested. Binning a floor that covers the whole map into 300 cells costs more than it saves. */
-const MAX_CELLS = 64
-
-/** Which cell a world coordinate is in, and the key the two indices make. */
+/** Which cell a world coordinate is in. */
 const index = value => Math.floor(value / CELL)
-const cellKey = (ix, iz) => `${ix},${iz}`
 
 function makeGrid() {
   let cells = new Map()
   let oversize = []
   let built = []
-
 
   /**
    * A door that opens is a solid that moved, and a grid that has not noticed is
@@ -132,14 +129,7 @@ function makeGrid() {
         const box = boxFor(solid)
         const x0 = index(box.x - box.halfWidth), x1 = index(box.x + box.halfWidth)
         const z0 = index(box.z - box.halfDepth), z1 = index(box.z + box.halfDepth)
-        if ((x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { oversize.push(solid); continue }
-        for (let ix = x0; ix <= x1; ix++) {
-          for (let iz = z0; iz <= z1; iz++) {
-            const list = cells.get(cellKey(ix, iz))
-            if (list) list.push(solid)
-            else cells.set(cellKey(ix, iz), [solid])
-          }
-        }
+        fillCells(cells, oversize, solid, { x0, x1, y0: z0, y1: z1 })
       }
     },
 
@@ -176,8 +166,8 @@ const grid = makeGrid()
  * with a 3D collider is a candidate.
  */
 export function castRay(entities, origin, direction, maxDistance = Infinity, options = {}) {
-  const from = asVector(origin)
-  const along = normalise(asVector(direction))
+  const from = asFiniteVector(origin)
+  const along = normalise(asFiniteVector(direction))
   if (!from) {
     report('ray-origin', `raycast needs an origin of three real numbers, as { x, y, z } or [x, y, z] — got ${JSON.stringify(origin)}. Refused rather than moved to the world origin, which would have returned a confident hit on the wrong thing.`)
     return null
@@ -357,14 +347,7 @@ function binBodies(bodies, seconds) {
     const reach = reachOf(body, seconds)
     const x0 = index(box.x - box.halfWidth - reach), x1 = index(box.x + box.halfWidth + reach)
     const z0 = index(box.z - box.halfDepth - reach), z1 = index(box.z + box.halfDepth + reach)
-    if ((x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { everywhere.push(at); return }
-    for (let ix = x0; ix <= x1; ix++) {
-      for (let iz = z0; iz <= z1; iz++) {
-        const list = cells.get(cellKey(ix, iz))
-        if (list) list.push(at)
-        else cells.set(cellKey(ix, iz), [at])
-      }
-    }
+    fillCells(cells, everywhere, at, { x0, x1, y0: z0, y1: z1 })
   })
 
   return {
@@ -656,7 +639,7 @@ export default {
         const ignore = [...asList(spec.ignore)]
         if (typeof spec.from === 'string') ignore.push(spec.from)
 
-        let direction = spec.direction ? asVector(spec.direction) : null
+        let direction = spec.direction ? asFiniteVector(spec.direction) : null
         // JSON has no Infinity, and no map is a kilometre across.
         let maxDistance = spec.maxDistance ?? 1000
 
@@ -714,25 +697,6 @@ export default {
 }
 
 // ------------------------------------------------------------------ small print
-/**
- * A point written as {x,y,z} or [x,y,z] — a hand-typed argument is an array.
- *
- * Every component has to be a real number, and a vector where one is not is
- * refused rather than repaired. `+value[0] || 0` used to rewrite a bad
- * coordinate to zero, which moved the ray to the world origin and then returned
- * a hit — a confident, precise, completely wrong answer about what a bullet
- * struck. There is no safe default for "where the shot came from".
- */
-function asVector(value) {
-  const written =
-    Array.isArray(value) ? [value[0], value[1], value[2]]
-    : (value && typeof value === 'object') ? [value.x, value.y, value.z]
-    : null
-  if (!written) return null
-  const [x, y, z] = written.map(Number)
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null
-  return { x, y, z }
-}
 
 /**
  * One entity, one id, or a list of either — whichever the caller had to hand.
@@ -757,18 +721,7 @@ function pointOf(context, value) {
     if (!entity) { console.error(`[physics-3d] no entity "${value}"`); return null }
     return { x: entity.x, y: entity.y, z: entity.z }
   }
-  return asVector(value)
-}
-
-/**
- * Callers are meant to hand in a unit vector, and one typed at a terminal never
- * is. Normalising here keeps `distance` in metres whichever way it arrived.
- */
-function normalise(vector) {
-  if (!vector) return null
-  const length = Math.hypot(vector.x, vector.y, vector.z)
-  if (!(length > 0)) return null
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length }
+  return asFiniteVector(value)
 }
 
 const round = n => Math.round(n * 1000) / 1000

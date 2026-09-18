@@ -699,42 +699,6 @@ There are no tool modes. The handle you grab is the choice.
   Fine for localhost; do not expose the dev server on a network.
 
 
-## Systems Inspector
-
-Open **SYSTEMS** in the editor toolbar to inspect Engine Core separately from Plugins.
-Expand fixed/frame systems in their registered order and select a node to read code.
-Entity updates expand into representative loaded types and their behaviour hooks.
-The kernel outline is a teaching view; plugin children come from the live registry.
-This is scheduled flow, not an execution trace. Source access is read-only.
-Commands and limits: `plugins/builtin/systems-inspector.agent.md`.
-
-Systems Inspector opens across the editor window. **Systems Map** shows core modules and labelled relationships, with plugins grouped separately. Simulation and presentation remain separate views. Use **Dock view** or **Close** to return to the editor.
-
-**Function calls** in the Systems Inspector parses the selected full source file. Select a function to inspect calls and file-local callers, jump to call-site lines, or follow local definitions and direct relative imports. Dynamic calls are marked unresolved. This does not record runtime execution.
-
-Select a module in Systems Map to highlight its connections while keeping the full map visible. Call lines link resolved imported functions, labelled caller → function; arrows open call sites. Import lines is a separate mode.
-
-The core map inventories index.html and all engine/ JavaScript, MJS and CSS sources from disk. It marks engine/index.js as browser main and draws literal imports. Hover or select a file to highlight its connections. Selection opens source beside the map; Local function detail is optional.
-
-## Systems Workspace: inspection, design and visual scripting
-
-Diagram starts in **Program Flow**: page → entry script → entry function → its direct startup calls → function completion. Calls run left to right; select a step to read its source. Awaited calls and callback registrations are labelled. This first view omits callback bodies, assignments and browser utilities, and does not expand called functions or model error paths. Entries with branches require the detailed Visual Script view. Choose **File Relationships** in the Diagram view selector for the file map.
-
-Use the permanent **Diagram**, **Code**, **Design**, and **Visual Script** links at the top. The blue link and view heading identify the active mode. Bookmark `#systems=inspect`, `#systems=code`, `#systems=design`, or `#systems=script` to reopen it. `systems.mode <mode>` opens the same view from the CLI. Visual Script offers a function picker before any flow exists. Anonymous callback rows are hidden by default; **Show anonymous callbacks** reveals them. Call connections stay included.
-
-System diagram shows file names above clickable function lists. ELK arranges calls left to right, JointJS draws the diagram, and Monaco displays source with syntax colouring and code editing. Select a function or call arrow to open its source line. Use **Selected file** or **Fit diagram** to navigate. Calls describe source structure, not runtime execution order.
-
-**Monaco Code Editor**, **JointJS Diagrams**, and **ELK Graph Layout** are separate plugins in PLUGINS. Systems Inspector declares their services as dependencies. Other plugins can consume them too. Libraries load on demand; disabling a provider disables Systems Inspector through the normal dependency rules. Re-enable the provider, then Systems Inspector, to use it again. Source edits remain drafts until **Apply to source**; **Discard source edits** restores the buffer.
-
-SYSTEMS opens a fullscreen workspace. Inspect code scans source files across engine, builtin plugins and game plugins. The graph follows parsed imports and resolved function calls; it never executes source. Filter by source group or file, select nodes and call sites, and inspect coupling, cycles and unresolved code.
-
-Design mode creates editable architecture drafts with typed nodes, connections, responsibility, inputs, outputs, constraints, decisions and acceptance criteria. Save and reopen project-local versioned diagrams; use undo/redo, JSON import, SVG/Mermaid export or an AI implementation brief. A source-linked draft reports changed evidence after a scan.
-
-Visual scripting converts one selected JavaScript function into code, condition, while and return nodes. Preview validates the flow before Apply writes that function back. Arbitrary statements remain code blocks; generators remain source-only. Source writes check the original hash, retain a backup, and preserve surrounding code. Invalid or conflicting changes remain editable.
-
-The host adapter and UI are separate from `plugins/builtin/systems-inspector/toolkit/`, a plain-data library with a standalone source-scanning CLI. Its README documents reuse outside the engine. Diagrams are stored under the game's `.engine/systems/`, with optimistic revision checks and one previous saved revision.
-
-
 ## Plugin and agent contracts
 
 The loader now owns scoped plugin resources and compiles system schedules.

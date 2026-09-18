@@ -26,6 +26,8 @@
  * deleting its corpses.
  */
 
+import { asVector } from '../../engine/vector.js'
+
 /** Everything this plugin set up. Nothing else is its business. See the header. */
 const managed = new Set()
 
@@ -74,12 +76,6 @@ function bagFor(entity) {
   if (entity.damageable) return entity.damageable
   if (entity.properties?.health === undefined && entity.properties?.maxHealth === undefined) return null
   return setUp(entity, {})
-}
-
-const asVector = value => {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object') return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  return null
 }
 
 /** Straight-line distance, ignoring height. A top-down game hits by footprint. */

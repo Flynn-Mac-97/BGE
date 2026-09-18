@@ -4,6 +4,12 @@ description: Stops the world and offers a row of cards to pick from. Use for lev
 ---
 <!-- generated from plugins/builtin/choice-screen.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/choice-screen.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/choice-screen.js"]}'
+```
+
 # Choice Screen
 
 - Stops the world and offers a row of cards to pick from.
@@ -18,6 +24,4 @@ description: Stops the world and offers a row of cards to pick from. Use for lev
   ends at `pick(index)`, so a bot and a player play the same game.
 - Reads: `.isOpen` `.waiting` `.view()`; `cancel()` drops everything unanswered
   and gives the world back — call it on death.
-- Announces `choice:offered`, `choice:picked`, `choice:closed`.
-- Commands: `choice.show`, `choice.pick <number>`.
 - Draws through **Screen**; without it the offer still queues, holds and picks.

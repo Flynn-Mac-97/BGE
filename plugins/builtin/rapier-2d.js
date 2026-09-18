@@ -10,6 +10,8 @@
  * enabled. `rapier2d.use` switches in one call and writes it to game.json.
  */
 import { makeBridge, GRAVITY_2D } from './rapier/bridge.js'
+import { makeLoader } from './rapier/loading.js'
+import { installSolver } from './rapier/solver-context.js'
 
 const REPLACES = 'Physics 2D'
 
@@ -23,75 +25,12 @@ const is2D = entity =>
 
 const round = value => Math.round(value * 1000) / 1000
 
-let loading = null
-
-/**
- * This world's solver, by its context.
- *
- * The compiled module is shared — megabytes, and compiling it twice for two worlds
- * costs seconds for nothing. The Rapier world and the entity-to-body map are not:
- * a bridge reconciles against one entity list and drops every body that is not in
- * it, so one bridge over two worlds made each step tear the other world's bodies
- * down and build them again from the entities.
- */
-const solvers = new WeakMap()
-
-/** This world's bridge, or null while the WebAssembly is still compiling. */
-const bridgeOf = context => solvers.get(context)?.bridge || null
-
-/** What the panel remembers between renders, per world. */
-const panelHashes = new WeakMap()
-
-/**
- * The module is megabytes of WebAssembly, so it is fetched once for the process.
- *
- * The timer holds the event loop open. Neither the import nor Rapier's `init`
- * counts as pending work in node, so a headless process with nothing else to
- * do exits part-way through the load and reports success.
- */
-async function loadModule() {
-  if (!loading) {
-    const hold = setInterval(() => {}, 50)
-    loading = import('@dimforge/rapier2d-deterministic-compat').then(async module => {
-      const loaded = module.default ?? module
-      await loaded.init()
-      return loaded
-    }).finally(() => clearInterval(hold))
-  }
-  return loading
-}
-
-/**
- * Start the WebAssembly, build this world's solver, and hold the world until it
- * lands.
- *
- * The hold is what makes the wait safe. A step taken while the solver is still
- * compiling moves a world with no physics in it and answers as though it had,
- * and two runs of the same level then disagree by however long the load took.
- * The hold is named, so `snapshot().paused` and a `simulate` reply say what the
- * world is waiting for.
- *
- * The promise is held rather than the bridge, so a step that arrives while the
- * module is still compiling waits on the first load instead of building a second
- * solver under the same world.
- *
- * A world from the kernel has a loop to hold and a startup registry the caller
- * waits on. A bare context in a unit test has neither, and there the load starts
- * unannounced, which is how it behaved before.
- */
-function startLoading(context) {
-  let solver = solvers.get(context)
-  if (!solver) { solver = { bridge: null, started: null }; solvers.set(context, solver) }
-  if (solver.started) return solver.started
-  context.loop?.hold(HOLD)
-  solver.started = loadModule().then(module => {
-    solver.bridge = makeBridge({ RAPIER: module, tag: 'rapier-2d', claims: is2D, flat: true, gravity: GRAVITY_2D })
-    solver.bridge.start()
-    return solver.bridge
-  }).finally(() => context.loop?.release(HOLD))
-  context.startup?.add(NAME, solver.started)
-  return solver.started
-}
+const { startLoading, bridgeOf } = makeLoader({
+  name: NAME,
+  hold: HOLD,
+  load: () => import('@dimforge/rapier2d-deterministic-compat'),
+  solver: module => makeBridge({ RAPIER: module, tag: 'rapier-2d', claims: is2D, flat: true, gravity: GRAVITY_2D })
+})
 
 /** Whether this solver may run, and the one sentence that says why not. */
 function standingDown(context) {
@@ -103,21 +42,18 @@ function standingDown(context) {
 /**
  * Put this world's solver back to the moment a checkpoint holds.
  *
- * `bytes` null means the checkpoint was taken while the solver held nothing — it
- * was still compiling, or nothing had stepped yet. Holding nothing is what it was,
- * so the bodies are dropped and built again from the entities on the next step.
- * Keeping them would leave the bodies of the later run standing in a world rewound
- * to an earlier one, with the entities looking right and the velocities wrong.
+ * A null capture resets the solver. Otherwise restore bytes and entity bindings
+ * after the world has restored its entities.
  *
  * @param {object} context The world's context.
- * @param {Uint8Array|null} bytes A snapshot, or null.
+ * @param {object|null} capture Solver bytes and entity bindings, or null.
  * @returns {boolean} Whether the solver is where the checkpoint says it was.
  */
-function restoreSolver(context, bytes) {
+function restoreSolver(context, capture) {
   const bridge = bridgeOf(context)
   // Not loaded yet, so it holds nothing and there is nothing to put back.
   if (!bridge) return true
-  if (bytes) return bridge.restore(bytes) === true
+  if (capture) return bridge.restoreCapture(capture, context.world) === true
   bridge.forget()
   return true
 }
@@ -128,21 +64,7 @@ export default {
   about: 'Rigid body physics in two dimensions, solved by Rapier. Adds rotation, mass, friction and sleeping to the Physics 2D contract, and replays identically on any machine.',
 
   onLoad(context) {
-    context.rapier2d = {
-      snapshot: () => bridgeOf(context)?.snapshot() || null,
-      /** Put the solver back to a snapshot's moment. False when it would not go. */
-      restore: bytes => bridgeOf(context)?.restore(bytes) === true
-    }
-    // What this solver holds, so a checkpoint of the run carries the bodies. The
-    // entities alone are not enough: a ball restored to where it was with no
-    // velocity behind it is a world that stands still and looks right. Null is a
-    // moment taken before the solver had bodies, and putting that back means
-    // holding none — otherwise the rewind replays the later run's velocities.
-    context.checkpoints?.add(NAME, {
-      capture: () => bridgeOf(context)?.snapshot() || null,
-      restore: bytes => restoreSolver(context, bytes)
-    })
-    context.bus.on('level:loaded', () => bridgeOf(context)?.forget())
+    installSolver(context, { key: 'rapier2d', name: NAME, bridgeOf, restore: restoreSolver })
 
     // Started here, before anything can step, so no run begins without its
     // solver. The choice is already readable: this stands down while Physics 2D

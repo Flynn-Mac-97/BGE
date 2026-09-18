@@ -20,6 +20,8 @@
  * Movement is swept: a fast shot tests the whole segment it crossed this step,
  * so raising the speed never starts passing through people.
  */
+
+import { asVector, normalise } from '../../engine/vector.js'
 import { radiusOf } from './health.js'
 
 /** The type name a shot is spawned under, unless the caller names another. */
@@ -27,19 +29,6 @@ const KIND = 'projectile'
 
 /** Live shots, in flight order. Kept here so the system does not walk the world. */
 const flying = []
-
-const asVector = value => {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object') return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  return null
-}
-
-function normalise(vector) {
-  if (!vector) return null
-  const length = Math.hypot(vector.x, vector.y, vector.z)
-  if (!(length > 0)) return null
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length }
-}
 
 /**
  * How close the shot came to a point over the step it just travelled.

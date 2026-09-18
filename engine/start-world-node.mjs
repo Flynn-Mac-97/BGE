@@ -35,6 +35,7 @@ import { makeHost } from './host-node.mjs'
 import { startWorld } from './start-world.js'
 import { buildIndex, walk } from './project-index.mjs'
 import { workLock } from './work-lock.mjs'
+import { pluginGuides } from './plugin-guides.mjs'
 import { PROJECT_PREFIX } from './asset-path.js'
 import { ensureProject, isUntitled, projectName, resolveProject } from './project-path.mjs'
 
@@ -57,6 +58,12 @@ export function onDisk(projectDirectory, checkout = ROOT) {
   // The checkout is passed in, not taken from the project's parent: the project
   // may be anywhere, and the engine's own instructions are read from here.
   const root = path.resolve(checkout)
+  let interfaceReader
+  const agentInterface = async (scope, file) => {
+    interfaceReader ??= import('../plugins/builtin/plugin-master/interface-block.js')
+      .then(module => module.makeInterfaceReader({ root, projectDirectory }))
+    return (await interfaceReader)(scope, file)
+  }
   /** Resolve one project file, refusing any path that climbs outside the project. */
   const inside = rel => {
     const abs = path.resolve(projectDirectory, rel)
@@ -74,8 +81,8 @@ export function onDisk(projectDirectory, checkout = ROOT) {
     const base = scope === 'engine' ? root : scope === 'project' ? projectDirectory : null
     const clean = String(rel || '').replaceAll('\\', '/').replace(/^\.\//, '')
     const allowed = scope === 'engine'
-      ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent\.md$/.test(clean)
-      : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent\.md$/.test(clean)
+      ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+      : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
     if (!base || !allowed) throw new Error(`bad agent file path: ${scope}:${rel}`)
     const abs = path.resolve(base, clean)
     if (!abs.startsWith(base + path.sep)) throw new Error(`bad agent file path: ${scope}:${rel}`)
@@ -83,49 +90,7 @@ export function onDisk(projectDirectory, checkout = ROOT) {
   }
 
   /** The `.agent.md` guides beside every plugin, in the shape the agent-context builder reads. */
-  const pluginSidecars = async () => {
-    const game = JSON.parse(await fs.readFile(path.join(projectDirectory, 'game.json'), 'utf8').catch(() => '{}'))
-    const disabled = new Set(game.plugins?.disabled || [])
-    const places = [
-      { scope: 'engine', directory: path.join(root, 'plugins/builtin'), prefix: 'plugins/builtin' },
-      { scope: 'project', directory: path.join(projectDirectory, 'plugins'), prefix: 'plugins' }
-    ]
-    const found = []
-    for (const place of places) {
-      let names = []
-      try { names = await fs.readdir(place.directory) } catch { continue }
-      for (const name of names.filter(name => name.endsWith('.agent.md')).sort()) {
-        const stem = name.slice(0, -'.agent.md'.length)
-        const source = await fs.readFile(path.join(place.directory, `${stem}.js`), 'utf8').catch(() => '')
-        const plugin = source.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
-        // A guide applies to its own plugin by default. A leading frontmatter
-        // `match:` (space-separated paths) adds more — Plugin Master uses it to
-        // ride along with every plugin task.
-        const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
-        const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
-        const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
-        // A guide may declare its own trigger words (comma-separated) — the
-        // same reading the dev server makes, or the two twins route
-        // differently.
-        const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
-        // `project/` is the one name for a file in the open project, whatever
-        // the directory is called on disk. Guides declare `match: project/**`
-        // and are right for every project.
-        const match = [...new Set([
-          `${place.scope === 'project' ? 'project/' : ''}${place.prefix}/${stem}.js`,
-          ...extra
-        ])]
-        found.push({
-          id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
-          scope: place.scope, file: `${place.prefix}/${name}`,
-          match,
-          triggers: [...new Set([stem.replaceAll('-', ' '), plugin.toLowerCase(), ...saidTriggers])],
-          enabled: !disabled.has(plugin), plugin
-        })
-      }
-    }
-    return found
-  }
+  const pluginSidecars = () => pluginGuides(root, projectDirectory)
 
   return {
     index: () => buildIndex(projectDirectory, root),
@@ -133,6 +98,7 @@ export function onDisk(projectDirectory, checkout = ROOT) {
       .filter(f => !f.startsWith('.engine'))
       .map(f => ({ path: f })),
     agentPlugins: pluginSidecars,
+    agentInterface,
     sourceCatalog: selection => sourceCatalog(root, projectDirectory, selection),
     listDocuments: () => listDocuments(projectDirectory),
     readDocument: (id, backup) => readDocument(projectDirectory, id, backup),

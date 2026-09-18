@@ -66,9 +66,7 @@ An unknown input is reported by name; the argument gets zero.
 
 ## Commands
 
-- `glsl.backend` — whether GLSL can build now, and why not if not.
 - `glsl.forceWebGL '[true]'` — choose WebGL on the next load; `'[false]'` goes back to WebGPU.
-- `glsl.list` — every GLSL shader, its slots and defaults.
 - `glsl.source '["dissolve"]'` — the helpers and slots of one.
 
 ## Detail

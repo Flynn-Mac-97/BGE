@@ -65,7 +65,6 @@ level reload forgets them.
 
 - `physics3d.raycast` — a sightline in one call. Takes a point or an entity id
   at each end.
-- `physics3d.bodies` — what is being simulated right now.
 
 ## What it costs
 

@@ -19,6 +19,8 @@
  * table in one place rather than three numbers at every call site.
  */
 
+import { asVector } from '../../engine/vector.js'
+
 /** Weight one: the heaviest hit a game should ever ask for. */
 const MOST_HOLD = 0.11      // seconds the world stops
 const MOST_SHAKE = 0.45     // metres the camera wanders
@@ -37,12 +39,6 @@ const state = { held: 0, shaken: 0, hits: 0, spentAt: -1, spent: 0 }
 
 /** Seconds of hold allowed per second of play. A third is generous and still safe. */
 const BUDGET = 0.34
-
-const asVector = value => {
-  if (Array.isArray(value)) return { x: +value[0] || 0, y: +value[1] || 0, z: +value[2] || 0 }
-  if (value && typeof value === 'object') return { x: +value.x || 0, y: +value.y || 0, z: +value.z || 0 }
-  return null
-}
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value))
 

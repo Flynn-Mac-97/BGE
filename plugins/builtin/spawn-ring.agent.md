@@ -4,7 +4,7 @@ description: Where just off screen is, in metres. Use to spawn enemies or waves 
 
 # Spawn Ring
 
-- Answers "where is just off screen, in metres". `context.spawnRing`.
+- Answers "where is just off screen, in metres".
 - `visibleRadius()` — centre of the screen to a corner, on the ground. Exact for an
   orthographic view; a flat estimate times a margin for any other, because a game
   camera that only writes x and y carries no eye height to measure with.

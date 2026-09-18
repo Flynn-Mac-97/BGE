@@ -88,6 +88,11 @@ A plugin holding state of its own declares it in `onLoad` with
 be carried is named in `moment.lost`: a scheduled callback is a closure, so a
 checkpoint holding one can only say how many it could not keep.
 
+A full restore clears the timer schedule, including timers created after capture.
+Captured callbacks remain listed in `lost`; a clock-only reload can retain its
+rebuilt schedule. Solver checkpoints store entity ids and body handles alongside
+the bytes. Entities restore first so solvers can bind bodies to revived entities.
+
 ## Stepping back
 
 `engine.stepBack(n)` and `engine.seek(step)` put the run back, and `engine.marks`

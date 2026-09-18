@@ -4,6 +4,12 @@ description: Times a run from first step to end and reports why it ended. Use fo
 ---
 <!-- generated from plugins/builtin/run-clock.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/run-clock.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/run-clock.js"]}'
+```
+
 # Run Clock
 
 - A run starts, is timed, and ends. Engine time, so a paused level-up does not
@@ -20,4 +26,3 @@ description: Times a run from first step to end and reports why it ended. Use fo
   so a result screen still draws.
 - The words on a result screen belong to the game. This plugin writes none.
 - Mirrors `runSeconds`, `runClock` and `runOver` into `world.state`.
-- Commands: `run.state`, `run.end <reason>`.

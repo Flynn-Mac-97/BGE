@@ -43,6 +43,7 @@ export function overHTTP() {
     index: () => j('/api/index'),
     tree: () => j('/api/tree'),
     agentPlugins: () => j('/api/agent-plugins'),
+    agentInterface: async (scope, file) => (await j('/api/agent-interface?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(file))).text,
     read: async path => (await j('/api/file?path=' + encodeURIComponent(path))).text,
     sourceCatalog: (selection = 'core') => j('/api/systems/catalog?selection=' + encodeURIComponent(selection)),
     listDocuments: () => j('/api/systems/documents'),
@@ -149,6 +150,7 @@ export function makeFiles(bus, transport = overHTTP()) {
     async index() { return transport.index() },
     async tree() { return transport.tree() },
     async agentPlugins() { return transport.agentPlugins() },
+    async agentInterface(scope, file) { return transport.agentInterface(scope, file) },
     async read(path) { return transport.read(path) },
     async sourceCatalog(selection = 'core') {
       if (!transport.sourceCatalog) throw new Error('source catalog unavailable in this transport')

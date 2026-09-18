@@ -4,6 +4,12 @@ description: Marks stuck to world surfaces: bullet holes, blood, scorch. Use for
 ---
 <!-- generated from plugins/builtin/decals.agent.md at server start; edits are lost -->
 
+Read the generated interface in `plugins/builtin/decals.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/decals.js"]}'
+```
+
 # Decals
 
 - Owns `context.decals`: one capped wall of marks stuck to world surfaces — bullet holes, blood, scorch. A decal is **not an entity**: it is not in `world.entities`, has no collider, and nothing can hit it.
@@ -34,7 +40,6 @@ Returns the decal, or `null` when it refuses. Every option, with its default:
 | `life` | `0` | seconds of engine time. `0` is permanent. A decal with a life fades out over its last quarter |
 
 - Read it back: `context.decals.recent(n)` (default 20, oldest first), `.state` → `{ cap, alive, placed, recycled, revision }`, `.count`, `.all`, `.alpha(decal)`, `.clear()`.
-- Commands: `decals.recent` · `decals.state` · `decals.clear`.
 - **Emits no events.** Listens for `level:loaded` (wipes the wall — old marks would be at coordinates that now mean somewhere else) and `shell:ready` (starts drawing). Combat Effects is what turns `weapon:hit` and `entity:killed` into `place` calls, and it takes the pictures from `context.particles.art.bulletHole` and `.art.blood`, which the game sets.
 - **The cap is 300 and it is a constant.** Placement 301 overwrites the oldest, silently. `state.recycled` counts it.
 - Each mark is lifted **1 mm along the normal** so it does not fight the wall for depth. `decal.point` keeps the raw hit, so a test asserts the offset rather than recomputing it.

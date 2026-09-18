@@ -16,3 +16,6 @@ the engine's rule wins.
 - Accept dependencies as parameters; do not create them inside. Return the
   result instead of changing shared state where you can.
 - The interface is the test surface. Test through it, not past it.
+- One record, one shape. Build a record in one place, and let each reader cut
+  the fields it names from it. Two hand-written projections of the same record
+  drift, and the untested one drifts in silence.
