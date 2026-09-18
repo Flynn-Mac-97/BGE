@@ -19,6 +19,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadSetup } from './scoring.mjs'
 import { runCandidate } from './candidate.mjs'
+import { costBands, sumCosts } from './pricing.mjs'
 import { renderReport } from './report.mjs'
 import { CHECKOUT, designSetup, preflight, recordSetupCheck, startRun, verifySetup } from './setup.mjs'
 
@@ -51,14 +52,20 @@ async function stopRequested(runDirectory) {
   return fs.access(path.join(runDirectory, 'stop')).then(() => true, () => false)
 }
 
-/** One candidate's record, written where a person can read it next to its patch. */
-async function writeCandidateRecord(runDirectory, round, record) {
+/**
+ * One candidate's record, written where a person can read it next to its patch.
+ *
+ * Both files are named after the candidate's id, so a record and its patch are
+ * found by the same name the lineage uses. Naming the patch after the attempt
+ * number instead is what once left a run with no `winner.patch` at all: the
+ * winner was named by id and copied by a name no file had.
+ */
+export async function writeCandidateRecord(runDirectory, round, record) {
   const directory = path.join(runDirectory, 'rounds', `r${String(round).padStart(4, '0')}`)
   await fs.mkdir(directory, { recursive: true })
-  const stem = path.join(directory, `c${record.attempt}`)
   const { patch, ...rest } = record
-  await fs.writeFile(`${stem}.json`, `${JSON.stringify(rest, null, 2)}\n`, 'utf8')
-  if (patch) await fs.writeFile(`${stem}.patch`, patch, 'utf8')
+  await fs.writeFile(path.join(directory, `${record.id}.json`), `${JSON.stringify(rest, null, 2)}\n`, 'utf8')
+  if (patch) await fs.writeFile(path.join(directory, `${record.id}.patch`), patch, 'utf8')
   return rest
 }
 
@@ -124,6 +131,11 @@ export async function dreamRun({
   const targetRecord = JSON.parse(await fs.readFile(path.join(directory, 'target.json'), 'utf8'))
   const targetText = target ?? targetRecord.target
   const suiteHash = checkRecord.digest
+
+  // What the run has cost so far, in RMB. The design phase is read from its own
+  // record, so a resumed run still counts what it spent before the resume.
+  const designRecord = JSON.parse(await fs.readFile(path.join(directory, 'design.json'), 'utf8').catch(() => 'null'))
+  const spent = designRecord?.tokens ? [costBands(designRecord.tokens)] : []
   let incumbent = {
     id: 'baseline',
     value: checkRecord.working.value,
@@ -142,7 +154,7 @@ export async function dreamRun({
       break
     }
 
-    await writeStatus(directory, { status: 'running', round, best: incumbent, candidates: history.length })
+    await writeStatus(directory, { status: 'running', round, best: incumbent, candidates: history.length, cost: sumCosts(spent) })
 
     let improved = false
     for (let attempt = 1; attempt <= candidates; attempt++) {
@@ -151,6 +163,7 @@ export async function dreamRun({
         runDirectory: directory,
         setup,
         attempt,
+        round,
         id,
         target: targetText,
         files: targetRecord.files ?? [],
@@ -176,7 +189,8 @@ export async function dreamRun({
         improved = true
       }
       const kept = await writeCandidateRecord(directory, round, record)
-      if (record.best) incumbent.patch = path.join(directory, 'rounds', `r${String(round).padStart(4, '0')}`, `c${record.attempt}.patch`)
+      if (record.cost) spent.push(record.cost)
+      if (record.best) incumbent.patch = path.join(directory, 'rounds', `r${String(round).padStart(4, '0')}`, `${record.id}.patch`)
       history.push({ id: kept.id, value: kept.value, pass: kept.verdict === 'scored', reason: kept.reason })
     }
 
@@ -188,7 +202,7 @@ export async function dreamRun({
     // Rewritten every round, so the document and the pictures follow the run
     // while it is still going rather than being a summary written at the end.
     await renderReport(directory)
-    await writeStatus(directory, { status: 'running', round, best: incumbent, candidates: history.length })
+    await writeStatus(directory, { status: 'running', round, best: incumbent, candidates: history.length, cost: sumCosts(spent) })
 
     withoutImprovement = improved ? 0 : withoutImprovement + 1
     if (withoutImprovement >= patience) {
@@ -197,32 +211,42 @@ export async function dreamRun({
     }
   }
 
-  const best = history.filter(entry => entry.id === incumbent.id)[0] ?? null
+  // The winner's own history line, matched on value as well as id: a run that
+  // reused an id across rounds used to report the earlier candidate here.
+  const best = history.find(entry => entry.id === incumbent.id && entry.value === incumbent.value) ?? null
   const winner = {
     id: incumbent.id,
     value: incumbent.value,
     measures: incumbent.measures,
     baseline: { value: checkRecord.working.value, measures: checkRecord.working.totals?.measures ?? null },
     improvement: Number((incumbent.value - checkRecord.working.value).toFixed(6)),
+    cost: sumCosts(spent),
     best,
     landed: false
   }
 
   if (best) {
     const roundsDirectory = await fs.readdir(path.join(directory, 'rounds'))
+    let found = null
     for (const roundName of roundsDirectory.sort().reverse()) {
       const files = await fs.readdir(path.join(directory, 'rounds', roundName))
-      const patchName = files.find(file => file === `${best.id}.patch`)
-      if (patchName) {
-        await fs.copyFile(path.join(directory, 'rounds', roundName, patchName), path.join(directory, 'winner.patch'))
-        winner.patch = 'winner.patch'
+      if (files.includes(`${best.id}.patch`)) {
+        found = roundName
         break
       }
+    }
+    if (found) {
+      await fs.copyFile(path.join(directory, 'rounds', found, `${best.id}.patch`), path.join(directory, 'winner.patch'))
+      winner.patch = 'winner.patch'
+    } else {
+      // Said rather than left out: a winner with no patch is a run that cannot
+      // be landed, and a silent absence reads as "nothing to apply".
+      winner.patchMissing = `no ${best.id}.patch was written among the rounds`
     }
   }
 
   await fs.writeFile(path.join(directory, 'winner.json'), `${JSON.stringify(winner, null, 2)}\n`, 'utf8')
-  await writeStatus(directory, { status: 'done', best: incumbent })
+  await writeStatus(directory, { status: 'done', best: incumbent, cost: sumCosts(spent) })
   await renderReport(directory)
   return {
     runDirectory: directory,

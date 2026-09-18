@@ -5,9 +5,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 
+import { costOf, bandAt, costBands, sumCosts } from '../tools/dream/pricing.mjs'
 import { digestOf, loadSetup, scoreRun } from '../tools/dream/scoring.mjs'
 import { sessionTokens } from '../tools/dream/measures.mjs'
 import { renderReport } from '../tools/dream/report.mjs'
+import { writeCandidateRecord } from '../tools/dream/loop.mjs'
 import { replaceOnce } from '../tools/dream/worktree.mjs'
 import reference from '../tools/dream/examples/agent-connection.mjs'
 
@@ -107,6 +109,34 @@ test('a control that would rewrite two places changes neither', async () => {
   assert.match(twice.error, /more than once/)
   assert.equal(once.ok, true)
   assert.equal(after, 'const a = 2\nconst b = 1\n', 'the refused control still wrote to the file')
+})
+
+test('a run is priced in RMB at the published rate for its model', () => {
+  const million = { inputTokens: 1_000_000, cacheReadTokens: 1_000_000, outputTokens: 1_000_000, totalTokens: 3_000_000 }
+  assert.equal(costOf(million, { band: 'peak' }).rmb, 10.04, 'a million of each at peak')
+  assert.equal(costOf(million, { band: 'offPeak' }).rmb, 5.02, 'the same at half price')
+  assert.equal(costOf({}).priced, false, 'an empty record was priced as free')
+})
+
+test('the peak band is Beijing working hours, not the machine clock', () => {
+  // Friday 14:42 in Beijing.
+  assert.equal(bandAt(new Date('2026-09-18T06:42:00Z')), 'peak')
+  // Friday 06:00 Beijing, before the working day.
+  assert.equal(bandAt(new Date('2026-09-17T22:00:00Z')), 'offPeak')
+  // Saturday 10:00 Beijing: the hour is inside a window, the day is not.
+  assert.equal(bandAt(new Date('2026-09-19T02:00:00Z')), 'offPeak')
+})
+
+test('a sum keeps both bands and says which one it was worked out at', () => {
+  const total = sumCosts([
+    costBands({ inputTokens: 1_000_000, cacheReadTokens: 0, outputTokens: 0, totalTokens: 1_000_000 }, new Date('2026-09-18T06:42:00Z')),
+    costBands({ inputTokens: 0, cacheReadTokens: 0, outputTokens: 1_000_000, totalTokens: 1_000_000 }, new Date('2026-09-18T06:42:00Z'))
+  ])
+  assert.equal(total.peak, 10)
+  assert.equal(total.offPeak, 5)
+  assert.equal(total.now, 10)
+  assert.equal(total.band, 'peak')
+  assert.equal(total.totalTokens, 2_000_000)
 })
 
 /** A run directory with one refused candidate and one that beat the target. */

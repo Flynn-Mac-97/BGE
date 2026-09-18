@@ -167,11 +167,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   }
 
   const { setup } = loaded
-  const project = await copyProject(path.resolve(CHECKOUT, setup.project))
+  const checkout = argument('checkout') ? path.resolve(argument('checkout')) : CHECKOUT
+  // The project is resolved against the checkout being scored, not against the
+  // tools, so a candidate that runs the scorer inside its own worktree opens
+  // its own copy of the project.
+  const project = await copyProject(path.resolve(checkout, setup.project))
   let record
   try {
     record = await scoreRun({
-      checkout: argument('checkout') ? path.resolve(argument('checkout')) : CHECKOUT,
+      checkout,
       project,
       tasks: setup.tasks,
       weights: setup.weights ?? {},

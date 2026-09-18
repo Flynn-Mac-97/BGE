@@ -16,6 +16,10 @@
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { PRICING, costBands, formatRmb, sumCosts } from './pricing.mjs'
+
+const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** Read every record a run wrote, oldest first. */
 export async function readRun(runDirectory) {
@@ -49,9 +53,30 @@ export async function readRun(runDirectory) {
   return {
     target: await optional('target.json'),
     check: await optional('setup-check.json'),
+    design: await optional('design.json'),
     rounds,
     winner: await optional('winner.json'),
     status: await optional('run.json')
+  }
+}
+
+/**
+ * What the run spent, in RMB.
+ *
+ * Summed from the token records on disk rather than from a stored total, so a
+ * run started before this existed still shows a cost, and a price change can be
+ * applied to an old run by reading it again.
+ */
+export function costOfRun(run) {
+  const candidates = []
+  for (const round of run.rounds) {
+    for (const candidate of round.candidates) candidates.push(costBands(candidate.tokens ?? null))
+  }
+  const design = run.design?.tokens ? costBands(run.design.tokens) : null
+  return {
+    design,
+    candidates: sumCosts(candidates),
+    total: sumCosts([...(design ? [design] : []), ...candidates])
   }
 }
 
@@ -193,6 +218,7 @@ export function attemptsOf(run) {
         reason: candidate.reason ?? null,
         measures: candidate.measures ?? null,
         tokens: candidate.tokens?.totalTokens ?? null,
+        cost: costBands(candidate.tokens ?? null),
         durationMs: candidate.durationMs ?? null,
         report: candidate.report ?? null
       })
@@ -244,13 +270,25 @@ export function markdownReport(run) {
   lines.push(`Value **${number(baseline)}**${run.check?.working?.totals?.measures ? `, measuring ${Object.entries(run.check.working.totals.measures).map(([measure, amount]) => `${number(amount)} ${measure}`).join(', ')}` : ''}.`)
   lines.push('')
 
+  lines.push('## What it cost')
+  lines.push('')
+  const spent = costOfRun(run)
+  lines.push(`Design ${spent.design?.priced ? formatRmb(spent.design.now) : 'none recorded'}, candidates ${spent.candidates.priced ? formatRmb(spent.candidates.now) : 'none recorded'}, total **${spent.total.priced ? formatRmb(spent.total.now) : 'unknown'}** at the hour the calls were made.`)
+  lines.push('')
+  if (spent.total.priced) {
+    lines.push(`Between ${formatRmb(spent.total.offPeak)} and ${formatRmb(spent.total.peak)} depending on the hour: ${PRICING.modelVersion} is charged at half price outside Beijing working hours.`)
+    lines.push('')
+  }
+  lines.push(`Priced by \`tools/dream/pricing.mjs\`: ${PRICING.model} at ¥${PRICING.rates.peak.cacheMiss} cache miss, ¥${PRICING.rates.peak.cacheHit} cache hit and ¥${PRICING.rates.peak.output} output per 1M tokens at peak, read ${PRICING.readAt} from ${PRICING.source}.`)
+  lines.push('')
+
   lines.push('## Attempts')
   lines.push('')
-  lines.push('| round | candidate | from | value | measures | tokens | verdict |')
-  lines.push('| --- | --- | --- | --- | --- | --- | --- |')
+  lines.push('| round | candidate | from | value | measures | tokens | cost | verdict |')
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const attempt of attempts) {
     const measures = attempt.measures ? Object.entries(attempt.measures).map(([measure, amount]) => `${measure} ${number(amount)}`).join(' ') : '—'
-    lines.push(`| ${attempt.round} | \`${attempt.id}\` | ${attempt.parent} | ${number(attempt.value)} | ${measures} | ${attempt.tokens ?? '—'} | ${attempt.scored ? (attempt.best ? 'kept' : 'scored, not better') : `refused — ${attempt.reason ?? ''}`} |`)
+    lines.push(`| ${attempt.round} | \`${attempt.id}\` | ${attempt.parent} | ${number(attempt.value)} | ${measures} | ${attempt.tokens ?? 'none'} | ${formatRmb(attempt.cost.now)} | ${attempt.scored ? (attempt.best ? 'kept' : 'scored, not better') : `refused: ${attempt.reason ?? ''}`} |`)
   }
   if (!attempts.length) lines.push('| — | no candidate has run | — | — | — | — | — |')
   lines.push('')
@@ -264,11 +302,15 @@ export function markdownReport(run) {
   if (winner && winner.id !== 'baseline' && kept.length) {
     lines.push(`\`${winner.id}\` scored **${number(winner.value)}** against the target's ${number(baseline)}, an improvement of ${number(winner.improvement)}.`)
     lines.push('')
-    lines.push(`Its patch is \`${winner.patch ?? 'winner.patch'}\` in this directory. To land it:`)
-    lines.push('')
-    lines.push('```sh')
-    lines.push(`git apply ${winner.patch ?? 'winner.patch'}`)
-    lines.push('```')
+    if (winner.patchMissing) {
+      lines.push(`No patch was written for it, so it cannot be landed: ${winner.patchMissing}.`)
+    } else {
+      lines.push(`Its patch is \`${winner.patch ?? 'winner.patch'}\` in this directory. To land it:`)
+      lines.push('')
+      lines.push('```sh')
+      lines.push(`git apply ${winner.patch ?? 'winner.patch'}`)
+      lines.push('```')
+    }
   } else {
     lines.push('No candidate beat the target as it stands. Everything tried is above.')
   }
@@ -297,4 +339,23 @@ export async function renderReport(runDirectory) {
     tree: path.join(runDirectory, 'tree.svg'),
     attempts: attempts.length
   }
+}
+
+// Run directly: rewrite one run's document and pictures from its records. This
+// is how a run that finished before a change to this file gets a document that
+// matches the change, without rerunning anything.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  const at = process.argv.indexOf('--run')
+  const named = at >= 0 ? process.argv[at + 1] : null
+  if (!named) {
+    process.stderr.write('usage: node tools/dream/report.mjs --run agent-runs/dream-...\n')
+    process.exit(2)
+  }
+  const directory = path.resolve(CHECKOUT, named)
+  if (!(await fs.access(directory).then(() => true, () => false))) {
+    process.stderr.write(`no run at ${named}\n`)
+    process.exit(2)
+  }
+  const written = await renderReport(directory)
+  process.stdout.write(`${written.report}\n${written.graph}\n${written.tree}\n`)
 }

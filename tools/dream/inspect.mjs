@@ -19,6 +19,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readRun } from './report.mjs'
+import { PRICING, costBands, sumCosts } from './pricing.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const RUNS = path.join(CHECKOUT, 'agent-runs')
@@ -80,7 +81,12 @@ function snapshot(directory) {
     const at = path.join(roundsDirectory, name)
     for (const file of fs.readdirSync(at).filter(entry => entry.endsWith('.json') && entry !== 'round.json').sort()) {
       try {
-        rounds.push(JSON.parse(fs.readFileSync(path.join(at, file), 'utf8')))
+        const candidate = JSON.parse(fs.readFileSync(path.join(at, file), 'utf8'))
+        // Cost is recomputed from the token record every read, so a run made
+        // before pricing existed still shows one, and a price change shows up
+        // without rerunning anything.
+        candidate.cost = costBands(candidate.tokens ?? null)
+        rounds.push(candidate)
       } catch { /* a candidate still being written */ }
     }
   }
@@ -88,6 +94,13 @@ function snapshot(directory) {
   const candidateTokens = rounds.reduce((total, one) => total + (one.tokens?.totalTokens ?? 0), 0)
   const spent = rounds.reduce((total, one) => total + (one.durationMs ?? 0), 0)
   const kept = rounds.filter(one => one.best === true)
+  const designCost = design?.tokens ? costBands(design.tokens) : null
+  const cost = {
+    design: designCost,
+    candidates: sumCosts(rounds.map(one => one.cost)),
+    total: sumCosts([...(designCost ? [designCost] : []), ...rounds.map(one => one.cost)]),
+    note: `${PRICING.modelVersion} · ¥${PRICING.rates.peak.cacheMiss} miss / ¥${PRICING.rates.peak.cacheHit} hit / ¥${PRICING.rates.peak.output} output per 1M at peak, half outside Beijing working hours · read ${PRICING.readAt}`
+  }
 
   return {
     name: path.basename(directory),
@@ -114,6 +127,7 @@ function snapshot(directory) {
     design: design ? { status: design.status, tokens: design.tokens?.totalTokens ?? null, durationMs: design.durationMs ?? null, text: design.text ?? '' } : null,
     rounds,
     tokens: { candidates: candidateTokens, design: design?.tokens?.totalTokens ?? 0, total: candidateTokens + (design?.tokens?.totalTokens ?? 0) },
+    cost,
     spentCandidateMs: spent,
     kept: kept.length,
     graph: textOf(directory, 'graph.svg'),
@@ -157,6 +171,7 @@ const PAGE = `<!doctype html>
 <h1 id="target">dream run</h1>
 <div class="sub" id="sub"></div>
 <div class="row" id="cards"></div>
+<div class="sub" id="costNote"></div>
 <h2>Setup — what this run froze</h2>
 <div id="setup"></div>
 <h2>Attempts</h2>
@@ -170,6 +185,7 @@ const PAGE = `<!doctype html>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 const num = v => (typeof v === 'number' ? (Math.round(v * 1e6) / 1e6).toLocaleString('en-US') : '—')
+const rmb = v => (typeof v === 'number' && isFinite(v) ? '¥' + (v >= 0.01 ? v.toFixed(2) : v.toFixed(6)) : '—')
 const card = (k, v, cls) => '<div class="card"><div class="k">' + esc(k) + '</div><div class="v ' + (cls||'') + '">' + v + '</div></div>'
 
 async function refresh() {
@@ -191,11 +207,15 @@ async function refresh() {
     card('target as it stands', d.baseline ? num(d.baseline.value) : '—'),
     card('best', d.best ? num(d.best.value) + ' <span class="dim">' + esc(d.best.id) + '</span>' : '—', 'ok'),
     card('improvement', d.winner ? num(d.winner.improvement) : '—'),
+    card('cost', rmb(d.cost.total.now), 'warn'),
+    card('design cost', rmb(d.cost.design ? d.cost.design.now : null)),
+    card('candidate cost', rmb(d.cost.candidates.now)),
     card('tokens spent', num(d.tokens.total)),
-    card('of that, design', num(d.tokens.design)),
     card('attempts', String(d.rounds.length) + (d.kept ? ' <span class="ok">' + d.kept + ' kept</span>' : '')),
     card('candidate time', Math.round(d.spentCandidateMs / 1000) + ' s')
   ].join('')
+  document.getElementById('costNote').innerHTML = 'cost in RMB at ' + esc(d.cost.total.band === 'peak' ? 'the peak price' : 'the off-peak price') +
+    ' · between ' + rmb(d.cost.total.offPeak) + ' and ' + rmb(d.cost.total.peak) + ' depending on the hour<br>' + esc(d.cost.note)
 
   const s = d.setup
   const designHtml = d.design && d.design.text
@@ -213,12 +233,13 @@ async function refresh() {
 
   document.getElementById('attempts').innerHTML = !d.rounds.length
     ? '<div class="dim">no candidate has run yet</div>'
-    : '<table><tr><th>#</th><th>candidate</th><th>from</th><th class="num">value</th><th>measures</th><th class="num">tokens</th><th class="num">seconds</th><th>verdict</th></tr>' +
+    : '<table><tr><th>#</th><th>candidate</th><th>from</th><th class="num">value</th><th>measures</th><th class="num">tokens</th><th class="num">cost</th><th class="num">seconds</th><th>verdict</th></tr>' +
       d.rounds.map((c, i) => '<tr><td class="dim">' + (i + 1) + '</td><td>' + esc(c.id) + (c.best ? ' <span class="ok">kept</span>' : '') + '</td>' +
         '<td class="dim">' + esc(c.parent || 'target') + '</td>' +
         '<td class="num">' + num(c.value) + '</td>' +
         '<td class="dim">' + esc(Object.entries(c.measures || {}).map(([k,v]) => k + ' ' + num(v)).join(' ')) + '</td>' +
         '<td class="num">' + num(c.tokens && c.tokens.totalTokens) + '</td>' +
+        '<td class="num warn">' + rmb(c.cost && c.cost.now) + '</td>' +
         '<td class="num">' + Math.round((c.durationMs || 0) / 1000) + '</td>' +
         '<td class="' + (c.verdict === 'scored' ? 'ok' : 'bad') + '">' + esc(c.verdict === 'scored' ? 'scored' : (c.reason || 'refused')) + '</td></tr>').join('') +
       '</table>'

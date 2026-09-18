@@ -16,6 +16,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { copyProject, digestOf, scoreRun } from './scoring.mjs'
 import { sessionTokens } from './measures.mjs'
+import { costBands } from './pricing.mjs'
 import { applyPatch, createWorktree, patchOf, removeWorktree } from './worktree.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -44,6 +45,10 @@ async function candidatePrompt({ checkout, runDirectory, setup, workspace, targe
   return template
     .replaceAll('{{TARGET}}', String(target))
     .replaceAll('{{RUN_DIR}}', path.relative(checkout, runDirectory).split(path.sep).join('/'))
+    // Absolute, because the command is run from the candidate's own worktree,
+    // and a run directory is inside the checkout the worktree branches from and
+    // therefore not present in it.
+    .replaceAll('{{SETUP}}', path.join(runDirectory, 'setup.mjs'))
     .replaceAll('{{PROJECT}}', setup.project)
     .replaceAll('{{WORKSPACE}}', workspace)
     .replaceAll('{{FILES}}', files.length ? files.map(file => `- \`${file}\``).join('\n') : '- The files the target lives in. Find them; the target names no file.')
@@ -62,6 +67,7 @@ export async function runCandidate({
   runDirectory,
   setup,
   attempt,
+  round = 1,
   id,
   target,
   files = [],
@@ -71,7 +77,10 @@ export async function runCandidate({
   timeoutSeconds = DEFAULT_CANDIDATE_TIMEOUT_SECONDS,
   model
 } = {}) {
-  const name = `${id}-c${attempt}`
+  // The round is part of the name: attempt numbers restart every round, and two
+  // candidates answering to one id would draw on top of each other in the tree
+  // and be mistaken for each other in the record.
+  const name = `${id}-r${round}c${attempt}`
   const record = {
     id: name,
     attempt,
@@ -83,6 +92,8 @@ export async function runCandidate({
     reason: null,
     measures: null,
     tokens: null,
+    sessionDirectory: null,
+    cost: null,
     durationMs: 0,
     report: null,
     patch: null
@@ -129,6 +140,10 @@ export async function runCandidate({
     if (envelope) {
       record.report = envelope.text ?? ''
       record.tokens = envelope.sessionDir ? sessionTokens(envelope.sessionDir) : { error: 'the harness reported no session' }
+      // The transcript's directory is kept so a cost can be recomputed against a
+      // new price table without rerunning the candidate.
+      record.sessionDirectory = envelope.sessionDir ?? null
+      record.cost = costBands(record.tokens)
       record.status = envelope.status
 
       const project = await copyProject(path.resolve(made.workspace, setup.project))

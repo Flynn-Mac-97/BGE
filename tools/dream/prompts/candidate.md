@@ -15,6 +15,9 @@ against a setup that is already frozen, and that you may not change.
 
 - Anything under `{{RUN_DIR}}/` — the setup, the task checks and the records.
 - The project the tasks open: `{{PROJECT}}`.
+- Any generated file, including `*.agent/interface.generated.md`: the server
+  writes those from the plugin source, so an edit there is a copy of a change
+  that has to be made in the source or not at all.
 - Any other file, unless the change is required by the target's own interface.
 
 Editing a check, a weight or a task raises this candidate's score without
@@ -39,8 +42,11 @@ so lower measured cost is a higher score.
 Run this in your workspace and make it exit 0:
 
 ```
-node tools/dream/scoring.mjs --setup {{RUN_DIR}}/setup.mjs --checkout {{WORKSPACE}}
+node tools/dream/scoring.mjs --setup "{{SETUP}}" --checkout .
 ```
+
+The setup path is absolute because a run's directory is inside the checkout you
+branched from, so it is not in your worktree.
 
 A record with `"verdict": "scored"` is a pass. A `"reason"` names what failed;
 fix it or leave the target as you found it.
