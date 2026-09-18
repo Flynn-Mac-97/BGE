@@ -111,6 +111,26 @@ export function bestAttemptOf(grid) {
 }
 
 /**
+ * The best attempt across every grid in the pool.
+ *
+ * Read after every round rather than only at the end, because a watcher that
+ * sees yesterday's best while the pool already holds a better one is being told
+ * something untrue.
+ */
+export function bestCellOf(grids) {
+  let best = null
+  for (const grid of grids) {
+    for (const [id, cell] of Object.entries(grid.cells ?? {})) {
+      if (typeof cell.outcome?.score !== 'number') continue
+      if (!best || cell.outcome.score > best.score) {
+        best = { grid: grid.id, cell: id, score: cell.outcome.score, patchPath: cell.patchPath ?? null, measures: cell.outcome.measures ?? null }
+      }
+    }
+  }
+  return best
+}
+
+/**
  * Run one target through the whole loop.
  *
  * A setup is designed and checked first when the run has none, so the loop has
@@ -361,21 +381,14 @@ export async function rsiRun({
       round,
       pool: poolSummary(await readPool(directory)),
       policy: dreamed.winner?.file ?? null,
-      best: history[history.length - 1]
+      best: bestCellOf(await readPool(directory)),
+      roundBest: history[history.length - 1]
     })
   }
 
   // The winner is the best attempted version across every grid this run made.
   const grids = await readPool(directory)
-  let best = null
-  for (const grid of grids) {
-    for (const [id, cell] of Object.entries(grid.cells ?? {})) {
-      if (typeof cell.outcome?.score !== 'number') continue
-      if (!best || cell.outcome.score > best.score) {
-        best = { grid: grid.id, cell: id, score: cell.outcome.score, patchPath: cell.patchPath ?? null, measures: cell.outcome.measures ?? null }
-      }
-    }
-  }
+  const best = bestCellOf(grids)
 
   record.pool = poolSummary(grids)
   record.best = best
