@@ -300,6 +300,24 @@ export async function rsiRun({
     }
     await fs.writeFile(path.join(roundDirectory(directory, round), 'rollout.json'), `${JSON.stringify(roundRecord, null, 2)}\n`, 'utf8')
 
+    // What each attempt cost, per cell. The grid keeps the score; this keeps the
+    // token breakdown and the session it came from, so a finished run can be
+    // priced without the grid having to carry the money as well as the outcome.
+    const attempts = rollout.records.map(made => ({
+      cell: made.id,
+      verdict: made.record?.verdict ?? null,
+      value: made.record?.value ?? null,
+      reason: made.record?.reason ?? null,
+      measures: made.record?.measures ?? null,
+      tokens: made.record?.tokens ?? null,
+      cost: made.record?.cost ?? null,
+      durationMs: made.record?.durationMs ?? null,
+      session: made.record?.sessionDirectory ?? null,
+      patch: made.patchPath ? path.relative(checkout, made.patchPath).split(path.sep).join('/') : null,
+      report: made.record?.report ?? null
+    }))
+    await fs.writeFile(path.join(roundDirectory(directory, round), 'attempts.json'), `${JSON.stringify(attempts, null, 2)}\n`, 'utf8')
+
     await writeStatus({ phase: 'dreaming', round, policy: policy.NAME, pool: poolSummary(await readPool(directory)) })
 
     const dreamed = await dreamPolicies({
