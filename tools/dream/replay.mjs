@@ -189,20 +189,11 @@ export function makeQuestion({ grid, maxParallelism = 3, onReveal = null }) {
 /**
  * Score one policy over one recorded grid.
  *
- * `auc` is the mean attainment over the probe budget: reaching a high score
- * early scores higher than reaching it late, and an answer never reached keeps
- * the score where it was. `parallel_penalty` is the paper's, and its two stated
- * sanity checks decide the arithmetic: a serial policy must come out near 1 and
- * batches that fill the workers near 1/W. Total effective sequential rounds
- * divided by total probes gives exactly that — a serial policy's sum of ones over
- * its probes is 1, and a policy batching W at a time spends probes/W rounds over
- * the same probes, which is 1/W. Averaging the per-round ratio instead would
- * give a serial policy 1/probes, which is not what the paper describes.
- *
- * The reward is the first minus lambda times the second, so a policy that batches
- * useful work and reaches a high score with few probes wins.
+ * The paper scores a replay by its best discovered quality, attempt cost, and
+ * parallelism bonus. `beta1` prices represented attempts. `beta2` rewards more
+ * attempts per decision round. The recorded curve remains for diagnostics.
  */
-export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds = 50, lambda = 0.5, budget = null } = {}) {
+export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds = 50, beta1 = 0.01, beta2 = 0.5, budget = null } = {}) {
   const question = makeQuestion({ grid, maxParallelism })
   let failure = null
 
@@ -224,20 +215,24 @@ export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds =
   // The curve starts at the baseline, before any probe: a policy that never
   // probes has still not lost the target it started from.
   const curve = [baseline, ...trace.map(round => round.attainment)]
-  const auc = Number((curve.reduce((total, value) => total + value, 0) / curve.length).toFixed(6))
-  const parallelPenalty = probes ? Number((sequentialRounds / probes).toFixed(6)) : 0
   const best = Math.max(...curve)
+  const attempts = trace.reduce((total, round) => total + round.batch.filter(id => Number(String(id).split(':')[1]) > 0).length, 0)
+  const parallelBonus = attempts ? Number((attempts / Math.max(1, trace.length)).toFixed(6)) : 0
+  const reward = Number((best - beta1 * attempts + beta2 * parallelBonus).toFixed(6))
 
   return {
     grid: grid.id,
     policy: policy.NAME ?? policy.name ?? policy.constructor?.name ?? 'unnamed',
     beta: policy.beta ?? null,
     maxParallelism,
-    reward: Number((auc - lambda * parallelPenalty).toFixed(6)),
-    auc,
+    reward,
+    quality: Number(best.toFixed(6)),
+    beta1,
+    beta2,
+    parallelBonus,
+    attempts,
     attainment: Number(best.toFixed(6)),
     gained: Number((best - baseline).toFixed(6)),
-    parallelPenalty,
     probes,
     sequentialRounds,
     rounds: trace.length,
@@ -255,9 +250,9 @@ export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds =
  * spread is reported too: a policy that wins only on average is worth less than
  * one that wins everywhere.
  */
-export async function replayPool({ grids, policy, maxParallelism = 3, maxRounds = 50, lambda = 0.5, budget = null } = {}) {
+export async function replayPool({ grids, policy, maxParallelism = 3, maxRounds = 50, beta1 = 0.01, beta2 = 0.5, budget = null } = {}) {
   const replays = []
-  for (const grid of grids) replays.push(await replayGrid({ grid, policy, maxParallelism, maxRounds, lambda, budget }))
+  for (const grid of grids) replays.push(await replayGrid({ grid, policy, maxParallelism, maxRounds, beta1, beta2, budget }))
   const rewards = replays.map(replay => replay.reward)
   return {
     policy: policy.NAME ?? policy.name ?? policy.constructor?.name ?? 'unnamed',
@@ -282,9 +277,9 @@ export async function replayPool({ grids, policy, maxParallelism = 3, maxRounds 
  * `makePolicy(beta)` is used rather than mutating one policy, so a sweep cannot
  * leave an instance holding the last beta it was tried at.
  */
-export async function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.75, 1], maxParallelism = 3, maxRounds = 50, lambda = 0.5 } = {}) {
+export async function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.75, 1], maxParallelism = 3, maxRounds = 50, beta1 = 0.01, beta2 = 0.5 } = {}) {
   const points = []
-  for (const beta of betas) points.push({ beta, ...(await replayPool({ grids, policy: makePolicy(beta), maxParallelism, maxRounds, lambda })) })
+  for (const beta of betas) points.push({ beta, ...(await replayPool({ grids, policy: makePolicy(beta), maxParallelism, maxRounds, beta1, beta2 })) })
   const rewards = points.map(point => point.reward)
   const spread = rewards.length ? Number((Math.max(...rewards) - Math.min(...rewards)).toFixed(6)) : 0
   const best = points.reduce((winner, point) => (!winner || point.reward > winner.reward ? point : winner), null)
@@ -302,9 +297,9 @@ export async function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.
 }
 
 /** One version's score: the sweep, summarised the way a dreaming phase ranks it. */
-export async function scorePolicy({ grids, Class, instance = null, betas, maxParallelism = 3, lambda = 0.5 } = {}) {
+export async function scorePolicy({ grids, Class, instance = null, betas, maxParallelism = 3, beta1 = 0.01, beta2 = 0.5 } = {}) {
   const makePolicy = beta => (Class ? new Class({ beta, name: instance?.NAME }) : { ...instance, beta })
-  const sweep = await replaySweep({ grids, makePolicy, betas, maxParallelism, lambda })
+  const sweep = await replaySweep({ grids, makePolicy, betas, maxParallelism, beta1, beta2 })
   return {
     policy: instance?.NAME ?? Class?.name ?? 'unnamed',
     score: sweep.meanReward,
@@ -322,7 +317,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const policyFile = argument('policy')
   const runDirectory = argument('run')
   if (!policyFile || !runDirectory) {
-    process.stderr.write('usage: node tools/dream/replay.mjs --policy <file> --run <run directory> [--lambda 0.5]\n')
+    process.stderr.write('usage: node tools/dream/replay.mjs --policy <file> --run <run directory> [--beta1 0.01] [--beta2 0.5]\n')
     process.exit(2)
   }
 
@@ -342,7 +337,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     grids,
     Class: loaded.Class,
     instance: loaded.policy,
-    lambda: argument('lambda') ? Number(argument('lambda')) : 0.5,
+    beta1: argument('beta1') ? Number(argument('beta1')) : 0.01,
+    beta2: argument('beta2') ? Number(argument('beta2')) : 0.5,
     maxParallelism: argument('parallelism') ? Number(argument('parallelism')) : 3
   })
   process.stdout.write(`${JSON.stringify({

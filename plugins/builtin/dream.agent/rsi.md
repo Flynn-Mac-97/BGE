@@ -41,10 +41,11 @@ question.meta(id)            // { branch, attempt, parent_id, seq, tags }
 `best_so_far` and `budget_spent` exist and must not decide anything: reading them
 is deciding from the evaluator's numbers rather than from what was revealed.
 
-The reward is the paper's: `auc − lambda × parallel_penalty`, where `auc` is mean
-attainment over the probes spent and the penalty is total effective sequential
-rounds over total probes. A serial policy scores 1; one that fills its workers
-approaches `1 / max_parallelism`.
+The reward is the paper's: `best_quality − beta1 × attempts + beta2 × attempts /
+decision_rounds`. `best_quality` is the best revealed score. `attempts` counts
+revealed non-root nodes. `decision_rounds` counts non-empty batches. `beta1` and
+`beta2` are fixed evaluator coefficients. The policy's `beta` is a separate
+exploration knob.
 
 ## What a run records
 

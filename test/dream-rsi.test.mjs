@@ -91,15 +91,18 @@ test('max_parallelism is a limit, not a suggestion', () => {
   assert.equal(question.probe_batch(['0:0', '1:0']).length, 2)
 })
 
-test('the parallel penalty is 1 for a serial policy and 1/W for full batches', async () => {
+test('the paper reward counts non-root attempts and rewards batching', async () => {
   const grid = gridWithOneGoodBranch()
   const serial = await replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
-  assert.equal(serial.parallelPenalty, 1, 'a serial policy did not come out at 1')
+  const roots = serial.trace.reduce((total, round) => total + round.batch.filter(id => Number(String(id).split(':')[1]) === 0).length, 0)
+  assert.equal(serial.attempts, serial.probes - roots, 'root probes were charged as refinements')
+  assert.ok(serial.parallelBonus > 0, 'serial refinement did not earn a batching term')
 
   // A policy that always fills the batch: the paper's other stated check.
   const greedy = { NAME: 'full-batches', solve(question) { question.reset(); while (question.legal_actions().length) question.probe_batch(question.legal_actions().slice(0, question.max_parallelism)) } }
   const filled = await replayGrid({ grid, policy: greedy, maxParallelism: 3 })
-  assert.equal(filled.parallelPenalty, Number((1 / 3).toFixed(6)), 'full batches did not come out at 1/W')
+  assert.ok(filled.parallelBonus >= 0, 'the batching term was not recorded')
+  assert.equal(filled.reward, Number((filled.quality - 0.01 * filled.attempts + 0.5 * filled.parallelBonus).toFixed(6)))
 })
 
 test('a policy that opens branches and fills batches beats one that only refines', async () => {

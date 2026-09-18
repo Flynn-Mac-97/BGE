@@ -47,9 +47,8 @@ async function revisionPrompt({ checkout, runDirectory, policyFile, source, repl
   for (const point of replay.points) {
     lines.push(`### beta ${point.beta}: mean reward ${point.reward}`)
     for (const grid of point.replays) {
-      lines.push(`- grid ${grid.grid}: reward ${grid.reward}, probes ${grid.probes}, rounds ${grid.rounds}, `
-        + `attainment ${grid.attainment} (from ${grid.baseline ?? ''}${grid.gained >= 0 ? ' up' : ' down'} ${grid.gained}), `
-        + `penalty ${grid.parallelPenalty}${grid.failure ? `, FAILED: ${grid.failure}` : ''}`)
+      lines.push(`- grid ${grid.grid}: reward ${grid.reward}, quality ${grid.quality}, probes ${grid.probes}, rounds ${grid.rounds}, `
+        + `bonus ${grid.parallelBonus}${grid.failure ? `, FAILED: ${grid.failure}` : ''}`)
       for (const round of grid.trace.slice(0, 12)) {
         lines.push(`  - round ${round.round}: probed ${round.batch.join(', ')} → attainment ${round.attainment}`)
       }
@@ -145,7 +144,8 @@ export async function dreamPolicies({
   versions = DEFAULT_VERSIONS,
   betas = BETA_GRID,
   maxParallelism = 3,
-  lambda = 0.5,
+  beta1 = 0.01,
+  beta2 = 0.5,
   degenerateEpsilon = 0.01,
   startPolicyFile = null,
   revise = reviseWithAgent,
@@ -175,7 +175,8 @@ export async function dreamPolicies({
   const record = {
     pool: { grids: grids.length, cells: grids.reduce((total, grid) => total + Object.keys(grid.cells).length, 0) },
     betas,
-    lambda,
+    beta1,
+    beta2,
     maxParallelism,
     versions: [],
     startedAt: new Date().toISOString()
@@ -185,7 +186,7 @@ export async function dreamPolicies({
   const evaluate = async (version, file) => {
     const loaded = await loadPolicy(file)
     if (loaded.error) return { version, file: path.relative(checkout, file), failure: loaded.error, score: null }
-    const scored = await scorePolicy({ grids, Class: loaded.Class, instance: loaded.policy, betas, maxParallelism, lambda })
+    const scored = await scorePolicy({ grids, Class: loaded.Class, instance: loaded.policy, betas, maxParallelism, beta1, beta2 })
     // The whole sweep is kept in memory for the next prompt, because a revision
     // is asked to improve on a specific route, not on a number. Only the summary
     // is written to disk: the traces are large and are the input to one decision.
@@ -214,8 +215,8 @@ export async function dreamPolicies({
         reward: replay.reward,
         probes: replay.probes,
         rounds: replay.rounds,
-        attainment: replay.attainment,
-        parallelPenalty: replay.parallelPenalty,
+        quality: replay.quality,
+        parallelBonus: replay.parallelBonus,
         failure: replay.failure,
         trace: replay.trace
       })))

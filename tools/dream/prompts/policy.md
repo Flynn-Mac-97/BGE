@@ -51,18 +51,16 @@ budget on unreached cells scores badly.
 ## What is rewarded
 
 ```
-reward = auc − lambda × parallel_penalty
+reward = best_quality − beta1 × attempts + beta2 × attempts / decision_rounds
 ```
 
-`auc` is the mean attainment over the probes spent, with the baseline as the
-floor: reaching a high score early beats reaching it late. `parallel_penalty` is
-total effective sequential rounds over total probes — one decision round per
-batch, and `ceil(batch / max_parallelism)` effective sequential rounds inside it.
-A serial policy scores 1; a policy that fills its workers approaches
-`1 / max_parallelism`.
+`best_quality` is the best revealed score. `attempts` is the number of revealed
+non-root nodes, and `decision_rounds` is the number of non-empty batches. The
+last term rewards useful batching. `beta1` and `beta2` are fixed evaluator
+coefficients; beta is the policy's exploration knob and is separate from them.
 
-So: fill batches with useful work, and do not spend probes on directions with no
-evidence behind them.
+So: find high-quality recorded outcomes with few attempts, then batch useful
+continuations when the policy has evidence for them.
 
 ## What the last version did
 
