@@ -227,14 +227,17 @@ export function attemptPatchName({ round, cell }) {
  * The parent's patch is the workspace the attempt continues from, which is what
  * makes a branch a line of work rather than a series of unrelated tries.
  */
-export function realAttempt({ checkout, runDirectory, setup, target, files, setupHash, timeoutSeconds, model, round = 0 }) {
+export function realAttempt({ checkout, runDirectory, setup, target, files, setupHash, timeoutSeconds, model, round = 1 }) {
   return async ({ cell, parent, id }) => {
     const record = await runCandidate({
       checkout,
       runDirectory,
       setup,
       attempt: cell.attempt + 1,
-      round: round + 1,
+      // The round is the run's own round number, used as given. Adding one here
+      // as well put a round-002 candidate's patch under an `r003` name, so the
+      // patch prefix and the round directory disagreed about which round it was.
+      round,
       id: `rsi-b${cell.branch}`,
       target,
       files,
@@ -247,7 +250,7 @@ export function realAttempt({ checkout, runDirectory, setup, target, files, setu
     // The patch is written beside the run's records so the next attempt on this
     // branch can continue from it. Without the file there is nothing to continue
     // from: a candidate is its parent's patch plus its own work.
-    const patchFile = path.join(runDirectory, 'rsi', attemptPatchName({ round: round + 1, cell: id }))
+    const patchFile = path.join(runDirectory, 'rsi', attemptPatchName({ round, cell: id }))
     await fs.mkdir(path.dirname(patchFile), { recursive: true })
     if (record.patch) await fs.writeFile(patchFile, record.patch, 'utf8')
 

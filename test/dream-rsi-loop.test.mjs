@@ -198,7 +198,9 @@ test('a run reads its own rounds, so a resume never writes over one', async () =
   assert.equal(before[0].number, 1)
   assert.equal(before[0].plannedBranchCount, 2, 'the plan earlier rounds used was not read back')
   assert.equal(before[0].bestAttempt, 1, 'the best attempt of the recorded grid was not read back')
-  assert.equal(result.rounds[0].round, 2, 'the resumed run numbered its round one again')
+  // The summary is cumulative: it describes every round the run has recorded, not
+  // only the ones the invocation that wrote it happened to make.
+  assert.deepEqual(result.rounds.map(round => round.round), [1, 2], 'the resumed run numbered its round one again, or lost the earlier round')
   assert.deepEqual(dirs, ['round-001', 'round-002'])
   assert.equal(after, recorded, 'the round already recorded was written over')
 })

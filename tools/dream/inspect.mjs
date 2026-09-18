@@ -20,7 +20,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseRecord } from './report.mjs'
 import { PRICING, costBands, sumCosts } from './pricing.mjs'
-import { transcriptFrames } from './measures.mjs'
+import { addUsage, transcriptFrames, usageTotals } from './measures.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const RUNS = path.join(CHECKOUT, 'agent-runs')
@@ -119,7 +119,13 @@ function readRsiRounds(directory) {
     const rollout = read('rollout.json')
     const dreaming = read('dreaming.json')
     if (!rollout && !dreaming) continue
-    rounds.push({ name, rollout, dreaming })
+    // What each cell cost. Written when a round's exploration ends, so it is the
+    // first place an attempt's tokens exist as a record.
+    const attempts = (read('attempts.json') ?? []).map(attempt => ({
+      ...attempt,
+      cost: costBands(attempt.tokens ?? null)
+    }))
+    rounds.push({ name, rollout, dreaming, attempts })
   }
   return rounds
 }
@@ -291,6 +297,70 @@ function liveCalls({ name, since = 0, limit = 12 } = {}) {
   }
 }
 
+/**
+ * Token usage of a transcript read so far, kept across polls.
+ *
+ * An attempt's spend exists only in its own transcript until the round writes
+ * `attempts.json`, which is minutes after the work starts. Only the tail is read
+ * and only steps not counted before are added, so a poll stays cheap and the
+ * number never counts one step twice.
+ */
+const usageRead = new Map()
+
+function tokensSoFar(file) {
+  let held = usageRead.get(file)
+  if (!held) {
+    held = { seen: new Set(), totals: usageTotals() }
+    usageRead.set(file, held)
+  }
+  return addUsage(tailFrames(file), held.totals, { seen: held.seen })
+}
+
+/**
+ * The name a session slug carries for its worktree.
+ *
+ * A candidate runs with its working directory inside its own worktree, and the
+ * harness names the session directory after that path, so the worktree is read
+ * back out of the slug rather than rebuilt.
+ */
+function worktreeOf(slug) {
+  const marker = '.agent-worktrees-'
+  const at = slug.indexOf(marker)
+  return at < 0 ? null : slug.slice(at + marker.length).replace(/-+$/, '')
+}
+
+/**
+ * The attempts that are spending money without a record yet.
+ *
+ * A round records its attempts when exploration ends, so a round in flight has
+ * no token record anywhere but its agents' own sessions. A candidate's session
+ * carries its worktree's name, which is how these are found, and the ones
+ * already recorded are told apart by the session their record names. A worktree
+ * that is still in `.agent-worktrees` is one that is working now; the rest have
+ * finished and their round has not written its record.
+ */
+function unrecordedAttempts(rsiRounds, since, liveWorktrees = new Set()) {
+  const recorded = new Set(
+    rsiRounds.flatMap(round => round.attempts ?? [])
+      .map(attempt => attempt.session)
+      .filter(Boolean)
+      .map(session => path.basename(session))
+  )
+  const found = []
+  for (const session of sessionsFor('dream-rsi-b')) {
+    if (session.mtime < since) continue
+    if (recorded.has(session.session)) continue
+    const worktree = worktreeOf(session.slug)
+    found.push({
+      session: session.session,
+      worktree,
+      live: worktree !== null && liveWorktrees.has(worktree),
+      tokens: tokensSoFar(session.file)
+    })
+  }
+  return found
+}
+
 /** Everything the page shows, read fresh so a refresh is never stale. */
 function snapshot(directory) {
   const problems = []
@@ -350,16 +420,34 @@ function snapshot(directory) {
   const spent = rounds.reduce((total, one) => total + (one.durationMs ?? 0), 0)
   const kept = rounds.filter(one => one.best === true)
   const designCost = design?.tokens ? costBands(design.tokens) : null
-  const cost = {
-    design: designCost,
-    candidates: sumCosts(rounds.map(one => one.cost)),
-    total: sumCosts([...(designCost ? [designCost] : []), ...rounds.map(one => one.cost)]),
-    note: `${PRICING.modelVersion} · ¥${PRICING.rates.peak.cacheMiss} miss / ¥${PRICING.rates.peak.cacheHit} hit / ¥${PRICING.rates.peak.output} output per 1M at peak, half outside Beijing working hours · read ${PRICING.readAt}`
-  }
+  const designTokens = design?.tokens?.totalTokens ?? 0
 
   const runName = path.basename(directory)
   const runStart = Date.parse(target?.startedAt ?? '') || 0
   const worktrees = readWorktrees(CHECKOUT).map(worktree => ({ ...worktree, live: liveCalls({ name: worktree.name, since: runStart }) }))
+
+  // The RSI loop's own spend: what a finished round recorded, and what a round
+  // still running has spent. Neither is in `rounds/`, which is the other loop's,
+  // so without them the page shows a cost that never moves while the expensive
+  // part of the run is running.
+  const rsiAttempts = rsiRounds.flatMap(round => round.attempts ?? [])
+  const transcriptAttempts = loop === 'Dream-RSI'
+    ? unrecordedAttempts(rsiRounds, runStart, new Set(worktrees.map(worktree => worktree.name)))
+    : []
+  const workingCosts = transcriptAttempts.filter(one => one.live).map(one => costBands(one.tokens))
+  const attemptCosts = [...rsiAttempts.map(attempt => attempt.cost), ...transcriptAttempts.map(one => costBands(one.tokens))]
+  const rsiTokens = rsiAttempts.reduce((total, attempt) => total + (attempt.tokens?.totalTokens ?? 0), 0)
+  const transcriptTokens = transcriptAttempts.reduce((total, one) => total + (one.tokens.totalTokens ?? 0), 0)
+  const workingTokens = transcriptAttempts.filter(one => one.live).reduce((total, one) => total + (one.tokens.totalTokens ?? 0), 0)
+  const cost = {
+    design: designCost,
+    candidates: sumCosts(rounds.map(one => one.cost)),
+    attempts: sumCosts(rsiAttempts.map(attempt => attempt.cost)),
+    unrecorded: sumCosts(transcriptAttempts.map(one => costBands(one.tokens))),
+    working: sumCosts(workingCosts),
+    total: sumCosts([...(designCost ? [designCost] : []), ...rounds.map(one => one.cost), ...attemptCosts]),
+    note: `${PRICING.modelVersion} · ¥${PRICING.rates.peak.cacheMiss} miss / ¥${PRICING.rates.peak.cacheHit} hit / ¥${PRICING.rates.peak.output} output per 1M at peak, half outside Beijing working hours · read ${PRICING.readAt}`
+  }
   // With nothing in flight, the newest session this run started is still the
   // closest thing to watching it: a candidate's session is under its worktree's
   // slug, which carries the candidate's name and never the run directory's, so
@@ -417,8 +505,16 @@ function snapshot(directory) {
     setupText,
     design: design ? { status: design.status, tokens: design.tokens?.totalTokens ?? null, durationMs: design.durationMs ?? null, text: design.text ?? '' } : null,
     rounds,
-    tokens: { candidates: candidateTokens, design: design?.tokens?.totalTokens ?? 0, total: candidateTokens + (design?.tokens?.totalTokens ?? 0) },
+    tokens: { candidates: candidateTokens, design: designTokens, attempts: rsiTokens, unrecorded: transcriptTokens, working: workingTokens, total: candidateTokens + designTokens + rsiTokens + transcriptTokens },
     cost,
+    runningAttempts: transcriptAttempts.map(one => ({
+      session: one.session,
+      worktree: one.worktree,
+      live: one.live,
+      tokens: one.tokens.totalTokens,
+      steps: one.tokens.steps,
+      cost: costBands(one.tokens)
+    })),
     spentCandidateMs: spent,
     kept: kept.length,
     graph: textOf(directory, 'graph.svg'),
@@ -503,12 +599,23 @@ async function refresh() {
     card('cost', rmb(d.cost.total.now), 'warn'),
     card('design cost', rmb(d.cost.design ? d.cost.design.now : null)),
     card('candidate cost', rmb(d.cost.candidates.now)),
+    card('attempt cost', rmb(d.cost.attempts.now)),
+    card('from transcripts', rmb(d.cost.unrecorded.now)),
+    card('working now', rmb(d.cost.working.now), 'warn'),
     card('tokens spent', num(d.tokens.total)),
+    card('tokens working now', num(d.tokens.working)),
     card('attempts', String(d.rounds.length) + (d.kept ? ' <span class="ok">' + d.kept + ' kept</span>' : '')),
     card('candidate time', Math.round(d.spentCandidateMs / 1000) + ' s')
   ].join('')
   document.getElementById('costNote').innerHTML = 'cost in RMB at ' + esc(d.cost.total.band === 'peak' ? 'the peak price' : 'the off-peak price') +
-    ' · between ' + rmb(d.cost.total.offPeak) + ' and ' + rmb(d.cost.total.peak) + ' depending on the hour<br>' + esc(d.cost.note)
+    ' · between ' + rmb(d.cost.total.offPeak) + ' and ' + rmb(d.cost.total.peak) + ' depending on the hour'
+    + (d.cost.working.priced
+      ? ' · includes ' + rmb(d.cost.working.now) + ' spent by ' + d.cost.working.priced + ' attempt(s) working now, priced from their own transcripts and rising as they work'
+      : '')
+    + (d.cost.unrecorded.priced
+      ? ' · ' + rmb(d.cost.unrecorded.now) + ' in all comes from transcripts, because no round has written a record naming those attempts yet'
+      : '')
+    + '<br>' + esc(d.cost.note)
     + ((d.problems && d.problems.length) ? '<br><span class="bad">' + d.problems.map(esc).join(' · ') + '</span>' : '')
 
   const s = d.setup
@@ -569,6 +676,18 @@ async function refresh() {
   } else {
     blocks.push('<h2>Working now</h2><div class="dim">no attempt is in flight, and no session was found for this run</div>')
   }
+  // An attempt's cost reaches the run directory only when its round ends, so
+  // while it works the page prices it from the transcript instead of showing the
+  // spend as zero.
+  if (d.runningAttempts && d.runningAttempts.length) {
+    blocks.push('<h2>Spending without a record yet</h2>')
+    blocks.push('<p class="sub">a round writes its attempts when exploration ends, so these are priced from their own transcripts. The working one rises step by step.</p>')
+    blocks.push('<table><tr><th>state</th><th>worktree</th><th class="num">steps</th><th class="num">tokens</th><th class="num">cost</th></tr>'
+      + d.runningAttempts.map(one => '<tr><td class="' + (one.live ? 'ok' : 'dim') + '">' + (one.live ? 'working' : 'finished') + '</td>'
+        + '<td class="dim">' + esc(one.worktree ?? one.session) + '</td><td class="num">' + num(one.steps) + '</td>'
+        + '<td class="num">' + num(one.tokens) + '</td><td class="num warn">' + rmb(one.cost.now) + '</td></tr>').join('')
+      + '</table>')
+  }
   nowSection.innerHTML = blocks.join('')
 
   const rsiSection = document.getElementById('rsi')
@@ -616,6 +735,17 @@ async function refresh() {
             + '<td class="dim">' + (v.degenerate ? 'yes — beta changes nothing' : 'no') + '</td>'
             + '<td class="dim">' + esc(v.failure || v.failures || '') + '</td></tr>').join('') + '</table>')
         blocks.push('<p class="sub">' + (dream.improved ? '<span class="ok">improved</span> by ' + num(dream.gain) : 'the policy it started from was already the best') + ' · deployed ' + esc(dream.deployed || '—') + '</p>')
+      }
+      if (round.attempts && round.attempts.length) {
+        blocks.push('<table><tr><th>cell</th><th>verdict</th><th class="num">score</th><th>measures</th><th class="num">tokens</th><th class="num">cost</th><th class="num">seconds</th></tr>'
+          + round.attempts.map(attempt => '<tr><td>' + esc(attempt.cell) + '</td>'
+            + '<td class="dim">' + esc(attempt.verdict || attempt.reason || '—') + '</td>'
+            + '<td class="num">' + num(attempt.value) + '</td>'
+            + '<td class="dim">' + esc(Object.entries(attempt.measures || {}).map(([key, value]) => key + ' ' + num(value)).join(' ')) + '</td>'
+            + '<td class="num">' + num(attempt.tokens && attempt.tokens.totalTokens) + '</td>'
+            + '<td class="num warn">' + rmb(attempt.cost && attempt.cost.now) + '</td>'
+            + '<td class="num">' + Math.round((attempt.durationMs || 0) / 1000) + '</td></tr>').join('')
+          + '</table>')
       }
     }
 
@@ -669,13 +799,40 @@ const port = Number(argument('port') ?? 4317)
 const directory = chosen.directory
 
 const server = http.createServer((request, response) => {
-  if (request.url.startsWith('/api/run')) {
-    response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-    response.end(JSON.stringify(snapshot(directory)))
-    return
+  // A viewer must not die because a record is odd. A run with a surprising shape
+  // took the whole page down once — the process exited on the uncaught throw and
+  // the page simply stopped, with nothing on it to read. The failure is now the
+  // answer, and the next refresh tries again.
+  try {
+    if (request.url.startsWith('/api/run')) {
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+      response.end(JSON.stringify(snapshot(directory)))
+      return
+    }
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    response.end(PAGE)
+  } catch (error) {
+    const said = String(error?.message || error)
+    process.stderr.write(`inspect: ${request.url} failed — ${said}\n`)
+    try {
+      if (request.url.startsWith('/api/run')) {
+        response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        response.end(JSON.stringify({ error: `reading the run failed: ${said}` }))
+      } else {
+        response.writeHead(500, { 'content-type': 'text/plain' })
+        response.end(`reading the run failed: ${said}\n`)
+      }
+    } catch { /* the socket has already gone */ }
   }
-  response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
-  response.end(PAGE)
+})
+
+server.on('error', error => {
+  // Said in words: from a browser, "nothing is listening" and "something else
+  // holds this port" look the same.
+  process.stderr.write(error?.code === 'EADDRINUSE'
+    ? `inspect: port ${port} is already in use — another inspector holds it; stop that one or pass --port <another>\n`
+    : `inspect: ${error?.message || error}\n`)
+  process.exit(2)
 })
 
 server.listen(port, '127.0.0.1', () => {

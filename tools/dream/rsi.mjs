@@ -449,6 +449,18 @@ export async function rsiRun({
   const grids = await readPool(directory)
   const best = bestCellOf(grids)
 
+  // Every round the run has ever recorded, not only the ones this invocation
+  // made. A resumed run that wrote its own two rounds into the summary left the
+  // earlier invocation's rounds out of it, and the document then described a run
+  // that had only ever done what the last invocation saw.
+  const everyRound = await recordedRsiRounds(directory)
+  const withDreaming = []
+  for (const round of everyRound) {
+    const dreaming = JSON.parse(await fs.readFile(path.join(roundDirectory(directory, round.number), 'dreaming.json'), 'utf8').catch(() => 'null'))
+    withDreaming.push({ ...(round.rollout ?? { round: round.number }), dreaming: dreaming ?? undefined })
+  }
+  if (withDreaming.length) record.rounds = withDreaming
+
   record.pool = poolSummary(grids)
   record.best = best
   record.baseline = baseline

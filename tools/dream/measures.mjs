@@ -103,19 +103,24 @@ export function transcriptFrames(buffer) {
   return frames
 }
 
+/** Token totals with nothing in them, so a caller has one shape to add to. */
+export function usageTotals() {
+  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, reasoningTokens: 0, totalTokens: 0, steps: 0 }
+}
+
 /**
- * Tokens a session spent, summed from its per-step usage records.
+ * Add the usage records in decoded frames to `totals`.
  *
  * A record that merely quotes the word is skipped: tool results carry the
  * engine's own text, and counting a mention as a spend would inflate every run
  * that read about token use.
+ *
+ * `seen` holds the key of every step already added, so a caller watching a
+ * transcript that is still being written can re-read its tail without counting
+ * one step twice and reporting a spend that climbs by itself. The key is the
+ * step's `seq`, and the line itself when a record carries none.
  */
-export function sessionTokens(directory) {
-  const path = join(directory, TRANSCRIPT)
-  if (!existsSync(path)) return { error: `no transcript in ${directory}` }
-
-  const frames = transcriptFrames(readFileSync(path))
-  const totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, reasoningTokens: 0, totalTokens: 0, steps: 0 }
+export function addUsage(frames, totals, { seen = null } = {}) {
   for (const frame of frames) {
     for (const line of frame.split('\n')) {
       if (!line.includes('totalTokens')) continue
@@ -127,6 +132,11 @@ export function sessionTokens(directory) {
       }
       const usage = record?.data?.usage ?? record?.usage
       if (!usage || typeof usage.totalTokens !== 'number') continue
+      if (seen) {
+        const step = String(record.seq ?? line)
+        if (seen.has(step)) continue
+        seen.add(step)
+      }
       totals.steps++
       for (const key of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'reasoningTokens', 'totalTokens']) {
         totals[key] += usage[key] ?? 0
@@ -134,4 +144,11 @@ export function sessionTokens(directory) {
     }
   }
   return totals
+}
+
+/** Tokens a session spent, summed from its per-step usage records. */
+export function sessionTokens(directory) {
+  const path = join(directory, TRANSCRIPT)
+  if (!existsSync(path)) return { error: `no transcript in ${directory}` }
+  return addUsage(transcriptFrames(readFileSync(path)), usageTotals())
 }
