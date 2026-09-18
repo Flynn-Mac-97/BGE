@@ -21,9 +21,22 @@ import { PRICING, costBands, formatRmb, sumCosts } from './pricing.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
+/**
+ * One record, parsed from text that may carry a byte-order mark.
+ *
+ * A record edited by hand or by a tool that writes a BOM — PowerShell's
+ * `Set-Content -Encoding utf8` does — is otherwise unreadable to `JSON.parse`,
+ * and a reader that swallows the error reports a different record instead of
+ * reporting the problem. That is how a run whose status file had a BOM came to
+ * be shown as the other loop.
+ */
+export function parseRecord(text) {
+  return JSON.parse(String(text).replace(/^\uFEFF/, ''))
+}
+
 /** Read every record a run wrote, oldest first. */
 export async function readRun(runDirectory) {
-  const read = async file => JSON.parse(await fs.readFile(path.join(runDirectory, file), 'utf8'))
+  const read = async file => parseRecord(await fs.readFile(path.join(runDirectory, file), 'utf8'))
   const optional = async file => {
     try {
       return await read(file)
@@ -40,13 +53,13 @@ export async function readRun(runDirectory) {
     const files = await fs.readdir(directory).catch(() => [])
     const candidates = []
     for (const file of files.filter(file => file.endsWith('.json') && file !== 'round.json').sort()) {
-      candidates.push(JSON.parse(await fs.readFile(path.join(directory, file), 'utf8')))
+      candidates.push(parseRecord(await fs.readFile(path.join(directory, file), 'utf8')))
     }
     rounds.push({
       name,
       round: Number(name.replace(/^r/, '')),
       candidates,
-      record: JSON.parse(await fs.readFile(path.join(directory, 'round.json'), 'utf8').catch(() => 'null'))
+      record: parseRecord(await fs.readFile(path.join(directory, 'round.json'), 'utf8').catch(() => 'null'))
     })
   }
 

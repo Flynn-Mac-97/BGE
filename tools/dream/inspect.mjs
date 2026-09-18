@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readRun } from './report.mjs'
+import { parseRecord } from './report.mjs'
 import { PRICING, costBands, sumCosts } from './pricing.mjs'
 import { transcriptFrames } from './measures.mjs'
 
@@ -58,7 +58,7 @@ function textOf(directory, file) {
 }
 
 /** Every grid in a run's pool, oldest first, with its cells flattened for reading. */
-function readGrids(directory) {
+function readGrids(directory, { active = false } = {}) {
   const sources = []
   const poolDirectory = path.join(directory, 'pool')
   for (const name of fs.existsSync(poolDirectory) ? fs.readdirSync(poolDirectory).sort() : []) {
@@ -70,7 +70,9 @@ function readGrids(directory) {
   const roundsDirectory = path.join(directory, 'rsi')
   for (const name of fs.existsSync(roundsDirectory) ? fs.readdirSync(roundsDirectory).sort() : []) {
     const file = path.join(roundsDirectory, name, 'grid.json')
-    if (fs.existsSync(file)) sources.push({ file, name: `${name} (live)`, live: true })
+    // Only a round in flight is live: a grid left in a finished round's directory
+    // is a record, and calling it live is a claim the page cannot support.
+    if (fs.existsSync(file)) sources.push({ file, name: active ? `${name} (live)` : name, live: active })
   }
 
   const grids = []
@@ -291,12 +293,17 @@ function liveCalls({ name, since = 0, limit = 12 } = {}) {
 
 /** Everything the page shows, read fresh so a refresh is never stale. */
 function snapshot(directory) {
+  const problems = []
   const read = file => {
     const text = textOf(directory, file)
     if (!text) return null
     try {
-      return JSON.parse(text)
-    } catch {
+      return parseRecord(text)
+    } catch (error) {
+      // Named, never swallowed. A record that exists and will not parse used to
+      // read as "this run has no such file", and the page then showed a different
+      // loop entirely while the real status sat there unread.
+      problems.push(`${file} will not parse — ${String(error.message).slice(0, 120)}`)
       return null
     }
   }
@@ -313,7 +320,11 @@ function snapshot(directory) {
   const rsiSummary = read('rsi-summary.json')
   const loop = rsiStatus ? 'Dream-RSI' : 'evolutionary'
   const liveStatus = rsiStatus ?? status
-  const grids = loop === 'Dream-RSI' ? readGrids(directory) : []
+  // A round is only live while the run is working: a grid left in a finished
+  // round's directory is a record, and calling it live is a claim the page
+  // cannot support.
+  const active = ['exploring', 'running', 'starting', 'dreaming'].includes(rsiStatus?.phase ?? '')
+  const grids = loop === 'Dream-RSI' ? readGrids(directory, { active }) : []
   const rsiRounds = loop === 'Dream-RSI' ? readRsiRounds(directory) : []
   const policyVersions = loop === 'Dream-RSI' ? readPolicyVersions(directory) : []
 
@@ -371,6 +382,7 @@ function snapshot(directory) {
     policy: liveStatus?.policy ?? null,
     worktrees,
     lastAttempt,
+    problems,
     rsi: loop === 'Dream-RSI'
       ? {
           phase: rsiStatus?.phase ?? 'unknown',
@@ -493,6 +505,7 @@ async function refresh() {
   ].join('')
   document.getElementById('costNote').innerHTML = 'cost in RMB at ' + esc(d.cost.total.band === 'peak' ? 'the peak price' : 'the off-peak price') +
     ' · between ' + rmb(d.cost.total.offPeak) + ' and ' + rmb(d.cost.total.peak) + ' depending on the hour<br>' + esc(d.cost.note)
+    + ((d.problems && d.problems.length) ? '<br><span class="bad">' + d.problems.map(esc).join(' · ') + '</span>' : '')
 
   const s = d.setup
   const designHtml = d.design && d.design.text
