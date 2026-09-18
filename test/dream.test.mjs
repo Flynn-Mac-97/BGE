@@ -1,0 +1,164 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { zstdCompressSync } from 'node:zlib'
+
+import { digestOf, loadSetup, scoreRun } from '../tools/dream/scoring.mjs'
+import { sessionTokens } from '../tools/dream/measures.mjs'
+import { renderReport } from '../tools/dream/report.mjs'
+import { replaceOnce } from '../tools/dream/worktree.mjs'
+import reference from '../tools/dream/examples/agent-connection.mjs'
+
+/** A transcript frame: one compressed line of the JSONL the harness writes. */
+const frame = record => zstdCompressSync(Buffer.from(`${JSON.stringify(record)}\n`, 'utf8'))
+
+const usageRecord = totalTokens => ({
+  type: 'step/end',
+  data: { usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: 5, reasoningTokens: 3, totalTokens } }
+})
+
+async function transcriptOf(frames) {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-transcript-'))
+  await fs.writeFile(path.join(directory, 'session.v3.jsonl.zstd'), Buffer.concat(frames))
+  return directory
+}
+
+test('a changed task makes the setup a different setup', () => {
+  const before = digestOf(reference)
+  const rewritten = {
+    ...reference,
+    tasks: reference.tasks.map(one => (one.id === 'healthy' ? { ...one, question: `${one.question} (and say why)` } : one))
+  }
+  assert.notEqual(digestOf(rewritten), before, 'a rewritten question left the digest the same')
+  assert.notEqual(digestOf({ ...reference, weights: { processes: 1 } }), before, 'changed weights left the digest the same')
+})
+
+test('a candidate is refused when the setup it was scored against has moved', async () => {
+  const record = await scoreRun({ tasks: [], suiteHash: '0', name: 'moved' })
+  assert.equal(record.verdict, 'refused')
+  assert.equal(record.tasks.length, 0, 'a refused run still ran the tasks')
+  assert.match(record.reason, /the setup changed/)
+})
+
+test('a setup that cannot tell two candidates apart is refused', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-setup-'))
+  const file = path.join(directory, 'no-check.mjs')
+  await fs.writeFile(file, 'export default { project: "test/fixture-project", tasks: [{ id: "nameless" }] }\n', 'utf8')
+
+  const loaded = await loadSetup(file)
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.match(loaded.error, /has no run/)
+  assert.equal(loaded.setup, undefined)
+})
+
+test('a task that fails costs a candidate the whole score, whatever it saved', async () => {
+  const record = await scoreRun({
+    tasks: [
+      { id: 'cheap', run: async () => ({ pass: true, measures: { characters: 0 } }) },
+      { id: 'broken', run: async () => ({ pass: false, problem: 'the answer named nothing' }) }
+    ],
+    weights: { characters: 1 },
+    name: 'gate'
+  })
+
+  assert.equal(record.verdict, 'refused')
+  assert.equal(record.value, 0)
+  assert.match(record.reason, /broken: the answer named nothing/)
+})
+
+test('tokens are summed from every frame, and a mention is not a spend', async () => {
+  const directory = await transcriptOf([
+    frame({ type: 'session', version: 3 }),
+    frame(usageRecord(1000)),
+    frame({ type: 'tool/result', data: { text: 'the tool reported totalTokens: 99999 in its output' } }),
+    frame(usageRecord(250))
+  ])
+  const totals = sessionTokens(directory)
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(totals.steps, 2, 'the quoted mention was counted as a step')
+  assert.equal(totals.totalTokens, 1250)
+  assert.equal(totals.inputTokens, 200)
+  assert.equal(totals.cacheReadTokens, 10)
+})
+
+test('a directory with no transcript reports what was missing, not a zero', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-empty-'))
+  const totals = sessionTokens(directory)
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.match(totals.error, /no transcript/)
+  assert.equal(totals.totalTokens, undefined)
+})
+
+test('a control that would rewrite two places changes neither', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-control-'))
+  const file = path.join(directory, 'target.js')
+  await fs.writeFile(file, 'const a = 1\nconst b = 1\n', 'utf8')
+
+  const twice = replaceOnce(file, '1', '2')
+  const once = replaceOnce(file, 'const a = 1', 'const a = 2')
+  const after = await fs.readFile(file, 'utf8')
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.match(twice.error, /more than once/)
+  assert.equal(once.ok, true)
+  assert.equal(after, 'const a = 2\nconst b = 1\n', 'the refused control still wrote to the file')
+})
+
+/** A run directory with one refused candidate and one that beat the target. */
+async function fabricatedRun() {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-run-'))
+  const round = path.join(directory, 'rounds', 'r0001')
+  await fs.mkdir(round, { recursive: true })
+
+  const write = (file, value) => fs.writeFile(path.join(directory, file), `${JSON.stringify(value, null, 2)}\n`, 'utf8')
+  await write('target.json', { target: 'make the packet smaller', startedAt: '2026-01-01T00:00:00.000Z', files: [] })
+  await write('setup-check.json', {
+    name: 'packets',
+    weights: { characters: 0.001 },
+    tasks: [{ id: 'find-player', question: 'which entity is the player?' }],
+    working: { value: 0.9, totals: { measures: { characters: 100 } } },
+    control: { value: 0, reason: 'find-player: snapshot answered no entity list', why: 'the player is never found' }
+  })
+  await fs.writeFile(path.join(round, 'c1.json'), `${JSON.stringify({ id: 'run-c1', parent: 'target', depth: 1, verdict: 'refused', value: 0, reason: 'find-player: snapshot answered no entity list' })}\n`, 'utf8')
+  await fs.writeFile(path.join(round, 'c2.json'), `${JSON.stringify({ id: 'run-c2', parent: 'target', depth: 1, verdict: 'scored', value: 0.95, best: true, measures: { characters: 50 }, tokens: { totalTokens: 1234 }, durationMs: 900 })}\n`, 'utf8')
+  await fs.writeFile(path.join(round, 'round.json'), `${JSON.stringify({ round: 1, improved: true, best: { id: 'run-c2', value: 0.95, depth: 1 } })}\n`, 'utf8')
+  await write('winner.json', { id: 'run-c2', value: 0.95, improvement: 0.05, patch: 'winner.patch', baseline: { value: 0.9 } })
+  return directory
+}
+
+test('the run writes a document naming the target, the check, the control and the winner', async () => {
+  const directory = await fabricatedRun()
+  const written = await renderReport(directory)
+  const report = await fs.readFile(written.report, 'utf8')
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.match(report, /# Dream: make the packet smaller/)
+  assert.match(report, /find-player/)
+  assert.match(report, /the player is never found/)
+  assert.match(report, /run-c2/)
+  assert.match(report, /0\.95/)
+  assert.equal(written.attempts, 2)
+})
+
+test('the two pictures carry every attempt and no missing number', async () => {
+  const directory = await fabricatedRun()
+  const written = await renderReport(directory)
+  const graph = await fs.readFile(written.graph, 'utf8')
+  const tree = await fs.readFile(written.tree, 'utf8')
+  await fs.rm(directory, { recursive: true, force: true })
+
+  for (const [name, svg] of [['graph', graph], ['tree', tree]]) {
+    assert.equal((svg.match(/<svg/g) ?? []).length, 1, `${name}.svg is not one svg`)
+    assert.equal((svg.match(/<\/svg>/g) ?? []).length, 1, `${name}.svg is not closed`)
+    assert.doesNotMatch(svg, /NaN|undefined/, `${name}.svg has a missing number`)
+    assert.match(svg, /run-c1/, `${name}.svg does not name the refused candidate`)
+    assert.match(svg, /run-c2/, `${name}.svg does not name the kept candidate`)
+  }
+  assert.match(tree, /<path d="M/, 'the tree draws no edge')
+  assert.match(graph, /stroke-dasharray/, 'the graph draws no baseline')
+})
