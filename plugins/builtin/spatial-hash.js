@@ -307,7 +307,7 @@ export default {
 
   commands: [{
     id: 'spatial.stats',
-    label: 'What each spatial group holds',
+    label: 'Spatial group counts',
     run(context) {
       if (!context.spatial) return { error: 'Spatial Hash did not load' }
       return { groups: context.spatial.groups.map(group => group.stats) }

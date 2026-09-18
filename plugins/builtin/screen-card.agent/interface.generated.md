@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/screen-card.js; sha256 2d69694729c18467e0cee44343e8e2105e2a931a5014b9e1d4732a3e13cab4a6. Do not edit. -->
+<!-- Generated from plugins/builtin/screen-card.js; sha256 6d563986de21eb1ff4eeec7a00523e9997db1b1849b0a81742d5f1af65b4b46b. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/screen-card.js). Where the prose below it disagrees, this is the code.
 
 ```

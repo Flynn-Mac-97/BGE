@@ -27,7 +27,7 @@ const RING = 60
 export default {
   name: 'Sound',
   category: 'engine',
-  about: 'Play sounds, and record every play whether or not it was audible.',
+  about: 'Play sounds and record every play.',
   inspect: context => {
     const recent = context.audio.recent(6)
     return recent.length
@@ -152,7 +152,7 @@ export default {
   commands: [
     {
       id: 'audio.recent',
-      label: 'Sounds played recently',
+      label: 'Recent sounds',
       run: context => context.audio.recent()
     },
     {

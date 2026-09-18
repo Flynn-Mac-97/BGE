@@ -98,7 +98,7 @@ export default {
   commands: [
     { id: 'code.open', label: 'Open a file', run: (context, path) => openFile(context, path) },
     { id: 'code.save', label: 'Save open file', run: context => save(context) },
-    { id: 'code.toggle', label: 'Expand or collapse the editor', run: context => { state.open = !state.open; context.redraw() } }
+    { id: 'code.toggle', label: 'Toggle the editor', run: context => { state.open = !state.open; context.redraw() } }
   ],
 
   onLoad(context) {

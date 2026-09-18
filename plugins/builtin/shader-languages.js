@@ -70,7 +70,7 @@ function rememberPreference(language) {
 export default {
   name: 'Shader Languages',
   category: 'visuals',
-  about: 'Which language each shader is written in, which the live backend can build, and the switch that swaps between them.',
+  about: 'Which language each shader is written in.',
   needs: ['Materials'],
 
   onLoad(context) {
@@ -106,7 +106,7 @@ export default {
   commands: [
     {
       id: 'shader.languages',
-      label: 'Every shader language, and whether the live backend can build it',
+      label: 'Shader languages',
       run: context => ({
         preferred: context.shaderLanguages?.preferred || null,
         backend: context.renderer?.backend?.name || 'none — headless',
@@ -115,12 +115,12 @@ export default {
     },
     {
       id: 'shader.list',
-      label: 'Every shader, the languages it is written in, and the one it is built from',
+      label: 'Shaders and languages',
       run: context => ({ shaders: context.shaderLanguages?.list() || [] })
     },
     {
       id: 'shader.prefer',
-      label: 'Prefer a shader language, and rebuild every shader that moved',
+      label: 'Prefer a language',
       run: (context, language) => {
         const registry = context.shaderLanguages
         if (!registry) return { error: 'Shader Languages did not load' }

@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/tests.js; sha256 598481c14d530ae8ca753d96291bcf7b28e52192203199e9aced0730196bd928. Do not edit. -->
+<!-- Generated from plugins/builtin/tests.js; sha256 7ccb0c669a784545a2863aa4428bb038c240c3730d637b77279801300f6bcca6. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/tests.js). Where the prose below it disagrees, this is the code.
 
 ```

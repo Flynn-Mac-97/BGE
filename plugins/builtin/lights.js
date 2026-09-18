@@ -311,7 +311,7 @@ export default {
   name: 'Lights',
 
   category: 'visuals',
-  about: 'Every light in the level, and the few knobs each kind actually reads.',
+  about: 'Every level light and its knobs.',
 
   panels: [{
     id: 'lights',
@@ -554,18 +554,18 @@ export default {
   commands: [
     {
       id: 'lights.list',
-      label: 'Every light in the level, and whether it is lighting anything',
+      label: 'Level lights',
       run: context => context.lights.report()
     },
     {
       id: 'lights.bake',
-      label: 'What an offline baker would bake — every static surface and light',
+      label: 'Offline bake result',
       // args: { surfaces: true } for the full surface list, which is long
       run: (context, options) => context.lights.bake(options)
     },
     {
       id: 'lights.flash',
-      label: 'Fire a one-shot light, to find a colour and a duration by eye',
+      label: 'Flash a light',
       // args: { at, color, intensity, seconds }
       run: (context, options) => {
         if (!context.loop.running) {

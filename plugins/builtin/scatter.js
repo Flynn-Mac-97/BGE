@@ -316,10 +316,7 @@ export default {
   name: 'Scatter',
 
   category: 'engine',
-  about: 'Bulk placement declared in the level: this many of these types, over this area, this far ' +
-    'apart, out of these circles and corridors. A scatter is an entity, so the rule is level data the ' +
-    'inspector tunes. The field grows with the clock and is never saved into the level; scatter.expand ' +
-    'turns it into real placements to nudge by hand.',
+  about: 'Bulk placements from a level rule.',
 
   onLoad(context) {
     /** scatter id -> { rule, placements, ids, asked, placed }. `ids` is empty when nothing is up. */
@@ -461,12 +458,12 @@ export default {
   commands: [
     {
       id: 'scatter.list',
-      label: 'Every scatter, what it resolves to, and how much of it is standing',
+      label: 'Scatters and counts',
       run: context => context.scatter.list()
     },
     {
       id: 'scatter.preview',
-      label: 'Grow the fields in the editor to look at — never saved',
+      label: 'Preview fields',
       // args: { id } for one, nothing for all of them
       run: (context, args) => ({
         grown: context.scatter.preview(args?.id),
@@ -475,12 +472,12 @@ export default {
     },
     {
       id: 'scatter.clear',
-      label: 'Take every previewed field back down',
+      label: 'Clear previews',
       run: context => context.scatter.clear()
     },
     {
       id: 'scatter.expand',
-      label: 'Write the field into the level as real placements, and remove the scatter',
+      label: 'Write placements',
       // args: { id } — one scatter, named
       run: async (context, args) => {
         if (context.loop.running) throw new Error('scatter.expand needs the clock stopped — a run is not an edit')

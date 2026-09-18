@@ -43,9 +43,7 @@ export default {
   name: 'Lane View',
 
   category: 'agents',
-  about: 'Shows one lane at a time: a schematic the lane\'s own engine computed from see.describe, and ' +
-    'the last frame that lane captured, each labelled and each dated. It polls only the lane you are ' +
-    'looking at, and sends nothing but reads.',
+  about: 'One lane at a time, from see.describe.',
 
   needs: ['Terminal Bridge'],
 
@@ -99,7 +97,7 @@ export default {
   commands: [
     {
       id: 'lane.view',
-      label: 'Open or close the lane viewer',
+      label: 'Toggle lane view',
       run: context => {
         // A headless world has no panel and no server to poll; a timer there
         // would run forever catching its own failed fetches.
@@ -113,7 +111,7 @@ export default {
 
     {
       id: 'lane.watch',
-      label: 'Watch one lane by client name — the only lane polled',
+      label: 'Watch a lane',
       async run(context, name) {
         const wanted = String([].concat(name ?? [])[0] ?? '').trim()
         if (!context.shell) {
@@ -132,7 +130,7 @@ export default {
 
     {
       id: 'lane.report',
-      label: 'What the lane viewer is showing, and when each half was taken',
+      label: 'Lane viewer state',
       run: () => report()
     }
   ]

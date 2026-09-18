@@ -22,7 +22,7 @@ const HOLD = 'run-over'
 export default {
   name: 'Run Clock',
   category: 'engine',
-  about: 'Time a run, end it when the thing it watches dies, and hold the world when it is over.',
+  about: 'Time a run, ending when the watched thing dies.',
   inspect: context => {
     const run = context.runClock
     if (!run) return []
@@ -163,8 +163,8 @@ export default {
   }],
 
   commands: [
-    { id: 'run.state', label: 'How the run is going', run: context => context.runClock.summary() },
-    { id: 'run.end', label: 'End the run now', run: (context, args) => context.runClock.end([].concat(args ?? [])[0] || 'ended') }
+    { id: 'run.state', label: 'Run state', run: context => context.runClock.summary() },
+    { id: 'run.end', label: 'End the run', run: (context, args) => context.runClock.end([].concat(args ?? [])[0] || 'ended') }
   ]
 }
 

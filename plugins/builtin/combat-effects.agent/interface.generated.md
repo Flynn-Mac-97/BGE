@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/combat-effects.js; sha256 bc678f4e68bf4cc847a03ebe22644c1f2888e74823391409c411763537892325. Do not edit. -->
+<!-- Generated from plugins/builtin/combat-effects.js; sha256 184d46e622cbb752fb604771efb58e717c3098f82202cbf5ce1852177a2fd32f. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/combat-effects.js). Where the prose below it disagrees, this is the code.
 
 ```

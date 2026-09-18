@@ -61,7 +61,7 @@ let painter = null
 export default {
   name: 'Damage Numbers',
   category: 'game',
-  about: 'The figure that lifts off a hit and fades — how much that did, said where it happened.',
+  about: 'The figure that lifts off a hit.',
 
   inspect: () => [{
     title: 'Damage Numbers',
@@ -167,12 +167,12 @@ export default {
   commands: [
     {
       id: 'damage.numbers',
-      label: 'Numbers in the air right now',
+      label: 'Numbers in the air',
       run: context => context.damageNumbers.rising()
     },
     {
       id: 'damage.number',
-      label: 'Show one number by hand',
+      label: 'Show one number',
       /** `run damage.number '[[0, 1, 0], 42]'` */
       run: (context, args) => {
         const [at, text, critical] = Array.isArray(args) ? args : [args, '', false]

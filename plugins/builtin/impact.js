@@ -45,7 +45,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value))
 export default {
   name: 'Impact',
   category: 'game',
-  about: 'Hit stop and screen shake — the frames a heavy hit freezes on, and the jolt after it.',
+  about: 'Hit stop and screen shake.',
 
   inspect: () => [{
     title: 'Impact',
@@ -135,12 +135,12 @@ export default {
   commands: [
     {
       id: 'impact.state',
-      label: 'How much the picture has been punched',
+      label: 'Screen punch state',
       run: context => context.impact.state()
     },
     {
       id: 'impact.hit',
-      label: 'Land one impact by hand',
+      label: 'Land one impact',
       /** `run impact.hit 0.8` */
       run: (context, weight) => context.impact.hit({ weight: typeof weight === 'number' ? weight : 0.5 })
     }

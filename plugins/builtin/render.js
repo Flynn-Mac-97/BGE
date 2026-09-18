@@ -258,9 +258,7 @@ function control(ui, context, key) {
 export default {
   name: 'Render',
   category: 'visuals',
-  about:
-    'How the frame is rendered: tone mapping, exposure, environment light, shadow quality and backend. ' +
-    'Every setting, its value and where the value came from is listed in the Render panel and by render.look.',
+  about: 'Tone mapping, exposure, light and shadows.',
 
   inspect: [{
     title: 'Render',
@@ -309,7 +307,7 @@ export default {
   commands: [
     {
       id: 'render.look',
-      label: 'Every render setting, its value, where it came from, and its options',
+      label: 'Render settings',
       run: async context => {
         await readLayers(context)
         return look(context)
@@ -317,7 +315,7 @@ export default {
     },
     {
       id: 'render.set',
-      label: 'Change render settings, written to game.json unless told otherwise',
+      label: 'Set render settings',
       // args: {"toneMapping":"neutral","exposure":1.2}
       //       {"exposure":0.8,"save":"level"}   into the open level
       //       {"exposure":0.8,"save":false}     this session only
@@ -325,7 +323,7 @@ export default {
     },
     {
       id: 'render.reset',
-      label: 'Drop the session-only settings and use the files again',
+      label: 'Drop session settings',
       run: async context => {
         state.session = {}
         await readLayers(context)

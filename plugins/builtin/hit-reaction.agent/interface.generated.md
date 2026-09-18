@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/hit-reaction.js; sha256 71c2c15f9c041ae7926741d99a086d927bbd1936701cd044659f9702ae34f38d. Do not edit. -->
+<!-- Generated from plugins/builtin/hit-reaction.js; sha256 3e7dbc795920546a9d2ec246b5fd3f4698000433ec109f0cccd44b8ebcb2cd87. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/hit-reaction.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Hit Reaction
   category   game
   needs      Health
-  commands   hits.flashing (What is flashing or collapsing)
+  commands   hits.flashing (Flashing entities)
   arguments  hits.flashing: none
   context    context.hitReaction
   systems    fixed

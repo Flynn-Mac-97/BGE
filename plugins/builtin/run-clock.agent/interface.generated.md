@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/run-clock.js; sha256 e28887ee732eb8beb7adf080de2e17014537127c48464d2c8a2e70ddc5e2cc5b. Do not edit. -->
+<!-- Generated from plugins/builtin/run-clock.js; sha256 fd232a2fabb88e1332dd99b62bc46c4d4b6b1deedc04eb6101ebfc99e6c6d28d. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/run-clock.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Run Clock
   category   engine
-  commands   run.state (How the run is going)
-             run.end (End the run now)
+  commands   run.state (Run state)
+             run.end (End the run)
   arguments  run.state: none
   arguments  run.end: args
   context    context.runClock

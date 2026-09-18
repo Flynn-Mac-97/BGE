@@ -90,7 +90,7 @@ async function readShelf() {
 export default {
   name: 'Agent Tools',
   category: 'agents',
-  about: 'The tooling shelf in tools/ — scripts written once, kept so nobody regenerates them, and the library they share.',
+  about: 'The tools/ shelf and its library.',
   inspect: () => [{ title: 'The shelf', rows: [['read with', 'tools.list']] }],
 
   onLoad(context) {
@@ -108,7 +108,7 @@ export default {
   commands: [
     {
       id: 'tools.list',
-      label: 'What is on the tooling shelf, and what the library already does',
+      label: 'Tools on the shelf',
       run: async () => {
         if (typeof process === 'undefined' || !process.versions?.node) {
           return { ...info(), why: 'reading tools/ needs node — use --headless or the terminal' }
@@ -127,7 +127,7 @@ export default {
     },
     {
       id: 'tools.make',
-      label: 'Run a tool from the shelf',
+      label: 'Run a shelf tool',
       run: async (context, name) => {
         if (typeof process === 'undefined' || !process.versions?.node) {
           return { ...info(), why: 'generators need node fs and zlib — use --headless or the terminal' }

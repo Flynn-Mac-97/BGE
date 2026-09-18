@@ -62,7 +62,7 @@ import { lookColour } from './render/look-colour.js'
 export default {
   name: 'World Look',
   category: 'visuals',
-  about: 'The fog and the global light — ambient and sun, declared in the level.',
+  about: 'The level\'s fog and global light.',
   inspect: context => {
     const look = context.worldLook?.resolved
     if (!look) return []
@@ -178,7 +178,7 @@ export default {
   commands: [
     {
       id: 'world.look',
-      label: 'Sky, fog, ambient and sun as they are set now',
+      label: 'Sky, fog, sun',
       // The level's block is read off disk and this is often the very first
       // thing a headless run asks. Waiting is the difference between reporting
       // what the level said and reporting the defaults as though it said nothing.
@@ -196,7 +196,7 @@ export default {
     },
     {
       id: 'world.set',
-      label: 'Change the sky, fog, ambient or sun for this session',
+      label: 'Set sky, fog, sun',
       // args: ['fog', 0.02] or ['sun', { intensity: 1.4 }] — or a whole block,
       // { fog: 0.02, sky: '#6d7f96' }, which is the same shape the level uses.
       run: async (context, args) => {

@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/materials.js; sha256 b41df5aa453ef90ff2e093b55aa764f51319e85ea41220f9250b7886f77d3268. Do not edit. -->
+<!-- Generated from plugins/builtin/materials.js; sha256 2a4cdd20dd6f9382e410de63c1e3446264b6672eb9853b19e197b8519669a92c. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/materials.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Materials
   category   visuals
   points     1 panel
-  commands   materials.list (Every registered material, and what it reads off a mesh)
+  commands   materials.list (Materials)
   arguments  materials.list: none
   context    context.materials
   systems    frame

@@ -196,10 +196,7 @@ const report = () => ({
 export default {
   name: 'Blender Shaders',
   category: 'visuals',
-  about:
-    'Rebuilds a Blender material node graph as a TSL shader, so a look designed in Blender draws ' +
-    'in the engine. Reads the *.shaders.json that blender.import writes beside each model. A ' +
-    'material is swapped only when every node in it can be translated.',
+  about: 'Rebuilds a Blender material graph as TSL.',
 
   inspect: [{
     title: 'Blender Shaders',
@@ -233,7 +230,7 @@ export default {
   commands: [
     {
       id: 'blender.shaders',
-      label: 'Every Blender material graph, and whether it can be translated',
+      label: 'Blender material graphs',
       run: async context => {
         if (!state.loaded) await readGraphs(context)
         return { ...report(), known: TRANSLATABLE_TYPES }
@@ -241,7 +238,7 @@ export default {
     },
     {
       id: 'blender.shaders.apply',
-      label: 'Re-read the graphs and rebuild every Blender material',
+      label: 'Rebuild materials',
       run: async context => {
         await readGraphs(context)
         await loadToolkit().catch(() => null)

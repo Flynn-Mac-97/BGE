@@ -76,7 +76,7 @@ function surface() {
 export default {
   name: 'VFX',
   category: 'visuals',
-  about: 'Effect kinds with a shape rather than a cloud of points — beams today. Each kind is a deterministic field simulated on the fixed clock, recorded headless, and drawn only in a browser.',
+  about: 'Shaped effects on the fixed clock.',
   inspect: context => [...fields].map(([name, field]) => ({ title: name, rows: Object.entries(field.state) })),
 
   onLoad(context) {
@@ -110,12 +110,12 @@ export default {
   ],
 
   commands: [
-    { id: 'vfx.state', label: 'How much of each effect kind is alive', run: context => context.vfx.state },
-    { id: 'vfx.recent', label: 'Effects recently made', run: (context, n) => context.vfx.recent(typeof n === 'number' ? n : 20) },
-    { id: 'vfx.clear', label: 'Remove every effect', run: context => { context.vfx.clear(); return context.vfx.state } },
+    { id: 'vfx.state', label: 'Live effects by kind', run: context => context.vfx.state },
+    { id: 'vfx.recent', label: 'Recent effects', run: (context, n) => context.vfx.recent(typeof n === 'number' ? n : 20) },
+    { id: 'vfx.clear', label: 'Clear effects', run: context => { context.vfx.clear(); return context.vfx.state } },
     {
       id: 'vfx.beam',
-      label: 'Make a named beam',
+      label: 'Make a beam',
       run: (context, argument) => {
         const [name, options] = Array.isArray(argument) ? argument : [argument, {}]
         return context.vfx.beams.effect(name, options || {})

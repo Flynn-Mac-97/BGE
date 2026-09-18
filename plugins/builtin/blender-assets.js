@@ -238,10 +238,7 @@ function panelRows(ui, context) {
 export default {
   name: 'Blender Assets',
   category: 'editor',
-  about:
-    'A .blend file in the project is the source of the .glb beside it. `blender.import` rebuilds ' +
-    'any model whose .blend has changed, and the .glb is what a type references. Blender is a ' +
-    'program, so every command here needs a headless run.',
+  about: 'A .blend is the source of the .glb beside it.',
 
   inspect: [{
     title: 'Blender',
@@ -280,7 +277,7 @@ export default {
   commands: [
     {
       id: 'blender.check',
-      label: 'Find the Blender this machine will use',
+      label: 'Find the Blender',
       run: async context => {
         if (!context.host) return needsNode('blender.check')
         const blender = await findBlender(context)
@@ -289,7 +286,7 @@ export default {
     },
     {
       id: 'blender.list',
-      label: 'Every .blend in the project, and whether its model is current',
+      label: 'Blends and freshness',
       run: async context => {
         state.reading = true
         context.redraw?.()
@@ -312,7 +309,7 @@ export default {
     },
     {
       id: 'blender.import',
-      label: 'Build the .glb for a .blend that changed',
+      label: 'Rebuild changed .blends',
       // args: {"file":"assets/models/kitten.blend"} | {"all":true} | {"all":true,"force":true}
       run: async (context, args) => {
         const asked = typeof args === 'string' ? { file: args } : (args || {})
@@ -330,7 +327,7 @@ export default {
     },
     {
       id: 'blender.inspect',
-      label: 'What a .blend holds: each character\'s armature, meshes, height and the collection setting that exports it',
+      label: 'Inspect a .blend',
       // args: {"file":"assets/models/figures.blend"}
       run: async (context, args) => {
         const asked = typeof args === 'string' ? { file: args } : (args || {})
@@ -341,7 +338,7 @@ export default {
     },
     {
       id: 'blender.settings',
-      label: 'Write the import settings for a .blend',
+      label: 'Import settings',
       // args: {"file":"assets/models/kitten.blend","scale":0.01}
       run: async (context, args) => {
         const asked = args || {}

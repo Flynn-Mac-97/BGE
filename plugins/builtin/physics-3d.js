@@ -615,7 +615,7 @@ export default {
   commands: [
     {
       id: 'physics3d.raycast',
-      label: 'Cast a ray and say what it hit',
+      label: 'Raycast',
       /**
        * A sightline is one call from the terminal rather than a script:
        *
@@ -671,7 +671,7 @@ export default {
 
     {
       id: 'physics3d.bodies',
-      label: 'What Physics 3D is simulating',
+      label: 'Physics 3D bodies',
       run(context) {
         grid.ensure(context.world)
         const claimed = context.world.entities.filter(is3D)

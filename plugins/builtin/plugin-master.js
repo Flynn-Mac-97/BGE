@@ -18,7 +18,7 @@
  * whichever of the two it has.
  */
 import { makeSourceReader } from './plugin-master/source-facts.js'
-import { summaryOf } from './plugin-master/describe.js'
+import { listLineOf, summaryOf } from './plugin-master/describe.js'
 
 /** Past this, split it. Roughly twice the median builtin, so it flags the tail. */
 const BIG = 400
@@ -172,11 +172,11 @@ function gameNouns(source, words) {
 export default {
   name: 'Plugin Master',
   category: 'engine',
-  about: 'The rules for creating and editing plugins, and a measure of which have grown too big to read cheaply.',
+  about: 'The rules for creating and editing plugins.',
 
   commands: [{
     id: 'plugin.sizes',
-    label: 'Measure every plugin against the size rule',
+    label: 'Plugins over the size rule',
     run: async context => {
       if (typeof process === 'undefined' || !process.versions?.node) {
         return { ...info(), why: 'reading source needs node — use --headless or the terminal' }
@@ -216,11 +216,11 @@ export default {
     }
   }, {
     id: 'plugin.facts',
-    label: 'Describe a plugin from its source, and list every derived description',
+    label: 'Describe a plugin',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      properties: { plugin: { type: 'string', description: 'one plugin name; omit for every plugin' } }
+      properties: { plugin: { type: 'string', description: 'one name, or none for all' } }
     },
     run: async (context, options = {}) => {
       if (typeof process === 'undefined' || !process.versions?.node) {
@@ -230,20 +230,20 @@ export default {
       const named = typeof options?.plugin === 'string' && options.plugin ? options.plugin : null
 
       if (named === null) {
+        // Every builtin shares one directory, so it is named once and each entry
+        // carries only the file inside it. A project plugin keeps its full path.
+        const builtinRoot = 'plugins/builtin/'
         return {
           counted: all.length,
-          // `described` says which plugins carry a sentence of their own. Every
-          // other one is answered by the derived line, so no surface shows a
-          // blank and nothing has to be worded twice.
+          builtin: builtinRoot.replace(/\/$/, ''),
+          // The list is an index: `about` is the author's sentence where one
+          // exists, and the short line says what the plugin fills in. The full
+          // summary is one query away, so the list does not repeat it per plugin.
           plugins: all.map(entry => ({
-            plugin: entry.plugin,
+            plugin: entry.builtin ? entry.plugin.slice(builtinRoot.length) : entry.plugin,
             name: entry.facts?.name ?? null,
-            category: entry.facts?.category ?? null,
-            // The authored sentence travels with the list, so one call answers
-            // both which plugins wrote their own and what they wrote.
-            about: entry.facts?.about ?? null,
-            described: entry.facts?.about ? 'declared' : 'derived',
-            description: summaryOf(entry.facts ?? {})
+            ...(entry.facts?.about ? { about: entry.facts.about } : {}),
+            description: listLineOf(entry.facts ?? {})
           }))
         }
       }

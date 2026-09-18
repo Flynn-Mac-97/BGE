@@ -108,7 +108,7 @@ const CHASE_PITCH = -1.05
 export default {
   name: 'Game Camera',
   category: 'engine',
-  about: 'Follow the player or look around freely — the game camera, separate from the editor viewport.',
+  about: 'Follow the player or look freely.',
   inspect: context => {
     const v = context.view || {}
     return [{ title: 'View', rows: [['mode', v.mode || 'ortho'], ['x', v.x], ['y', v.y], ['zoom', v.zoom]] }]

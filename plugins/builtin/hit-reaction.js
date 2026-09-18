@@ -57,7 +57,7 @@ function untint(entity, remembered) {
 export default {
   name: 'Hit Reaction',
   category: 'game',
-  about: 'Flash, knockback and a death that collapses — the visible half of being hit.',
+  about: 'Flash, knockback and a collapsing death.',
   needs: ['Health'],
 
   inspect: () => [{
@@ -167,7 +167,7 @@ export default {
 
   commands: [{
     id: 'hits.flashing',
-    label: 'What is flashing or collapsing',
+    label: 'Flashing entities',
     run: () => ({
       flashing: [...flashing.keys()].map(entity => entity.id),
       dying: [...dying.keys()].map(entity => entity.id)

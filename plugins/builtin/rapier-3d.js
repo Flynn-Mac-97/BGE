@@ -164,7 +164,7 @@ function giveBackVerbs(context) {
 export default {
   name: NAME,
   category: 'engine',
-  about: 'Rigid body physics in three dimensions, solved by Rapier. Adds rotation, mass, friction and sleeping to the Physics 3D contract, and replays identically on any machine.',
+  about: '3D rigid body physics in Rapier.',
 
   onLoad(context) {
     installSolver(context, { key: 'rapier3d', name: NAME, bridgeOf, restore: restoreSolver })
@@ -235,7 +235,7 @@ export default {
   commands: [
     {
       id: 'rapier3d.use',
-      label: 'Switch 3D physics between Rapier and the built-in solver',
+      label: 'Switch 3D solver',
       // run rapier3d.use            — Rapier on, Physics 3D off
       // run rapier3d.use '{"on":false}'
       async run(context, options) {
@@ -254,7 +254,7 @@ export default {
     },
     {
       id: 'rapier3d.bodies',
-      label: 'What Rapier 3D is simulating',
+      label: 'Rapier 3D bodies',
       run(context) {
         const held = standingDown(context)
         if (held) return { standingDown: held }
@@ -277,7 +277,7 @@ export default {
     },
     {
       id: 'rapier3d.snapshot',
-      label: 'Hash the simulated world, to prove two runs match',
+      label: 'Hash world',
       /**
        * The hash, not the bytes: a snapshot is hundreds of kilobytes and the
        * only question anyone asks of it is whether two of them agree.
@@ -295,7 +295,7 @@ export default {
     },
     {
       id: 'rapier3d.raycast',
-      label: 'Cast a ray and say what it hit',
+      label: 'Raycast',
       // run rapier3d.raycast '[[0,1.6,0],[0,0,-1],40]'
       run(context, argument) {
         const [origin, direction, maxDistance] = Array.isArray(argument)

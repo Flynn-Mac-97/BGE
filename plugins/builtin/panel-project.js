@@ -139,7 +139,7 @@ export default {
 
   commands: [{
     id: 'project.reindex',
-    label: 'Rebuild project index',
+    label: 'Rebuild index',
     run: async context => { context.editor.index = await context.files.index(); context.redraw() }
   }]
 }

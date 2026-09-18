@@ -84,7 +84,7 @@ const flatDistance = (a, b) => Math.hypot(a.x - b.x, (a.z || 0) - (b.z || 0))
 export default {
   name: 'Health',
   category: 'game',
-  about: 'Health, the one damage verb, and the moment something dies — the arithmetic of a hit, without the theatre.',
+  about: 'The one damage verb, and death.',
 
   inspect: context => {
     const alive = [...managed].filter(entity => entity.damageable?.alive)
@@ -287,7 +287,7 @@ export default {
   commands: [
     {
       id: 'health.list',
-      label: 'What is alive and how hurt it is',
+      label: 'Alive and hurt',
       run: context => context.world.entities
         .filter(entity => entity.damageable)
         .map(entity => ({
@@ -300,7 +300,7 @@ export default {
     },
     {
       id: 'health.damage',
-      label: 'Damage one entity by id',
+      label: 'Damage one entity',
       /** `run health.damage '["bandit-2", 25]'` */
       run: (context, args) => {
         const [id, amount] = Array.isArray(args) ? args : [args, 1]
@@ -311,7 +311,7 @@ export default {
     },
     {
       id: 'health.give',
-      label: 'Give one entity a health pool',
+      label: 'Give a health pool',
       /** `run health.give '["dummy-1", {"health": 40}]'` */
       run: (context, args) => {
         const [id, options] = Array.isArray(args) ? args : [args, {}]

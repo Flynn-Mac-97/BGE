@@ -220,7 +220,7 @@ export default {
 
   commands: [{
     id: 'play.focus',
-    label: 'Whether the game fills the screen, and why not',
+    label: 'Screen fill state',
     // args: nothing to read it, true or false to set it by hand
     run(context, wanted) {
       if (wanted === undefined || wanted === null) return describeFocus(context)

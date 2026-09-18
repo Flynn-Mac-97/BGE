@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/elk-layout.js; sha256 b0449997e7c1d24e451c9aabf1dd5a95d9ff40757595ea53d515ba2a2e0b28fb. Do not edit. -->
+<!-- Generated from plugins/builtin/elk-layout.js; sha256 0b7f564f5f84ed794bbe9e2d98c103089281682a65f223b255c232d70f6a2d21. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/elk-layout.js). Where the prose below it disagrees, this is the code.
 
 ```

@@ -86,7 +86,7 @@ function fold(stats, changes) {
 export default {
   name: 'Auto Weapons',
   category: 'game',
-  about: 'Weapons that fire on their own cooldowns, with every number in one bag so an upgrade is a change to a number.',
+  about: 'Weapons that fire on their own cooldowns.',
   needs: ['Health'],
 
   inspect: () => {
@@ -242,7 +242,7 @@ export default {
   commands: [
     {
       id: 'weapons.carried',
-      label: 'Who is armed with what',
+      label: 'Who is armed',
       run: () => [...carried].map(([owner, held]) => ({
         owner: owner.id,
         weapons: [...held.values()].map(weapon => ({
@@ -255,7 +255,7 @@ export default {
     },
     {
       id: 'weapons.give',
-      label: 'Give an entity a weapon',
+      label: 'Give a weapon',
       /** `run weapons.give '["you", "claw dart"]'` */
       run: (context, args) => {
         const [id, name, overrides] = Array.isArray(args) ? args : [args, '', {}]
@@ -267,7 +267,7 @@ export default {
     },
     {
       id: 'weapons.upgrade',
-      label: 'Change the numbers on a carried weapon',
+      label: 'Change weapon numbers',
       /** `run weapons.upgrade '["you", "claw dart", {"damage": "+5", "count": "+1"}]'` */
       run: (context, args) => {
         const [id, name, changes] = Array.isArray(args) ? args : [args, '', {}]
@@ -278,7 +278,7 @@ export default {
     },
     {
       id: 'weapons.defined',
-      label: 'Every weapon the game has described',
+      label: 'Defined weapons',
       run: () => [...defined].map(([name, definition]) => ({ name, stats: { ...STATS, ...(definition.stats || {}) } }))
     }
   ]

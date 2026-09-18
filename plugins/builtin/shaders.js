@@ -78,7 +78,7 @@ function applyShader(context, entities, name) {
 export default {
   name: 'Shaders',
   category: 'visuals',
-  about: 'The sample shader shelf — edges, grass, aura, waves, hologram, dissolve, gradient — described once and implemented in TSL.',
+  about: 'The sample shader shelf, in TSL.',
   needs: ['Materials', 'Shader Languages'],
 
   panels: [{
@@ -146,7 +146,7 @@ export default {
 
   commands: [{
     id: 'shaders.list',
-    label: 'Every sample shader, what it is for, and the keys it reads',
+    label: 'Sample shaders',
     run: context => ({
       shaders: Object.entries(SHADERS).map(([name, details]) => ({
         name,

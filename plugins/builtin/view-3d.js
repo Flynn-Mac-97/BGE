@@ -46,7 +46,7 @@ const state = {
 export default {
   name: '3D View',
   category: 'visuals',
-  about: 'Fly the editor viewport around the level — the editor\'s own 3D camera, separate from the game camera.',
+  about: 'Fly the editor viewport.',
   inspect: context => {
     const v = context.view
     if (v.mode !== '3d') return [{ title: '3D View', rows: [['mode', 'ortho — 2D view']] }]
@@ -71,7 +71,7 @@ export default {
   commands: [
     {
       id: 'view.3d',
-      label: 'Toggle the 3D editor fly camera',
+      label: 'Toggle 3D camera',
       // run view.3d          — toggle
       // run view.3d true     — on
       // run view.3d false    — off
@@ -83,7 +83,7 @@ export default {
     },
     {
       id: 'view.3d.report',
-      label: 'Where the editor viewport is looking',
+      label: 'Viewport aim',
       run: context => report(context)
     }
   ],

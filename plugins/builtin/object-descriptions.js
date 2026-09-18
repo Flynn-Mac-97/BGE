@@ -292,23 +292,22 @@ export default {
   name: 'Object Descriptions',
 
   category: 'agents',
-  about: 'What each object IS, written on its type and read by every agent surface — '
-    + 'about, appearance and looksWrongWhen on a type, and a note on one placement.',
+  about: 'What each object is, by type and placement.',
 
   commands: [
     {
       id: 'description',
-      label: 'What the author says a thing is, what a correct one looks like, and what a broken one looks like',
+      label: 'Author\'s description',
       run: (context, options) => description(context, options || {})
     },
     {
       id: 'description.missing',
-      label: 'Which types have no about, appearance or looksWrongWhen yet — the backfill worklist',
+      label: 'Missing descriptions',
       run: context => missing(context)
     },
     {
       id: 'description.record',
-      label: 'Record the tint, model, texture and box a type\'s description was written against, so a later change is caught as drift',
+      label: 'Description facts',
       run: (context, options) => record(context, options || {})
     }
   ],

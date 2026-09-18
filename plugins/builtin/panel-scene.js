@@ -38,7 +38,7 @@ export default {
   commands: [
     {
       id: 'scene.selectAll',
-      label: 'Select all entities',
+      label: 'Select all',
       run: context => context.select(context.world.entities.map(e => e.id))
     },
     {

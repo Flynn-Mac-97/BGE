@@ -113,9 +113,7 @@ export default {
   name: 'Project Switcher',
 
   category: 'editor',
-  about: 'Says which project this editor has open, lists the ones beside it, opens another, ' +
-    'gives the untitled project a name, and closes one by opening a fresh untitled project. ' +
-    'The dev server repoints itself, so opening a project is a page reload and not a restart.',
+  about: 'Which project is open; open or close one.',
 
   onLoad(context) {
     // shell:ready only fires where there is a document, which is exactly where
@@ -228,7 +226,7 @@ export default {
   commands: [
     {
       id: 'project.panel',
-      label: 'Show the project panel',
+      label: 'Project panel',
       run: context => {
         state.open = !state.open
         if (state.open) askServer(context)
@@ -239,7 +237,7 @@ export default {
 
     {
       id: 'project.list',
-      label: 'Which projects there are',
+      label: 'List projects',
       async run(context) {
         if (!context.shell) {
           return {
@@ -262,7 +260,7 @@ export default {
 
     {
       id: 'project.open',
-      label: 'Open a project by name or path',
+      label: 'Open a project',
       async run(context, said) {
         const wanted = String([].concat(said ?? [])[0] ?? '').trim()
         if (!wanted) throw new Error('which project? project.open "demo" — a name in the projects folder, or a path')
@@ -276,7 +274,7 @@ export default {
 
     {
       id: 'project.saveAs',
-      label: 'Give the untitled project a name',
+      label: 'Name the project',
       async run(context, said) {
         const name = String([].concat(said ?? [])[0] ?? '').trim()
         if (!NAME.test(name)) {
@@ -299,7 +297,7 @@ export default {
 
     {
       id: 'project.close',
-      label: 'Close the project — opens a fresh untitled one',
+      label: 'Close project',
       async run(context) {
         if (!context.shell) {
           return { screen: false, note: 'a headless world ends with its process — there is nothing to close' }

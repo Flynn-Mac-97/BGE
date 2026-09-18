@@ -53,7 +53,7 @@ export default {
   name: 'Choice Screen',
   category: 'game',
   needs: ['Screen', 'Keyboard Input'],
-  about: 'Stop the world and offer a row of cards to pick from, by number or by arrow keys.',
+  about: 'Stop the world and offer cards.',
   inspect: context => {
     const view = context.choiceScreen?.view()
     if (!view?.open) return []
@@ -244,12 +244,12 @@ export default {
   commands: [
     {
       id: 'choice.show',
-      label: 'What is being offered',
+      label: 'Offered cards',
       run: context => context.choiceScreen.view()
     },
     {
       id: 'choice.pick',
-      label: 'Take one of the offered cards',
+      label: 'Pick a card',
       // args: the number on the card, as a player would press it
       run: (context, args) => context.choiceScreen.pick(Number([].concat(args ?? [])[0] ?? 1) - 1)
     }

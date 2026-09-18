@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/world-look.js; sha256 c5894588ccfdd076ce3510223afb85ee8d27cf3256f78c78cef89579f264793e. Do not edit. -->
+<!-- Generated from plugins/builtin/world-look.js; sha256 223fe7682a1a9d858d41073cf924da01ab0c18b046290a58cf39e5845b4e2f69. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/world-look.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     World Look
   category   visuals
-  commands   world.look (Sky, fog, ambient and sun as they are set now)
-             world.set (Change the sky, fog, ambient or sun for this session)
+  commands   world.look (Sky, fog, sun)
+             world.set (Set sky, fog, sun)
   arguments  world.look: none
   arguments  world.set: args
   context    context.worldLook

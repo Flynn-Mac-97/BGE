@@ -16,7 +16,7 @@ const BUILTIN_KINDS = { 'third-person': thirdPerson }
 export default {
   name: 'Live Camera',
   category: 'engine',
-  about: 'Play cameras listed in the level\'s `cameras` block, each of a kind, the highest priority live. Updated on every drawn frame, so mouse turn has no step delay.',
+  about: 'The level\'s highest-priority camera, every drawn frame.',
 
   inspect: context => {
     const live = context.cameras?.state()
@@ -112,17 +112,17 @@ export default {
   commands: [
     {
       id: 'cameras.state',
-      label: 'The live camera, its settings, and where it put the view',
+      label: 'Live camera state',
       run: context => context.cameras.state()
     },
     {
       id: 'cameras.activate',
-      label: 'Make one camera live regardless of priority; id null returns to priority',
+      label: 'Activate a camera',
       run: (context, options = {}) => ({ live: context.cameras.activate(options.id ?? null) })
     },
     {
       id: 'cameras.kinds',
-      label: 'Every camera kind and its settings with defaults',
+      label: 'Camera kinds',
       run: context => context.cameras.kinds()
     }
   ]

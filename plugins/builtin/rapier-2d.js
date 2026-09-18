@@ -61,7 +61,7 @@ function restoreSolver(context, capture) {
 export default {
   name: NAME,
   category: 'engine',
-  about: 'Rigid body physics in two dimensions, solved by Rapier. Adds rotation, mass, friction and sleeping to the Physics 2D contract, and replays identically on any machine.',
+  about: '2D rigid body physics in Rapier.',
 
   onLoad(context) {
     installSolver(context, { key: 'rapier2d', name: NAME, bridgeOf, restore: restoreSolver })
@@ -131,7 +131,7 @@ export default {
   commands: [
     {
       id: 'rapier2d.use',
-      label: 'Switch 2D physics between Rapier and the built-in solver',
+      label: 'Switch 2D solver',
       // run rapier2d.use            — Rapier on, Physics 2D off
       // run rapier2d.use '{"on":false}'
       async run(context, options) {
@@ -150,7 +150,7 @@ export default {
     },
     {
       id: 'rapier2d.bodies',
-      label: 'What Rapier 2D is simulating',
+      label: 'Rapier 2D bodies',
       run(context) {
         const held = standingDown(context)
         if (held) return { standingDown: held }
@@ -174,7 +174,7 @@ export default {
     },
     {
       id: 'rapier2d.snapshot',
-      label: 'Hash the simulated world, to prove two runs match',
+      label: 'Hash world',
       async run(context) {
         const bytes = bridgeOf(context)?.snapshot()
         if (!bytes) return { error: 'nothing simulated yet' }

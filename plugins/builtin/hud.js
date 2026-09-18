@@ -30,7 +30,7 @@ const LAYER = { owner: 'hud', className: 'hud-layer' }
 export default {
   name: 'Heads Up Display',
   category: 'game',
-  about: "Draw the level's HUD into the canvas — text and bars read from world state.",
+  about: "The level's HUD, from world state.",
   inspect: context => {
     const items = context.hud?.items || []
     return items.length
@@ -98,7 +98,7 @@ export default {
     },
     {
       id: 'hud.toggle',
-      label: 'Show the HUD while editing',
+      label: 'Show the HUD',
       run: context => { context.hud.always = !context.hud.always; return { always: !!context.hud.always } }
     }
   ]

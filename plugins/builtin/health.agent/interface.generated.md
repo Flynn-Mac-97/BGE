@@ -1,12 +1,12 @@
-<!-- Generated from plugins/builtin/health.js; sha256 5a22d240bb1277fe501fdee984fb303baea3293f218c8f1c77de32bf389183d5. Do not edit. -->
+<!-- Generated from plugins/builtin/health.js; sha256 c871d024cc03bac7631b2e2ea50f07e63afb2d98e22aaea8072c9b54cb1ea834. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/health.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Health
   category   game
-  commands   health.list (What is alive and how hurt it is)
-             health.damage (Damage one entity by id)
-             health.give (Give one entity a health pool)
+  commands   health.list (Alive and hurt)
+             health.damage (Damage one entity)
+             health.give (Give a health pool)
   arguments  health.list: none
   arguments  health.damage: args
   arguments  health.give: args

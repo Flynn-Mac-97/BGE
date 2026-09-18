@@ -105,12 +105,12 @@ export default {
     },
     {
       id: 'rig.load',
-      label: 'Load every declared rig clip',
+      label: 'Load rig clips',
       run: context => context.rigAnimation.loadDeclared()
     },
     {
       id: 'rig.sources',
-      label: 'Stored motion in assets/motion/source, ready to retarget',
+      label: 'Stored motion',
       run: async context => {
         if (!context.host) return needsNode('rig.sources')
         return (await clipShelf()).listSources(context.host.project)
@@ -118,7 +118,7 @@ export default {
     },
     {
       id: 'rig.retarget',
-      label: 'Put stored motion onto a model: {"model":"models/hero.glb","clips":["idle","walk"],"once":["death"]}',
+      label: 'Retarget motion',
       run: async (context, options = {}) => {
         if (!context.host) return needsNode('rig.retarget', options)
         if (!options.model) return { error: 'name the model as a type does: {"model":"models/hero.glb"}' }
@@ -129,7 +129,7 @@ export default {
     },
     {
       id: 'rig.check',
-      label: 'Measure a model\'s clips against their capture — height, floor, limbs, still bones, loop seam: {"model":"models/hero.glb"}',
+      label: 'Clips against capture',
       run: async (context, options = {}) => {
         if (!context.host) return needsNode('rig.check', options)
         if (!options.model) return { error: 'name the model as a type does: {"model":"models/hero.glb"}' }
@@ -139,7 +139,7 @@ export default {
     },
     {
       id: 'rig.compare',
-      label: 'Render a clip in Blender beside its capture, front and side: {"model":"models/hero.glb","clip":"run","frames":[0,6,12]}',
+      label: 'Clip beside capture',
       run: async (context, options = {}) => {
         if (!context.host) return needsNode('rig.compare', options)
         if (!options.model || !options.clip) return { error: 'name the model and the clip: {"model":"models/hero.glb","clip":"run"}' }
@@ -148,7 +148,7 @@ export default {
     },
     {
       id: 'rig.play',
-      label: 'Play a clip on one entity',
+      label: 'Play a clip',
       run: (context, { entity, clip }) => {
         const target = context.world.entities.find(e => e.id === entity || e.type === entity)
         if (!target) return { error: `no entity ${entity}` }
@@ -158,8 +158,7 @@ export default {
     }
   ],
 
-  about: 'Plays a baked motion clip on the named nodes of a model. Clips come from '
-    + '`tools/make-rig-clip.mjs`; the renderer turns `entity.pose` into rotations.',
+  about: "Plays a baked clip on a model's nodes.",
 
   inspect: context => [{
     title: 'Clips',

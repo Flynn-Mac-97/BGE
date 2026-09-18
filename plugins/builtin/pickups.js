@@ -38,7 +38,7 @@ const DEFAULTS = {
 export default {
   name: 'Pickups',
   category: 'game',
-  about: 'Drop things in the world that latch on inside a radius and accelerate into whoever is collecting.',
+  about: 'Latch onto things in a radius.',
   inspect: context => {
     const list = context.pickups?.all() || []
     return list.length
@@ -171,7 +171,7 @@ export default {
   commands: [
     {
       id: 'pickups.list',
-      label: 'What is waiting to be picked up',
+      label: 'Waiting pickups',
       run: context => context.pickups.all().map(entity => ({
         id: entity.id,
         kind: entity.properties.pickup,
@@ -182,7 +182,7 @@ export default {
     },
     {
       id: 'pickups.attract',
-      label: 'Pull every pickup in now',
+      label: 'Pull pickups in',
       run: context => ({ latched: context.pickups.attractAll() })
     }
   ]

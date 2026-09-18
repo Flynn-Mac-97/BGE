@@ -56,7 +56,7 @@ export default {
 
   commands: [{
     id: 'hot.reloadType',
-    label: 'Reload a type from disk',
+    label: 'Reload a type',
     run: (context, name) => context.editor.reloadType(name)
   }]
 }

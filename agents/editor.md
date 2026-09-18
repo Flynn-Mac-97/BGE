@@ -1,7 +1,6 @@
 # Editor work
 
 - Build editor features as plugins.
-- Build panels with `ui.*`. Add a UI primitive if one is missing.
-- Give actions terminal commands when agents need them.
-- Use short labels that say what they do.
-- Engine and plugin edits reload the page. Reconnect before testing.
+- Build panels with `ui.*`; add a UI primitive if one is missing.
+- Give actions terminal commands; use short labels.
+- Engine and plugin edits reload the page; reconnect before testing.

@@ -216,7 +216,7 @@ export const decals = makeDecalWall()
 export default {
   name: 'Decals',
   category: 'visuals',
-  about: 'Marks on the surfaces they hit — bullet holes, blood, scorch — within a fixed budget.',
+  about: 'Surface marks within a budget.',
   inspect: context => {
     const s = context.decals.state
     return [{ title: 'Budget', rows: [['alive', s.alive], ['cap', s.cap], ['placed', s.placed], ['recycled', s.recycled]] }]
@@ -252,12 +252,12 @@ export default {
   commands: [
     {
       id: 'decals.recent',
-      label: 'Marks left on the world',
+      label: 'Recent decals',
       run: (context, n) => context.decals.recent(typeof n === 'number' ? n : 20)
     },
     {
       id: 'decals.state',
-      label: 'How full the decal budget is',
+      label: 'Decal budget use',
       run: context => context.decals.state
     },
     {

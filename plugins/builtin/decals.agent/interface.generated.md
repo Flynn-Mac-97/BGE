@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/decals.js; sha256 c0c2e3c39ed3b80a3c97cf880aa7e99ff68600f39533207dfe127e0c7a90470a. Do not edit. -->
+<!-- Generated from plugins/builtin/decals.js; sha256 cb66326971b899f1e216df45e54a63decfcdd69114e6dcf5a5525ad43d7d0e7e. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/decals.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Decals
   category   visuals
-  commands   decals.recent (Marks left on the world)
-             decals.state (How full the decal budget is)
+  commands   decals.recent (Recent decals)
+             decals.state (Decal budget use)
              decals.clear (Wipe every decal)
   arguments  decals.recent: n
   arguments  decals.state: none

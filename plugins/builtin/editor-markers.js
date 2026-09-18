@@ -74,7 +74,7 @@ export default {
   commands: [
     {
       id: 'markers.list',
-      label: 'Which entities are editor-only markers',
+      label: 'Markers',
       run: context => ({
         markers: context.markers.list(),
         hiddenNow: context.world.entities.filter(e => e._definition?.marker && e.hidden).length
@@ -82,7 +82,7 @@ export default {
     },
     {
       id: 'markers.reveal',
-      label: 'Show markers during play',
+      label: 'Show markers',
       run: (context, on) => context.markers.reveal(on ?? true)
     }
   ]

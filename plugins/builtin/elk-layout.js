@@ -1,6 +1,6 @@
 export default {
   name: 'ELK Graph Layout', category: 'editor', lifecycle: 'scoped',
-  about: 'Reusable automatic graph arrangement using ELK. Accepts plain graph data in browser and headless sessions.',
+  about: 'Graph arrangement with ELK.',
   provides: ['graph.layout'],
   onLoad(context, scope) {
     let library, closed = false

@@ -4,17 +4,17 @@ const matches = (text, query) => !query || text.toLowerCase().includes(query.toL
 
 export default {
   name: 'Agent Contracts', category: 'agents', lifecycle: 'scoped', provides: ['agent.contracts'],
-  about: 'Reports live plugin ownership, service dependencies, system schedules and command inputs without reading source. Legacy and undeclared contracts remain explicit.',
+  about: 'Live plugin ownership and dependencies.',
   onLoad(context, scope) { scope.provide('agent.contracts', { inspect: () => context.loader.contracts() }) },
   commands: [
-    { id: 'agent.contracts', label: 'Inspect plugin contracts and execution order', inputSchema: input,
+    { id: 'agent.contracts', label: 'Plugin contracts', inputSchema: input,
       run(context, options = {}) {
         const report = context.loader.contracts()
         const plugins = report.plugins.filter(plugin => (!options.plugin || plugin.name === options.plugin) && matches(plugin.name, options.query))
         const selected = page(plugins, options), names = new Set(selected.items.map(plugin => plugin.name))
         return { ...selected, services: report.services.filter(service => names.has(service.owner)), schedule: Object.fromEntries(Object.entries(report.schedule).map(([phase, systems]) => [phase, systems.filter(system => names.has(system.plugin))])), scheduleError: report.scheduleError, diagnostics: report.diagnostics.filter(item => names.has(item.plugin)), coverage: { plugins: report.plugins.length, scoped: report.plugins.filter(plugin => plugin.lifecycle === 'scoped').length }, note: 'Reads and writes are declarations, not runtime enforcement. Legacy plugins may retain unmanaged side effects when disabled.' }
       } },
-    { id: 'agent.commands', label: 'Find commands and their accepted arguments', inputSchema: input,
+    { id: 'agent.commands', label: 'Find commands', inputSchema: input,
       run(context, options = {}) {
         const commands = [...context.loader.contrib.commands, ...context.loader.contrib.menus].filter(command => (!options.plugin || command.plugin === options.plugin) && matches(`${command.id} ${command.label || ''}`, options.query))
         return page(commands.map(command => ({ id: command.id, plugin: command.plugin, label: command.label, inputSchema: command.inputSchema ? JSON.parse(JSON.stringify(command.inputSchema)) : null, validation: command.inputSchema ? 'validated' : 'undeclared' })), options)

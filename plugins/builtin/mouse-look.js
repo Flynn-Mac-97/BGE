@@ -212,7 +212,7 @@ export default {
 
   commands: [{
     id: 'mouse.sensitivity',
-    label: 'Read or set mouse sensitivity',
+    label: 'Mouse sensitivity',
     // args: nothing to read it, a number to set it
     run(context, value) {
       const input = context.input

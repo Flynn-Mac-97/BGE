@@ -47,10 +47,33 @@ export function summaryOf(facts = {}) {
   if (facts.systems?.length) clauses.push(`${facts.systems.join(' and ')} each step`)
   if (facts.listens?.length) clauses.push(`listens for ${facts.listens.join(', ')}`)
   if (facts.emits?.length) clauses.push(`emits ${facts.emits.map(entry => entry.event).join(', ')}`)
-  const head = `${facts.category || 'plugin'} plugin`
+  const head = facts.category || 'plugin'
   return clauses.length
     ? `${head}: ${clauses.join('. ')}.`
-    : `${head}: declares no contribution point — its work is in onLoad, and its guide is where it is written down.`
+    : `${head}: no contribution point; read its guide.`
+}
+
+/**
+ * The short index line for one entry of the whole list.
+ *
+ * A list of every plugin is read to find one, and the authored `about` is what
+ * that reader matches on. The full {@link summaryOf} line adds the category and
+ * interface detail — systems, listeners, emitted events — that
+ * `plugin.facts '{"plugin":"<name>"}'` answers anyway. This line keeps only what
+ * the plugin provides and its contribution points, so the list stays an index
+ * and the single-plugin answer keeps everything.
+ */
+export function listLineOf(facts = {}) {
+  const head = facts.category || 'plugin'
+  const parts = []
+  if (facts.provides?.length) parts.push(facts.provides.join(', '))
+  // A count of one is the point's own name: `panel` says as much as `1 panel`,
+  // and this line is read once per plugin in a list of every plugin.
+  const points = POINTS
+    .filter(point => (facts.contributes || {})[point] > 0)
+    .map(point => facts.contributes[point] === 1 ? PLURAL[point] : `${facts.contributes[point]} ${point}`)
+  if (points.length) parts.push(points.join(' '))
+  return parts.length ? parts.join(' ') : head
 }
 
 /**

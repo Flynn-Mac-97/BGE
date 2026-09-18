@@ -404,7 +404,7 @@ export default {
   name: 'Materials',
 
   category: 'visuals',
-  about: 'The library of surfaces a mesh can name, what each one is for, and which the open level uses.',
+  about: 'Named surfaces a mesh can use.',
 
   panels: [{
     id: 'materials',
@@ -519,7 +519,7 @@ export default {
 
   commands: [{
     id: 'materials.list',
-    label: 'Every registered material, and what it reads off a mesh',
+    label: 'Materials',
     run: context => ({
       default: context.materials.fallback,
       drawing: !!context.renderer,

@@ -101,7 +101,7 @@ function cellForLens(context, lens, description, options, overlays) {
 export default {
   name: 'See',
   category: 'agents',
-  about: 'Frames and frame facts from any camera — computed facts first, pixels only when pixels are the question.',
+  about: 'Frames and frame facts from any camera.',
   inspect: () => [{ title: 'See', rows: [['frames taken', framesTaken()]] }],
 
   onLoad(context) {
@@ -121,7 +121,7 @@ export default {
   commands: [
     {
       id: 'see.describe',
-      label: 'What is on screen, as computed facts — no pixels, no vision read',
+      label: 'What is on screen',
       run: async (context, options) => {
         const resolved = await resolveView(context, options || {})
         return resolved.error ? resolved : withSubject(context, resolved, opts => describe(context, opts))
@@ -129,37 +129,37 @@ export default {
     },
     {
       id: 'see.view',
-      label: 'Save, list, drop, or aim the camera — a view worth returning to is a word',
+      label: 'Saved views',
       run: (context, options) => view(context, options || {})
     },
     {
       id: 'see.occlusion',
-      label: 'How much of one entity the camera sees, and who blocks the rest',
+      label: 'How much is visible',
       run: (context, options) => occlusion(context, options || {})
     },
     {
       id: 'see.isolate',
-      label: 'One entity in full — world box, screen box, cover, velocity, camera relation',
+      label: 'One entity in full',
       run: (context, options) => withSubject(context, options || {}, opts => isolate(context, opts))
     },
     {
       id: 'see.find',
-      label: 'Every entity matching the given predicates, on screen or off',
+      label: 'Matching entities',
       run: (context, options) => find(context, options || {})
     },
     {
       id: 'see.diff',
-      label: 'What appeared, moved, or left over exact fixed steps',
+      label: 'Changes over steps',
       run: (context, options) => diff(context, options || {})
     },
     {
       id: 'see.camera',
-      label: 'Why the frame looks wrong, asked of the camera itself',
+      label: 'Frame faults',
       run: context => camera(context)
     },
     {
       id: 'see.ray',
-      label: 'What sits at a screen point, a grid of them, or in a direction from an entity',
+      label: 'Screen point or ray',
       run: (context, options) => ray(context, options || {})
     },
     {
@@ -167,12 +167,12 @@ export default {
       // The one question the plugin was built for: a player points at something
       // and asks what it is. `see.ray` answers the same point from geometry;
       // this answers it from the pixel the renderer actually drew.
-      label: 'What is drawn at this screen point, by the renderer that drew it',
+      label: 'Pixel at a point',
       run: (context, options) => identify(context, options || {})
     },
     {
       id: 'see.sketch',
-      label: 'A flat-colour frame of screen hulls, drawn without a renderer',
+      label: 'Flat screen hulls',
       run: async (context, options = {}) => {
         options = await resolveView(context, options)
         if (options.error) return { error: options.error }
@@ -218,7 +218,7 @@ export default {
     },
     {
       id: 'see.moment',
-      label: 'One moment through several lenses, stepped forward, on one labelled sheet',
+      label: 'Moment, several lenses',
       /**
        * The same instant through each lens — the real frame, and the flat
        * type layer that is its answer key — then whole fixed steps forward
@@ -301,7 +301,7 @@ export default {
     },
     {
       id: 'see.capture',
-      label: 'The real rendered frame, hulls outlined, with a JSON sidecar',
+      label: 'Frame and sidecar',
       run: (context, options = {}) => capture(context, options)
     }
   ]

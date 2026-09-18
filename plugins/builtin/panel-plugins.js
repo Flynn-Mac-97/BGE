@@ -174,7 +174,7 @@ export default {
     },
     {
       id: 'plugins.enable',
-      label: 'Turn a plugin on or off',
+      label: 'Toggle a plugin',
       run: (context, args) => {
         const [name, on] = [].concat(args)
         const p = context.loader.plugins.get(name)

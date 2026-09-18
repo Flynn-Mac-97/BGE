@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/physics-3d.js; sha256 96755179053fc1a36ccc2d2f60f9885b358f0dc033307a22b4cf273c6297b3dc. Do not edit. -->
+<!-- Generated from plugins/builtin/physics-3d.js; sha256 a7c192df3bcec7d99645d6d4bccebefe2d5e1856140fccfe7b6f0a2d2c793617. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/physics-3d.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Physics 3D
   category   engine
-  commands   physics3d.raycast (Cast a ray and say what it hit)
-             physics3d.bodies (What Physics 3D is simulating)
+  commands   physics3d.raycast (Raycast)
+             physics3d.bodies (Physics 3D bodies)
   arguments  physics3d.raycast: args
   arguments  physics3d.bodies: none
   context    context.canStand, context.raycast

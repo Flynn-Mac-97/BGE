@@ -24,7 +24,7 @@ export default {
   name: 'Screen Card',
   category: 'game',
   needs: ['Screen'],
-  about: 'Adds the card item to Screen — a number, a glyph, a name, a rank and one line.',
+  about: 'The card item for Screen.',
 
   onLoad(context) {
     context.screen.painter('card', {

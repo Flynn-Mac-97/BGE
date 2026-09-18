@@ -23,7 +23,7 @@
 export default {
   name: 'Modifiers',
   category: 'game',
-  about: 'Stack named stat changes onto an entity and recompute its properties from the base values.',
+  about: 'Named stat changes on an entity.',
   inspect: context => {
     const rows = []
     for (const entity of context.world.entities) {
@@ -131,7 +131,7 @@ export default {
 
   commands: [{
     id: 'modifiers.list',
-    label: 'What is changing an entity\'s stats',
+    label: 'Stat changes',
     run: (context, args) => {
       const entity = context.world.byId([].concat(args ?? [])[0])
       if (!entity) return { ok: false, reason: 'name an entity' }

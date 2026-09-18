@@ -1,11 +1,11 @@
-<!-- Generated from plugins/builtin/screen.js; sha256 7314b7109eae3beb302ec4e48beae745cfb93cc51d60028f94277592d35945cc. Do not edit. -->
+<!-- Generated from plugins/builtin/screen.js; sha256 ab2894747aaca0d8de64f4442fc4352e27379616420429a294c8ff16ae0aa63e. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/screen.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     Screen
   category   game
-  commands   screen.read (What the screen says)
-             screen.list (Which screens are up)
+  commands   screen.read (Screen contents)
+             screen.list (Active screens)
   arguments  screen.read: none
   arguments  screen.list: none
   context    context.screen

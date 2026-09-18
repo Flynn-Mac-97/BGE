@@ -251,7 +251,7 @@ const measureFill = fillWith({ measure, drawOnce, round })
 export default {
   name: 'Profiler',
   category: 'agents',
-  about: 'Measures what a frame costs on the thread and on the card, over many frames drawn back to back rather than at the screen refresh, and what a fixed step costs system by system.',
+  about: 'What a frame costs, per system and thread.',
 
   lifecycle: 'scoped',
   provides: ['profiler'],
@@ -270,19 +270,19 @@ export default {
 
   commands: [{
     id: 'profile.frames',
-    label: 'Draw many frames and report what they cost, on the thread and on the card',
+    label: 'Cost frames',
     // run profile.frames
     // run profile.frames '{"frames": 400, "warm": 30}'
     run: (context, options) => measure(context, options || {})
   }, {
     id: 'profile.fill',
-    label: 'Stack quads that cover the frame on one material, and report what its pixels cost',
+    label: 'Cost quad pixels',
     // run profile.fill '{"material": "hologram"}'
     // run profile.fill '{"material": "hologram", "layers": 24, "frames": 300}'
     run: (context, options) => measureFill(context, options || {})
   }, {
     id: 'profile.steps',
-    label: 'Simulate many fixed steps and report what each system cost',
+    label: 'Cost per system',
     // run profile.steps
     // run profile.steps '{"steps": 1200, "warm": 120}'
     run: (context, options) => measureSteps(context, options || {})

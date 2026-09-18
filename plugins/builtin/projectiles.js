@@ -53,7 +53,7 @@ function nearestOnSegment(from, to, point) {
 export default {
   name: 'Projectiles',
   category: 'game',
-  about: 'Shots that fly, pierce, home and expire — swept hits against anything with health.',
+  about: 'Shots that fly, pierce, home and expire.',
   // Named so the damage verb is on context before the first shot lands, rather
   // than one plugin later. Every call into it is still guarded.
   needs: ['Health'],
@@ -193,7 +193,7 @@ export default {
     },
     {
       id: 'projectiles.clear',
-      label: 'Take every shot out of the air',
+      label: 'Clear shots',
       run: context => { context.projectiles.clear(); return { flying: flying.length } }
     }
   ]

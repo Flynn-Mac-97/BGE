@@ -67,7 +67,7 @@ export default {
 
   commands: [{
     id: 'new.file',
-    label: 'Create a type, behaviour, level, test or plugin',
+    label: 'Create a type or level',
     // args: 'type' | ['type', 'enemy']
     run: (context, args) => {
       const [kind, name] = [].concat(args)

@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/joint-diagrams.js; sha256 9bd55f09c544052ca0c772884c8e8fb30fdd95a2c6bf1c1fda4ad5c96aacdec4. Do not edit. -->
+<!-- Generated from plugins/builtin/joint-diagrams.js; sha256 aa9b4733473b8973b73c33e071ebcf9bdc3985fea870b76198217c45a1a386c9. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/joint-diagrams.js). Where the prose below it disagrees, this is the code.
 
 ```

@@ -46,7 +46,7 @@ import { lookColour } from './render/look-colour.js'
 export default {
   name: 'Skybox',
   category: 'visuals',
-  about: 'The sky — a flat colour or a panorama over a sphere, declared in the level.',
+  about: 'The level sky: a flat colour or panorama.',
   inspect: context => {
     const sky = context.skybox?.resolved
     if (!sky) return []
@@ -169,7 +169,7 @@ export default {
   commands: [
     {
       id: 'skybox.look',
-      label: 'The sky as it is set now',
+      label: 'The sky now',
       // The level's block is read off disk and this is often the very first
       // thing a headless run asks. Waiting is the difference between reporting
       // what the level said and reporting the defaults as though it said nothing.
@@ -180,7 +180,7 @@ export default {
     },
     {
       id: 'skybox.set',
-      label: 'Change the sky for this session',
+      label: 'Set the sky',
       // args: ['sky', '#6d7f96'] or ['skyTexture', 'sky.png'] — or a whole
       // block, { sky: '#6d7f96', skyTexture: 'sky.png' }, the same shape the
       // level uses.

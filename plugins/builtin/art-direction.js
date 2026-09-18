@@ -72,14 +72,12 @@ const countKinds = rulings =>
 export default {
   name: 'Art Direction',
   category: 'agents',
-  about: 'Gathers visual references per subject — the world, the effects, the interface — measures '
-    + 'them, and turns what they agree on into rulings a frame can be checked against. Each '
-    + 'subject\'s art bible is generated from that evidence, never typed.',
+  about: 'References per subject, turned into rulings.',
 
   commands: [
     {
       id: 'art.brief',
-      label: 'Open a subject, or read what one is for',
+      label: 'Open or read a brief',
       run: async (context, options = {}) => {
         if (options.subject && (options.reads || options.camera || options.questions)) {
           const subject = slug(options.subject)
@@ -99,7 +97,7 @@ export default {
 
     {
       id: 'art.reference',
-      label: 'List a subject\'s references, or put one on its shelf',
+      label: 'List references',
       run: async (context, options = {}) => {
         const where = await resolve(context, options)
         if (where.error) return { error: where.error, subjects: where.open }
@@ -128,7 +126,7 @@ export default {
 
     {
       id: 'art.measure',
-      label: 'Measure a subject\'s references and report what they agree on',
+      label: 'Measure references',
       run: async (context, options = {}) => {
         const where = await resolve(context, options)
         if (where.error) return { error: where.error, subjects: where.open }
@@ -148,7 +146,7 @@ export default {
 
     {
       id: 'art.rule',
-      label: 'List a subject\'s rulings, or write one',
+      label: 'Rulings',
       run: async (context, options = {}) => {
         const where = await resolve(context, options)
         if (where.error) return { error: where.error, subjects: where.open }
@@ -192,7 +190,7 @@ export default {
 
     {
       id: 'art.check',
-      label: 'Measure a frame and test a subject\'s measured rulings against it',
+      label: 'Test rulings on a frame',
       run: async (context, options = {}) => {
         const where = await resolve(context, options)
         if (where.error) return { error: where.error, subjects: where.open }
@@ -227,7 +225,7 @@ export default {
 
     {
       id: 'art.compare',
-      label: 'One reference beside one frame, same height, no marks',
+      label: 'Reference beside frame',
       run: async (context, options = {}) => {
         const where = await resolve(context, options)
         if (where.error) return { error: where.error, subjects: where.open }
@@ -260,7 +258,7 @@ export default {
 
     {
       id: 'art.bible',
-      label: 'Write a subject\'s art bible from its brief, references and rulings',
+      label: 'Write an art bible',
       run: async (context, options = {}) => {
         const where = await resolve(context, options)
         if (where.error) return { error: where.error, subjects: where.open }
@@ -288,7 +286,7 @@ export default {
 
     {
       id: 'art.status',
-      label: 'Every subject, and where each one is in the loop',
+      label: 'Subjects and stages',
       run: async context => {
         const open = await subjectsIn(context)
         const subjects = []

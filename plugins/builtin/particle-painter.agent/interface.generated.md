@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/particle-painter.js; sha256 5c63b3d8beb6fb293c6f9c9bc2600b3141cd614171b83fc084665598bd4f2009. Do not edit. -->
+<!-- Generated from plugins/builtin/particle-painter.js; sha256 e5efd0f7f057b8e4d527c0fc2176aed1a254c52274701bd0c1bd98ba4f35f9ba. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/particle-painter.js). Where the prose below it disagrees, this is the code.
 
 ```

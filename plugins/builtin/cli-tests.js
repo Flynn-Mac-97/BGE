@@ -18,14 +18,14 @@ const info = () => ({
 export default {
   name: 'CLI Tests',
   category: 'agents',
-  about: 'Inspect the engine\'s own CLI test suites — the bridge suite and the offline door suite.',
+  about: 'The CLI test suites, bridge and offline.',
   inspect: () => [
     { title: 'How to run', rows: [['bridge', 'node test/cli.bridge.mjs'], ['offline', 'node --test test/cli.offline.test.mjs'], ['full', 'npm test']] },
     { title: 'Needs', rows: info().needs.map(n => [n, '']) }
   ],
   commands: [{
     id: 'tests.cli',
-    label: 'Inspect the CLI test suite',
+    label: 'CLI test suite',
     run: () => info()
   }]
 }

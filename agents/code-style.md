@@ -1,6 +1,5 @@
 # Code style
 
 - Use full names: `context`, not `ctx`.
-- Use plain words that say what a thing does.
-- Keep one idea in one small function.
+- Plain words that say what a thing does; one idea per small function.
 - A project may replace this rule for its own files.

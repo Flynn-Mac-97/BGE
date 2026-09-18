@@ -1,21 +1,11 @@
 # Codebase design
 
-Codemap's design rules. They add to the engine's rules; where the two disagree,
-the engine's rule wins.
+Codemap's rules; the engine's rules win where they disagree.
 
-- A module is anything with an interface and an implementation: a function, a
-  file, a folder. The interface is everything a caller must know — parameters,
-  return, errors, order, side effects.
-- Make a module deep: a small interface with a lot of behaviour behind it.
-  Before adding a method or a parameter, ask whether the interface can be
-  smaller and more can be hidden inside.
-- Apply the deletion test. If deleting a module only moves its code into its
-  callers, it was a pass-through. Do not add a pass-through layer.
-- Earn a seam. Add an interface to swap an implementation only when two real
-  implementations exist.
-- Accept dependencies as parameters; do not create them inside. Return the
-  result instead of changing shared state where you can.
-- The interface is the test surface. Test through it, not past it.
-- One record, one shape. Build a record in one place, and let each reader cut
-  the fields it names from it. Two hand-written projections of the same record
-  drift, and the untested one drifts in silence.
+- A module has an interface and an implementation: a function, a file, a folder. The interface is all a caller must know: parameters, return, errors, order, side effects.
+- Make a module deep: a small interface over much behaviour. Before adding a method or parameter, ask if the interface can shrink.
+- Deletion test: if deleting a module only moves its code into its callers, it was a pass-through. Do not add one.
+- Earn a seam: swap an implementation behind an interface only when two real ones exist.
+- Pass dependencies in; return the result rather than changing shared state where you can.
+- The interface is the test surface; test through it.
+- One record, one shape. Two hand-written projections drift, and the untested one drifts in silence.

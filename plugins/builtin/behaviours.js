@@ -29,7 +29,7 @@ export default {
   commands: [
     {
       id: 'behaviour.attach',
-      label: 'Attach a behaviour to an entity',
+      label: 'Attach behaviour',
       // args: ['crate-1', 'float'] or ['crate-1', 'float', { speed: 4 }]
       run: (context, args) => {
         const [id, name, properties] = [].concat(args)
@@ -41,7 +41,7 @@ export default {
     },
     {
       id: 'behaviour.detach',
-      label: 'Take a behaviour off an entity',
+      label: 'Detach behaviour',
       run: (context, args) => {
         const [id, name] = [].concat(args)
         return change(context, id, e => {
@@ -52,7 +52,7 @@ export default {
     },
     {
       id: 'behaviour.list',
-      label: 'Every behaviour, what it holds, and who attaches it',
+      label: 'Behaviours and owners',
       run: context => context.behaviours().map(b => ({
         name: b.name,
         about: b.about,

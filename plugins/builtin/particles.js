@@ -306,7 +306,7 @@ export const art = { bulletHole: '', blood: '' }
 export default {
   name: 'Particles',
   category: 'visuals',
-  about: 'Deterministic bursts, trails and sight-blocking clouds — simulated on the fixed clock, recorded headless, drawn by Particle Painter.',
+  about: 'Bursts, trails, sight-blocking clouds.',
   inspect: context => [{ title: 'Alive', rows: Object.entries(context.particles.state) }],
 
   onLoad(context) {
@@ -325,18 +325,18 @@ export default {
   ],
 
   commands: [
-    { id: 'particles.recent', label: 'Bursts recently made', run: (context, n) => context.particles.recent(typeof n === 'number' ? n : 20) },
-    { id: 'particles.state', label: 'How many particles are alive', run: context => context.particles.state },
+    { id: 'particles.recent', label: 'Recent bursts', run: (context, n) => context.particles.recent(typeof n === 'number' ? n : 20) },
+    { id: 'particles.state', label: 'Live particle count', run: context => context.particles.state },
     {
       id: 'particles.effect',
-      label: 'Play one named effect',
+      label: 'Play an effect',
       /** `run particles.effect '["smoke", {"at": [0, 1, 0]}]'` */
       run: (context, args) => {
         const [name, options] = Array.isArray(args) ? args : [args, {}]
         return context.particles.effect(name, options || {})
       }
     },
-    { id: 'particles.clear', label: 'Remove every particle', run: context => { context.particles.clear(); return context.particles.state } }
+    { id: 'particles.clear', label: 'Clear particles', run: context => { context.particles.clear(); return context.particles.state } }
   ]
 }
 

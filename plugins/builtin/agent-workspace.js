@@ -154,9 +154,9 @@ export default {
   }],
 
   commands: [
-    { id: 'agent.context', label: 'Build a small instruction packet', run: packetFor },
-    { id: 'agent.status', label: 'Read the agent tree and runs', run: async context => ({ workspace: await readAgentWorkspace(reader(context), await pluginNodes(context)), runs: await readRegistry(context) }) },
-    { id: 'agent.toggle', label: 'Turn an optional skill on or off', run: (context, value) => setSkill(context, value.id || value[0], value.enabled ?? value[1]) },
-    { id: 'agent.create', label: 'Add an instruction or skill', run: (context, value) => createNode(context, value) }
+    { id: 'agent.context', label: 'Instruction packet', run: packetFor },
+    { id: 'agent.status', label: 'Agent runs and tree', run: async context => ({ workspace: await readAgentWorkspace(reader(context), await pluginNodes(context)), runs: await readRegistry(context) }) },
+    { id: 'agent.toggle', label: 'Toggle a skill', run: (context, value) => setSkill(context, value.id || value[0], value.enabled ?? value[1]) },
+    { id: 'agent.create', label: 'Add an instruction', run: (context, value) => createNode(context, value) }
   ]
 }

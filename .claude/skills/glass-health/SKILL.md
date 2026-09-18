@@ -12,12 +12,14 @@ node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/healt
 
 # Health
 
-- Owns the one damage verb: `context.damage(target, amount, how)` → `{ dealt, remaining, killed, blocked }`.
-- `how` carries `from`, `source`, `every` (seconds this source must wait before hitting the same target again), `direction`, `point`, `critical`, `hitbox`, `invulnerableFor`.
-- State is `entity.damageable` — `health`, `maxHealth`, `alive`, `lastHurtBy`, `linger`, `removeOnDeath`. Read the bag; never ask this plugin.
-- A type that declares `health` in `properties` gets a pool on its first hit. Otherwise call `context.health.give(entity, { health, maxHealth, removeOnDeath, linger })`.
-- Also on `context.health`: `nearest(point, { within, hits })`, `living(test)`, `damageInRadius({ at, radius, damage, hits, from })`, `radiusOf(entity)`, `of(entity)`, `alive(entity)`.
-- Hit flash, knockback, floating numbers and screen shake are other plugins listening on the same bus — this file has no theatre in it.
-- Removes a body `linger` seconds after death, default 0.35. A player sets `removeOnDeath: false`; nothing else has to.
-- Only manages entities it set up. A game that publishes its own `context.damage` shadows this one, and this one then touches nothing.
-- Check with `health.list`; drive with `health.damage '["id", 25]'` and `health.give '["id", {"health": 40}]'`.
+- Owns the one damage verb: `context.damage(target, amount, how)` â†’ `{ dealt, remaining, killed, blocked }`.
+- State is `entity.damageable`: `health`, `maxHealth`, `alive`, `lastHurtBy`, `linger`, `removeOnDeath`.
+- A type declaring `health` gets a pool on first hit; otherwise `context.health.give(entity, { health, maxHealth, removeOnDeath, linger })`.
+- Hit flash, knockback, numbers and shake are other plugins.
+- Removes a body `linger` seconds after death, default 0.35; a player sets `removeOnDeath: false`.
+- Owns only entities it set up; a game publishing `context.damage` shadows it.
+- Check with `health.list`; drive with `health.damage '["id", 25]'`.
+
+## Detail
+
+- `plugins/builtin/health.agent/damage.md` â€” `how` fields, `context.health` verbs

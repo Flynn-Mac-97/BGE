@@ -25,7 +25,7 @@ const DEFAULT_CURVE = { base: 5, growth: 1.35, maxLevel: 99 }
 export default {
   name: 'Experience',
   category: 'game',
-  about: 'Count experience points against a curve and announce every level gained.',
+  about: 'Experience against a curve, announcing levels.',
   inspect: context => {
     const experience = context.experience
     if (!experience) return []
@@ -154,7 +154,7 @@ export default {
     },
     {
       id: 'experience.gain',
-      label: 'Award experience points',
+      label: 'Award experience',
       run: (context, args) => context.experience.gain(Number([].concat(args ?? [])[0] ?? 1), 'command')
     }
   ]

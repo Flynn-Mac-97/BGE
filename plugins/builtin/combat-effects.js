@@ -22,7 +22,7 @@ import { normalise, asWrittenVector } from '../../engine/vector.js'
 export default {
   name: 'Combat Effects',
   category: 'game',
-  about: 'Turns the engine\'s combat events — shots, hits, hurts, kills, blasts — into named particle effects and decals.',
+  about: 'Combat events become effects and decals.',
   needs: ['Particles', 'Decals'],
 
   onLoad(context) {

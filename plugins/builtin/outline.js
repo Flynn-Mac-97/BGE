@@ -80,7 +80,7 @@ function chosen(context, what) {
 export default {
   name: 'Outline',
   category: 'visuals',
-  about: 'Switches a screen-width outline on and off per entity. The standard feedback for hover, selection, and what a player can act on. Never saved into the level.',
+  about: 'A screen-width outline per entity.',
 
   panels: [{
     id: 'outline',
@@ -186,7 +186,7 @@ export default {
   commands: [
     {
       id: 'outline.show',
-      label: 'Outline one entity, a list of them, or every one of a type',
+      label: 'Outline entities',
       // run outline.show crate              — one id, or a type
       // run outline.show '["a","b"]'        — several
       // run outline.show                    — whatever is selected
@@ -194,17 +194,17 @@ export default {
     },
     {
       id: 'outline.hide',
-      label: 'Take the outline off — everything, if nothing is named',
+      label: 'Remove outline',
       run: (context, what) => ({ cleared: context.outline.hide(what) })
     },
     {
       id: 'outline.toggle',
-      label: 'Switch the outline on what is named, or on the selection',
+      label: 'Toggle outline',
       run: (context, what, options) => ({ outlined: context.outline.toggle(what, options || {}) })
     },
     {
       id: 'outline.list',
-      label: 'What is outlined now, and what an outline looks like',
+      label: 'Outlined entities',
       run: () => ({ outlined: [...shown.keys()], width: panel.width, colour: panel.colour, following: panel.follow })
     }
   ]

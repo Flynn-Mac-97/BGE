@@ -25,15 +25,15 @@ const javascriptExtensions = new Set(['.js', '.mjs', '.cjs']);
 // still matches them. On a mismatch the hook sends the changed document whole,
 // so a stale summary can never be the only thing the agent sees.
 const styleDocumentHashes = {
-  'agents/comment-style.md': '9f45f405a0183736',
-  'agents/code-style.md': 'a1d391808d55ae86'
+  'agents/comment-style.md': '3ab1fc81bf485fa0',
+  'agents/code-style.md': 'ef29954f61c8f72b'
 };
 
 const commentRules =
-  'Comments: say why, not what; short and true; no metaphor, analogy or story; ' +
-  'state the rule, not the mistake that taught it; literal verbs, short words, ' +
-  'active voice; cut any word doing no work; delete comments that no longer ' +
-  'match the code.';
+  'Comments: say why, not what; short and true; no metaphor or story; ' +
+  'state the fact and the reason, not the mistake that taught it; literal ' +
+  'verbs, active voice, short words; write for the least capable model; ' +
+  'delete comments that no longer match the code.';
 
 const nameRules =
   'Names: in full — `context`, not `ctx`. Plain words for what a thing does. ' +

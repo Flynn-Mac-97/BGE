@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/shader-languages.js; sha256 d236095b8c9bb5099f15fb86966df8a6002dc232d86413b6739ce52cd988071d. Do not edit. -->
+<!-- Generated from plugins/builtin/shader-languages.js; sha256 bc252b339bd5d0965772147afaca2868ac8cb1a0774fd8a114430ee3533cd788. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/shader-languages.js). Where the prose below it disagrees, this is the code.
 
 ```
@@ -6,9 +6,9 @@
   category   visuals
   needs      Materials
   points     1 panel
-  commands   shader.languages (Every shader language, and whether the live backend can build it)
-             shader.list (Every shader, the languages it is written in, and the one it is built from)
-             shader.prefer (Prefer a shader language, and rebuild every shader that moved)
+  commands   shader.languages (Shader languages)
+             shader.list (Shaders and languages)
+             shader.prefer (Prefer a language)
   arguments  shader.languages: none
   arguments  shader.list: none
   arguments  shader.prefer: language

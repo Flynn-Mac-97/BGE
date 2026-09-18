@@ -44,7 +44,7 @@ const state = {
 export default {
   name: '3D Transform Gizmo',
   category: 'editor',
-  about: 'Move, rotate and scale the selection in the 3D view — real geometry in the scene, dragged along world axes.',
+  about: 'Move, rotate and scale the selection.',
   inspect: context => [{
     title: 'Gizmo',
     rows: [
@@ -57,7 +57,7 @@ export default {
   commands: [
     {
       id: 'gizmo3d.mode',
-      label: 'Set the 3D gizmo mode (move, rotate, scale)',
+      label: '3D gizmo mode',
       // run gizmo3d.mode rotate
       run: (context, mode) => {
         const wanted = String(mode || '').toLowerCase()
@@ -71,7 +71,7 @@ export default {
     },
     {
       id: 'gizmo3d.state',
-      label: 'What the 3D gizmo is doing',
+      label: '3D gizmo state',
       run: context => ({
         mode: state.mode,
         visible: visibleFor(context),

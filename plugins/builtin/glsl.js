@@ -139,7 +139,7 @@ export function readDefinition(name, definition = {}) {
 export default {
   name: 'GLSL',
   category: 'visuals',
-  about: 'Shaders written as GLSL source, bound to engine inputs by name. Builds on the WebGL backend only.',
+  about: 'GLSL shaders bound to engine inputs; WebGL.',
   needs: ['Shader Languages'],
 
   onLoad(context) {
@@ -215,7 +215,7 @@ export default {
   commands: [
     {
       id: 'glsl.backend',
-      label: 'Whether GLSL can be built right now, and what to do if it cannot',
+      label: 'GLSL availability',
       run: context => {
         const answer = supportedOn(context.renderer?.backend || null)
         return {
@@ -228,7 +228,7 @@ export default {
     },
     {
       id: 'glsl.forceWebGL',
-      label: 'Ask the next page load for the WebGL backend, so GLSL can compile',
+      label: 'Force WebGL',
       run: (context, on) => {
         const wanted = Array.isArray(on) ? on[0] : on
         const chosen = forceWebGL(wanted !== false && wanted !== 'false')
@@ -240,12 +240,12 @@ export default {
     },
     {
       id: 'glsl.list',
-      label: 'Every GLSL shader, its inputs and its defaults',
+      label: 'GLSL shaders',
       run: context => ({ shaders: context.glsl?.written() || [] })
     },
     {
       id: 'glsl.source',
-      label: 'The GLSL source of one shader',
+      label: 'GLSL source',
       run: (context, name) => {
         const wanted = Array.isArray(name) ? name[0] : name
         const source = context.glsl?.source(wanted)

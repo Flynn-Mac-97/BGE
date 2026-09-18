@@ -77,7 +77,7 @@ const shape = run => ({
 export default {
   name: 'Dream',
   category: 'agents',
-  about: 'Improve one target in the engine by trying versions of it and scoring them against a measure designed for it.',
+  about: 'Improve one target by trying and scoring versions.',
 
   inspect: () => (newest()
     ? [{
@@ -180,7 +180,7 @@ export default {
     },
     {
       id: 'dream.rsi',
-      label: 'Dream: run the recursive self-improvement loop',
+      label: 'Dream: run the RSI loop',
       // args: the target in words, then { rounds, versions, parallelism, branches, refinements, seed, timeout, model }
       run: async (context, target, options = {}) => {
         if (!context.host) return needsNode('dream.rsi')
@@ -203,7 +203,7 @@ export default {
     },
     {
       id: 'dream.status',
-      label: 'Dream: what the runs are doing',
+      label: 'Dream: run status',
       run: async (context, directory) => {
         if (!context.host) return needsNode('dream.status')
         await refresh(context)
@@ -215,7 +215,7 @@ export default {
     },
     {
       id: 'dream.stop',
-      label: 'Dream: ask a run to stop',
+      label: 'Dream: stop a run',
       run: async (context, directory) => {
         if (!context.host) return needsNode('dream.stop')
         const run = newest()
@@ -229,7 +229,7 @@ export default {
     },
     {
       id: 'dream.report',
-      label: 'Dream: the document a run wrote about itself',
+      label: 'Dream: run report',
       run: async (context, directory) => {
         if (!context.host) return needsNode('dream.report')
         const run = directory ? state.runs.find(one => one.name === directory || one.directory === directory) ?? newest() : newest()
@@ -239,7 +239,7 @@ export default {
     },
     {
       id: 'dream.forget',
-      label: 'Dream: throw a finished run away',
+      label: 'Dream: discard run',
       run: async (context, directory) => {
         if (!context.host) return needsNode('dream.forget')
         const forgotten = (await node()).forgetRun({ checkout: context.host.checkout, directory })

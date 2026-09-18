@@ -161,7 +161,7 @@ export default {
 
   commands: [{
     id: 'spawnRing.state',
-    label: 'How far the camera sees, and where a spawn would land',
+    label: 'Camera reach, spawn sites',
     run(context) {
       if (!context.spawnRing) return { error: 'Spawn Ring did not load' }
       const seen = context.spawnRing.visibleRadius()

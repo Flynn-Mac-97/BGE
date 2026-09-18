@@ -49,6 +49,11 @@ It comes from the syntax tree, not from a pattern over the text, so it survives
 the shapes that defeat a scan: a description written as several literals joined
 across lines, a name held in a top-level `const`, a key spelled as shorthand.
 
+The list route keeps only what the plugin provides and its contribution points,
+and drops the category, systems, listeners and emitted events;
+`plugin.facts '{"plugin":"<name>"}'` still answers with all of them. The list
+also names the builtin directory once, so each entry carries only the file.
+
 ## What only source can answer
 
 Four fields exist nowhere else, and they are the reason this reads source

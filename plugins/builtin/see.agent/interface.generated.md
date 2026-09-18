@@ -1,21 +1,21 @@
-<!-- Generated from plugins/builtin/see.js; sha256 d21f6834016f7c1756632f61d396ac670cd25ff3dd6a803e86aa6bb9fcb28fbd. Do not edit. -->
+<!-- Generated from plugins/builtin/see.js; sha256 a82101c7ff2feae79588384065d25a02b5b364daefe204272d7b023cb4e3dca4. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/see.js). Where the prose below it disagrees, this is the code.
 
 ```
   plugin     See
   category   agents
-  commands   see.describe (What is on screen, as computed facts — no pixels, no vision read)
-             see.view (Save, list, drop, or aim the camera — a view worth returning to is a word)
-             see.occlusion (How much of one entity the camera sees, and who blocks the rest)
-             see.isolate (One entity in full — world box, screen box, cover, velocity, camera relation)
-             see.find (Every entity matching the given predicates, on screen or off)
-             see.diff (What appeared, moved, or left over exact fixed steps)
-             see.camera (Why the frame looks wrong, asked of the camera itself)
-             see.ray (What sits at a screen point, a grid of them, or in a direction from an entity)
-             see.identify (What is drawn at this screen point, by the renderer that drew it)
-             see.sketch (A flat-colour frame of screen hulls, drawn without a renderer)
-             see.moment (One moment through several lenses, stepped forward, on one labelled sheet)
-             see.capture (The real rendered frame, hulls outlined, with a JSON sidecar)
+  commands   see.describe (What is on screen)
+             see.view (Saved views)
+             see.occlusion (How much is visible)
+             see.isolate (One entity in full)
+             see.find (Matching entities)
+             see.diff (Changes over steps)
+             see.camera (Frame faults)
+             see.ray (Screen point or ray)
+             see.identify (Pixel at a point)
+             see.sketch (Flat screen hulls)
+             see.moment (Moment, several lenses)
+             see.capture (Frame and sidecar)
   arguments  see.describe: options
   arguments  see.view: options
   arguments  see.occlusion: options

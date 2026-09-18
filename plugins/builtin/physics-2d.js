@@ -188,7 +188,7 @@ export default {
 
   commands: [{
     id: 'physics.gravity',
-    label: 'Set world gravity for every 2D entity',
+    label: 'Set 2D gravity',
     /**
      * The three system filters above skip 3D entities, and this has to skip them
      * too or the disjoint-domains claim is only true of the simulation and not

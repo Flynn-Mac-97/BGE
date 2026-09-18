@@ -307,7 +307,7 @@ export default {
 
   commands: [{
     id: 'crowd.stats',
-    label: 'What each crowd holds and what its last step cost',
+    label: 'What each crowd holds',
     run(context) {
       if (!context.crowd) return { error: 'Crowd did not load' }
       return { groups: context.crowd.groups.map(group => group.stats) }

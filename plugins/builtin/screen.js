@@ -59,7 +59,7 @@ export const FONT = "ui-monospace, 'SF Mono', Menlo, monospace"
 export default {
   name: 'Screen',
   category: 'game',
-  about: 'Draw game screens — a title card, a pause menu, a result card — from a list of plain items.',
+  about: 'Game screens from plain items.',
   inspect: context => {
     const shown = context.screen?.shown() || []
     return shown.length ? [{ title: 'On screen', rows: shown.map(s => [s.id, `${s.count} items`]) }] : []
@@ -188,8 +188,8 @@ export default {
   }],
 
   commands: [
-    { id: 'screen.read', label: 'What the screen says', run: context => context.screen.read() },
-    { id: 'screen.list', label: 'Which screens are up', run: context => context.screen.shown() }
+    { id: 'screen.read', label: 'Screen contents', run: context => context.screen.read() },
+    { id: 'screen.list', label: 'Active screens', run: context => context.screen.shown() }
   ]
 }
 

@@ -26,7 +26,7 @@ export default {
 
   commands: [{
     id: 'place.at',
-    label: 'Place a type at a position',
+    label: 'Place a type',
     // args: ['coin', 4, 2]
     run: (context, args) => {
       const [type, x = 0, y = 0] = [].concat(args)

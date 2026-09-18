@@ -190,13 +190,13 @@ function namesTrigger(task, trigger) {
  */
 function withheldReason(node, replaced) {
   if (replaced) return `replaced by the project's own ${node.override} rule`
-  if (!node.enabled) return 'switched off in agents/settings.json'
+  if (!node.enabled) return 'switched off'
   const byFile = (node.match || []).length > 0
   const byWord = (node.triggers || []).length > 0
-  if (byFile && byWord) return 'no file matched, no trigger word in the task'
+  if (byFile && byWord) return 'no file or word'
   if (byFile) return 'no file matched its patterns'
-  if (byWord) return 'no trigger word in the task'
-  return 'selected only by name'
+  if (byWord) return 'no word'
+  return 'by id'
 }
 
 /**
@@ -285,8 +285,8 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // and never parse the JSON.
   const noFilesNotice = request.files.length || !skippedByFile ? null
     : '# You named no files\n\n'
-      + `${skippedByFile} rule sets are chosen by the files you touch. Name them:\n\n`
-      + '```sh\nnode bin/engine.mjs agent.context \'{"task":"...","files":["path/to/file.js"]}\'\n```'
+      + `${skippedByFile} rule sets match on your files:\n\n`
+      + '```sh\nnode bin/engine.mjs agent.context \'{"files":["f.js"]}\'\n```'
   // The engine's own rules are named in full, because a packet that dropped them
   // must say so in the exact words a reader and a test both look for. The rest
   // are grouped by reason: the id says which rule set, and the title only
@@ -296,19 +296,19 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   for (const node of withheld) {
     if (node === engineEntry) continue
     const ids = groupedByReason.get(node.reason) || []
-    ids.push(`\`${node.id}\``)
+    ids.push(node.id)
     groupedByReason.set(node.reason, ids)
   }
   const withheldNotice = withheld.length || withheldPluginGuides
     ? [
       '# Not included',
-      'Ask for one by id: `\'{"task":"...","nodes":["<id>"]}\'`.',
+      'Ask: `\'{"nodes":["<id>"]}\'`.',
       engineEntry ? `- \`${engineEntry.id}\` — ${engineEntry.title} — ${engineEntry.reason}` : null,
       ...[...groupedByReason].map(([reason, ids]) => `- ${ids.join(', ')} — ${reason}`),
       withheldPluginGuides
-        ? `${withheldPluginGuides} plugin guides are missing; each arrives when the task uses its plugin's words.`
+        ? `${withheldPluginGuides} guides withheld.`
         : null
-    ].filter(Boolean).join('\n\n')
+    ].filter(Boolean).join('\n')
     : null
   const parts = [
     request.task ? `# Task\n\n${request.task}` : null,

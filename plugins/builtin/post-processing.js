@@ -208,7 +208,7 @@ export default {
 
   commands: [{
     id: 'post.chain',
-    label: 'What the picture is being put through, and what else it could be',
+    label: 'Post chain',
     // args: nothing to read it, a preset name or a chain to set it, `null` to
     // hand it back to the level.
     run: (context, args) => {

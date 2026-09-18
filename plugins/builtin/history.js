@@ -92,7 +92,7 @@ let loading = false
 export default {
   name: 'History',
   category: 'editor',
-  about: 'Step back and forward through this session\'s edits, or click a row to jump several at once.',
+  about: 'Step through this session\'s edits.',
 
   inspect: () => palette.entries.length
     ? [{
@@ -193,7 +193,7 @@ export default {
     },
     {
       id: 'history.list',
-      label: 'List the recorded steps',
+      label: 'Recorded steps',
       run: () => ({
         level: palette.level,
         current: palette.current,
@@ -209,7 +209,7 @@ export default {
     },
     {
       id: 'history.clear',
-      label: 'Forget the recorded steps',
+      label: 'Forget history',
       run: context => {
         const dropped = palette.entries.length
         const baseline = reset(context)
