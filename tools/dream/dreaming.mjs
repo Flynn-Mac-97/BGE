@@ -101,6 +101,38 @@ export async function reviseWithAgent({ checkout, runDirectory, policyFile, sour
 }
 
 /**
+ * Which version a dreaming phase deploys.
+ *
+ * Highest average replay reward, with one exception. A version whose beta sweep
+ * is flat has tied its knob to nothing: the online rollout plays exactly one
+ * beta, so a policy that ignores beta cannot be steered at all. When such a
+ * version wins by a margin small enough to be noise, a version that does respond
+ * to its knob is deployed instead, and the record says so.
+ *
+ * The exception is bounded on purpose. A flat policy that wins by a real margin
+ * keeps its win: the reward is the measurement, and degeneracy is a diagnostic
+ * about the knob rather than a fault in the route.
+ */
+export function selectVersion({ versions = [], epsilon = 0.01 } = {}) {
+  const scored = versions.filter(version => !version.failure && typeof version.score === 'number')
+  if (!scored.length) return { winner: null, rule: 'no version scored' }
+
+  const ranked = [...scored].sort((left, right) => right.score - left.score)
+  const best = ranked[0]
+  if (!best.degenerate) return { winner: best, rule: 'highest average replay reward' }
+
+  const responsive = ranked.find(version => !version.degenerate && version.score >= best.score - epsilon)
+  if (responsive) {
+    return {
+      winner: responsive,
+      rule: `beta changes nothing in the best version, so a version that responds to it was preferred within ${epsilon}`,
+      displaced: { version: best.version, score: best.score }
+    }
+  }
+  return { winner: best, rule: 'highest average replay reward; the best version ignores beta, by a margin larger than epsilon' }
+}
+
+/**
  * Run the dreaming phase.
  *
  * The pool is read once and held for the whole phase. Version 0 is the policy the
@@ -114,6 +146,7 @@ export async function dreamPolicies({
   betas = BETA_GRID,
   maxParallelism = 3,
   lambda = 0.5,
+  degenerateEpsilon = 0.01,
   startPolicyFile = null,
   revise = reviseWithAgent,
   timeoutSeconds,
@@ -204,11 +237,12 @@ export async function dreamPolicies({
     await fs.writeFile(path.join(replayDirectory, `v${String(version).padStart(3, '0')}.json`), `${JSON.stringify(record.versions[version], null, 2)}\n`, 'utf8')
   }
 
-  const scoredVersions = record.versions.filter(version => !version.failure && typeof version.score === 'number')
-  const winner = scoredVersions.reduce((best, version) => (!best || version.score > best.score ? version : best), null)
+  const selection = selectVersion({ versions: record.versions, epsilon: degenerateEpsilon })
+  const winner = selection.winner
   const floor = record.versions[0]
 
   record.winner = winner ? { version: winner.version, file: winner.file, score: winner.score, bestBeta: winner.bestBeta } : null
+  record.selection = { rule: selection.rule, epsilon: degenerateEpsilon, displaced: selection.displaced ?? null }
   record.improved = Boolean(winner && floor && typeof floor.score === 'number' && winner.score > floor.score)
   record.gain = winner && floor && typeof floor.score === 'number' ? Number((winner.score - floor.score).toFixed(6)) : 0
   record.cost = record.versions

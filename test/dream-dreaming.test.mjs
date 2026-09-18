@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { emptyGrid, record } from '../tools/dream/grid.mjs'
 import { addGrid, readPool, poolSummary } from '../tools/dream/pool.mjs'
-import { dreamPolicies } from '../tools/dream/dreaming.mjs'
+import { dreamPolicies, selectVersion } from '../tools/dream/dreaming.mjs'
 import { loadPolicy } from '../tools/dream/policy.mjs'
 
 /** A grid where branch 1 holds the win, so a policy's route is visible in its score. */
@@ -108,6 +108,30 @@ test('a version that cannot probe legally is recorded as failed and never wins',
   assert.equal(record.versions[1].policy, 'broken')
   assert.ok(record.versions[1].failures > 0, 'an illegal probe was not recorded as a failure')
   assert.equal(record.winner.version, 0, 'a version that cannot probe won the phase')
+})
+
+test('a version that ignores beta wins only by a margin, and loses a close call to one that responds', () => {
+  const flat = { version: 1, score: 0.5, degenerate: true }
+  const responsive = { version: 2, score: 0.495, degenerate: false }
+  const behind = { version: 3, score: 0.4, degenerate: false }
+
+  // The knob matters more than a hair of reward: the rollout plays one beta.
+  const close = selectVersion({ versions: [flat, responsive, behind], epsilon: 0.01 })
+  assert.equal(close.winner.version, 2)
+  assert.match(close.rule, /beta changes nothing in the best version/)
+  assert.deepEqual(close.displaced, { version: 1, score: 0.5 })
+
+  // A flat policy that wins by a real margin keeps its win: the reward is the measurement.
+  const clear = selectVersion({ versions: [{ version: 1, score: 0.9, degenerate: true }, { version: 2, score: 0.5, degenerate: false }], epsilon: 0.01 })
+  assert.equal(clear.winner.version, 1)
+  assert.match(clear.rule, /larger than epsilon/)
+
+  // A version that responds to beta and leads is simply the best.
+  const leads = selectVersion({ versions: [{ version: 1, score: 0.4, degenerate: true }, { version: 2, score: 0.6, degenerate: false }] })
+  assert.equal(leads.winner.version, 2)
+  assert.match(leads.rule, /highest average replay reward/)
+
+  assert.equal(selectVersion({ versions: [{ version: 0, failure: 'will not load' }] }).winner, null)
 })
 
 test('a dreaming phase with an empty pool refuses instead of reporting a winner', async () => {
