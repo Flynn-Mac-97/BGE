@@ -263,7 +263,21 @@ export async function rsiRun({
       refineCount: plan.refineCount
     })
 
-    const rollout = await rolloutOnce({ grid, policy, maxParallelism, attempt: makeAttempt })
+    // The grid is written after every attempt, not only when the round ends. A
+    // rollout is the expensive part of the loop, and one that can only be watched
+    // after it finishes is one nobody can stop in time.
+    await fs.mkdir(roundDirectory(directory, round), { recursive: true })
+    const liveGrid = path.join(roundDirectory(directory, round), 'grid.json')
+    const writeGrid = () => fs.writeFile(liveGrid, `${JSON.stringify(grid, null, 2)}\n`, 'utf8')
+    await writeGrid()
+
+    const rollout = await rolloutOnce({
+      grid,
+      policy,
+      maxParallelism,
+      attempt: makeAttempt,
+      onAttempt: writeGrid
+    })
     for (const made of rollout.records) {
       if (made.record?.cost) spent.push(made.record.cost)
       else if (made.record?.tokens) spent.push(costBands(made.record.tokens))

@@ -147,7 +147,9 @@ export function makeOnlineQuestion({ grid, maxParallelism = 3, attempt, onAttemp
         const answer = { id, ...question.meta(id) }
         answers.push(answer)
         onRevealOne?.(answer)
-        onAttempt?.(answer, made)
+        // Awaited, so a watcher that writes the grid on every attempt sees the
+        // cells in the order they were made rather than whenever a write lands.
+        await onAttempt?.(answer, made)
       }
 
       const top = answers.reduce((highest, answer) => {

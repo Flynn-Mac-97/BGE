@@ -56,6 +56,84 @@ function textOf(directory, file) {
   }
 }
 
+/** Every grid in a run's pool, oldest first, with its cells flattened for reading. */
+function readGrids(directory) {
+  const sources = []
+  const poolDirectory = path.join(directory, 'pool')
+  for (const name of fs.existsSync(poolDirectory) ? fs.readdirSync(poolDirectory).sort() : []) {
+    if (name.endsWith('.json')) sources.push({ file: path.join(poolDirectory, name), name, live: false })
+  }
+  // A round writes its grid after every attempt, so a rollout in flight can be
+  // watched: the cells that are made appear, and the ones the policy has not
+  // reached yet stay visible as gaps.
+  const roundsDirectory = path.join(directory, 'rsi')
+  for (const name of fs.existsSync(roundsDirectory) ? fs.readdirSync(roundsDirectory).sort() : []) {
+    const file = path.join(roundsDirectory, name, 'grid.json')
+    if (fs.existsSync(file)) sources.push({ file, name: `${name} (live)`, live: true })
+  }
+
+  const grids = []
+  for (const source of sources) {
+    try {
+      const grid = JSON.parse(fs.readFileSync(source.file, 'utf8'))
+      const cells = []
+      for (let branch = 0; branch < (grid.branchCount ?? 0); branch++) {
+        for (let attempt = 0; attempt <= (grid.refineCount ?? 0); attempt++) {
+          const id = `${branch}:${attempt}`
+          const cell = grid.cells?.[id]
+          cells.push({
+            id,
+            branch,
+            attempt,
+            made: Boolean(cell),
+            score: cell?.outcome?.score ?? null,
+            verdict: cell?.outcome ? cell.outcome.verdict : 'not attempted',
+            reason: cell?.outcome?.reason ?? null,
+            measures: cell?.outcome?.measures ?? null,
+            tokens: cell?.outcome?.tokens ?? null,
+            best: cell?.outcome?.best === true
+          })
+        }
+      }
+      grids.push({ name: source.name, live: source.live, id: grid.id, baseline: grid.baseline?.value ?? null, branchCount: grid.branchCount, refineCount: grid.refineCount, cells })
+    } catch { /* a grid still being written */ }
+  }
+  return grids
+}
+
+/** One RSI round's records: what the rollout spent, and what dreaming decided. */
+function readRsiRounds(directory) {
+  const roundsDirectory = path.join(directory, 'rsi')
+  const rounds = []
+  for (const name of fs.existsSync(roundsDirectory) ? fs.readdirSync(roundsDirectory).sort() : []) {
+    const read = file => {
+      try {
+        return JSON.parse(fs.readFileSync(path.join(roundsDirectory, name, file), 'utf8'))
+      } catch {
+        return null
+      }
+    }
+    const rollout = read('rollout.json')
+    const dreaming = read('dreaming.json')
+    if (!rollout && !dreaming) continue
+    rounds.push({ name, rollout, dreaming })
+  }
+  return rounds
+}
+
+/** Every policy version a dreaming phase scored, newest phase last. */
+function readPolicyVersions(directory) {
+  const replayDirectory = path.join(directory, 'replay')
+  const versions = []
+  for (const name of fs.existsSync(replayDirectory) ? fs.readdirSync(replayDirectory).sort() : []) {
+    if (!name.endsWith('.json')) continue
+    try {
+      versions.push(JSON.parse(fs.readFileSync(path.join(replayDirectory, name), 'utf8')))
+    } catch { /* a version still being scored */ }
+  }
+  return versions
+}
+
 /** Everything the page shows, read fresh so a refresh is never stale. */
 function snapshot(directory) {
   const read = file => {
@@ -74,6 +152,15 @@ function snapshot(directory) {
   const design = read('design.json')
   const winner = read('winner.json')
   const setupText = textOf(directory, 'setup.mjs')
+  // A run is either the evolutionary loop or the Dream-RSI loop. Both write a
+  // status, and the page shows whichever it finds rather than assuming one.
+  const rsiStatus = read('rsi.json')
+  const rsiSummary = read('rsi-summary.json')
+  const loop = rsiStatus ? 'Dream-RSI' : 'evolutionary'
+  const liveStatus = rsiStatus ?? status
+  const grids = loop === 'Dream-RSI' ? readGrids(directory) : []
+  const rsiRounds = loop === 'Dream-RSI' ? readRsiRounds(directory) : []
+  const policyVersions = loop === 'Dream-RSI' ? readPolicyVersions(directory) : []
 
   const rounds = []
   const roundsDirectory = path.join(directory, 'rounds')
@@ -105,16 +192,36 @@ function snapshot(directory) {
   return {
     name: path.basename(directory),
     directory,
+    loop,
     target: target?.target ?? null,
     files: target?.files ?? [],
     startedAt: target?.startedAt ?? null,
-    phase: status?.status ?? 'unknown',
-    round: status?.round ?? 0,
-    pid: status?.pid ?? null,
-    live: isLive(status?.pid),
-    why: status?.why ?? null,
+    phase: liveStatus?.status ?? liveStatus?.phase ?? 'unknown',
+    round: liveStatus?.round ?? 0,
+    pid: liveStatus?.pid ?? null,
+    live: isLive(liveStatus?.pid),
+    why: liveStatus?.why ?? null,
+    plan: liveStatus?.plan ?? null,
+    policy: liveStatus?.policy ?? null,
+    rsi: loop === 'Dream-RSI'
+      ? {
+          phase: rsiStatus?.phase ?? 'unknown',
+          round: rsiStatus?.round ?? 0,
+          plan: rsiStatus?.plan ?? null,
+          policy: rsiStatus?.policy ?? null,
+          pool: rsiStatus?.pool ?? rsiSummary?.pool ?? null,
+          seeded: rsiSummary?.seeded ?? null,
+          grids,
+          rounds: rsiRounds,
+          versions: policyVersions,
+          best: rsiSummary?.best ?? rsiStatus?.best ?? null,
+          improvement: rsiSummary?.improvement ?? null
+        }
+      : null,
     baseline: check?.working ? { value: check.working.value, measures: check.working.totals?.measures ?? {} } : null,
-    best: status?.best ?? null,
+    best: rsiSummary?.best
+      ? { id: `${rsiSummary.best.grid} ${rsiSummary.best.cell}`, value: rsiSummary.best.score, measures: rsiSummary.best.measures ?? null }
+      : status?.best ?? null,
     winner: winner ? { id: winner.id, value: winner.value, improvement: winner.improvement, patch: winner.patch ?? null } : null,
     setup: check ? {
       name: check.name,
@@ -174,6 +281,7 @@ const PAGE = `<!doctype html>
 <div class="sub" id="costNote"></div>
 <h2>Setup — what this run froze</h2>
 <div id="setup"></div>
+<div id="rsi"></div>
 <h2>Attempts</h2>
 <div id="attempts"></div>
 <h2>Score against attempts</h2>
@@ -231,7 +339,7 @@ async function refresh() {
       ' · project ' + esc(s.project) + '</p>' +
       (s.control ? '<p class="dim">control — a broken target must fail: ' + esc(s.control.reason) + '</p>' : '')) + designHtml
 
-  document.getElementById('attempts').innerHTML = !d.rounds.length
+  const attemptsTable = !d.rounds.length
     ? '<div class="dim">no candidate has run yet</div>'
     : '<table><tr><th>#</th><th>candidate</th><th>from</th><th class="num">value</th><th>measures</th><th class="num">tokens</th><th class="num">cost</th><th class="num">seconds</th><th>verdict</th></tr>' +
       d.rounds.map((c, i) => '<tr><td class="dim">' + (i + 1) + '</td><td>' + esc(c.id) + (c.best ? ' <span class="ok">kept</span>' : '') + '</td>' +
@@ -241,8 +349,66 @@ async function refresh() {
         '<td class="num">' + num(c.tokens && c.tokens.totalTokens) + '</td>' +
         '<td class="num warn">' + rmb(c.cost && c.cost.now) + '</td>' +
         '<td class="num">' + Math.round((c.durationMs || 0) / 1000) + '</td>' +
-        '<td class="' + (c.verdict === 'scored' ? 'ok' : 'bad') + '">' + esc(c.verdict === 'scored' ? 'scored' : (c.reason || 'refused')) + '</td></tr>').join('') +
+        '<td>' + esc(c.verdict === 'scored' ? 'scored' : (c.reason || c.verdict || '')) + '</td></tr>').join('') +
       '</table>'
+
+  const rsiSection = document.getElementById('rsi')
+  if (!d.rsi) {
+    rsiSection.innerHTML = ''
+  } else {
+    const blocks = []
+    const plan = d.rsi.plan
+    blocks.push('<h2>The loop — ' + esc(d.rsi.phase) + ' · round ' + esc(d.rsi.round) + '</h2>')
+    blocks.push('<p class="sub">pool: ' + esc(d.rsi.pool ? d.rsi.pool.grids + ' grids, ' + d.rsi.pool.cells + ' cells recorded' : 'empty')
+      + ' · policy: ' + esc(d.rsi.policy || 'the shipping one')
+      + (plan ? ' · plan: ' + esc(plan.branchCount) + ' branches × ' + esc(plan.refineCount) + ' refinements — ' + esc(plan.reason) : '') + '</p>')
+    if (d.rsi.seeded && d.rsi.seeded.length) {
+      blocks.push('<p class="dim">seeded from: ' + d.rsi.seeded.map(one => esc(one.run) + ' (' + one.attempts + ' attempts)').join(', ') + '</p>')
+    }
+
+    // The grids: one table per recorded rollout, cells empty where the policy
+    // never went. This is the discovery tree the policy moved over.
+    for (const grid of d.rsi.grids) {
+      blocks.push('<h2>Grid ' + esc(grid.id || grid.name) + '</h2>')
+      blocks.push('<p class="sub">target as it stood ' + num(grid.baseline) + ' · ' + esc(grid.branchCount) + ' branches × ' + esc(grid.refineCount + 1) + ' attempts</p>')
+      blocks.push('<table><tr><th>cell</th>' + ['score', 'verdict', 'measures', 'tokens'].map(h => '<th class="num">' + h + '</th>').join('') + '</tr>'
+        + grid.cells.map(cell => '<tr><td>' + esc(cell.id) + (cell.best ? ' <span class="ok">kept</span>' : '') + '</td>'
+          + '<td class="num ' + (cell.made && cell.score !== null ? 'ok' : '') + '">' + num(cell.score) + '</td>'
+          + '<td class="dim">' + esc(cell.made ? cell.verdict : 'not attempted') + '</td>'
+          + '<td class="dim">' + esc(Object.entries(cell.measures || {}).map(([k, v]) => k + ' ' + num(v)).join(' ')) + '</td>'
+          + '<td class="num">' + num(cell.tokens) + '</td></tr>').join('') + '</table>')
+    }
+
+    // The rounds: what exploring cost and what dreaming decided.
+    for (const round of d.rsi.rounds) {
+      const r = round.rollout
+      const dream = round.dreaming
+      blocks.push('<h2>Round ' + esc(r ? r.round : round.name) + '</h2>')
+      if (r) {
+        blocks.push('<p class="sub">policy ' + esc(r.policy && r.policy.name) + ' · probes ' + esc(r.rollout.probes)
+          + ' · decision rounds ' + esc(r.rollout.rounds) + ' · attained ' + num(r.rollout.attained)
+          + ' · ' + Math.round((r.rollout.durationMs || 0) / 1000) + ' s'
+          + (r.rollout.failure ? ' · <span class="bad">' + esc(r.rollout.failure) + '</span>' : '') + '</p>')
+      }
+      if (dream) {
+        blocks.push('<table><tr><th>version</th><th>policy</th><th class="num">reward</th><th class="num">best beta</th><th>flat sweep?</th><th>failures</th></tr>'
+          + dream.versions.map(v => '<tr><td>' + esc(v.version) + (dream.winner && dream.winner.version === v.version ? ' <span class="ok">selected</span>' : '') + '</td>'
+            + '<td>' + esc(v.policy) + '</td><td class="num">' + num(v.score) + '</td><td class="num">' + num(v.bestBeta) + '</td>'
+            + '<td class="dim">' + (v.degenerate ? 'yes — beta changes nothing' : 'no') + '</td>'
+            + '<td class="dim">' + esc(v.failure || v.failures || '') + '</td></tr>').join('') + '</table>')
+        blocks.push('<p class="sub">' + (dream.improved ? '<span class="ok">improved</span> by ' + num(dream.gain) : 'the policy it started from was already the best') + ' · deployed ' + esc(dream.deployed || '—') + '</p>')
+      }
+    }
+
+    if (d.rsi.best) {
+      blocks.push('<h2>Best attempt so far</h2>')
+      blocks.push('<p class="sub">' + esc(d.rsi.best.grid) + ' cell ' + esc(d.rsi.best.cell) + ' scored ' + num(d.rsi.best.score)
+        + (typeof d.rsi.improvement === 'number' ? ' — ' + num(d.rsi.improvement) + ' over the target as it stood' : '') + '</p>')
+    }
+    rsiSection.innerHTML = blocks.join('')
+  }
+
+  document.getElementById('attempts').innerHTML = attemptsTable
 
   const graph = document.getElementById('graph'), tree = document.getElementById('tree')
   if (d.graph) { graph.className = ''; graph.innerHTML = d.graph } 
