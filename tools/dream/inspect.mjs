@@ -298,22 +298,28 @@ function liveCalls({ name, since = 0, limit = 12 } = {}) {
 }
 
 /**
- * Token usage of a transcript read so far, kept across polls.
+ * Token usage of a transcript, read whole and cached until the file grows.
  *
- * An attempt's spend exists only in its own transcript until the round writes
- * `attempts.json`, which is minutes after the work starts. Only the tail is read
- * and only steps not counted before are added, so a poll stays cheap and the
- * number never counts one step twice.
+ * The tail of a long transcript no longer carries the steps that came before it,
+ * and counting one step in two polls reports a spend the run never made. A whole
+ * read is the same count a finished attempt's record holds, so what the page
+ * shows while an attempt works is what its record will say when the round ends.
+ * The read repeats only when the file has grown.
  */
 const usageRead = new Map()
 
 function tokensSoFar(file) {
-  let held = usageRead.get(file)
-  if (!held) {
-    held = { seen: new Set(), totals: usageTotals() }
-    usageRead.set(file, held)
+  let size
+  try {
+    size = fs.statSync(file).size
+  } catch {
+    return usageTotals()
   }
-  return addUsage(tailFrames(file), held.totals, { seen: held.seen })
+  const held = usageRead.get(file)
+  if (held && held.size === size) return held.totals
+  const totals = addUsage(transcriptFrames(fs.readFileSync(file)), usageTotals())
+  usageRead.set(file, { size, totals })
+  return totals
 }
 
 /**

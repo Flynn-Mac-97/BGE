@@ -114,13 +114,8 @@ export function usageTotals() {
  * A record that merely quotes the word is skipped: tool results carry the
  * engine's own text, and counting a mention as a spend would inflate every run
  * that read about token use.
- *
- * `seen` holds the key of every step already added, so a caller watching a
- * transcript that is still being written can re-read its tail without counting
- * one step twice and reporting a spend that climbs by itself. The key is the
- * step's `seq`, and the line itself when a record carries none.
  */
-export function addUsage(frames, totals, { seen = null } = {}) {
+export function addUsage(frames, totals) {
   for (const frame of frames) {
     for (const line of frame.split('\n')) {
       if (!line.includes('totalTokens')) continue
@@ -132,11 +127,6 @@ export function addUsage(frames, totals, { seen = null } = {}) {
       }
       const usage = record?.data?.usage ?? record?.usage
       if (!usage || typeof usage.totalTokens !== 'number') continue
-      if (seen) {
-        const step = String(record.seq ?? line)
-        if (seen.has(step)) continue
-        seen.add(step)
-      }
       totals.steps++
       for (const key of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'reasoningTokens', 'totalTokens']) {
         totals[key] += usage[key] ?? 0
