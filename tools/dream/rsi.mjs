@@ -159,6 +159,16 @@ export async function rsiRun({
 
   await writeStatus({ phase: 'setup', target, round: 0 })
 
+  // A stop file outlives the process it was meant for. Left in place it turns a
+  // fresh run into a silent no-op that exits 0 — which reads as success. So it is
+  // named here and the run is refused, rather than doing nothing politely.
+  const stopFile = path.join(directory, 'stop')
+  if (await fs.access(stopFile).then(() => true, () => false)) {
+    const why = `a stop file is already in this run directory, from an earlier stop request: remove ${stopFile} to run again`
+    await writeStatus({ phase: 'refused', why })
+    return { runDirectory: directory, error: why }
+  }
+
   const setupPath = path.join(directory, 'setup.mjs')
   if (!(await fs.access(setupPath).then(() => true, () => false))) {
     const design = await designSetup({ checkout, runDirectory: directory, target, timeoutSeconds, model })
@@ -217,8 +227,10 @@ export async function rsiRun({
     record.seeded = await seedPool({ checkout, runDirectory: directory, limit: seed })
   }
 
+  let stopped = false
   for (let round = 1; round <= rounds; round++) {
     if (await fs.access(path.join(directory, 'stop')).then(() => true, () => false)) {
+      stopped = true
       await writeStatus({ phase: 'stopped', round: round - 1 })
       break
     }
@@ -346,7 +358,7 @@ export async function rsiRun({
   }
 
   await fs.writeFile(path.join(directory, 'rsi-summary.json'), `${JSON.stringify(record, null, 2)}\n`, 'utf8')
-  await writeStatus({ phase: 'done', pool: record.pool, best })
+  await writeStatus({ phase: stopped ? 'stopped' : 'done', pool: record.pool, best })
   await renderReport(directory)
   return { runDirectory: directory, ...record }
 }

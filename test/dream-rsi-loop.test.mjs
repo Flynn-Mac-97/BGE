@@ -170,7 +170,7 @@ test('the pool is seeded from runs that already recorded attempts', async () => 
   assert.equal(pool[0].baseline.value, 0.4)
 })
 
-test('a run that is asked to stop stops after the round in flight', async () => {
+test('a stop file left over from an earlier run refuses the run instead of doing nothing', async () => {
   const directory = await readyRun()
   await fs.writeFile(path.join(directory, 'stop'), `${new Date().toISOString()}\n`, 'utf8')
 
@@ -183,8 +183,35 @@ test('a run that is asked to stop stops after the round in flight', async () => 
     attempt: attempt(path.join(directory, 'patches')),
     revise: writesBranchOneFirst
   })
+  const status = JSON.parse(await fs.readFile(path.join(directory, 'rsi.json'), 'utf8'))
   await fs.rm(directory, { recursive: true, force: true })
 
-  assert.equal(result.rounds.length, 0, 'a stopped run explored anyway')
-  assert.equal(result.best, null)
+  assert.match(result.error, /stop file is already in this run directory/, 'a stale stop file was obeyed silently')
+  assert.equal(result.rounds, undefined, 'a refused run explored anyway')
+  assert.equal(status.phase, 'refused')
+})
+
+test('a stop during a round ends the run after the work in flight', async () => {
+  const directory = await readyRun()
+  const stopAfterFirstProbe = async ({ id }) => {
+    await fs.writeFile(path.join(directory, 'stop'), `${new Date().toISOString()}\n`, 'utf8')
+    return { id, patchPath: null, outcome: { score: 0.3, verdict: 'scored', reason: null, measures: {} } }
+  }
+
+  const result = await rsiRun({
+    checkout: CHECKOUT,
+    runDirectory: directory,
+    rounds: 3,
+    versions: 2,
+    maxParallelism: 1,
+    attempt: stopAfterFirstProbe,
+    revise: writesBranchOneFirst
+  })
+  const status = JSON.parse(await fs.readFile(path.join(directory, 'rsi.json'), 'utf8'))
+  await fs.rm(directory, { recursive: true, force: true })
+
+  // Round one finished — its attempts were paid for — and round two never began.
+  assert.equal(result.rounds.length, 1, 'a stopped run kept exploring')
+  assert.equal(status.phase, 'stopped')
+  assert.equal(status.round, 1)
 })
