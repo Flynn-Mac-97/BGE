@@ -66,3 +66,9 @@ node tools/dream/scoring.mjs --setup tools/dream/examples/agent-connection.mjs
 53,383 packet characters and 5 engine processes, value 0.36617 at the time of
 writing. A run designs its own setup; treat this one as a starting point, not a
 standard.
+
+The design phase must cover the target's contract, not just its current files.
+It should leave room for a new architecture, algorithm, module boundary or
+workflow when the target permits one, and test public behavior after such a
+change. A lower token count alone is not an improvement: required facts,
+commands, links, checks and holdout routes must remain reachable.

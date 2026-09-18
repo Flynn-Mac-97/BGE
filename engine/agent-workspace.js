@@ -166,6 +166,17 @@ const asProjectPattern = (file, projectPath) => {
 /** Whether a node kind can be selected into a packet. */
 const selectableKind = node => ['instruction', 'skill'].includes(node.kind)
 
+/** Whether a requested file is the plugin source or one of its files. */
+function namesPluginSource(node, file) {
+  const source = cleanPath(node.source)
+  if (!source) return false
+  const at = source.lastIndexOf('/')
+  const directory = at < 0 ? '' : source.slice(0, at + 1)
+  const stem = source.slice(at + 1).replace(/\.js$/, '')
+  const bare = cleanPath(file).replace(new RegExp(`^${PROJECT_PREFIX}/`), '')
+  return bare === source || bare.startsWith(`${directory}${stem}/`)
+}
+
 /**
  * Whether a task names a trigger word.
  *
@@ -226,12 +237,14 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const matchable = request.files.map(file => asProjectPattern(file, projectPath))
 
   const wanted = new Set(request.nodes)
+  const interfaceWanted = new Set(request.nodes)
   const task = request.task.toLowerCase()
   for (const node of workspace.nodes) {
     if (!selectableKind(node)) continue
-    if (node.always) wanted.add(node.id)
-    if ((node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))) wanted.add(node.id)
-    if ((node.triggers || []).some(trigger => namesTrigger(task, trigger))) wanted.add(node.id)
+    const byFile = (node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))
+    const byWord = (node.triggers || []).some(trigger => namesTrigger(task, trigger))
+    if (node.always || byFile || byWord) wanted.add(node.id)
+    if (byWord || matchable.some(file => namesPluginSource(node, file))) interfaceWanted.add(node.id)
   }
 
   const unknown = [...wanted].filter(id => !workspace.nodes.some(node => node.id === id))
@@ -254,9 +267,10 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const entries = await Promise.all(resolved.map(async node => {
     const text = await read(node.scope, node.file)
     let parsed = null
-    if (node.source) {
+    if (node.source && interfaceWanted.has(node.id)) {
       try { parsed = await interfaceText?.(node.scope, node.source) } catch { /* Report the missing interface below. */ }
       parsed ||= `Interface unavailable. Read \`${node.source}\` for commands and arguments before calling this plugin.`
+      if (parsed) parsed = String(parsed).trimEnd()
     }
     return { ...node, text, interface: parsed }
   }))

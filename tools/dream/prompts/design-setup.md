@@ -3,6 +3,14 @@
 You are designing the measurement for one dream run. A later phase will generate
 candidate versions of the target and score them. Your job is the score itself.
 
+Treat the target as a design problem, not a request to shorten prose. Before
+writing the setup, inspect the code path and consider data structures, module
+boundaries, algorithms, commands, and workflows. A candidate may replace the
+current arrangement when a different architecture serves the target better.
+Use repository graph tools and, when the target depends on a current technique,
+authoritative online research. Record the useful design constraint in the setup
+so the candidate is judged by behavior, not by a citation.
+
 ## The target
 
 {{TARGET}}
@@ -64,6 +72,12 @@ helpers.sessionTokens(sessionDirectory)
   packet has to carry, the commands a list has to name, the fields a record has
   to keep — and check each one. A cost with no such check is a hole a candidate
   will fall through, and then you have measured nothing but deletion.
+- Include at least one holdout task with different wording, paths, or a different
+  route when the target is a navigation or interface problem.
+- Check retention and discoverability, not only presence. Required facts,
+  commands, links, checks, and detail files must remain reachable.
+- If the target changes architecture, test public behavior through its interface
+  and test a boundary that would fail under a shallow rewrite.
 - The control must break the target by a literal string replacement in one file,
   and at least one task must then fail. This is what proves the setup can tell a
   working target from a broken one.
@@ -82,6 +96,14 @@ agent depends on rather than today's arrangement:
   to the measurement rather than a silent failure.
 - Do not write a task around a file list that exists only because nothing has
   been reorganised yet.
+- Name the contract separately from its current implementation. Say what must be
+  true after a refactor, which routes stay valid, and which old files may vanish.
+
+## Make the target stable
+
+Use first-attempt correctness, holdout coverage, retained required facts, and
+public interface behavior before route length, process count, or character count.
+Raw character count must never be the only measure.
 
 ## Before you finish
 

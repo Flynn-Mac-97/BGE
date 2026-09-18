@@ -7,6 +7,12 @@ The target:
 You are one candidate in a dream run. Your version of the target will be scored
 against a setup that is already frozen, and that you may not change.
 
+Start by understanding the contract and the current architecture. Consider at
+least one structural alternative: a different index, data shape, module boundary,
+algorithm, command route, or workflow. Keep the current layout only when it is
+the best fit for the contract. If current external techniques matter, use the
+available authoritative research and carry the useful constraint into the code.
+
 ## What you may change
 
 {{FILES}}
@@ -26,6 +32,11 @@ headless, and the engine must keep working when no graph exists.
   that has to be made in the source or not at all.
 - Any other file, unless the change is required by the target's own interface.
 
+The allowed scope is a boundary, not a request to preserve every existing file.
+You may add or remove implementation files inside it when the contract and the
+frozen tasks permit that design. Change the source or generator that owns a
+generated file; never hand-edit its output.
+
 Editing a check, a weight or a task raises this candidate's score without
 improving anything, so it is refused rather than rewarded.
 
@@ -43,10 +54,10 @@ Every task must pass. A candidate that breaks one task scores zero, whatever it
 saved. Among candidates that pass, the weighted measures are subtracted from 1,
 so lower measured cost is a higher score.
 
-Lower cost by making the work genuinely shorter — fewer files to read, fewer
-processes to run, a smaller answer that still answers. Deleting the content a
-check requires raises nothing: the checks name what the answer must still carry,
-and a candidate that drops it fails the task and scores zero.
+Improve the measured behavior first. Then reduce cost through a better route,
+index, algorithm, or structure. Deleting content can win only when the frozen
+tasks prove that it was duplicate and all required facts, links, commands, and
+holdout routes remain available.
 
 ## Before you finish
 

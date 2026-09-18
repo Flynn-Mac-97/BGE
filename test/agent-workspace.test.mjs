@@ -133,6 +133,23 @@ test('enabled plugin guides load only when the task names the plugin', async () 
   assert.match(matched.text, /collision/)
 })
 
+test('a broad file match carries the guide without an unrelated plugin interface', async () => {
+  const guide = {
+    id: 'plugin-engine-physics', title: 'Physics', kind: 'instruction', parent: 'skills',
+    scope: 'engine', file: 'plugins/builtin/physics.agent.md', source: 'plugins/builtin/physics.js',
+    match: ['plugins/**'], enabled: true
+  }
+  const interfaces = []
+  const read = async (scope, file) => file === guide.file ? '# Physics\n\n- Use this for collision.\n' : memoryReader()(scope, file)
+  const packet = await resolveAgentContext(read, { files: ['plugins/builtin/particles.js'] }, [guide], 'project', async (scope, file) => {
+    interfaces.push(`${scope}:${file}`)
+    return 'PARSED PHYSICS INTERFACE'
+  })
+  assert.match(packet.text, /Use this for collision/)
+  assert.doesNotMatch(packet.text, /PARSED PHYSICS INTERFACE/)
+  assert.deepEqual(interfaces, [])
+})
+
 // The first call an agent makes is the one where it does not yet know its
 // files, so any rule selected by file match is absent from it. Style rules
 // govern every write, so they cannot be selected that way.
