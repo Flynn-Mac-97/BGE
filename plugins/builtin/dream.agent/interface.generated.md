@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/dream.js; sha256 f409749c6627a7ccc3635936e7c15f64ce8301e1ab45ece0cb3705febd3cfda1. Do not edit. -->
+<!-- Generated from plugins/builtin/dream.js; sha256 9b0c8f1a856c41917900e5f2d477e03b8f68b8a9f19569948ee2b0564a88f613. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/dream.js). Where the prose below it disagrees, this is the code.
 
 ```
@@ -17,5 +17,5 @@
   arguments  dream.stop: directory
   arguments  dream.report: directory
   arguments  dream.forget: directory
-  source     249 lines
+  source     252 lines
 ```
