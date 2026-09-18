@@ -90,7 +90,19 @@ node tools/dream/inspect.mjs --port 4317
 ```
 
 The page reads the run directory, the pool, the policy versions and the agent's
-own transcript, so a working attempt is visible while it works.
+own transcript, so a working attempt is visible while it works. It draws the grid
+cell by cell with the order each attempt was probed in, and reward against beta
+beside attainment against probes.
+
+Started as a managed background job, the shell that launched it can be reaped
+while the server it spawned keeps running, and the job then reports a failure that
+never happened. **The port is the truth, not the job status.** To find and stop the
+one serving:
+
+```
+Get-NetTCPConnection -LocalPort 4317 -State Listen | Select-Object OwningProcess
+Stop-Process -Id <pid>
+```
 
 ## What a run has cost, and what it has left
 
