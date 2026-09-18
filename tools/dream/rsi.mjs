@@ -26,11 +26,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { emptyGrid } from './grid.mjs'
+import { emptyGrid, gridFromRun } from './grid.mjs'
 import { addGrid, readPool, poolSummary } from './pool.mjs'
 import { dreamPolicies, BETA_GRID } from './dreaming.mjs'
 import { loadPolicy, makePolicy } from './policy.mjs'
-import { planFromHistory } from './policy-api.mjs'
+import { planFromHistory, gridPlan } from './policy-api.mjs'
 import { realAttempt, rolloutOnce } from './rollout.mjs'
 import { costBands, sumCosts } from './pricing.mjs'
 import { loadSetup } from './scoring.mjs'
@@ -58,8 +58,48 @@ const roundDirectory = (runDirectory, round) => path.join(runDirectory, 'rsi', `
  * `bestAttempt` is the attempt index of the best cell in the last grid, which is
  * what tells `planFromHistory` whether gains are arriving early or late.
  */
-export function planRound({ history, fallback = { branchCount: 2, refineCount: 2 } }) {
+export function planRound({ history, fallback = { branchCount: 2, refineCount: 2 }, fixed = null }) {
+  // A pinned plan bounds what a first run costs: the number of attempts a round
+  // can make is the number of cells, and that is the expensive part.
+  if (fixed) return gridPlan({ branchCount: fixed.branchCount, refineCount: fixed.refineCount, reason: 'pinned for this run, so its cost is bounded in advance' })
   return planFromHistory({ history, fallback, hardMaxBranchCount: HARD_MAX_BRANCH_COUNT, hardMaxRefineCount: HARD_MAX_REFINE_COUNT })
+}
+
+/**
+ * Fill a pool from runs that already recorded attempts.
+ *
+ * The paper's claim is about accumulated discovery history, not about one
+ * rollout: a policy is judged on the pool, so a pool of one grid makes the first
+ * dreaming phase a comparison against nothing. Earlier runs in this checkout are
+ * real recorded attempts, and this run's own rounds count too.
+ *
+ * A run whose records are empty, or whose setup was never checked, contributes
+ * nothing — `addGrid` refuses an empty grid, and that refusal is the answer, not
+ * an error to report.
+ */
+export async function seedPool({ checkout, runDirectory, limit = 3 }) {
+  const runs = path.join(checkout, 'agent-runs')
+  const names = (await fs.readdir(runs).catch(() => [])).filter(name => name.startsWith('dream-')).sort()
+  const seeded = []
+
+  for (const name of names.slice(-limit)) {
+    const directory = path.join(runs, name)
+    if (path.resolve(directory) === path.resolve(runDirectory)) continue
+    const converted = await gridFromRun(directory, { branchCount: HARD_MAX_BRANCH_COUNT })
+    if (converted.error || !converted.grid) continue
+    const added = await addGrid(runDirectory, converted.grid)
+    if (!added.error) seeded.push({ run: name, attempts: converted.attempts, pool: added.file })
+  }
+
+  // This run's own evolutionary records, when it has any: a run that already
+  // tried attempts has a grid worth dreaming in before its first RSI round.
+  const own = await gridFromRun(runDirectory, { branchCount: HARD_MAX_BRANCH_COUNT })
+  if (!own.error && own.grid && own.attempts > 0) {
+    const added = await addGrid(runDirectory, own.grid)
+    if (!added.error) seeded.push({ run: path.basename(runDirectory), attempts: own.attempts, pool: added.file })
+  }
+
+  return seeded
 }
 
 /** The attempt index of the best scored cell in a grid, or null. */
@@ -90,7 +130,9 @@ export async function rsiRun({
   timeoutSeconds,
   model,
   attempt = null,
-  revise = undefined
+  revise = undefined,
+  fixedPlan = null,
+  seed = 0
 } = {}) {
   // The clean-baseline guard is about real candidates: each one is a worktree
   // branched from HEAD, so work that is not committed is work it cannot see. An
@@ -169,13 +211,19 @@ export async function rsiRun({
     startedAt: new Date().toISOString()
   }
 
+  // Seeding happens once. On a resume the pool already holds the grids it was
+  // given, and seeding again would double every grid it lists.
+  if (seed > 0 && (await readPool(directory)).length === 0) {
+    record.seeded = await seedPool({ checkout, runDirectory: directory, limit: seed })
+  }
+
   for (let round = 1; round <= rounds; round++) {
     if (await fs.access(path.join(directory, 'stop')).then(() => true, () => false)) {
       await writeStatus({ phase: 'stopped', round: round - 1 })
       break
     }
 
-    const plan = planRound({ history, fallback: { branchCount: 2, refineCount: 2 } })
+    const plan = planRound({ history, fallback: { branchCount: 2, refineCount: 2 }, fixed: fixedPlan })
     if (plan.error) {
       await writeStatus({ phase: 'plan-failed', why: plan.error })
       return { runDirectory: directory, error: plan.error }
@@ -324,7 +372,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     maxParallelism: Number(argument('parallelism') ?? DEFAULT_MAX_PARALLELISM),
     lambda: argument('lambda') ? Number(argument('lambda')) : 0.5,
     timeoutSeconds: argument('timeout') ? Number(argument('timeout')) : undefined,
-    model: argument('model')
+    model: argument('model'),
+    seed: Number(argument('seed') ?? 0),
+    // Pinning the plan is how a first run keeps its cost knowable: cells are
+    // attempts, and attempts are the expensive part.
+    fixedPlan: argument('branches') || argument('refinements')
+      ? { branchCount: Number(argument('branches') ?? 2), refineCount: Number(argument('refinements') ?? 1) }
+      : null
   })
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)

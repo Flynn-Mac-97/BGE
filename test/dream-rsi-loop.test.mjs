@@ -5,7 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { bestAttemptOf, planRound, rsiRun } from '../tools/dream/rsi.mjs'
+import { bestAttemptOf, planRound, rsiRun, seedPool } from '../tools/dream/rsi.mjs'
+import { readPool } from '../tools/dream/pool.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const CHECKOUT = path.resolve(HERE, '..')
@@ -141,6 +142,32 @@ test('the whole loop explores, pools, dreams, redeploys and names a winner', asy
     assert.ok(roundFiles[name].includes('rollout.json'), `${name} kept no rollout record`)
     assert.ok(roundFiles[name].includes('dreaming.json'), `${name} kept no dreaming record`)
   }
+})
+
+test('a pinned plan bounds what a first run may spend, whatever the history says', () => {
+  const pinned = planRound({ history: [{ plannedBranchCount: 4, plannedRefineCount: 4, bestAttempt: 0 }], fixed: { branchCount: 2, refineCount: 1 } })
+  assert.equal(pinned.branchCount, 2)
+  assert.equal(pinned.refineCount, 1)
+  assert.match(pinned.reason, /pinned/)
+})
+
+test('the pool is seeded from runs that already recorded attempts', async () => {
+  const checkout = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-seed-checkout-'))
+  const past = path.join(checkout, 'agent-runs', 'dream-past-run')
+  const now = path.join(checkout, 'agent-runs', 'dream-now-run')
+  await fs.mkdir(path.join(past, 'rounds/r0001'), { recursive: true })
+  await fs.mkdir(now, { recursive: true })
+  await fs.writeFile(path.join(past, 'setup-check.json'), `${JSON.stringify({ working: { value: 0.4, totals: { measures: {} } } })}\n`, 'utf8')
+  await fs.writeFile(path.join(past, 'rounds/r0001/past-r1c1.json'), `${JSON.stringify({ id: 'past-r1c1', verdict: 'scored', value: 0.7, measures: {}, best: true, depth: 1 })}\n`, 'utf8')
+
+  const seeded = await seedPool({ checkout, runDirectory: now, limit: 3 })
+  const pool = await readPool(now)
+  await fs.rm(checkout, { recursive: true, force: true })
+
+  assert.equal(seeded.length, 1, 'an earlier run with a recorded attempt was not seeded')
+  assert.equal(pool.length, 1)
+  assert.equal(pool[0].cells['0:0'].outcome.score, 0.7, 'the seeded grid lost the score the earlier run recorded')
+  assert.equal(pool[0].baseline.value, 0.4)
 })
 
 test('a run that is asked to stop stops after the round in flight', async () => {
