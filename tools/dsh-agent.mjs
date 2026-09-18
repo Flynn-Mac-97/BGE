@@ -15,7 +15,7 @@
  *   dsh-agent --cwd <dir> "task"               run with that working directory
  *   dsh-agent --timeout <seconds> "task"       abort after N seconds (exit 124)
  *   dsh-agent --permission-mode <mode> "task"  read-only | workspace-write | danger-full-access
- *   dsh-agent --model <name> "task"            override the model (default: deepseek-v4-flash)
+ *   dsh-agent --model <name> "task"            override the model (default: the harness's own, deepseek-flash)
  *   dsh-agent --help
  *
  * Exit codes: 0 completed, 1 agent error / unexpected failure, 2 usage error,
@@ -69,7 +69,7 @@ function usage(stream, error) {
     "  --cwd <dir>               working directory for the agent (default: current dir)",
     "  --timeout <seconds>       abort the run after N seconds (exit 124)",
     "  --permission-mode <mode>  read-only | workspace-write | danger-full-access",
-    "  --model <name>            override the model (default: deepseek-v4-flash)",
+    "  --model <name>            override the model (default: the harness default, deepseek-flash)",
     "  --help                    show this help",
     "",
     "Examples:",
