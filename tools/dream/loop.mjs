@@ -38,7 +38,10 @@ export const STATUS_FILE = 'run.json'
 async function writeStatus(runDirectory, status) {
   const file = path.join(runDirectory, STATUS_FILE)
   const before = await fs.readFile(file, 'utf8').catch(() => null)
-  const record = { ...(before ? JSON.parse(before) : {}), ...status, at: new Date().toISOString() }
+  // The loop's own process id is written with every status: a run started by
+  // hand has no other way to say whether it is still working, and a watcher
+  // that cannot tell a slow round from a dead one is not watching anything.
+  const record = { ...(before ? JSON.parse(before) : {}), ...status, pid: process.pid, at: new Date().toISOString() }
   await fs.writeFile(file, `${JSON.stringify(record, null, 2)}\n`, 'utf8')
   return record
 }
