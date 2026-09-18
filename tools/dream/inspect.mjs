@@ -134,6 +134,64 @@ function readPolicyVersions(directory) {
   return versions
 }
 
+/**
+ * The worktrees an attempt is working in, and when each last changed.
+ *
+ * A rollout spends most of its time inside a worktree, and the run directory
+ * gains nothing until the attempt finishes. Without this the page sits still for
+ * six minutes at a time and reads as a hung run, when the files are moving the
+ * whole way.
+ */
+function readWorktrees(checkout) {
+  const root = path.join(checkout, '.agent-worktrees')
+  const worktrees = []
+  for (const name of fs.existsSync(root) ? fs.readdirSync(root) : []) {
+    const directory = path.join(root, name)
+    let newest = 0
+    let newestFile = null
+    let files = 0
+
+    const walk = (at, depth) => {
+      let entries
+      try {
+        entries = fs.readdirSync(at, { withFileTypes: true })
+      } catch {
+        return
+      }
+      for (const entry of entries) {
+        if (entry.name === 'node_modules' || entry.name === '.git') continue
+        const full = path.join(at, entry.name)
+        if (entry.isDirectory()) {
+          if (depth < 8) walk(full, depth + 1)
+          continue
+        }
+        try {
+          const stat = fs.statSync(full)
+          files++
+          if (stat.mtimeMs > newest) {
+            newest = stat.mtimeMs
+            newestFile = path.relative(directory, full).split(path.sep).join('/')
+          }
+        } catch { /* a file that went away while it was being read */ }
+      }
+    }
+    walk(directory, 0)
+
+    // The name a candidate worktree carries is `dream-<run>-rsi-b<branch>-r<round>c<attempt>`.
+    const parsed = /rsi-b(\d+)-r(\d+)c(\d+)$/.exec(name)
+    worktrees.push({
+      name,
+      branch: parsed ? Number(parsed[1]) : null,
+      round: parsed ? Number(parsed[2]) : null,
+      cell: parsed ? `${parsed[1]}:${Number(parsed[3]) - 1}` : null,
+      files,
+      newestFile,
+      quietSeconds: newest ? Math.round((Date.now() - newest) / 1000) : null
+    })
+  }
+  return worktrees.sort((left, right) => (left.quietSeconds ?? 1e9) - (right.quietSeconds ?? 1e9))
+}
+
 /** Everything the page shows, read fresh so a refresh is never stale. */
 function snapshot(directory) {
   const read = file => {
@@ -203,6 +261,7 @@ function snapshot(directory) {
     why: liveStatus?.why ?? null,
     plan: liveStatus?.plan ?? null,
     policy: liveStatus?.policy ?? null,
+    worktrees: readWorktrees(CHECKOUT),
     rsi: loop === 'Dream-RSI'
       ? {
           phase: rsiStatus?.phase ?? 'unknown',
@@ -281,6 +340,7 @@ const PAGE = `<!doctype html>
 <div class="sub" id="costNote"></div>
 <h2>Setup — what this run froze</h2>
 <div id="setup"></div>
+<div id="now"></div>
 <div id="rsi"></div>
 <h2>Attempts</h2>
 <div id="attempts"></div>
@@ -351,6 +411,16 @@ async function refresh() {
         '<td class="num">' + Math.round((c.durationMs || 0) / 1000) + '</td>' +
         '<td>' + esc(c.verdict === 'scored' ? 'scored' : (c.reason || c.verdict || '')) + '</td></tr>').join('') +
       '</table>'
+
+  const nowSection = document.getElementById('now')
+  nowSection.innerHTML = !d.worktrees || !d.worktrees.length
+    ? '<h2>Working now</h2><div class="dim">no attempt is in flight</div>'
+    : '<h2>Working now</h2><table><tr><th>cell</th><th>round</th><th>worktree</th><th class="num">files</th><th>last changed</th><th class="num">quiet for</th></tr>'
+      + d.worktrees.map(w => '<tr><td>' + esc(w.cell ?? '—') + '</td><td class="num">' + esc(w.round ?? '—') + '</td>'
+        + '<td class="dim">' + esc(w.name) + '</td><td class="num">' + esc(w.files) + '</td>'
+        + '<td class="dim">' + esc(w.newestFile ?? '—') + '</td>'
+        + '<td class="num ' + (w.quietSeconds !== null && w.quietSeconds > 120 ? 'warn' : 'ok') + '">' + esc(w.quietSeconds ?? '—') + ' s</td></tr>').join('')
+      + '</table>'
 
   const rsiSection = document.getElementById('rsi')
   if (!d.rsi) {
