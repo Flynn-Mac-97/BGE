@@ -68,4 +68,5 @@ Read only the file your task needs.
 
 - `dream.agent/setup.md` — what the design phase writes, the helpers, and the control rule
 - `dream.agent/records.md` — every file a run writes, and how to read the pictures
+- `dream.agent/rsi.md` — the dreaming loop: grid, replay, policy revisions, redeploy
 - `dream.agent/troubleshooting.md` — the refusals, and what each one wants
