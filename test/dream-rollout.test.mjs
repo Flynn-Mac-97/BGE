@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { emptyGrid, legalActions } from '../tools/dream/grid.mjs'
-import { makeOnlineQuestion, parseCell, rolloutOnce } from '../tools/dream/rollout.mjs'
+import { attemptPatchName, makeOnlineQuestion, parseCell, rolloutOnce } from '../tools/dream/rollout.mjs'
 import { replayGrid } from '../tools/dream/replay.mjs'
 import { makePolicy } from '../tools/dream/policy.mjs'
 import { addGrid, readPool } from '../tools/dream/pool.mjs'
@@ -37,6 +37,13 @@ const freshGrid = (branchCount = 3, refineCount = 2) => emptyGrid({
   baseline: { value: 0.2, measures: {} },
   branchCount,
   refineCount
+})
+
+test('an attempt patch is named for its round, so a later round cannot overwrite it', () => {
+  assert.equal(attemptPatchName({ round: 1, cell: '0:0' }), 'r001-b0a0.patch')
+  assert.equal(attemptPatchName({ round: 2, cell: '0:0' }), 'r002-b0a0.patch')
+  assert.notEqual(attemptPatchName({ round: 1, cell: '0:0' }), attemptPatchName({ round: 2, cell: '0:0' }))
+  assert.equal(attemptPatchName({ round: 12, cell: '3:2' }), 'r012-b3a2.patch')
 })
 
 test('a live rollout makes exactly the attempts the policy asked for, in its order', async () => {

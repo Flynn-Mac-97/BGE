@@ -209,6 +209,18 @@ export async function rolloutOnce({ grid, policy, maxParallelism = 3, attempt, o
 }
 
 /**
+ * What one attempt's patch is called on disk.
+ *
+ * The round is part of the name. Cell `0:0` exists in every round of a run, so a
+ * name without the round means a later round writes over the earlier one's patch
+ * — which is how a round that had already been paid for lost its record.
+ */
+export function attemptPatchName({ round, cell }) {
+  const [branch, attempt] = String(cell).split(':')
+  return `r${String(round).padStart(3, '0')}-b${branch}a${attempt}.patch`
+}
+
+/**
  * The attempt a real rollout makes: one worktree, one agent, one score.
  *
  * The parent's patch is the workspace the attempt continues from, which is what
@@ -234,7 +246,7 @@ export function realAttempt({ checkout, runDirectory, setup, target, files, setu
     // The patch is written beside the run's records so the next attempt on this
     // branch can continue from it. Without the file there is nothing to continue
     // from: a candidate is its parent's patch plus its own work.
-    const patchFile = path.join(runDirectory, 'rsi', `${id.split(':').join('-')}.patch`)
+    const patchFile = path.join(runDirectory, 'rsi', attemptPatchName({ round: round + 1, cell: id }))
     await fs.mkdir(path.dirname(patchFile), { recursive: true })
     if (record.patch) await fs.writeFile(patchFile, record.patch, 'utf8')
 

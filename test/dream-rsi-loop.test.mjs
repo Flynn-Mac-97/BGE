@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { bestAttemptOf, planRound, rsiRun, seedPool } from '../tools/dream/rsi.mjs'
+import { bestAttemptOf, planRound, recordedRsiRounds, rsiRun, seedPool } from '../tools/dream/rsi.mjs'
 import { readPool } from '../tools/dream/pool.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -168,6 +168,39 @@ test('the pool is seeded from runs that already recorded attempts', async () => 
   assert.equal(pool.length, 1)
   assert.equal(pool[0].cells['0:0'].outcome.score, 0.7, 'the seeded grid lost the score the earlier run recorded')
   assert.equal(pool[0].baseline.value, 0.4)
+})
+
+test('a run reads its own rounds, so a resume never writes over one', async () => {
+  const directory = await readyRun()
+  const earlier = path.join(directory, 'rsi', 'round-001')
+  await fs.mkdir(earlier, { recursive: true })
+  const recorded = `${JSON.stringify({ round: 1, plan: { branchCount: 2, refineCount: 1 }, policy: { name: 'parallel-refine' }, rollout: { probes: 4, attained: 0.65 } })}\n`
+  await fs.writeFile(path.join(earlier, 'rollout.json'), recorded, 'utf8')
+  await fs.writeFile(path.join(earlier, 'grid.json'), `${JSON.stringify({ id: 'earlier', branchCount: 2, refineCount: 1, cells: { '0:0': { branch: 0, attempt: 0, outcome: { score: 0.5 } }, '1:1': { branch: 1, attempt: 1, outcome: { score: 0.65 } } } })}\n`, 'utf8')
+
+  const before = await recordedRsiRounds(directory)
+  const result = await rsiRun({
+    checkout: CHECKOUT,
+    runDirectory: directory,
+    rounds: 1,
+    versions: 2,
+    maxParallelism: 1,
+    fixedPlan: { branchCount: 1, refineCount: 0 },
+    attempt: attempt(path.join(directory, 'patches')),
+    revise: writesBranchOneFirst
+  })
+
+  const after = await fs.readFile(path.join(earlier, 'rollout.json'), 'utf8')
+  const dirs = (await fs.readdir(path.join(directory, 'rsi'))).sort()
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(before.length, 1)
+  assert.equal(before[0].number, 1)
+  assert.equal(before[0].plannedBranchCount, 2, 'the plan earlier rounds used was not read back')
+  assert.equal(before[0].bestAttempt, 1, 'the best attempt of the recorded grid was not read back')
+  assert.equal(result.rounds[0].round, 2, 'the resumed run numbered its round one again')
+  assert.deepEqual(dirs, ['round-001', 'round-002'])
+  assert.equal(after, recorded, 'the round already recorded was written over')
 })
 
 test('a stop file left over from an earlier run refuses the run instead of doing nothing', async () => {

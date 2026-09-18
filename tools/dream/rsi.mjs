@@ -111,6 +111,39 @@ export function bestAttemptOf(grid) {
 }
 
 /**
+ * What a Dream-RSI run has already done, from its own round records.
+ *
+ * The evolutionary loop's `recordedState` reads `rounds/r####`, which a
+ * Dream-RSI run never writes — its rounds are `rsi/round-###`. Reading the wrong
+ * layout is not a small mistake: a resumed run numbered its next round one, wrote
+ * over the round already recorded, and lost it. So this run numbers its rounds
+ * from its own records, and no number is ever reused.
+ */
+export async function recordedRsiRounds(runDirectory) {
+  const roundsDirectory = path.join(runDirectory, 'rsi')
+  const rounds = []
+  for (const name of (await fs.readdir(roundsDirectory).catch(() => [])).sort()) {
+    const match = /^round-(\d+)$/.exec(name)
+    if (!match) continue
+    const read = async file => JSON.parse(await fs.readFile(path.join(roundsDirectory, name, file), 'utf8').catch(() => 'null'))
+    const rollout = await read('rollout.json')
+    const grid = await read('grid.json')
+    rounds.push({
+      number: Number(match[1]),
+      name,
+      rollout,
+      // The fields `planFromHistory` reads, so a resumed run plans from what the
+      // rounds before it did rather than from nothing.
+      plannedBranchCount: rollout?.plan?.branchCount ?? null,
+      plannedRefineCount: rollout?.plan?.refineCount ?? null,
+      bestAttempt: grid ? bestAttemptOf(grid) : null,
+      attained: rollout?.rollout?.attained ?? null
+    })
+  }
+  return rounds.sort((left, right) => left.number - right.number)
+}
+
+/**
  * The best attempt across every grid in the pool.
  *
  * Read after every round rather than only at the end, because a watcher that
@@ -219,7 +252,8 @@ export async function rsiRun({
 
   // The attempt a rollout makes. Real by default: a worktree, an agent and a
   // score. Injectable so the loop can be exercised without spending anything.
-  const makeAttempt = attempt ?? realAttempt({
+  // Built per round, so an attempt's patch carries the round it belongs to.
+  const makeAttemptFactory = round => attempt ?? realAttempt({
     checkout,
     runDirectory: directory,
     setup,
@@ -227,11 +261,24 @@ export async function rsiRun({
     files: targetRecord.files ?? [],
     setupHash: checkRecord.digest,
     timeoutSeconds,
-    model
+    model,
+    round
   })
 
   const policyDirectory = path.join(directory, 'policy')
-  const history = []
+  // Rounds already recorded, and the number this invocation may start at. Both
+  // come from the run's own layout, so a resume continues rather than restarting.
+  const priorRounds = await recordedRsiRounds(directory)
+  const firstRound = priorRounds.reduce((highest, round) => Math.max(highest, round.number), 0) + 1
+  const history = priorRounds
+    .filter(round => round.plannedBranchCount !== null)
+    .map(round => ({
+      round: round.number,
+      plannedBranchCount: round.plannedBranchCount,
+      plannedRefineCount: round.plannedRefineCount,
+      bestAttempt: round.bestAttempt,
+      attained: round.attained
+    }))
   const spent = []
   const record = {
     target: targetText,
@@ -248,11 +295,20 @@ export async function rsiRun({
   }
 
   let stopped = false
-  for (let round = 1; round <= rounds; round++) {
+  for (let round = firstRound; round < firstRound + rounds; round++) {
     if (await fs.access(path.join(directory, 'stop')).then(() => true, () => false)) {
       stopped = true
       await writeStatus({ phase: 'stopped', round: round - 1 })
       break
+    }
+
+    // Belt and braces on the numbering: a round that is already recorded is never
+    // written over, whatever put it there.
+    const taken = await fs.access(path.join(roundDirectory(directory, round), 'rollout.json')).then(() => true, () => false)
+    if (taken) {
+      const why = `round ${round} is already recorded in ${roundDirectory(directory, round)}; a run never overwrites a round it paid for`
+      await writeStatus({ phase: 'refused', why })
+      return { runDirectory: directory, error: why, rounds: record.rounds }
     }
 
     const plan = planRound({ history, fallback: { branchCount: 2, refineCount: 2 }, fixed: fixedPlan })
@@ -295,7 +351,7 @@ export async function rsiRun({
       grid,
       policy,
       maxParallelism,
-      attempt: makeAttempt,
+      attempt: makeAttemptFactory(round),
       onAttempt: writeGrid
     })
     for (const made of rollout.records) {
