@@ -130,7 +130,7 @@ export function readReport({ checkout, directory }) {
  * setting of one: the evolutionary loop improves the artifact and keeps a fixed
  * measure, and this one improves the exploration policy over recorded attempts.
  */
-export async function startRsi({ checkout, target, rounds = 2, versions = 3, parallelism = 3, timeout, model }) {
+export async function startRsi({ checkout, target, rounds = 2, versions = 3, parallelism = 3, branches, refinements, seed, timeout, model }) {
   if (!target || !String(target).trim()) return { refused: 'dream.rsi needs a target to improve' }
 
   const { startRun: makeRun } = await import(/* @vite-ignore */ '../../../tools/dream/setup.mjs')
@@ -139,6 +139,11 @@ export async function startRsi({ checkout, target, rounds = 2, versions = 3, par
   const log = path.join(directory, 'loop.log')
 
   const args = ['tools/dream/rsi.mjs', '--run', directory, '--target', String(target), '--rounds', String(rounds), '--versions', String(versions), '--parallelism', String(parallelism)]
+  // A pinned plan is how a run keeps its cost knowable: cells are attempts, and
+  // attempts are the expensive part. Seed pulls grids in from earlier runs so the
+  // first dreaming phase averages over more than one history.
+  if (branches !== undefined && refinements !== undefined) args.push('--branches', String(branches), '--refinements', String(refinements))
+  if (seed !== undefined) args.push('--seed', String(seed))
   for (const [flag, value] of [['timeout', timeout], ['model', model]]) {
     if (value !== undefined && value !== null && value !== '') args.push(`--${flag}`, String(value))
   }

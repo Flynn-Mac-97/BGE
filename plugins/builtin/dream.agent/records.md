@@ -20,6 +20,29 @@ agent-runs/dream-<stamp>-<target>/
     round.json         whether the round improved
 ```
 
+## A Dream-RSI run's directory
+
+`dream.rsi` writes the same target, setup and pictures, and its own records:
+
+```
+pool/                     one JSON grid per rollout: cells, outcomes, each cell's patch
+policy/v000.mjs           the policy a round started from, and every revision
+policy/current.mjs        the version the next round plays
+replay/v000.json          that version's sweep: mean reward, best beta, spread, failures
+rsi/0-0.patch             one attempt's diff, named by its cell
+rsi/round-001/grid.json   the grid as it stood after every attempt, so a rollout is watchable
+rsi/round-001/rollout.json   what exploring cost: probes, decision rounds, attainment
+rsi/round-001/dreaming.json  every version replayed, which won, what was deployed
+dreaming.json             the last phase's versions and what it deployed
+rsi-summary.json          the whole run: rounds, pool, best cell, improvement, cost
+rsi.json                  live phase, round, plan, pool and policy — what the panel reads
+winner.patch              the best attempt that was really made
+```
+
+`pool/` is the simulator. A policy is scored against every grid in it, so a
+phase that ran after the pool grew is not comparable with one that ran before —
+which is why the pool is frozen for the length of a dreaming phase.
+
 ## Resuming a run
 
 A run is resumed by naming its directory. It continues after its last recorded

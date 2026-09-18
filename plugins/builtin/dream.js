@@ -181,7 +181,7 @@ export default {
     {
       id: 'dream.rsi',
       label: 'Dream: run the recursive self-improvement loop',
-      // args: the target in words, then { rounds, versions, parallelism, timeout, model }
+      // args: the target in words, then { rounds, versions, parallelism, branches, refinements, seed, timeout, model }
       run: async (context, target, options = {}) => {
         if (!context.host) return needsNode('dream.rsi')
         if (!target) return { refused: 'name a target to improve, in words' }
@@ -191,6 +191,9 @@ export default {
           rounds: options.rounds,
           versions: options.versions,
           parallelism: options.parallelism,
+          branches: options.branches,
+          refinements: options.refinements,
+          seed: options.seed,
           timeout: options.timeout,
           model: options.model
         })
