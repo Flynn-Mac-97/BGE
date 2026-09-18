@@ -167,6 +167,22 @@ const asProjectPattern = (file, projectPath) => {
 const selectableKind = node => ['instruction', 'skill'].includes(node.kind)
 
 /**
+ * Whether a task names a trigger word.
+ *
+ * A trigger is a stem, so `occlud` selects on `occlusion` and `health` on
+ * `healthy`. It has to start a word, so `pose` does not select on `exposes`
+ * and `rig` does not select on `trigger`.
+ */
+function namesTrigger(task, trigger) {
+  const word = String(trigger).toLowerCase()
+  if (!word) return false
+  for (let at = task.indexOf(word); at !== -1; at = task.indexOf(word, at + 1)) {
+    if (at === 0 || !/[a-z0-9]/.test(task[at - 1])) return true
+  }
+  return false
+}
+
+/**
  * Why one rule set is missing, short enough to send on every packet.
  *
  * A packet that lists only what it holds looks complete. The reason tells an
@@ -215,7 +231,7 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
     if (!selectableKind(node)) continue
     if (node.always) wanted.add(node.id)
     if ((node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))) wanted.add(node.id)
-    if ((node.triggers || []).some(trigger => task.includes(String(trigger).toLowerCase()))) wanted.add(node.id)
+    if ((node.triggers || []).some(trigger => namesTrigger(task, trigger))) wanted.add(node.id)
   }
 
   const unknown = [...wanted].filter(id => !workspace.nodes.some(node => node.id === id))
@@ -269,17 +285,28 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // and never parse the JSON.
   const noFilesNotice = request.files.length || !skippedByFile ? null
     : '# You named no files\n\n'
-      + `This packet is short. ${skippedByFile} rule sets are chosen by the files you touch, and none of them are here.`
-      + ' Ask again as soon as you know the files:\n\n'
+      + `${skippedByFile} rule sets are chosen by the files you touch. Name them:\n\n`
       + '```sh\nnode bin/engine.mjs agent.context \'{"task":"...","files":["path/to/file.js"]}\'\n```'
+  // The engine's own rules are named in full, because a packet that dropped them
+  // must say so in the exact words a reader and a test both look for. The rest
+  // are grouped by reason: the id says which rule set, and the title only
+  // repeats the id.
+  const engineEntry = withheld.find(node => node.id === 'engine')
+  const groupedByReason = new Map()
+  for (const node of withheld) {
+    if (node === engineEntry) continue
+    const ids = groupedByReason.get(node.reason) || []
+    ids.push(`\`${node.id}\``)
+    groupedByReason.set(node.reason, ids)
+  }
   const withheldNotice = withheld.length || withheldPluginGuides
     ? [
       '# Not included',
-      'These rule sets exist and are not above. Ask for one by id with `\'{"task":"...","nodes":["<id>"]}\'`.',
-      withheld.length ? withheld.map(node => `- \`${node.id}\` — ${node.title} — ${node.reason}`).join('\n') : null,
+      'Ask for one by id: `\'{"task":"...","nodes":["<id>"]}\'`.',
+      engineEntry ? `- \`${engineEntry.id}\` — ${engineEntry.title} — ${engineEntry.reason}` : null,
+      ...[...groupedByReason].map(([reason, ids]) => `- ${ids.join(', ')} — ${reason}`),
       withheldPluginGuides
-        ? `${withheldPluginGuides} plugin guides are also missing. A guide arrives when your task uses that`
-          + " plugin's words; each guide is the `*.agent.md` file beside its plugin."
+        ? `${withheldPluginGuides} plugin guides are missing; each arrives when the task uses its plugin's words.`
         : null
     ].filter(Boolean).join('\n\n')
     : null

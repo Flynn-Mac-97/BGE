@@ -177,8 +177,16 @@ export async function contextFromDisk(root, request, projectPath = 'project', in
     return fs.promises.readFile(target, 'utf8')
   }
   const transport = onDisk(project, root)
-  return resolveAgentContext(
+  const packet = await resolveAgentContext(
     read, request, await transport.agentPlugins(), project, interfaceText || transport.agentInterface)
+  // A request that names no files has given the agent nothing to point at. The
+  // file tree in the packet answers that, so finding a path costs no second
+  // engine process (`tree`). A request that names files needs no tree.
+  if (!packet.files.length) {
+    const { walk } = await import('./project-index.mjs')
+    packet.tree = await walk(project)
+  }
+  return packet
 }
 
 /**

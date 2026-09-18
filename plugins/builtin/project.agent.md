@@ -1,5 +1,6 @@
 ---
 description: Which game the editor has open, and how to open, name or leave one. Use when starting a new game, switching between games, saving the untitled project under a name, or working out where a project lives on disk.
+triggers: project switcher, switch project, switch between games, open project, close project, project.open, project.close, project.list, project.saveAs, project.panel, save as, untitled project, named project, game.json, projects root, where a project lives, project directory, project path
 ---
 
 # Project Switcher

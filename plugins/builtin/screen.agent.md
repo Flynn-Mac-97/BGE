@@ -1,5 +1,6 @@
 ---
 description: Draw a full game screen — a title card, pause menu, level-up choice, game-over card. Use for anything the player reads that is not the HUD and not an editor panel. Use HUD for values that sit over live play, and Choice Screen for a row of cards to pick from.
+triggers: screens, screen.read, screen.list, context.screen, pause screen, title screen, game screen, result screen, game-over screen, level up, upgrade card
 ---
 # Screen
 

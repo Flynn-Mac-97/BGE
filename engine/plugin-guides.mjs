@@ -46,7 +46,13 @@ export async function pluginGuides(root, projectDirectory) {
       // that says "look at x" pulls the plugin that answers looking — and a
       // disabled plugin's words pull nothing, because the node is disabled
       // with it. This is what makes a guide a skill.
+      //
+      // A declared list is the whole list. The name-derived words are a fallback
+      // for a guide with none: `screen` alone pulls the game-screen plugin into
+      // every task that mentions the rendered frame, and See already answers
+      // those. A guide that knows its own words states them instead.
       const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
+      const nameTriggers = [stem.replaceAll('-', ' '), plugin.toLowerCase()]
       // `project/` is the one name for a file in the open project, whatever the
       // directory is called on disk. Guides declare `match: project/**` and are
       // right for every project.
@@ -61,7 +67,7 @@ export async function pluginGuides(root, projectDirectory) {
         // an agent reads is the code now, not a list somebody kept in step.
         source: source ? `${place.prefix}/${stem}.js` : null,
         match,
-        triggers: [...new Set([stem.replaceAll('-', ' '), plugin.toLowerCase(), ...saidTriggers])],
+        triggers: [...new Set(saidTriggers.length ? saidTriggers : nameTriggers)],
         enabled: !disabled.has(plugin), plugin
       })
     }

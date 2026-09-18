@@ -1,7 +1,7 @@
 ---
 skill: see-the-game
 description: Use when a question is about what is actually there in the running game world or on screen — and the answer must come from live engine data, not from reading source, type files, or a screenshot. Trigger it for: "what is that thing on screen / in my level", something missing or not appearing (is it hidden, blocked, off-screen, or absent?), something drawn wrong (grey box, flat colour, wrong shape), things overlapping, stacking, floating, or piling up at one spot, and checking positions, counts, sizes, or what blocks what after simulating steps. Also use when a debugging question would otherwise be answered by guessing from code or by eyeballing a picture — query the scene graph instead. Covers identify, describe, find, isolate, occlusion, diff, camera. Do not use for writing gameplay or rendering features, camera or effect authoring, renames, or for capturing/prompting on an image — that is the See Frames guide.
-triggers: look at, looks, on screen, off screen, hidden, occlud, blocking, what does, appearance, what is that, what is this, unidentified, identify, looks wrong, wrong on screen, unexpected, is it visible, cannot see
+triggers: see, look at, looks, on screen, off screen, hidden, occlud, blocking, what does, appearance, what is that, what is this, unidentified, identify, looks wrong, wrong on screen, unexpected, is it visible, cannot see
 ---
 
 
