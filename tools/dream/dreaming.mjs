@@ -204,7 +204,21 @@ export async function dreamPolicies({
       spread: scored.spread,
       degenerate: scored.degenerate,
       failures: scored.points.reduce((total, point) => total + point.failures, 0),
-      perBeta: scored.points.map(point => ({ beta: point.beta, reward: point.reward }))
+      perBeta: scored.points.map(point => ({ beta: point.beta, reward: point.reward })),
+      // The traces are kept so the run's picture can draw what each version
+      // reached against the probes it spent. Without them the replay is a number
+      // and the reason for it is gone.
+      replays: scored.points.flatMap(point => point.replays.map(replay => ({
+        beta: point.beta,
+        grid: replay.grid,
+        reward: replay.reward,
+        probes: replay.probes,
+        rounds: replay.rounds,
+        attainment: replay.attainment,
+        parallelPenalty: replay.parallelPenalty,
+        failure: replay.failure,
+        trace: replay.trace
+      })))
     }
   }
 

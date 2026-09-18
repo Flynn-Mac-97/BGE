@@ -327,6 +327,8 @@ function snapshot(directory) {
   const grids = loop === 'Dream-RSI' ? readGrids(directory, { active }) : []
   const rsiRounds = loop === 'Dream-RSI' ? readRsiRounds(directory) : []
   const policyVersions = loop === 'Dream-RSI' ? readPolicyVersions(directory) : []
+  const gridPicture = loop === 'Dream-RSI' ? textOf(directory, 'rsi/grid.svg') : null
+  const replayPicture = loop === 'Dream-RSI' ? textOf(directory, 'rsi/replay.svg') : null
 
   const rounds = []
   const roundsDirectory = path.join(directory, 'rounds')
@@ -395,7 +397,9 @@ function snapshot(directory) {
           rounds: rsiRounds,
           versions: policyVersions,
           best: rsiSummary?.best ?? rsiStatus?.best ?? null,
-          improvement: rsiSummary?.improvement ?? null
+          improvement: rsiSummary?.improvement ?? null,
+          gridPicture,
+          replayPicture
         }
       : null,
     baseline: check?.working ? { value: check.working.value, measures: check.working.totals?.measures ?? {} } : null,
@@ -465,9 +469,9 @@ const PAGE = `<!doctype html>
 <div id="rsi"></div>
 <h2>Attempts</h2>
 <div id="attempts"></div>
-<h2>Score against attempts</h2>
+<h2 id="graphTitle">Score against attempts</h2>
 <div id="graph" class="dim">no round has finished yet</div>
-<h2>Lineage</h2>
+<h2 id="treeTitle">Lineage</h2>
 <div id="tree" class="dim">no candidate has run yet</div>
 <h2>Where this lives</h2>
 <div id="paths"></div>
@@ -626,8 +630,20 @@ async function refresh() {
   document.getElementById('attempts').innerHTML = attemptsTable
 
   const graph = document.getElementById('graph'), tree = document.getElementById('tree')
-  if (d.graph) { graph.className = ''; graph.innerHTML = d.graph } 
-  if (d.tree) { tree.className = ''; tree.innerHTML = d.tree }
+  if (d.loop === 'Dream-RSI') {
+    // The evolutionary pictures describe rounds of candidates against one
+    // measure. A Dream-RSI run has branches, attempts and replayed policy
+    // versions, so its own two pictures are shown and the old ones are not
+    // passed off as this loop's.
+    graph.className = ''; tree.className = ''
+    graph.innerHTML = d.rsi.gridPicture ? d.rsi.gridPicture : '<div class="dim">no grid picture yet</div>'
+    tree.innerHTML = d.rsi.replayPicture ? d.rsi.replayPicture : '<div class="dim">no replay picture yet</div>'
+    document.getElementById('graphTitle').textContent = 'The grids — every cell, and the order the policy probed them'
+    document.getElementById('treeTitle').textContent = 'What replay said — reward against beta, attainment against probes'
+  } else {
+    if (d.graph) { graph.className = ''; graph.innerHTML = d.graph }
+    if (d.tree) { tree.className = ''; tree.innerHTML = d.tree }
+  }
 
   document.getElementById('paths').innerHTML = '<table>' + Object.entries(d.paths)
     .map(([k, v]) => '<tr><td class="dim">' + esc(k) + '</td><td>' + esc(v) + '</td></tr>').join('') + '</table>'

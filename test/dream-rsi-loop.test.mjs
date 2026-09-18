@@ -191,7 +191,7 @@ test('a run reads its own rounds, so a resume never writes over one', async () =
   })
 
   const after = await fs.readFile(path.join(earlier, 'rollout.json'), 'utf8')
-  const dirs = (await fs.readdir(path.join(directory, 'rsi'))).sort()
+  const dirs = (await fs.readdir(path.join(directory, 'rsi'))).filter(name => name.startsWith('round-')).sort()
   await fs.rm(directory, { recursive: true, force: true })
 
   assert.equal(before.length, 1)
@@ -201,6 +201,46 @@ test('a run reads its own rounds, so a resume never writes over one', async () =
   assert.equal(result.rounds[0].round, 2, 'the resumed run numbered its round one again')
   assert.deepEqual(dirs, ['round-001', 'round-002'])
   assert.equal(after, recorded, 'the round already recorded was written over')
+})
+
+test('a run draws its grids and its replay, and writes the document beside them', async () => {
+  const directory = await readyRun()
+  const result = await rsiRun({
+    checkout: CHECKOUT,
+    runDirectory: directory,
+    rounds: 1,
+    versions: 2,
+    maxParallelism: 2,
+    fixedPlan: { branchCount: 2, refineCount: 1 },
+    attempt: attempt(path.join(directory, 'patches')),
+    revise: writesBranchOneFirst
+  })
+
+  const grid = await fs.readFile(path.join(directory, 'rsi/grid.svg'), 'utf8')
+  const replay = await fs.readFile(path.join(directory, 'rsi/replay.svg'), 'utf8')
+  const document = await fs.readFile(path.join(directory, 'rsi/report.md'), 'utf8')
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(result.error, undefined, result.error)
+  for (const [name, svg] of [['grid', grid], ['replay', replay]]) {
+    assert.equal((svg.match(/<svg/g) ?? []).length, 1, `${name}.svg is not one svg`)
+    assert.equal((svg.match(/<\/svg>/g) ?? []).length, 1, `${name}.svg is not closed`)
+    assert.doesNotMatch(svg, /NaN|undefined/, `${name}.svg has a missing number`)
+  }
+  // The grid picture draws every cell of the planned environment, including the
+  // ones the policy never went to, and the order it probed the rest in.
+  for (const cell of ['0:0', '1:0', '0:1', '1:1']) {
+    assert.match(grid, new RegExp(`>${cell.replace(':', ':')}<|${cell}`), `grid.svg does not draw ${cell}`)
+  }
+  assert.match(grid, />1</, 'the probe order is not drawn')
+  // The replay picture names the policies it plots and marks a flat sweep.
+  assert.match(replay, /parallel-refine/)
+  assert.match(replay, /branch-one-first/)
+  assert.match(replay, /ignores beta/, 'a flat sweep was not marked')
+  assert.match(document, /# Dream-RSI/)
+  assert.match(document, /Target as it stood/)
+  assert.match(document, /grid\.svg/)
+  assert.match(document, /replay\.svg/)
 })
 
 test('a stop file left over from an earlier run refuses the run instead of doing nothing', async () => {

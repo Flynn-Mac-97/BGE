@@ -137,8 +137,9 @@ export function makeOnlineQuestion({ grid, maxParallelism = 3, attempt, onAttemp
         const outcome = made.outcome ?? null
         // The patch path is kept with the revealed cell: a child attempt
         // continues from its parent's patch, so a branch is a line of work
-        // rather than a series of unrelated tries.
-        const stored = { branch: cell.branch, attempt: cell.attempt, outcome, patchPath: made.patchPath ?? null }
+        // rather than a series of unrelated tries. `seq` is the order the policy
+        // probed it in, which is the route the picture draws.
+        const stored = { branch: cell.branch, attempt: cell.attempt, outcome, patchPath: made.patchPath ?? null, seq: probes + 1 }
         revealed.set(id, stored)
         grid.cells[id] = stored
         probes++

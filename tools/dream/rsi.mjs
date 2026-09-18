@@ -35,7 +35,7 @@ import { realAttempt, rolloutOnce } from './rollout.mjs'
 import { costBands, sumCosts } from './pricing.mjs'
 import { loadSetup } from './scoring.mjs'
 import { CHECKOUT, designSetup, preflight, recordSetupCheck, startRun, verifySetup } from './setup.mjs'
-import { renderReport } from './report.mjs'
+import { renderRsiPictures } from './rsi-pictures.mjs'
 
 /** Rounds of explore-dream-redeploy. */
 const DEFAULT_ROUNDS = 2
@@ -432,6 +432,9 @@ export async function rsiRun({
       policyScore: dreamed.winner ? dreamed.winner.score : null
     })
 
+    // The pictures are rewritten every round, so the page and the document follow
+    // the run while it goes rather than describing it only once it stops.
+    await renderRsiPictures(directory)
     await writeStatus({
       phase: 'running',
       round,
@@ -460,7 +463,7 @@ export async function rsiRun({
 
   await fs.writeFile(path.join(directory, 'rsi-summary.json'), `${JSON.stringify(record, null, 2)}\n`, 'utf8')
   await writeStatus({ phase: stopped ? 'stopped' : 'done', pool: record.pool, best })
-  await renderReport(directory)
+  await renderRsiPictures(directory)
   return { runDirectory: directory, ...record }
 }
 
