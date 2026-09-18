@@ -60,6 +60,45 @@ rsi.json         live phase, round, pool and policy — what the panel reads
 winner.patch     the best attempted version, ready to land
 ```
 
+## Picking a run back up
+
+A run is resumed by naming its directory. It continues after its last recorded
+round, plays the policy the last dreaming phase deployed, and plans from what the
+rounds before it did:
+
+```
+node tools/dream/rsi.mjs --run agent-runs/dream-<stamp>-<target> --rounds 2 --versions 2 --parallelism 2 --timeout 900
+```
+
+`--target` is optional on a resume: the run directory holds it in `target.json`.
+`--rounds` is how many more rounds this invocation may run. `--branches` with
+`--refinements` pins the plan so the cost is knowable before it starts — cells are
+attempts, and attempts are the expensive part.
+
+Before resuming, look for a `stop` file in the run directory. `dream.stop` writes
+one, and it outlives the process it was meant for, so a resume refuses until it is
+removed rather than exiting zero having done nothing:
+
+```
+Remove-Item agent-runs/dream-<stamp>-<target>/stop
+```
+
+Watch it while it runs:
+
+```
+node tools/dream/inspect.mjs --port 4317
+```
+
+The page reads the run directory, the pool, the policy versions and the agent's
+own transcript, so a working attempt is visible while it works.
+
+## What a run has cost, and what it has left
+
+`rsi-summary.json` carries the run's cost in RMB, and `rsi/round-###/attempts.json`
+carries each attempt's token breakdown, its session and its patch. Prices live in
+`tools/dream/pricing.mjs` with the page they were read from; a cost is recomputed
+from the token records on every read, so a price change applies to old runs too.
+
 ## What is not the paper
 
 - **Batches are not concurrent yet.** A batch is one decision round and is
