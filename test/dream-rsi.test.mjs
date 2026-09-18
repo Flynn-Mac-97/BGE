@@ -42,10 +42,10 @@ test('a grid only ever offers a branch root or the next attempt of an opened bra
   assert.deepEqual(legalActions(grid), ['1:0'], 'a full branch offers nothing more')
 })
 
-test('a replay is deterministic and spends no agent and no process', () => {
+test('a replay is deterministic and spends no agent and no process', async () => {
   const grid = gridWithOneGoodBranch()
-  const first = replayGrid({ grid, policy: makePolicy('parallel-refine'), maxParallelism: 3 })
-  const second = replayGrid({ grid, policy: makePolicy('parallel-refine'), maxParallelism: 3 })
+  const first = await replayGrid({ grid, policy: makePolicy('parallel-refine'), maxParallelism: 3 })
+  const second = await replayGrid({ grid, policy: makePolicy('parallel-refine'), maxParallelism: 3 })
 
   assert.deepEqual(second, first, 'the same policy on the same grid replayed differently')
   assert.equal(first.failure, null)
@@ -91,29 +91,29 @@ test('max_parallelism is a limit, not a suggestion', () => {
   assert.equal(question.probe_batch(['0:0', '1:0']).length, 2)
 })
 
-test('the parallel penalty is 1 for a serial policy and 1/W for full batches', () => {
+test('the parallel penalty is 1 for a serial policy and 1/W for full batches', async () => {
   const grid = gridWithOneGoodBranch()
-  const serial = replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
+  const serial = await replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
   assert.equal(serial.parallelPenalty, 1, 'a serial policy did not come out at 1')
 
   // A policy that always fills the batch: the paper's other stated check.
   const greedy = { NAME: 'full-batches', solve(question) { question.reset(); while (question.legal_actions().length) question.probe_batch(question.legal_actions().slice(0, question.max_parallelism)) } }
-  const filled = replayGrid({ grid, policy: greedy, maxParallelism: 3 })
+  const filled = await replayGrid({ grid, policy: greedy, maxParallelism: 3 })
   assert.equal(filled.parallelPenalty, Number((1 / 3).toFixed(6)), 'full batches did not come out at 1/W')
 })
 
-test('a policy that opens branches and fills batches beats one that only refines', () => {
+test('a policy that opens branches and fills batches beats one that only refines', async () => {
   const grid = gridWithOneGoodBranch()
-  const parallel = replayGrid({ grid, policy: makePolicy('parallel-refine'), maxParallelism: 3 })
-  const serial = replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
-  const greedy = replayGrid({ grid, policy: new GreedyBest({ beta: 0.6 }), maxParallelism: 3 })
+  const parallel = await replayGrid({ grid, policy: makePolicy('parallel-refine'), maxParallelism: 3 })
+  const serial = await replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
+  const greedy = await replayGrid({ grid, policy: new GreedyBest({ beta: 0.6 }), maxParallelism: 3 })
 
   assert.ok(parallel.reward > serial.reward, 'batching did not pay')
   assert.ok(parallel.attainment > greedy.attainment, 'opening branches did not pay on a grid where the win is on branch 1')
   assert.equal(greedy.attainment, 0.21, 'the exploiter was expected to sit on the branch it opened')
 })
 
-test('a policy written to the paper shape runs here, curve and all', () => {
+test('a policy written to the paper shape runs here, curve and all', async () => {
   const grid = gridWithOneGoodBranch()
 
   // Listing 2's loop, in its own idiom: a class, a solve, a curve recorded on
@@ -149,7 +149,7 @@ test('a policy written to the paper shape runs here, curve and all', () => {
   }
 
   const policy = new PaperShapedPolicy({ beta: 0.5 })
-  const replay = replayGrid({ grid, policy, maxParallelism: 2 })
+  const replay = await replayGrid({ grid, policy, maxParallelism: 2 })
 
   assert.equal(replay.failure, null, 'the paper-shaped policy failed')
   assert.ok(replay.probes >= 2)
@@ -158,12 +158,12 @@ test('a policy written to the paper shape runs here, curve and all', () => {
   assert.ok(replay.trace.length > 0, 'the replay kept no trace to show the agent that revises the policy')
 })
 
-test('a sweep says whether beta changes anything at all', () => {
+test('a sweep says whether beta changes anything at all', async () => {
   const grid = gridWithOneGoodBranch()
-  const flat = replaySweep({ grids: [grid], makePolicy: beta => ({ NAME: 'ignores-beta', beta, solve: question => makePolicy('parallel-refine', beta).solve(question) }), betas: [0, 0.5, 1] })
+  const flat = await replaySweep({ grids: [grid], makePolicy: beta => ({ NAME: 'ignores-beta', beta, solve: question => makePolicy('parallel-refine', beta).solve(question) }), betas: [0, 0.5, 1] })
   assert.equal(flat.degenerate, false, 'a policy whose behaviour varies with beta was called degenerate')
 
-  const constant = replaySweep({ grids: [grid], makePolicy: beta => ({ NAME: 'constant', beta, solve: question => makePolicy('serial-refine', beta).solve(question) }), betas: [0, 0.5, 1] })
+  const constant = await replaySweep({ grids: [grid], makePolicy: beta => ({ NAME: 'constant', beta, solve: question => makePolicy('serial-refine', beta).solve(question) }), betas: [0, 0.5, 1] })
   assert.equal(constant.degenerate, true, 'a policy that ignores beta was reported as exposing a trade-off')
 })
 
@@ -175,7 +175,7 @@ test('a policy version loads from a file, and one without a solve is refused', a
 
   const loaded = await loadPolicy(file)
   assert.equal(loaded.error, undefined, `the starter policy did not load: ${loaded.error}`)
-  const replay = replayGrid({ grid: gridWithOneGoodBranch(), policy: loaded.policy, maxParallelism: 3 })
+  const replay = await replayGrid({ grid: gridWithOneGoodBranch(), policy: loaded.policy, maxParallelism: 3 })
   assert.equal(replay.attainment, 0.9, 'the policy loaded from the run directory did not reach the recorded best')
 
   const bad = path.join(directory, 'no-solve.mjs')

@@ -19,7 +19,11 @@
  * attainment does not move, which is what the paper means by a route outside the
  * recorded support earning no reward.
  */
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { legalActions, observationOf } from './grid.mjs'
+import { readPool } from './pool.mjs'
+import { loadPolicy } from './policy.mjs'
 
 /**
  * The question a policy is solved against.
@@ -198,13 +202,16 @@ export function makeQuestion({ grid, maxParallelism = 3, onReveal = null }) {
  * The reward is the first minus lambda times the second, so a policy that batches
  * useful work and reaches a high score with few probes wins.
  */
-export function replayGrid({ grid, policy, maxParallelism = 3, maxRounds = 50, lambda = 0.5, budget = null } = {}) {
+export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds = 50, lambda = 0.5, budget = null } = {}) {
   const question = makeQuestion({ grid, maxParallelism })
   let failure = null
 
   question.reset()
   try {
-    policy.solve(question, budget)
+    // Awaiting a synchronous policy costs nothing and returns undefined, so the
+    // paper's synchronous shape and a policy that also drives a live rollout —
+    // where a probe really has to be waited for — are the same interface here.
+    await policy.solve(question, budget)
   } catch (error) {
     failure = String(error?.message || error)
   }
@@ -248,8 +255,9 @@ export function replayGrid({ grid, policy, maxParallelism = 3, maxRounds = 50, l
  * spread is reported too: a policy that wins only on average is worth less than
  * one that wins everywhere.
  */
-export function replayPool({ grids, policy, maxParallelism = 3, maxRounds = 50, lambda = 0.5, budget = null } = {}) {
-  const replays = grids.map(grid => replayGrid({ grid, policy, maxParallelism, maxRounds, lambda, budget }))
+export async function replayPool({ grids, policy, maxParallelism = 3, maxRounds = 50, lambda = 0.5, budget = null } = {}) {
+  const replays = []
+  for (const grid of grids) replays.push(await replayGrid({ grid, policy, maxParallelism, maxRounds, lambda, budget }))
   const rewards = replays.map(replay => replay.reward)
   return {
     policy: policy.NAME ?? policy.name ?? policy.constructor?.name ?? 'unnamed',
@@ -274,8 +282,9 @@ export function replayPool({ grids, policy, maxParallelism = 3, maxRounds = 50, 
  * `makePolicy(beta)` is used rather than mutating one policy, so a sweep cannot
  * leave an instance holding the last beta it was tried at.
  */
-export function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.75, 1], maxParallelism = 3, maxRounds = 50, lambda = 0.5 } = {}) {
-  const points = betas.map(beta => ({ beta, ...replayPool({ grids, policy: makePolicy(beta), maxParallelism, maxRounds, lambda }) }))
+export async function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.75, 1], maxParallelism = 3, maxRounds = 50, lambda = 0.5 } = {}) {
+  const points = []
+  for (const beta of betas) points.push({ beta, ...(await replayPool({ grids, policy: makePolicy(beta), maxParallelism, maxRounds, lambda })) })
   const rewards = points.map(point => point.reward)
   const spread = rewards.length ? Number((Math.max(...rewards) - Math.min(...rewards)).toFixed(6)) : 0
   const best = points.reduce((winner, point) => (!winner || point.reward > winner.reward ? point : winner), null)
@@ -290,4 +299,61 @@ export function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.75, 1]
     bestReward: best ? best.reward : null,
     meanReward: rewards.length ? Number((rewards.reduce((total, value) => total + value, 0) / rewards.length).toFixed(6)) : 0
   }
+}
+
+/** One version's score: the sweep, summarised the way a dreaming phase ranks it. */
+export async function scorePolicy({ grids, Class, instance = null, betas, maxParallelism = 3, lambda = 0.5 } = {}) {
+  const makePolicy = beta => (Class ? new Class({ beta, name: instance?.NAME }) : { ...instance, beta })
+  const sweep = await replaySweep({ grids, makePolicy, betas, maxParallelism, lambda })
+  return {
+    policy: instance?.NAME ?? Class?.name ?? 'unnamed',
+    score: sweep.meanReward,
+    ...sweep
+  }
+}
+
+// Run directly: score one policy file against one run's pool. This is the check
+// the policy-development prompt tells an agent to run before it finishes.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  const argument = name => {
+    const at = process.argv.indexOf(`--${name}`)
+    return at >= 0 ? process.argv[at + 1] : undefined
+  }
+  const policyFile = argument('policy')
+  const runDirectory = argument('run')
+  if (!policyFile || !runDirectory) {
+    process.stderr.write('usage: node tools/dream/replay.mjs --policy <file> --run <run directory> [--lambda 0.5]\n')
+    process.exit(2)
+  }
+
+  const grids = await readPool(path.resolve(runDirectory))
+  if (!grids.length) {
+    process.stderr.write(`no grids in ${runDirectory}/pool — a replay needs recorded attempts to read\n`)
+    process.exit(2)
+  }
+
+  const loaded = await loadPolicy(path.resolve(policyFile))
+  if (loaded.error) {
+    process.stderr.write(`${loaded.error}\n`)
+    process.exit(1)
+  }
+
+  const scored = await scorePolicy({
+    grids,
+    Class: loaded.Class,
+    instance: loaded.policy,
+    lambda: argument('lambda') ? Number(argument('lambda')) : 0.5,
+    maxParallelism: argument('parallelism') ? Number(argument('parallelism')) : 3
+  })
+  process.stdout.write(`${JSON.stringify({
+    policy: scored.policy,
+    grids: grids.length,
+    meanReward: scored.score,
+    bestReward: scored.bestReward,
+    bestBeta: scored.bestBeta,
+    spread: scored.spread,
+    degenerate: scored.degenerate,
+    perBeta: scored.points.map(point => ({ beta: point.beta, reward: point.reward, probes: point.replays.reduce((total, replay) => total + replay.probes, 0), failures: point.failures }))
+  }, null, 2)}\n`)
+  process.exitCode = scored.points.some(point => point.failures) ? 1 : 0
 }

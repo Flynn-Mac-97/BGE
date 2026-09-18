@@ -38,7 +38,7 @@ export class ParallelRefine extends LLMDesignedMethod {
     this.NAME = config?.name ?? 'parallel-refine'
   }
 
-  solve(question, budget = null) {
+  async solve(question, budget = null) {
     question.reset()
     const schedule = this.schedule()
     let flatRounds = 0
@@ -102,7 +102,7 @@ export class ParallelRefine extends LLMDesignedMethod {
 
       const chosen = batch.slice(0, question.max_parallelism)
       if (!chosen.length) return
-      question.probe_batch(chosen)
+      await question.probe_batch(chosen)
 
       // Low beta stops early: the paper's schedule says a low beta has an earlier
       // stagnation stop, and a policy that ignores it is not using its knob.
@@ -128,7 +128,7 @@ export class SerialRefine extends LLMDesignedMethod {
     this.NAME = config?.name ?? 'serial-refine'
   }
 
-  solve(question) {
+  async solve(question) {
     question.reset()
     while (true) {
       const legal = question.legal_actions()
@@ -136,7 +136,7 @@ export class SerialRefine extends LLMDesignedMethod {
       const best = bestScored(question.observed())
       const frontier = best ? `${best.branch}:${best.attempt + 1}` : null
       const next = frontier && legal.includes(frontier) ? frontier : (question.legal_roots()[0] ?? legal[0])
-      question.probe_batch([next])
+      await question.probe_batch([next])
     }
   }
 }
@@ -154,11 +154,11 @@ export class GreedyBest extends LLMDesignedMethod {
     this.NAME = config?.name ?? 'greedy-best'
   }
 
-  solve(question) {
+  async solve(question) {
     question.reset()
     const first = question.legal_roots()[0]
     if (!first) return
-    question.probe_batch([first])
+    await question.probe_batch([first])
 
     while (true) {
       const best = bestScored(question.observed())
@@ -166,7 +166,7 @@ export class GreedyBest extends LLMDesignedMethod {
       const frontier = `${best.branch}:${best.attempt + 1}`
       const legal = question.legal_actions()
       if (!legal.includes(frontier)) return
-      question.probe_batch([frontier])
+      await question.probe_batch([frontier])
     }
   }
 }
@@ -196,14 +196,15 @@ export async function loadPolicy(file) {
   const exported = module.default
   if (!exported) return { error: `${file} exports nothing` }
 
-  const policy = typeof exported === 'function'
-    ? new exported({ beta: module.BETA ?? 0.6 })
-    : exported
+  // The constructor is kept beside the instance so an evaluator can build the
+  // same policy at every beta of a sweep without the file being re-imported.
+  const Class = typeof exported === 'function' ? exported : null
+  const policy = Class ? new Class({ beta: module.BETA ?? 0.6 }) : exported
   if (typeof policy.solve !== 'function') return { error: `${file} exports no policy with a solve method` }
   const NAME = policy.NAME ?? module.NAME ?? policy.constructor?.name
   if (typeof NAME !== 'string' || !NAME) return { error: `${file} names no policy: a NAME is required to report a winner` }
   policy.NAME = NAME
-  return { policy, file }
+  return { policy, Class, file }
 }
 
 /**
