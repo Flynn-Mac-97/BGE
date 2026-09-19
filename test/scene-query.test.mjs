@@ -14,7 +14,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { occlusionGrid } from '../engine/scene-query.js'
+import { rayBox, occlusionGrid } from '../engine/scene-query.js'
+import { boundsOf } from '../engine/frame-facts.js'
 
 /** A 2x2x2 subject at the origin; the eye on +Z sees its z = +1 face, x,y in [-1,1]. */
 const HERO = () => ({ id: 'hero', x: 0, y: 0, z: 0, mesh: { box: [2, 2, 2] } })
@@ -34,6 +35,39 @@ const rayRatio = answer => {
 
 /** The ids the answer says block part of the face. */
 const named = answer => new Set(answer.blockedBy.map(entry => entry.id))
+
+/**
+ * The visible fraction by dense sampling of the eye-facing face, each ray tested
+ * with `rayBox`. Independent of the kernel's shadow-area math; only the choice
+ * of face is shared, because the kernel samples that face and no other.
+ */
+function denseVisibleFraction(eye, subject, others, size = 240) {
+  const bounds = boundsOf(subject)
+  const centre = { x: subject.x, y: subject.y, z: subject.z || 0 }
+  const half = { x: bounds.w / 2, y: bounds.h / 2, z: (bounds.l || 0) / 2 }
+  const offset = { x: eye.x - centre.x, y: eye.y - centre.y, z: (eye.z || 0) - centre.z }
+  const facing = ['x', 'y', 'z'].reduce((best, axis) => Math.abs(offset[axis]) > Math.abs(offset[best]) ? axis : best)
+  const side = Math.sign(offset[facing]) || 1
+  const [runs, rises] = facing === 'x' ? ['z', 'y'] : facing === 'y' ? ['x', 'z'] : ['x', 'y']
+  const boxes = others.map(entity => ({ x: entity.x, y: entity.y, z: entity.z || 0, ...boundsOf(entity) }))
+  let visible = 0
+  for (let row = 0; row < size; row++) {
+    for (let column = 0; column < size; column++) {
+      const point = { ...centre }
+      point[facing] += side * half[facing]
+      point[runs] += ((column + 0.5) / size * 2 - 1) * half[runs]
+      point[rises] += ((row + 0.5) / size * 2 - 1) * half[rises]
+      const direction = { x: point.x - eye.x, y: point.y - eye.y, z: point.z - eye.z }
+      const span = Math.hypot(direction.x, direction.y, direction.z)
+      const blocked = boxes.some(box => {
+        const distance = rayBox(eye, direction, box)
+        return distance !== null && distance < span - 1e-6
+      })
+      if (!blocked) visible++
+    }
+  }
+  return visible / (size * size)
+}
 
 test('an empty scene sees the whole face', () => {
   const answer = occlusionGrid(EYE, HERO(), [], 8, 8)
@@ -99,6 +133,48 @@ test('a blocker whose shadow misses the face is not named and changes nothing', 
   const answer = occlusionGrid(EYE, HERO(), [box('far-away', 50, 0, 4, 0.2, 40, 0.2)], 10, 10)
   assert.ok(Math.abs(answer.visibleFraction - 1) < 1e-9, `a shadow off the face occluded it: ${answer.visibleFraction}`)
   assert.deepEqual(answer.blockedBy, [])
+})
+
+test('a near blocker inside a farther shadow is named, not hidden by it', () => {
+  // The eye at z 24 looks toward -Z, so the post at z 12 is NEARER than the
+  // wall at z 6, and its shadow falls wholly inside the wall's.
+  const eye = { x: 0, y: 0, z: 24 }
+  const wall = slab('wall', 0, 6)
+  const post = box('post', 0, 0, 12, 0.4, 0.4, 0.4)
+  const answer = occlusionGrid(eye, HERO(), [post, wall], 8, 8)
+
+  assert.deepEqual([...named(answer)].sort(), ['post', 'wall'], 'the nearest blocker was dropped')
+  assert.ok(answer.visibleFraction <= 1e-9, `a full wall left ${answer.visibleFraction} visible`)
+})
+
+test('a complex scene matches a dense independent sample, and unions rather than sums', () => {
+  const eye = { x: 4, y: 2, z: 24 }
+  const subject = box('hull', 0, 0, 0, 5, 5, 5)
+  const others = [
+    box('far-wall', 0.65, 0, 6, 1.8, 6, 0.3),
+    box('mid-wall', 1.21, 0, 9, 1.6, 6, 0.3),
+    box('thin-post', 2.42, 0, 7, 0.1, 6, 0.1),
+    box('near-post', 1.77, 0, 12, 0.3, 2, 0.3),
+    box('behind', 0, 0, -3, 3, 3, 3)
+  ]
+
+  const answer = occlusionGrid(eye, subject, others, 6, 6)
+  const dense = denseVisibleFraction(eye, subject, others)
+  assert.ok(Math.abs(answer.visibleFraction - dense) < 0.015,
+    `analytic ${answer.visibleFraction} against dense ${dense}`)
+
+  // Five overlapping shadows: the union is far smaller than the sum of the parts.
+  const sumBlocked = others.reduce((total, one) => total + (1 - occlusionGrid(eye, subject, [one], 6, 6).visibleFraction), 0)
+  assert.ok(1 - answer.visibleFraction < sumBlocked - 0.2,
+    `overlapping shadows were summed: union ${1 - answer.visibleFraction} against parts ${sumBlocked}`)
+
+  // Nearest attribution, both directions.
+  const names = named(answer)
+  assert.ok(names.has('near-post'), 'a near blocker inside a farther shadow was dropped')
+  assert.ok(names.has('thin-post'), 'the thin post was dropped')
+  assert.ok(names.has('mid-wall'), 'the wall that covers the far wall was dropped')
+  assert.ok(!names.has('far-wall'), 'a blocker fully covered by a nearer one was named')
+  assert.ok(!names.has('behind'), 'a blocker behind the subject was named')
 })
 
 test('a blocker with its edge on the centre line cuts the face exactly in half', () => {
