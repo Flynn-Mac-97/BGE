@@ -28,7 +28,7 @@ const DEFAULT_CANDIDATE_TIMEOUT_SECONDS = 900
 function historyLines(history = []) {
   if (!history.length) return 'No candidate has run yet. The target as it stands is the one to beat.'
   return history
-    .map(entry => `- ${entry.id}: value ${entry.value}, ${entry.pass ? 'every task passed' : `refused — ${entry.reason}`}`)
+    .map(entry => `- ${entry.id}: value ${entry.value}, ${entry.pass ? 'every task passed' : `score zero — ${entry.reason}`}`)
     .join('\n')
 }
 
@@ -36,15 +36,16 @@ function historyLines(history = []) {
 async function candidatePrompt({ checkout, runDirectory, setup, workspace, target, files, history }) {
   const template = await fs.readFile(path.join(checkout, 'tools/dream/prompts/candidate.md'), 'utf8')
   const measures = setup.tasks
-    .map(task => `- ${task.id}: ${task.question}`)
+    .map(task => `- ${task.id}${task.holdout ? ' (holdout)' : ''}: ${task.question}`)
     .join('\n')
   const weights = Object.entries(setup.weights ?? {})
-    .map(([measure, weight]) => `${weight} per ${measure}`)
+    .map(([measure, weight]) => `${weight} per ${measure}${weight < 0 ? ' (quality gain)' : ''}`)
     .join(', ')
 
   return template
     .replaceAll('{{TARGET}}', String(target))
     .replaceAll('{{RUN_DIR}}', path.relative(checkout, runDirectory).split(path.sep).join('/'))
+    .replaceAll('{{OBJECTIVE}}', setup.objective ?? 'a higher value is a better target')
     // Absolute, because the command is run from the candidate's own worktree,
     // and a run directory is inside the checkout the worktree branches from and
     // therefore not present in it.
@@ -89,6 +90,12 @@ export async function runCandidate({
     status: 'failed',
     value: 0,
     verdict: 'refused',
+    evaluated: false,
+    valid: false,
+    nValid: 0,
+    nTotal: 0,
+    failClass: 'harness',
+    error: null,
     reason: null,
     measures: null,
     tokens: null,
@@ -163,6 +170,12 @@ export async function runCandidate({
       }
       record.value = score.value
       record.verdict = score.verdict
+      record.evaluated = score.evaluated
+      record.valid = score.valid
+      record.nValid = score.nValid
+      record.nTotal = score.nTotal
+      record.failClass = score.failClass
+      record.error = score.error
       record.measures = score.totals?.measures ?? null
       record.reason = score.reason
     }

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { emptyGrid, record, legalActions, gridFromRun } from '../tools/dream/grid.mjs'
+import { emptyGrid, record, legalActions, gridFromRun, observationOf } from '../tools/dream/grid.mjs'
 import { makeQuestion, replayGrid, replayPool, replaySweep } from '../tools/dream/replay.mjs'
 import { GreedyBest, SerialRefine, ParallelRefine, makePolicy, loadPolicy, policySource } from '../tools/dream/policy.mjs'
 import { LLMDesignedMethod, SimResult, recordCurve, finalizeResult, budgetDone, planFromHistory } from '../tools/dream/policy-api.mjs'
@@ -225,6 +225,34 @@ test('a cost plan is derived from what earlier rollouts did, inside the caps', (
   })
   assert.equal(deeper.refineCount, 4, 'a late win should deepen, within the cap')
   assert.match(deeper.reason, /late/)
+})
+
+test('a failed check is an evaluated zero a policy may repair', () => {
+  const grid = emptyGrid({ id: 'g', baseline: { value: 0.5 }, branchCount: 1, refineCount: 0 })
+  record(grid, {
+    branch: 0,
+    attempt: 0,
+    outcome: {
+      score: 0,
+      verdict: 'failed',
+      evaluated: true,
+      valid: false,
+      failClass: 'correctness',
+      error: 'find-player: no entity of type player',
+      nValid: 2,
+      nTotal: 3,
+      measures: {}
+    }
+  })
+
+  const observed = observationOf(grid.cells['0:0'], grid)
+  assert.equal(observed.evaluated, true, 'a failed check was reported as unevaluated')
+  assert.equal(observed.score, 0, 'a failed check did not score zero')
+  assert.equal(observed.valid, false)
+  assert.equal(observed.fail_class, 'correctness')
+  assert.equal(observed.n_valid, 2)
+  assert.equal(observed.n_total, 3)
+  assert.equal(branchFailedHard({ '0:0': observed }, 0).hard, false, 'a failed check closed the branch')
 })
 
 test('a policy that counts its own successes follows the paper, not a validity flag', () => {

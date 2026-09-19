@@ -17,19 +17,21 @@ measure it designs for that target. The target is named in words — a file, an
 algorithm, a workflow, the context an agent is handed — and a run decides what
 "better" means for it, because that depends on the target.
 
-Reach for it when a component has a cost you can measure and a correct answer
-you can check, and you want the improvement found rather than typed.
+Reach for it when a target has an objective you can measure and a correct answer
+you can check — a cost to lower or a quality to raise — and you want the
+improvement found rather than typed.
 
 ## A run is three phases
 
 1. **Design.** An agent reads the target and writes `setup.mjs`: the tasks, the
-   checks, and what each measure costs in score.
+   checks, the objective, and what each measure is worth in score. A negative
+   weight is a quality gain; a positive weight is a cost.
 2. **Check.** The setup must pass the target as it stands, and must fail the
    target with one literal break applied. A setup that passes both cannot tell
    an improvement from a regression, so it is refused and no round runs.
 3. **Rounds.** Candidates follow, each one a version of the target built on the
-   best version before it. A candidate that fails any task scores zero, whatever
-   it saved.
+   best version before it. A candidate that fails a check scores zero and keeps
+   the attempt; a candidate the harness could not score is refused.
 
 Only the setup is frozen. Candidates may change the target and nothing else.
 

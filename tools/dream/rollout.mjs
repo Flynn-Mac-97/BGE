@@ -259,9 +259,14 @@ export function realAttempt({ checkout, runDirectory, setup, target, files, setu
       record,
       patchPath: record.patch ? patchFile : null,
       outcome: {
-        score: record.verdict === 'scored' ? record.value : null,
+        score: record.evaluated ? record.value : null,
         verdict: record.verdict,
-        reason: record.reason ?? null,
+        evaluated: record.evaluated === true,
+        valid: record.valid === true,
+        failClass: record.failClass ?? (record.verdict === 'scored' ? 'ok' : 'refused'),
+        error: record.error ?? record.reason ?? null,
+        nValid: record.nValid ?? null,
+        nTotal: record.nTotal ?? null,
         measures: record.measures ?? null,
         tokens: record.tokens?.totalTokens ?? null,
         verifiedAgainst: setupHash ?? null

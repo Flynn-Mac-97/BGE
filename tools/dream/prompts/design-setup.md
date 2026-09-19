@@ -1,15 +1,14 @@
-# Design the setup for one dream run
+# Design the fixed evaluator for one dream run
 
-You are designing the measurement for one dream run. A later phase will generate
-candidate versions of the target and score them. Your job is the score itself.
+You are writing the evaluator for one discovery problem. A later phase generates
+candidate versions of the target and scores them against this file, and this file
+never changes afterwards. Your job is the score itself: what a solution must be
+correct about, and what makes one correct solution better than another.
 
-Treat the target as a design problem, not a request to shorten prose. Before
-writing the setup, inspect the code path and consider data structures, module
-boundaries, algorithms, commands, and workflows. A candidate may replace the
-current arrangement when a different architecture serves the target better.
-Use repository graph tools and, when the target depends on a current technique,
-authoritative online research. Record the useful design constraint in the setup
-so the candidate is judged by behavior, not by a citation.
+The paper's rule is the one to follow. The evaluator returns a quality: a larger
+number is a better solution. A candidate that fails a correctness check scores
+zero and is still an evaluated attempt, so a search policy can repair it rather
+than treat the branch as dead. Only a broken harness produced no score.
 
 ## The target
 
@@ -23,65 +22,62 @@ One file: `{{RUN_DIR}}/setup.mjs`. Nothing else. Do not edit the target.
 export default {
   name: '<short name>',
   project: '<path to a project the tasks open, relative to the checkout>',
-  weights: { <measure>: <cost in score per unit> },
+  objective: '<what a higher value means, in one sentence>',
+  weights: { <measure>: <score per unit> },
   control: { file: '<path>', find: '<a string in it>', replace: '<a string that breaks it>', why: '<what stops working>' },
   tasks: [
     {
       id: '<short id>',
+      holdout: false,
       question: '<what an agent is asked, in words>',
       async run({ checkout, project, helpers }) {
         // Do the work, or run the route the documentation implies.
-        return { pass: true, problem: null, measures: { characters: 1200, processes: 1 } }
+        return { pass: true, problem: null, measures: { <name>: <number> } }
       }
     }
   ]
 }
 ```
 
-`run` returns `{ pass, problem, measures }`. `problem` is a sentence naming what
-was wrong, and is required when `pass` is false. Every number in `measures` is
-summed across tasks, multiplied by its weight, and subtracted from 1, so weights
-are the score a whole run of that measure may cost. Weights for milliseconds are
-allowed but are not recommended: wall time moves with the machine.
+`run` returns `{ pass, problem, measures }`. `pass` says the candidate is
+correct; the numbers in `measures` say how good it is. `problem` names what was
+wrong and is required when `pass` is false.
 
-## The helpers
+## The objective
 
-```js
-helpers.engineProcess(checkout, project, args, { level, timeout })
-  // one headless engine process; args are appended after --headless --project
-  // returns { reply, problem, milliseconds }
+- A weight is subtracted from 1, so a positive weight is a cost: lower is better.
+  A negative weight is a quality gain: higher is better. A target whose aim is to
+  maximize a number uses a negative weight, and `objective` says so in words.
+- Weight the objective, not a proxy. A candidate must not be able to raise the
+  value by deleting the work the check requires.
+- `node tools/dream/scoring.mjs --setup {{RUN_DIR}}/setup.mjs` prints the value of
+  the target as it stands. That number is the baseline every candidate has to
+  beat.
 
-helpers.packetCharacters(checkout, request)
-  // the context packet agent.context would hand an agent
-  // returns { characters, milliseconds, error }
+## The evaluator
 
-helpers.sessionTokens(sessionDirectory)
-  // what a harness session spent, summed from its transcript
-  // returns { totalTokens, inputTokens, outputTokens, steps } or { error }
-```
-
-## Rules the run enforces
-
-- Three to six tasks. Each must run headless with no model and no dev server.
+- Three to six tasks. Each runs headless with no model and no dev server.
 - Every task must pass on the checkout as it is now. A setup whose tasks fail
   before any candidate exists measures nothing.
-- At least one task must measure a cost, or the score cannot change.
-- **A task that measures a cost must also check the content it paid for.** If a
-  task only counts characters, the cheapest candidate is an empty answer, and the
-  run will find it. State what the answer must still contain — the rule sets a
-  packet has to carry, the commands a list has to name, the fields a record has
-  to keep — and check each one. A cost with no such check is a hole a candidate
-  will fall through, and then you have measured nothing but deletion.
-- Include at least one holdout task with different wording, paths, or a different
-  route when the target is a navigation or interface problem.
+- At least one task carries a measure, or the value cannot change.
+- A task that measures a cost must also check the content it paid for. If a task
+  only counts, the cheapest candidate is an empty answer. State what the answer
+  must still contain and check each one.
+- Include at least one task with `holdout: true`: different instances, paths, or a
+  different route, so a candidate that only fits the discovery cases fails it.
+  Discovery cases are the ones the candidate is written against; the holdout is
+  the generalization test, as the paper's held-out datasets are.
 - Check retention and discoverability, not only presence. Required facts,
   commands, links, checks, and detail files must remain reachable.
 - If the target changes architecture, test public behavior through its interface
   and test a boundary that would fail under a shallow rewrite.
-- The control must break the target by a literal string replacement in one file,
-  and at least one task must then fail. This is what proves the setup can tell a
-  working target from a broken one.
+- The control must break the target by one literal string replacement in one
+  file, and at least one task must then fail. This is what proves the setup can
+  tell a working target from a broken one.
 - No task may read the score, the weights, or another task's measures.
+- Return `pass: false` for a wrong answer. Never throw for one: the run records a
+  failed check as a score of zero and keeps the attempt, but a throw is a broken
+  harness and produces no score at all.
 
 ## The engine will change
 
@@ -91,19 +87,11 @@ agent depends on rather than today's arrangement:
 
 - Prefer a task whose route is a command id, a documented entry point or a
   generated index, because those keep answering after files move.
-- When a task must name a path, name the one the target's own change is about —
-  and say in `question` what that path is for, so a rename is visibly a change
-  to the measurement rather than a silent failure.
+- When a task must name a path, name the one the target's own change is about.
 - Do not write a task around a file list that exists only because nothing has
   been reorganised yet.
 - Name the contract separately from its current implementation. Say what must be
   true after a refactor, which routes stay valid, and which old files may vanish.
-
-## Make the target stable
-
-Use first-attempt correctness, holdout coverage, retained required facts, and
-public interface behavior before route length, process count, or character count.
-Raw character count must never be the only measure.
 
 ## Before you finish
 

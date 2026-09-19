@@ -119,5 +119,7 @@ from the token records on every read, so a price change applies to old runs too.
   attempts run one after another. Real concurrency needs the policy off the main
   thread, because a synchronous `probe_batch` cannot let a child process's events
   fire while it waits.
-- **`n_valid` and `n_total` are null.** They are a task's own validator counts and
-  this engine's runs record a verdict and its measures instead.
+- **A failure class comes from the evaluator, not a task's own validators.**
+  `n_valid` and `n_total` are the checks that passed against the checks that ran.
+  A failed check is `fail_class: correctness` and keeps its branch; a thrown
+  task or a moved setup is a harness failure and yields no score.

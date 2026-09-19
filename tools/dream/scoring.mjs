@@ -3,16 +3,23 @@
  *
  * A setup is what a dream run decided to measure for its target: a list of
  * tasks, the checks that say whether each task was done, and what each measure
- * costs in score. Nothing here knows what the target is.
+ * is worth in score. Nothing here knows what the target is.
+ *
+ * A weight is normally a cost, subtracted from 1. A negative weight is a
+ * quality term instead: the measure raises the score as it rises, so a target
+ * whose objective is to maximize a number is expressed the same way.
  *
  * Two rules make a self-designed score mean something.
  *
  * The setup is digested and compared before any task runs, so a candidate that
  * edited the tasks, the checks or the weights is refused rather than rewarded.
  *
- * Every task must pass. Optimising cost is only meaningful among candidates
- * that still do the work, and a candidate that breaks the target is cheap by
- * definition. A task failure refuses the candidate outright.
+ * A check that fails is not a harness failure. The paper scores a failed
+ * correctness check zero and keeps the attempt: `verdict: 'failed'`,
+ * `evaluated: true`, `failClass: 'correctness'`. A task that throws, or a setup
+ * whose digest has moved, produced no score at all: `verdict: 'refused'`,
+ * `evaluated: false`, `failClass: 'harness'` or `'stale_suite'`. A policy can
+ * then tell a wrong answer it may repair from a run that never happened.
  *
  * Wall time is a measure like any other and is left out of the default weights:
  * it moves with the machine, and a selection decided by a noisy number is a
@@ -78,11 +85,20 @@ export async function scoreRun({ checkout = CHECKOUT, project, tasks, weights = 
     tasks: [],
     totals: { tasks: tasks.length, passed: 0, measures: {} },
     value: 0,
+    // `scored` — every check passed. `failed` — a check failed, so the attempt
+    // scores zero but was still evaluated. `refused` — no score could be read.
     verdict: 'refused',
+    evaluated: false,
+    valid: false,
+    nValid: 0,
+    nTotal: tasks.length,
+    failClass: 'harness',
+    error: null,
     reason: null
   }
 
   if (suiteHash !== undefined && suiteHash !== digest) {
+    record.failClass = 'stale_suite'
     record.reason = `the setup changed: this run froze ${suiteHash}, this checkout has ${digest}`
     return record
   }
@@ -90,19 +106,22 @@ export async function scoreRun({ checkout = CHECKOUT, project, tasks, weights = 
   for (const task of tasks) {
     const started = Date.now()
     let result
+    let threw = false
     try {
       result = await task.run({ checkout, project, helpers: HELPERS })
     } catch (error) {
-      result = { pass: false, problem: `threw — ${error?.message || error}` }
+      threw = true
+      result = { problem: `threw — ${error?.message || error}` }
     }
     const measures = result?.measures ?? {}
-    const taskRecord = {
+    const passed = result?.pass === true
+    record.tasks.push({
       id: task.id,
-      pass: result?.pass === true,
-      problem: result?.pass === true ? null : String(result?.problem ?? 'the task reported no verdict'),
+      pass: passed,
+      threw,
+      problem: passed ? null : String(result?.problem ?? 'the task reported no verdict'),
       measures: { ...measures, milliseconds: measures.milliseconds ?? Date.now() - started }
-    }
-    record.tasks.push(taskRecord)
+    })
   }
 
   for (const task of record.tasks) {
@@ -112,10 +131,21 @@ export async function scoreRun({ checkout = CHECKOUT, project, tasks, weights = 
       record.totals.measures[measure] = (record.totals.measures[measure] ?? 0) + amount
     }
   }
+  record.nValid = record.totals.passed
+  record.nTotal = record.tasks.length
 
   const failed = record.tasks.filter(task => !task.pass)
   if (failed.length) {
-    record.reason = failed.map(task => `${task.id}: ${task.problem}`).join('; ')
+    record.error = record.reason = failed.map(task => `${task.id}: ${task.problem}`).join('; ')
+    // A throw is the harness failing, not the work: no score can be read from it.
+    const harness = failed.some(task => task.threw)
+    record.failClass = harness ? 'harness' : 'correctness'
+    if (harness) return record
+    // The paper's rule: a failed check scores zero, and the attempt is still
+    // evaluated, so a policy may repair it rather than close the branch.
+    record.verdict = 'failed'
+    record.evaluated = true
+    record.valid = false
     return record
   }
 
@@ -125,6 +155,9 @@ export async function scoreRun({ checkout = CHECKOUT, project, tasks, weights = 
   }
   record.value = Number((1 - cost).toFixed(6))
   record.verdict = 'scored'
+  record.evaluated = true
+  record.valid = true
+  record.failClass = 'ok'
   return record
 }
 

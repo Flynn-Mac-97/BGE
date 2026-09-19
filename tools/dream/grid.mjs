@@ -22,27 +22,29 @@ import path from 'node:path'
 /**
  * The cell a policy reads. Only revealed cells are ever handed out.
  *
- * The field names are the paper's `Observation`. `n_valid` and `n_total` are
- * null here: they are the counts a task's own validators reported, and this
- * engine's runs record a verdict and its measures rather than a pass count. Null
- * says that, where a zero would read as a task that passed nothing.
+ * The field names are the paper's `Observation`. `n_valid` and `n_total` are the
+ * checks that passed against the checks that ran, so a policy can see partial
+ * progress; they are null on a cell with no recorded outcome. `evaluated` is
+ * false both for a cell the run never reached and for a harness failure that
+ * produced no score, and `fail_class` names which.
  */
 export const observationOf = (cell, grid) => {
   const parent = cell.attempt > 0 ? grid.cells[`${cell.branch}:${cell.attempt - 1}`] : null
+  const outcome = cell.outcome
   return {
     branch: cell.branch,
     attempt: cell.attempt,
-    score: cell.outcome ? cell.outcome.score : null,
-    evaluated: Boolean(cell.outcome),
-    valid: cell.outcome ? cell.outcome.verdict === 'scored' : false,
-    fail_class: cell.outcome ? (cell.outcome.verdict === 'scored' ? 'ok' : 'refused') : 'not_recorded',
-    error: cell.outcome ? cell.outcome.reason ?? null : 'this attempt was never made',
-    delta_vs_baseline: cell.outcome && cell.outcome.score !== null ? Number((cell.outcome.score - grid.baseline.value).toFixed(6)) : null,
-    delta_vs_parent: cell.outcome?.score != null && parent?.outcome?.score != null
-      ? Number((cell.outcome.score - parent.outcome.score).toFixed(6))
+    score: outcome ? outcome.score : null,
+    evaluated: outcome ? outcome.evaluated !== false : false,
+    valid: outcome ? (outcome.valid ?? outcome.verdict === 'scored') : false,
+    fail_class: outcome ? (outcome.failClass ?? (outcome.verdict === 'scored' ? 'ok' : 'refused')) : 'not_recorded',
+    error: outcome ? outcome.error ?? outcome.reason ?? null : 'this attempt was never made',
+    delta_vs_baseline: outcome && outcome.score !== null ? Number((outcome.score - grid.baseline.value).toFixed(6)) : null,
+    delta_vs_parent: outcome?.score != null && parent?.outcome?.score != null
+      ? Number((outcome.score - parent.outcome.score).toFixed(6))
       : null,
-    n_valid: null,
-    n_total: null
+    n_valid: outcome?.nValid ?? null,
+    n_total: outcome?.nTotal ?? null
   }
 }
 
@@ -165,10 +167,16 @@ export async function gridFromRun(runDirectory, { branchCount = 3, refineCount =
   // did: it refined its best version and never opened a second line of work.
   // Attempt 0 opens the branch, so the first candidate is 0:0 and not 0:1.
   records.forEach((entry, index) => {
+    const evaluated = entry.record.evaluated ?? entry.record.verdict === 'scored'
     const outcome = {
-      score: entry.record.verdict === 'scored' ? entry.record.value : null,
+      score: evaluated ? entry.record.value : null,
       verdict: entry.record.verdict,
-      reason: entry.record.reason ?? null,
+      evaluated,
+      valid: entry.record.valid ?? entry.record.verdict === 'scored',
+      failClass: entry.record.failClass ?? (entry.record.verdict === 'scored' ? 'ok' : 'refused'),
+      error: entry.record.error ?? entry.record.reason ?? null,
+      nValid: entry.record.nValid ?? null,
+      nTotal: entry.record.nTotal ?? null,
       measures: entry.record.measures ?? null,
       tokens: entry.record.tokens?.totalTokens ?? null,
       best: entry.record.best === true

@@ -38,10 +38,14 @@ The loop writes `run.json` between candidates, so a long candidate shows the
 previous round. Check the process: `run.json` records its `pid`. A crash before
 the first round leaves `starting`.
 
-## Every candidate is refused
+## Every candidate scores zero or is refused
 
-Read one `c<N>.json`; `reason` names the task and what it saw. If all of them say
-`the setup changed`, an earlier winner's patch conflicts with the setup's
-expectations. If they say a task failed on the first attempt, the tasks are
-stricter than the design phase measured — check `setup-check.json` and
-`git status` for edits made after the freeze.
+Read one `c<N>.json`. `verdict: failed` means a check failed: `reason` names the
+task and what it saw, `failClass` is `correctness`, and the attempt is kept. This
+is the ordinary case for a target whose candidates are often wrong, and the loop
+keeps going. `verdict: refused` means no score was produced: `failClass: harness`
+for a task that threw, or `stale_suite` for a setup that moved. If all of them say
+`stale_suite`, an earlier winner's patch conflicts with the setup's expectations.
+If they say a check failed on the first attempt, the tasks are stricter than the
+design phase measured — check `setup-check.json` and `git status` for edits made
+after the freeze.

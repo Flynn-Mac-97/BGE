@@ -200,8 +200,9 @@ export async function recordSetupCheck(runDirectory, check, setupPath) {
   const record = {
     name: setup.name,
     project: setup.project,
+    objective: setup.objective ?? null,
     weights: setup.weights ?? {},
-    tasks: setup.tasks.map(task => ({ id: task.id, question: task.question })),
+    tasks: setup.tasks.map(task => ({ id: task.id, question: task.question, holdout: task.holdout === true })),
     digest: digestOf({ name: setup.name, tasks: setup.tasks, weights: setup.weights ?? {} }),
     working: check.working ?? null,
     control: check.control ?? null

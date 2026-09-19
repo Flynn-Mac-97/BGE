@@ -103,15 +103,16 @@ const escape = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;')
  * Score against attempts.
  *
  * Every scored candidate is a point, the running best is a step line, and the
- * target as it stood is a dashed floor. A refused candidate is drawn hollow:
- * it was tried, it cost something, and it bought nothing.
+ * target as it stood is a dashed floor. A candidate that failed a check is drawn
+ * at its zero, hollow; a refused candidate is hollow at the baseline: it was
+ * tried, it cost something, and it bought nothing.
  */
 export function svgImprovement({ baseline, points, width = 900, height = 320 }) {
   const left = 70
   const right = 20
   const top = 24
   const bottom = 46
-  const values = [baseline, ...points.filter(point => point.scored).map(point => point.value)]
+  const values = [baseline, ...points.filter(point => point.scored).map(point => point.value), ...points.filter(point => point.failed).map(() => 0)]
   const highest = Math.max(...values)
   const lowest = Math.min(...values)
   const span = highest - lowest || 1
@@ -134,12 +135,16 @@ export function svgImprovement({ baseline, points, width = 900, height = 320 }) 
 
   const markers = points.map((point, index) => {
     const kept = point.scored && point.best === true
-    return `<circle cx="${x(index).toFixed(1)}" cy="${y(point.scored ? point.value : baseline).toFixed(1)}" r="${kept ? 5 : 3.5}" `
-      + `fill="${point.scored ? (kept ? '#1a7f37' : '#8a8a8a') : '#ffffff'}" stroke="${point.scored ? '#1a7f37' : '#c0392b'}" stroke-width="1.5">`
-      + `<title>${escape(point.id)}: ${point.scored ? `value ${number(point.value)}` : `refused — ${point.reason ?? 'no reason given'}`}</title></circle>`
+    const plotted = point.scored || point.failed ? point.value : baseline
+    const mark = kept ? '#1a7f37' : point.failed ? '#fff5e6' : point.scored ? '#8a8a8a' : '#ffffff'
+    const edge = point.scored ? '#1a7f37' : point.failed ? '#b06000' : '#c0392b'
+    const said = point.scored ? `value ${number(point.value)}` : point.failed ? `failed — ${point.reason ?? 'no reason given'}` : `refused — ${point.reason ?? 'no reason given'}`
+    return `<circle cx="${x(index).toFixed(1)}" cy="${y(plotted).toFixed(1)}" r="${kept ? 5 : 3.5}" `
+      + `fill="${mark}" stroke="${edge}" stroke-width="1.5">`
+      + `<title>${escape(point.id)}: ${said}</title></circle>`
   }).join('')
 
-  const footer = `baseline ${number(baseline)} · ${points.filter(point => point.scored).length} scored of ${points.length} attempts`
+  const footer = `baseline ${number(baseline)} · ${points.filter(point => point.scored).length} scored, ${points.filter(point => point.failed).length} failed, of ${points.length} attempts`
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="ui-monospace, monospace">`
     + `<rect width="${width}" height="${height}" fill="#ffffff"/>`
@@ -203,9 +208,12 @@ export function svgLineage({ baseline, nodes, width = 900, height = 420 }) {
   const drawn = nodes.map(node => {
     const where = placed.get(node.id)
     const kept = node.best === true
-    return `<g><circle cx="${where.x.toFixed(1)}" cy="${where.y.toFixed(1)}" r="${kept ? 7 : 5}" fill="${node.scored ? (kept ? '#1a7f37' : '#8a8a8a') : '#ffffff'}" stroke="${node.scored ? '#1a7f37' : '#c0392b'}" stroke-width="1.5">`
-      + `<title>${escape(node.id)}: ${node.scored ? `value ${number(node.value)}` : 'refused'}</title></circle>`
-      + `<text x="${(where.x + 10).toFixed(1)}" y="${(where.y + 4).toFixed(1)}" font-size="11" fill="#333">${escape(node.id)} ${node.scored ? number(node.value) : 'refused'}</text></g>`
+    const mark = node.scored ? (kept ? '#1a7f37' : '#8a8a8a') : node.failed ? '#fff5e6' : '#ffffff'
+    const edge = node.scored ? '#1a7f37' : node.failed ? '#b06000' : '#c0392b'
+    const said = node.scored ? `value ${number(node.value)}` : node.failed ? 'failed' : 'refused'
+    return `<g><circle cx="${where.x.toFixed(1)}" cy="${where.y.toFixed(1)}" r="${kept ? 7 : 5}" fill="${mark}" stroke="${edge}" stroke-width="1.5">`
+      + `<title>${escape(node.id)}: ${said}</title></circle>`
+      + `<text x="${(where.x + 10).toFixed(1)}" y="${(where.y + 4).toFixed(1)}" font-size="11" fill="#333">${escape(node.id)} ${node.scored ? number(node.value) : said}</text></g>`
   }).join('')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="ui-monospace, monospace">`
@@ -226,6 +234,7 @@ export function attemptsOf(run) {
         parent: candidate.parent ?? 'target',
         depth: candidate.depth ?? 0,
         scored: candidate.verdict === 'scored',
+        failed: candidate.verdict === 'failed',
         best: candidate.best === true,
         value: candidate.value ?? 0,
         reason: candidate.reason ?? null,
@@ -259,13 +268,17 @@ export function markdownReport(run) {
 
   lines.push('## What is measured')
   lines.push('')
-  lines.push('A candidate is scored by running every task headless with no model in the loop. All tasks must pass; then each measure is summed across tasks, multiplied by its weight, and subtracted from 1.')
+  lines.push('A candidate is scored by running every task headless with no model in the loop. A failed check scores zero and keeps the attempt; a refused candidate produced no score at all. Among passing candidates each measure is summed across tasks, multiplied by its weight, and subtracted from 1, so a negative weight is a quality term that raises the score.')
   lines.push('')
   lines.push('| task | asked |')
   lines.push('| --- | --- |')
-  for (const task of tasks) lines.push(`| \`${task.id}\` | ${task.question} |`)
+  for (const task of tasks) lines.push(`| \`${task.id}\`${task.holdout ? ' *(holdout)*' : ''} | ${task.question} |`)
   lines.push('')
-  lines.push(`Weights: ${weights.length ? weights.map(([measure, weight]) => `\`${weight}\` per ${measure}`).join(', ') : 'none'}.`)
+  if (run.check?.objective) {
+    lines.push(`Objective: ${run.check.objective}`)
+    lines.push('')
+  }
+  lines.push(`Weights: ${weights.length ? weights.map(([measure, weight]) => `\`${weight}\` per ${measure}${weight < 0 ? ' (quality gain)' : ''}`).join(', ') : 'none'}.`)
   lines.push('')
 
   if (run.check?.control) {
@@ -274,7 +287,7 @@ export function markdownReport(run) {
     lines.push(`The setup must fail a deliberately broken target, or it cannot tell an improvement from a regression. The break and its effect:`)
     lines.push('')
     lines.push(`- broke \`${run.check.control.why ?? 'the target'}\``)
-    lines.push(`- every task still passing would have refused this setup; the control scored ${number(run.check.control.value)} and was refused for: ${run.check.control.reason ?? '—'}`)
+    lines.push(`- every task still passing would have refused this setup; the control failed for: ${run.check.control.reason ?? '—'}`)
     lines.push('')
   }
 
@@ -301,7 +314,8 @@ export function markdownReport(run) {
   lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const attempt of attempts) {
     const measures = attempt.measures ? Object.entries(attempt.measures).map(([measure, amount]) => `${measure} ${number(amount)}`).join(' ') : '—'
-    lines.push(`| ${attempt.round} | \`${attempt.id}\` | ${attempt.parent} | ${number(attempt.value)} | ${measures} | ${attempt.tokens ?? 'none'} | ${formatRmb(attempt.cost.now)} | ${attempt.scored ? (attempt.best ? 'kept' : 'scored, not better') : `refused: ${attempt.reason ?? ''}`} |`)
+    const verdict = attempt.scored ? (attempt.best ? 'kept' : 'scored, not better') : attempt.failed ? `failed: ${attempt.reason ?? ''}` : `refused: ${attempt.reason ?? ''}`
+    lines.push(`| ${attempt.round} | \`${attempt.id}\` | ${attempt.parent} | ${number(attempt.value)} | ${measures} | ${attempt.tokens ?? 'none'} | ${formatRmb(attempt.cost.now)} | ${verdict} |`)
   }
   if (!attempts.length) lines.push('| — | no candidate has run | — | — | — | — | — |')
   lines.push('')

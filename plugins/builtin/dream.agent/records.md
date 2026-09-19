@@ -15,7 +15,7 @@ agent-runs/dream-<stamp>-<target>/
   winner.patch         the winning diff
   history.json         the run's whole state in one file: rounds, attempts, best, cost
   rounds/r0001/
-    c1.json            one candidate: verdict, measures, tokens, duration, report
+    c1.json            one candidate: verdict, evaluated, failClass, measures, tokens, duration, report
     c1.patch           what that candidate changed
     round.json         whether the round improved
 ```
@@ -60,14 +60,16 @@ stopped improving.
 ## Reading the pictures
 
 `graph.svg` — one point per attempt in the order they ran. A green filled point
-was kept; a grey point scored but did not beat the best so far; a hollow red
-point was refused, and its tooltip names the task that failed. The green step
-line is the running best, and the dashed red line is the target as it stood.
-Lower measured cost is a higher line.
+was kept; a grey point scored but did not beat the best so far; a hollow orange
+point failed a check and scored zero, so the attempt was kept and may be passed
+again; a hollow red point was refused, which means no score was produced. The
+tooltip names the task that failed. The green step line is the running best, and
+the dashed red line is the target as it stood. A higher line is a better value,
+whether the weights were costs to lower or a quality to raise.
 
 `tree.svg` — the lineage. Every candidate descends from the best version before
-it, so the edges are the run's actual history rather than a tidy story. A
-refused candidate is a leaf: the search went there and stopped going there.
+it, so the edges are the run's actual history rather than a tidy story. A refused
+candidate is a leaf: the search went there and stopped going there.
 
 ## Landing a winner
 

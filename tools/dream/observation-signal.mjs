@@ -11,7 +11,14 @@
  * about what it has revealed.
  */
 
-/** A failure class the paper's prompt says is normally repairable. */
+/**
+ * A failure class the paper's prompt says is normally repairable.
+ *
+ * `correctness` is what an engine run records when a check failed: the target
+ * ran and scored zero, which is a wrong answer rather than a dead branch.
+ * `harness`, `stale_suite` and `refused` are the classes that produced no score
+ * at all, and they are deliberately absent here.
+ */
 const REPAIRABLE = new Set(['output_mismatch', 'correctness', 'resource', 'variable', 'mask_layout', 'shape', 'compile_other'])
 
 /**

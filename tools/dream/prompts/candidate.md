@@ -44,15 +44,18 @@ improving anything, so it is refused rather than rewarded.
 
 {{MEASURES}}
 
+Objective: {{OBJECTIVE}}
+
 ## The record so far
 
 {{HISTORY}}
 
 ## How a candidate is scored
 
-Every task must pass. A candidate that breaks one task scores zero, whatever it
-saved. Among candidates that pass, the weighted measures are subtracted from 1,
-so lower measured cost is a higher score.
+A failed check scores zero, and the run keeps the attempt; it is not a crash, and
+you may repair it. Among candidates that pass, each weighted measure is
+subtracted from 1, so a positive weight is a cost and a negative weight is a
+quality gain: read the objective below to see which way the value moves.
 
 Improve the measured behavior first. Then reduce cost through a better route,
 index, algorithm, or structure. Deleting content can win only when the frozen
@@ -75,5 +78,5 @@ fix it or leave the target as you found it.
 
 ## Report
 
-Four lines at most: what you changed, why it lowers the measured cost, the value
-the scorer printed, and anything you tried that did not work.
+Four lines at most: what you changed, why it raises the value, the value the
+scorer printed, and anything you tried that did not work.

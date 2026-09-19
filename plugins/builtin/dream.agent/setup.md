@@ -6,15 +6,22 @@ One file, `<run>/setup.mjs`:
 export default {
   name: 'agent-connection',
   project: 'test/fixture-project',
+  objective: 'a higher value is a cheaper agent connection that still answers',
   weights: { processes: 0.02, characters: 0.00001 },
   control: { file: 'bin/engine.mjs', find: '<a line>', replace: '<a line that breaks it>', why: 'what stops working' },
-  tasks: [{ id: 'find-player', question: '<what an agent is asked>', async run({ checkout, project, helpers }) { ... } }]
+  tasks: [{ id: 'find-player', holdout: false, question: '<what an agent is asked>', async run({ checkout, project, helpers }) { ... } }]
 }
 ```
 
-`run` returns `{ pass, problem, measures }`. Every number in `measures` is summed
-across tasks, multiplied by its weight, and subtracted from 1. A weight is
-therefore the score that a whole run of that measure may cost.
+`run` returns `{ pass, problem, measures }`. `pass` says the candidate is
+correct; the numbers in `measures` say how good it is. Every number is summed
+across tasks, multiplied by its weight, and subtracted from 1. A positive weight
+is a cost, so it is the score a whole run of that measure may cost. A negative
+weight is a quality gain: the measure raises the value as it rises, so a target
+that maximizes a number uses a negative weight and `objective` says so in words.
+
+The baseline is the target as it stands, and `node tools/dream/scoring.mjs
+--setup <run>/setup.mjs` prints its value. A candidate must beat that number.
 
 ## The helpers
 
@@ -41,6 +48,10 @@ not a score.
 - Three to six tasks, each headless, no model, no dev server.
 - Every task passes on the target as it stands.
 - At least one task reports a measure, or the score cannot change.
+- At least one task is a holdout: different instances, paths or route, so a
+  candidate that only fits the discovery cases fails it.
+- A failed check scores zero and keeps the attempt. Only a thrown task, or a
+  setup whose digest moved, produces no score at all.
 - The control breaks the target by one literal replacement in one file, and at
   least one task then fails. `replaceOnce` refuses a string that appears twice,
   so the break is the one the setup named.

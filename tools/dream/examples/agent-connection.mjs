@@ -43,9 +43,10 @@ function route({ checkout, project, helpers }, steps) {
 }
 
 /** One task: how it is run, and what makes its answer right. */
-const task = (id, question, steps, check) => ({
+const task = (id, question, steps, check, options = {}) => ({
   id,
   question,
+  holdout: options.holdout === true,
   async run(context) {
     const result = route(context, steps)
     if (result.problem) return { pass: false, problem: result.problem, measures: result.measures }
@@ -57,6 +58,7 @@ const task = (id, question, steps, check) => ({
 export default {
   name: 'agent-connection',
   project: 'test/fixture-project',
+  objective: 'a higher value is a cheaper agent connection that still answers every job',
   weights: { processes: 0.02, characters: 0.00001 },
   tasks: [
     task(
@@ -137,7 +139,8 @@ export default {
           if (!ids.includes(wanted)) return `the command list has no ${wanted}`
         }
         return null
-      }
+      },
+      { holdout: true }
     )
   ]
 }
