@@ -466,16 +466,6 @@ export function makeWorld(bus) {
   const beforeYaw = []
 
   /**
-   * Those arrays as one object, so a caller walking the entity list can
-   * interpolate in its own loop.
-   *
-   * `drawnPlaceAt` answers one entity at a time, which is a call per entity on a
-   * frame where every entity moved. Handing the arrays over lets the renderer
-   * read the same numbers inline.
-   */
-  const beforePlaces = { entity: beforeEntities, x: beforeX, y: beforeY, z: beforeZ, yaw: beforeYaw }
-
-  /**
    * Write the place between two steps into `target` rather than a new object.
    *
    * A body with no earlier place, or a blend of one, is drawn where it is.
@@ -555,16 +545,6 @@ export function makeWorld(bus) {
     drawnPlaceInto(target, entity, blend = 1) {
       return drawnPlaceInto(target, entity, blend)
     },
-
-    /**
-     * Where every body was before the last step, by position in `entities`.
-     *
-     * A caller walking the list in order reads them inline instead of paying a
-     * call and a `WeakMap` probe per entity. Entries are only valid for the
-     * entity `entity[index]` still stands for, which is why the entity list is
-     * carried beside the numbers.
-     */
-    beforePlaces,
 
     /**
      * The interpolated place for the body at one position in the entity list.

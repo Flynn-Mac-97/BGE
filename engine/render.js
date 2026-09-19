@@ -1109,22 +1109,8 @@ export async function makeRenderer(canvas, view, viewport) {
    */
   let drawnKeylineColour
 
-  /**
-   * The default outline width the drawn outlines were built with.
-   *
-   * Only an entity that declares none reads it, so a change to it has to reach
-   * those outlines the same way a changed colour does.
-   */
-  let drawnDefaultKeyline = -1
-
-  /**
-   * Whether every quiet slot still stands for the entity the last full pass drew.
-   *
-   * A playing frame draws most entities without rewriting their slot, so the
-   * first still frame after one full-passes them all rather than trust a place
-   * the slot recorded before they moved.
-   */
-  let quietSlotsValid = false
+  /** The default keyline width the drawn outlines were built with. */
+  let drawnKeylineWidth
 
   /** Set when a sync builds an object for an id that had none. */
   let objectsGrew = false
@@ -1133,78 +1119,45 @@ export async function makeRenderer(canvas, view, viewport) {
   function recordFor(entity) {
     let record = records.get(entity)
     if (record) return record
-    // Fields are written in the order the moving frame reads them. A record is
-    // about fifty slots, so where they sit is a cache question, and a playing
-    // frame touches one of these per entity in the level.
     record = {
-      // The guard: identity, then the declaration the cached answers were
-      // measured from.
       object: null,
-      entity: null,
-      plain: false,
-      drawnLook: null,
-      planMesh: undefined,
-      planType: undefined,
-      planCollider: undefined,
-      turnRotation: undefined,
-      turnYaw: undefined,
-      privateMaterial: false,
-      moved: false,
-      declaresKeyline: false,
-      declaresRing: false,
-      // The stillness signature, compared as three numbers rather than a string.
-      sigX: 0, sigY: 0, sigZ: 0,
-      // The anchor as a fraction of draw scale, so a changed scale does not
-      // rebuild a number the declaration already fixed.
-      anchorUnit: 0,
-      // What the object was last drawn with, so an unchanged turn and scale are
-      // not written again.
-      appliedScale: NaN, appliedTurnY: NaN,
-      // The three angles of the cached turn, as numbers, so the fast path reads
-      // one field rather than an object built for the full pass.
-      turnX: 0, turnY: 0, turnZ: 0,
-      // The contact shadow's constants, in the declaration's own units, so the
-      // moving fast path does not read the declaration and the shape again for
-      // every entity in the frame.
-      shadowAsked: undefined,
-      shadowStrengthBase: undefined,
-      shadowAcross: 0,
-      shadowHalf: 0,
-      // The radius and strength the last shadow was drawn with, and the height
-      // and scale they were measured at. A body that only moves sideways keeps
-      // both, and the fast path writes four numbers instead of a square root.
-      shadowCachedY: NaN,
-      shadowCachedScale: NaN,
-      shadowCachedAsked: undefined,
-      shadowDrawn: false,
-      shadowRadius: 0,
-      shadowStrengthValue: 0,
       // True once the merge decision is final for the current look, so a frame
       // that changes nothing can skip the entity entirely.
       settled: false,
+      moved: false,
+      simple: false,
+      idle: false,
       keyline: false,
       haveSignature: false,
       frames: 0,
-      simple: false,
-      idle: false,
-      mergeable: false,
+      sigX: 0, sigY: 0, sigZ: 0,
       sigScale: 1, sigTurnX: 0, sigTurnY: 0, sigTurnZ: 0, sigLook: null,
-      turn: null,
-      turnObject: null, appliedTurnX: NaN, appliedTurnZ: NaN,
+      turn: null, turnRotation: undefined, turnYaw: undefined,
+      turnObject: null, appliedTurnX: NaN, appliedTurnY: NaN, appliedTurnZ: NaN,
       // The plan and the declaration it was measured from, so the per-entity
       // lookup is four identity compares rather than a map keyed by a string.
-      plan: null, planSprite: undefined,
-      // Answers the full pass already gave and the moving frame does not read
-      // every time: the declaration and shape the marks were measured from.
-      declared: null,
-      shape: null,
+      plan: null, planMesh: undefined, planSprite: undefined,
+      planType: undefined, planCollider: undefined,
+      // The look string the object was built with, so a frame that changed
+      // nothing compares one record field instead of reaching into `userData`.
+      drawnLook: null,
       // The keyline already hanging off this entity's object, and the width and
       // colour it was built with. Read here rather than off `userData`, whose
       // shape grows a new property for every feature this file gains.
-      keylineMesh: null, keylineWidth: -1, keylineColour: null,
+      keylineMesh: null, keylineWidth: -1, keylineColour: null, keylineReady: false,
       // The batch this entity is in, or null. Mirrors `userData.batch` so the
       // moving path does not have to reach into the object to find out.
-      batchKey: null
+      batchKey: null,
+      // The declaration, drawn shape and feet-anchor height the last full pass
+      // used, so a moving entity that changed nothing else can be placed and
+      // shadowed without measuring any of them again.
+      declared: null, shape: null, anchor: 0,
+      // True when this entity is a simple mesh, out of every batch, whose only
+      // per-frame input is its position. `scanMoving` then answers it.
+      steady: false,
+      // The entity this record answered for last, so the position-indexed array
+      // can tell a stable list from a reordered one.
+      entity: null
     }
     records.set(entity, record)
     return record
@@ -1266,11 +1219,6 @@ export async function makeRenderer(canvas, view, viewport) {
         && record.turnRotation === entity.rotation && record.turnYaw === entity.yaw) return record.turn
     const turn = turnRadians(entity)
     record.turn = turn
-    // The same three angles as numbers, so a playing frame can read them off the
-    // record without touching the object the full pass builds.
-    record.turnX = turn.x
-    record.turnY = turn.y
-    record.turnZ = turn.z
     record.turnRotation = entity.rotation
     record.turnYaw = entity.yaw
     return turn
@@ -1294,7 +1242,7 @@ export async function makeRenderer(canvas, view, viewport) {
    * the authority for slow-path state; this only answers "is this still the
    * entity the last pass drew".
    */
-  const SLOT_STRIDE = 13
+  const SLOT_STRIDE = 16
   const SLOT_OBJECT = 1
   const SLOT_MESH = 2
   const SLOT_COLLIDER = 3
@@ -1307,11 +1255,38 @@ export async function makeRenderer(canvas, view, viewport) {
   const SLOT_HIDDEN = 10
   const SLOT_OPACITY = 11
   const SLOT_FLAGS = 12
-  /** What the quiet test needs set, and the one thing it reports. */
+  // What the moving scan needs to place an entity and its contact shadow,
+  // copied here so that scan never touches the entity's record: the record is a
+  // second heap object per entity and a cache miss the flat array does not pay.
+  const SLOT_ANCHOR = 13
+  const SLOT_DECLARED = 14
+  const SLOT_SHAPE = 15
+  /** What the quiet test needs set, and the marks the scan reports. */
   const SLOT_QUIET = 1
   const SLOT_KEYLINE = 2
+  const SLOT_STEADY = 4
 
   const snapshot = []
+
+  /**
+   * The place the last frame drew each entity at, as plain doubles.
+   *
+   * The snapshot above holds objects and numbers in one array, so a fractional
+   * position written into it is a heap number — one allocation per entity per
+   * frame, which a playing frame then pays to collect. A typed array stores the
+   * place unboxed, and the place is the only number a moving frame rewrites on
+   * every entity.
+   */
+  const DRAWN_STRIDE = 3
+  let drawnPlaces = new Float64Array(0)
+
+  /** Room for one drawn place per entity, keeping what is already there. */
+  function growDrawnPlaces(length) {
+    if (drawnPlaces.length >= length * DRAWN_STRIDE) return
+    const next = new Float64Array(length * DRAWN_STRIDE)
+    next.set(drawnPlaces)
+    drawnPlaces = next
+  }
 
   /** Forget slots past the end of the entity list, so a removed entity is not held. */
   function trimSlots(length) {
@@ -1340,11 +1315,21 @@ export async function makeRenderer(canvas, view, viewport) {
     snapshot[at + SLOT_YAW] = entity.yaw
     snapshot[at + SLOT_HIDDEN] = entity.hidden
     snapshot[at + SLOT_OPACITY] = entity.opacity
+    snapshot[at + SLOT_ANCHOR] = record.anchor
+    snapshot[at + SLOT_DECLARED] = record.declared
+    snapshot[at + SLOT_SHAPE] = record.shape
+    const drawn = index * DRAWN_STRIDE
+    drawnPlaces[drawn] = entity.x
+    drawnPlaces[drawn + 1] = entity.y
+    drawnPlaces[drawn + 2] = entity.z
     // Settled, idle and never moved: the answers that let the next frame skip
-    // this entity, and whether it draws an outline while skipped.
+    // this entity, and whether it draws an outline while skipped. Steady is the
+    // moving counterpart: a simple mesh, out of every batch, whose outline is
+    // already resolved, so a frame that only moved it needs to write a place.
     snapshot[at + SLOT_FLAGS] =
       (record.settled && record.idle && !record.moved ? SLOT_QUIET : 0)
       | (record.keyline ? SLOT_KEYLINE : 0)
+      | (record.steady ? SLOT_STEADY : 0)
   }
 
   /** The entities the quiet scan could not answer, filled by `scanQuiet`. */
@@ -1391,6 +1376,58 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /**
+   * The per-entity cost of a playing frame, in a function of its own.
+   *
+   * A playing frame moves every entity and draws it between its last two steps,
+   * so the quiet scan cannot answer it. Almost every one of those entities is
+   * the same thing it was last frame except for its place: same declaration,
+   * same turn, same scale, same outline. This scan writes the interpolated
+   * place and the contact shadow that follows it, and leaves everything else
+   * exactly as the last full pass left it. Whatever it cannot answer goes to
+   * the full pass through `dirtyIndices`.
+   */
+  function scanMoving(entities, blend, drawAt, ringedId) {
+    dirtyIndices.length = 0
+    let keylines = 0
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i]
+      const at = i * SLOT_STRIDE
+      const drawn = i * DRAWN_STRIDE
+      const flags = snapshot[at + SLOT_FLAGS]
+      if (snapshot[at] === entity
+          && (flags & SLOT_STEADY) !== 0
+          && typeof entity.rotation !== 'object'
+          && snapshot[at + SLOT_MESH] === entity.mesh
+          && snapshot[at + SLOT_COLLIDER] === entity.collider
+          && snapshot[at + SLOT_TYPE] === entity.type
+          && (drawnPlaces[drawn] !== entity.x
+            || drawnPlaces[drawn + 1] !== entity.y
+            || drawnPlaces[drawn + 2] !== entity.z)
+          && snapshot[at + SLOT_SCALE] === entity.scale
+          && snapshot[at + SLOT_YAW] === entity.yaw
+          && snapshot[at + SLOT_HIDDEN] === entity.hidden
+          && snapshot[at + SLOT_OPACITY] === entity.opacity
+          && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))) {
+        const place = drawAt(drawnPlaceScratch, i, entity, blend)
+        const object = snapshot[at + SLOT_OBJECT]
+        object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
+        // The keyline hangs off the object and moves with it, so only the
+        // ground mark has to be written again.
+        if (!entity.hidden) {
+          noteContactShadow(entity, snapshot[at + SLOT_DECLARED], snapshot[at + SLOT_SHAPE], true, place)
+        }
+        drawnPlaces[drawn] = entity.x
+        drawnPlaces[drawn + 1] = entity.y
+        drawnPlaces[drawn + 2] = entity.z
+        if (flags & SLOT_KEYLINE) keylines++
+        continue
+      }
+      dirtyIndices.push(i)
+    }
+    return keylines
+  }
+
+  /**
    * Draw one entity the quiet scan could not answer: it moved, or its look
    * changed, so every field is read and written.
    *
@@ -1412,11 +1449,14 @@ export async function makeRenderer(canvas, view, viewport) {
       : entity
     const declared = entity.mesh ? meshOf(entity) : null
     const anchor = declared?.anchor == null ? 0 : anchorOffset(entity)
+    record.declared = declared
+    record.anchor = anchor
     object.position.set(place.x, place.y + anchor, place.z || 0)
     object.visible = !entity.hidden
 
     if (entity.mesh) {
       const shape = plan.shape
+      record.shape = shape
       // Solid geometry carries its own size, so scale multiplies rather
       // than sets.
       const s = totalScale(entity)
@@ -1439,7 +1479,6 @@ export async function makeRenderer(canvas, view, viewport) {
       // The editor dims a hovered entity to preview it.
       const opacity = entity.opacity ?? 1
       dim(object, opacity)
-      record.privateMaterial = object.userData.privateMaterial === true
       // A named part of a body built from boxes poses exactly as a named
       // node of a model does, so a run cycle is the same four numbers
       // either way and game code never asks which the body is made of.
@@ -1452,30 +1491,22 @@ export async function makeRenderer(canvas, view, viewport) {
       object.renderOrder = 0
       record.simple = !declared.model && !Array.isArray(declared.parts)
       record.idle = record.simple && declared.shadow === undefined && declared.ring === undefined
-      // What the moving fast path draws from, kept where the full pass already
-      // measured it rather than re-derived for every entity on every frame.
-      record.plain = record.simple
-      record.declared = declared
-      record.shape = shape
-      record.shadowAsked = declared.shadow
-      record.shadowStrengthBase = declared.shadowStrength
-      record.shadowAcross = Math.max(shape.w, shape.d)
-      record.shadowHalf = shape.h
-      // The declaration decided the shadow's base radius again, so the cached
-      // one is a different shape's answer.
-      record.shadowCachedAsked = undefined
-      record.declaresKeyline = declared.keyline !== undefined
-      record.declaresRing = declared.ring !== undefined
-      record.anchorUnit = s === 0 ? 0 : anchor / s
       considerForMerging(entity, object, described, opacity, !record.simple, turn, record)
       // After merging, which is where "has this ever moved" is answered.
       record.keyline = updateReadability(entity, object, declared, shape, record.moved, place, record)
+      // What `scanMoving` reads next frame to place this entity without
+      // measuring it again. Only a simple mesh that is in no batch and whose
+      // outline is already drawn can be answered that cheaply — a ring or a
+      // pose is a mark or a transform this scan does not write.
+      record.steady = record.simple && record.batchKey === null && record.keylineReady
+        && declared.ring === undefined && entity.pose === undefined
       saveSlot(i, entity, object, record)
       return record.keyline ? 1 : 0
     }
 
     record.simple = false
     record.idle = false
+    record.steady = false
     const { w, h } = drawSize(entity)
     object.rotation.set(0, 0, spinRadians(entity))
     object.scale.set(w, h, 1)
@@ -1519,173 +1550,6 @@ export async function makeRenderer(canvas, view, viewport) {
     for (let c = 0; c < count; c++) {
       const i = indices === null ? c : indices[c]
       keylines += syncEntity(i, entities[i], frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters)
-    }
-    return keylines
-  }
-
-  /**
-   * Draw a frame that is playing — every entity between its last two steps.
-   *
-   * A playing frame changes only the place. The declaration, the object, the
-   * material, the outline and the contact shadow are answers the full pass gave
-   * and nothing has changed, so an entity whose declaration still holds, which
-   * is not dimmed, hidden or a model, and which moved since the last frame is
-   * drawn from the record instead of being re-derived.
-   *
-   * The body of that path is written out here rather than called as a function
-   * per entity. Three calls per entity at fifty thousand entities is most of the
-   * frame, and a callee this deep in a loop was the one place V8 kept
-   * deoptimizing. Everything the fast path needs is read into a local first, so
-   * the loop touches the record, the entity and the object and nothing else.
-   *
-   * Everything the fast path cannot answer goes through the full pass, which is
-   * what keeps a changed type, a model, a sprite and a body still waiting to
-   * merge correct.
-   *
-   * Returns how many entities drew an outline.
-   */
-  function syncPlaying(entities, frame, sweep, blend, before, drawAt, drawInto, drawPlace, ringPossible) {
-    let keylines = 0
-    // Read once: `sync` runs to the end without yielding, so nothing can change
-    // them under the loop, and a read per entity per frame is not free.
-    const shadowDefault = readability.shadow
-    const shadowGround = readability.groundY
-    const shadowRange = readability.shadowRange
-    const shadowStrengthDefault = readability.shadowStrength
-    const shadowX = shadowPlaces.x
-    const shadowZ = shadowPlaces.z
-    const shadowRadius = shadowPlaces.radius
-    const shadowStrength = shadowPlaces.strength
-
-    for (let index = 0; index < entities.length; index++) {
-      const entity = entities[index]
-      // The record for this position, or the one this entity already has. A
-      // reorder, a spawn or a removal falls back to the WeakMap.
-      let record = recordByIndex[index]
-      if (record === undefined || record.entity !== entity) {
-        record = recordFor(entity)
-        record.entity = entity
-        recordByIndex[index] = record
-      }
-
-      const object = record.object
-      if (object === null
-          || !record.plain
-          || record.planMesh !== entity.mesh
-          || record.planType !== entity.type
-          || record.planCollider !== entity.collider
-          // A declared turn that is a list can be edited in place, so its angles
-          // are re-measured every frame rather than cached.
-          || typeof entity.rotation === 'object'
-          || record.turnRotation !== entity.rotation
-          || record.turnYaw !== entity.yaw
-          || (entity.opacity ?? 1) < 1
-          || entity.hidden
-          || record.privateMaterial
-          || (!record.moved && !record.declaresKeyline)
-          || (entity.x === record.sigX && entity.y === record.sigY && entity.z === record.sigZ)) {
-        keylines += syncEntity(index, entity, frame, sweep, blend, false, drawAt, drawInto, drawPlace)
-        continue
-      }
-      if (sweep) object.userData.seen = frame
-
-      // The place between the last two steps, into the one shared scratch. The
-      // arrays are the world's own, read in the order it walks the list, so this
-      // is one load each rather than a call per entity.
-      let place
-      if (before !== null && before.entity[index] === entity) {
-        const wasX = before.x[index]
-        const wasY = before.y[index]
-        const wasZ = before.z[index]
-        const z = entity.z || 0
-        drawnPlaceScratch.x = wasX + (entity.x - wasX) * blend
-        drawnPlaceScratch.y = wasY + (entity.y - wasY) * blend
-        drawnPlaceScratch.z = wasZ + (z - wasZ) * blend
-        const wasYaw = before.yaw[index]
-        // The short way round, so a body turning past half a circle does not
-        // spin the long way for one frame.
-        drawnPlaceScratch.yaw = Number.isFinite(wasYaw) && Number.isFinite(entity.yaw)
-          ? wasYaw + Math.atan2(Math.sin(entity.yaw - wasYaw), Math.cos(entity.yaw - wasYaw)) * blend
-          : entity.yaw
-        place = drawnPlaceScratch
-      } else {
-        place = drawAt ? drawAt(drawnPlaceScratch, index, entity, blend)
-          : drawInto ? drawInto(drawnPlaceScratch, entity, blend)
-          : drawPlace ? drawPlace(entity, blend)
-          : entity
-      }
-
-      const scale = entity.scale ?? 1
-      // Written field by field rather than through `Vector3.set`: this is the one
-      // statement every moving entity in the frame runs, and the method call costs
-      // more than the three stores it makes.
-      const position = object.position
-      position.x = place.x
-      position.y = place.y + record.anchorUnit * scale
-      position.z = place.z || 0
-      if (record.appliedScale !== scale) {
-        object.scale.set(scale, scale, scale)
-        record.appliedScale = scale
-      }
-      const yaw = Number.isFinite(place.yaw) ? place.yaw : record.turnY
-      if (record.appliedTurnY !== yaw) {
-        object.rotation.set(record.turnX, yaw, record.turnZ, 'YXZ')
-        record.appliedTurnX = record.turnX
-        record.appliedTurnY = yaw
-        record.appliedTurnZ = record.turnZ
-      }
-
-      // The same answer `considerForMerging` gives a moved entity, without the
-      // look string it compares: the declaration has not changed, so the look
-      // has not either. Only the place is written back, because a later still
-      // frame compares the place to decide the body has settled, and a turn or a
-      // scale that moved and moved back leaves it at the same place either way.
-      if (record.batchKey !== null) leaveBatch(entity.id, record)
-      if (!record.moved) {
-        if (record.haveSignature) record.moved = true
-        record.haveSignature = true
-        record.frames = 0
-        record.settled = !record.mergeable
-      }
-      record.sigX = entity.x
-      record.sigY = entity.y
-      record.sigZ = entity.z || 0
-
-      // The contact shadow, written where it is measured. This is the same
-      // answer `noteContactShadow` gives, with the declaration's half read off
-      // the record and the height and scale an unchanged body keeps.
-      const asked = record.shadowAsked === undefined ? (record.moved && shadowDefault) : record.shadowAsked
-      if (asked) {
-        if (record.shadowCachedAsked !== asked || record.shadowCachedY !== entity.y
-            || record.shadowCachedScale !== scale) {
-          const stated = typeof asked === 'number' ? asked : record.shadowAcross * scale * 0.55
-          record.shadowCachedAsked = asked
-          record.shadowCachedY = entity.y
-          record.shadowCachedScale = scale
-          if (stated > 0) {
-            const lift = Math.min(1, Math.max(0, (entity.y - record.shadowHalf * scale / 2 - shadowGround) / shadowRange))
-            // (1 - lift) ** 1.5 as its own square root: the power operator calls
-            // into the maths library, and the square root is one instruction for
-            // the same curve.
-            const rest = 1 - lift
-            record.shadowDrawn = true
-            record.shadowRadius = stated * (1 + lift * 0.7)
-            record.shadowStrengthValue = (record.shadowStrengthBase ?? shadowStrengthDefault) * rest * Math.sqrt(rest)
-          } else {
-            record.shadowDrawn = false
-          }
-        }
-        if (record.shadowDrawn) {
-          const at = shadowPlaces.count++
-          shadowX[at] = place.x
-          shadowZ[at] = place.z || 0
-          shadowRadius[at] = record.shadowRadius
-          shadowStrength[at] = record.shadowStrengthValue
-        }
-      }
-      if (record.declaresRing || ringPossible) noteGroundRing(entity, record.declared, record.shape, place)
-
-      if (record.keyline) keylines++
     }
     return keylines
   }
@@ -1995,7 +1859,6 @@ export async function makeRenderer(canvas, view, viewport) {
         record.drawnLook = described.look
         object.userData.record = record
         record.keylineMesh = object.userData.keylineMesh ?? null
-        record.privateMaterial = object.userData.privateMaterial === true
         return object
       }
       // Changing a texture — or a box size — in the inspector has to show up
@@ -2012,7 +1875,6 @@ export async function makeRenderer(canvas, view, viewport) {
     record.object = object
     record.drawnLook = described.look
     object.userData.record = record
-    record.privateMaterial = object.userData.privateMaterial === true
     // The new object carries no keyline yet, whatever the old one had.
     record.keylineMesh = null
     record.keylineWidth = -1
@@ -2204,7 +2066,7 @@ export async function makeRenderer(canvas, view, viewport) {
     // is kept on the record. Reading it off `userData` meant a property whose
     // shape grows with every feature this file gains, once per entity per frame.
     if (record.keylineWidth === width && record.keylineColour === colour
-        && (width <= 0 || record.keylineMesh !== null)) return
+        && (width <= 0 || record.keylineMesh !== null)) { record.keylineReady = true; return }
 
     const drawn = record.keylineMesh ?? object.userData.keylineMesh
     if (width <= 0) {
@@ -2212,6 +2074,7 @@ export async function makeRenderer(canvas, view, viewport) {
       record.keylineMesh = null
       record.keylineWidth = 0
       record.keylineColour = colour
+      record.keylineReady = true
       object.userData.keylineMesh = null
       return
     }
@@ -2220,7 +2083,7 @@ export async function makeRenderer(canvas, view, viewport) {
     const geometry = hullFor(entity, object, declared, shape)
     // A model still loading. The next frame builds it, and there is no state
     // to keep.
-    if (!geometry) return
+    if (!geometry) { record.keylineReady = false; return }
 
     const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour, shape?.kind === 'quad'))
     // Read by hullGeometry, and by the batcher deciding what to hide.
@@ -2232,6 +2095,7 @@ export async function makeRenderer(canvas, view, viewport) {
     record.keylineMesh = hull
     record.keylineWidth = width
     record.keylineColour = colour
+    record.keylineReady = true
   }
 
   /**
@@ -2255,7 +2119,26 @@ export async function makeRenderer(canvas, view, viewport) {
     return { count: 0, x: [], z: [], radius: [], colour: [], strength: [] }
   }
 
-  const shadowPlaces = placeList()
+  /**
+   * One frame's contact shadows, as one typed array: x, z, radius, strength.
+   *
+   * A plain array stores a fractional double as a heap number, and the four
+   * parallel arrays a shadow used to write spread one entity across four cache
+   * streams. One `Float64Array` with a stride keeps a shadow's four numbers in
+   * the same cache line and allocates nothing once the room has grown.
+   */
+  const SHADOW_STRIDE = 4
+  let shadowData = new Float64Array(0)
+  let shadowCount = 0
+
+  /** Room for one shadow per entity, keeping what is already there. */
+  function growShadowData(length) {
+    if (shadowData.length >= length * SHADOW_STRIDE) return
+    const next = new Float64Array(length * SHADOW_STRIDE)
+    next.set(shadowData)
+    shadowData = next
+  }
+
   let contactShadows = null
   let contactStrengths = null
 
@@ -2287,6 +2170,7 @@ export async function makeRenderer(canvas, view, viewport) {
     contactStrengths = new THREE.InstancedBufferAttribute(new Float32Array(room), 1)
     SHADOW_QUAD.setAttribute('contactStrength', contactStrengths)
     contactShadows = new THREE.InstancedMesh(SHADOW_QUAD, contactShadowMaterial(), room)
+    seedInstanceMatrices(contactShadows)
     // The matrices are rewritten every frame, so a bounding sphere computed
     // from them is a frame out of date and would cull live shadows.
     contactShadows.frustumCulled = false
@@ -2298,42 +2182,26 @@ export async function makeRenderer(canvas, view, viewport) {
    * Note where one entity's shadow goes, and how hard it presses.
    *
    * It tightens and darkens as the thing nears the ground, which is what says
-   * a bird is flying and a rat is walking. The declaration's half of the answer
-   * is read off the record, because a moving frame asks this for every entity
-   * and the declaration and the shape have not changed.
+   * a bird is flying and a rat is walking.
    */
-  function noteContactShadow(entity, record, moved, place) {
-    const asked = record.shadowAsked === undefined ? (moved && readability.shadow) : record.shadowAsked
-    if (!asked) return
+  function noteContactShadow(entity, declared, shape, moved, place) {
+    const asked = declared.shadow ?? (moved && readability.shadow)
+    if (!asked || !shape) return
     const scale = entity.scale ?? 1
-    // The radius and the strength only follow the height and the scale. A body
-    // that moves sideways keeps both, so a playing frame writes them back
-    // instead of a division and a square root for every one of fifty thousand.
-    if (record.shadowCachedAsked !== asked || record.shadowCachedY !== entity.y
-        || record.shadowCachedScale !== scale) {
-      const stated = typeof asked === 'number' ? asked : record.shadowAcross * scale * 0.55
-      record.shadowCachedAsked = asked
-      record.shadowCachedY = entity.y
-      record.shadowCachedScale = scale
-      if (!(stated > 0)) {
-        record.shadowDrawn = false
-      } else {
-        const lift = Math.min(1, Math.max(0, (entity.y - record.shadowHalf * scale / 2 - readability.groundY) / readability.shadowRange))
-        // (1 - lift) ** 1.5 as its own square root: the power operator calls into
-        // the maths library, and the square root is one instruction for the same curve.
-        const rest = 1 - lift
-        record.shadowDrawn = true
-        record.shadowRadius = stated * (1 + lift * 0.7)
-        record.shadowStrengthValue = (record.shadowStrengthBase ?? readability.shadowStrength) * rest * Math.sqrt(rest)
-      }
-    }
-    if (!record.shadowDrawn) return
+    const across = Math.max(shape.w, shape.d) * scale
+    const stated = typeof asked === 'number' ? asked : across * 0.55
+    if (!(stated > 0)) return
 
-    const at = shadowPlaces.count++
-    shadowPlaces.x[at] = place.x
-    shadowPlaces.z[at] = place.z || 0
-    shadowPlaces.radius[at] = record.shadowRadius
-    shadowPlaces.strength[at] = record.shadowStrengthValue
+    const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - readability.groundY) / readability.shadowRange))
+    const at = shadowCount++ * SHADOW_STRIDE
+    shadowData[at] = place.x
+    shadowData[at + 1] = place.z || 0
+    shadowData[at + 2] = stated * (1 + lift * 0.7)
+    // `(1 - lift) ** 1.5` is a `Math.pow` call per entity per frame. The
+    // exponent is constant and the base is never negative, so the square root
+    // is the same number for a hardware instruction.
+    const fade = 1 - lift
+    shadowData[at + 3] = (declared.shadowStrength ?? readability.shadowStrength) * fade * Math.sqrt(fade)
   }
 
   /**
@@ -2354,7 +2222,7 @@ export async function makeRenderer(canvas, view, viewport) {
 
     updateKeyline(entity, object, declared, shape, moved, record)
     if (!entity.hidden) {
-      noteContactShadow(entity, record, moved, place)
+      noteContactShadow(entity, declared, shape, moved, place)
       noteGroundRing(entity, declared, shape, place)
     }
     return record.keylineMesh !== null
@@ -2373,6 +2241,8 @@ export async function makeRenderer(canvas, view, viewport) {
    * The instance matrix is written element by element. `Matrix4.makeScale` and
    * `setPosition` build one matrix and `setMatrixAt` copies it, which is three
    * calls and a copy per mark where the mark is only a scale and a translation.
+   * Only the five entries a mark can change are written; the rest are seeded
+   * once, when the room is built, by `seedInstanceMatrices`.
    */
   function placeMarks(places, { meshOf, height, grow, write, attributesOf = () => [] }) {
     if (!places.count) {
@@ -2390,21 +2260,10 @@ export async function makeRenderer(canvas, view, viewport) {
       const at = i * 16
       const wide = places.radius[i] * 2
       array[at] = wide
-      array[at + 1] = 0
-      array[at + 2] = 0
-      array[at + 3] = 0
-      array[at + 4] = 0
-      array[at + 5] = 1
-      array[at + 6] = 0
-      array[at + 7] = 0
-      array[at + 8] = 0
-      array[at + 9] = 0
       array[at + 10] = wide
-      array[at + 11] = 0
       array[at + 12] = places.x[i]
       array[at + 13] = height
       array[at + 14] = places.z[i]
-      array[at + 15] = 1
       if (write) write(places, i)
     }
     mesh.count = places.count
@@ -2412,16 +2271,53 @@ export async function makeRenderer(canvas, view, viewport) {
     for (const attribute of attributesOf()) attribute.needsUpdate = true
   }
 
-  /** Write the frame's shadows into the instanced mesh. Called once per sync. */
+  /**
+   * Seed the constant entries of an instanced quad's matrices, once per room.
+   *
+   * A floor mark is an axis-aligned scale and a translation, so of the sixteen
+   * entries nine are always zero and two are always one. Writing the two ones
+   * when the room is built leaves five to rewrite per mark per frame instead of
+   * sixteen.
+   */
+  function seedInstanceMatrices(mesh) {
+    const array = mesh.instanceMatrix.array
+    for (let at = 5; at < array.length; at += 16) {
+      array[at] = 1
+      array[at + 10] = 1
+    }
+  }
+
+  /**
+   * Write the frame's shadows into the instanced mesh. Called once per sync.
+   *
+   * A shadow is a translation, a scale and one strength, so the instance matrix
+   * is written entry by entry: `makeScale` and `setPosition` would build a whole
+   * matrix per shadow to copy five numbers out of it.
+   */
   function placeContactShadows() {
-    placeMarks(shadowPlaces, {
-      meshOf: () => contactShadows,
-      // Just clear of the floor, or the two surfaces fight for the same pixels.
-      height: readability.groundY + 0.015,
-      grow: growContactShadows,
-      attributesOf: () => [contactStrengths],
-      write: (places, i) => contactStrengths.setX(i, places.strength[i])
-    })
+    if (!shadowCount) {
+      if (contactShadows) contactShadows.count = 0
+      return
+    }
+    growContactShadows(shadowCount)
+    const matrix = contactShadows.instanceMatrix.array
+    const strengths = contactStrengths.array
+    // Just clear of the floor, or the two surfaces fight for the same pixels.
+    const height = readability.groundY + 0.015
+    for (let i = 0; i < shadowCount; i++) {
+      const at = i * SHADOW_STRIDE
+      const base = i * 16
+      const wide = shadowData[at + 2] * 2
+      matrix[base] = wide
+      matrix[base + 10] = wide
+      matrix[base + 12] = shadowData[at]
+      matrix[base + 13] = height
+      matrix[base + 14] = shadowData[at + 1]
+      strengths[i] = shadowData[at + 3]
+    }
+    contactShadows.count = shadowCount
+    contactShadows.instanceMatrix.needsUpdate = true
+    contactStrengths.needsUpdate = true
   }
 
   /**
@@ -2478,6 +2374,7 @@ export async function makeRenderer(canvas, view, viewport) {
     RING_QUAD.setAttribute('ringTint', ringTints)
     RING_QUAD.setAttribute('ringStrength', ringStrengths)
     groundRings = new THREE.InstancedMesh(RING_QUAD, groundRingMaterial(), room)
+    seedInstanceMatrices(groundRings)
     // Rewritten every frame, so a bounding sphere from them is a frame old.
     groundRings.frustumCulled = false
     // After the contact shadow, which is the other transparent thing on the
@@ -2650,9 +2547,6 @@ export async function makeRenderer(canvas, view, viewport) {
     // entity draws on a layer the camera ignores — the outline would go with it.
     const canMerge = !isModel && opacity >= 1 && !entity.hidden
       && !(described.keyline > 0)
-    // The half of that answer the declaration fixes, so a moving entity's
-    // settled flag does not re-read the mark and the shape every frame.
-    record.mergeable = !isModel && !(described.keyline > 0)
 
     // The stillness signature, compared as numbers instead of assembled into a
     // string and compared back. The look is one shared string while the
@@ -3056,7 +2950,7 @@ export async function makeRenderer(canvas, view, viewport) {
     sync(world, blend = 1) {
       const painters = flat()
       const frame = ++frameCounter
-      shadowPlaces.count = 0
+      shadowCount = 0
       ringPlaces.count = 0
       let keylines = 0
 
@@ -3069,30 +2963,19 @@ export async function makeRenderer(canvas, view, viewport) {
       const drawAt = settledFrame ? null : (world.drawnPlaceAt || null)
       const drawInto = settledFrame ? null : (world.drawnPlaceInto || null)
       const drawPlace = settledFrame ? null : (world.drawnPlace || null)
-      // The places every body held before the last step, for the renderer's own
-      // walk of the entity list. Absent on a world that only answers one entity
-      // at a time, which is what the draw helpers above are for.
-      const before = settledFrame ? null : (world.beforePlaces || null)
-      // A changed default outline colour has to reach the outlines already
-      // drawn, and nothing else on `readability` applies to an entity that has
-      // never moved and declares no mark.
+      // A changed default outline colour or width has to reach the outlines
+      // already drawn, and nothing else on `readability` applies to an entity
+      // that has never moved and declares no mark.
       const marksChanged = readability.keylineColour !== drawnKeylineColour
+        || readability.keyline !== drawnKeylineWidth
       drawnKeylineColour = readability.keylineColour
-      // The same for the width an entity that declares none is drawn with, and
-      // that is what says a playing frame may take the plain path at all.
-      const marksStable = !marksChanged && readability.keyline === drawnDefaultKeyline
-      drawnDefaultKeyline = readability.keyline
+      drawnKeylineWidth = readability.keyline
       // The one entity named by the ring rule. Everything else that is never
       // moved and declares no mark can be left exactly as it was last frame.
       const ringRule = readability.ring
       const ringedId = ringRule === 'followed'
         ? (view.mode === 'first-person' ? null : view.follows ?? null)
         : (typeof ringRule === 'string' ? ringRule : null)
-      // Whether the ring rule can name anybody at all, so a frame with no ring
-      // in it does not read every entity's declaration looking for one.
-      const ringPossible = ringRule === 'followed'
-        ? ringedId !== null
-        : typeof ringRule === 'string'
 
       const entities = world.entities
       // One object stands for every entity, so equal counts mean nothing has
@@ -3102,27 +2985,21 @@ export async function makeRenderer(canvas, view, viewport) {
       objectsGrew = false
       // A shorter list means entities went; drop their slots so nothing is held.
       if (snapshot.length > entities.length * SLOT_STRIDE) trimSlots(entities.length)
+      growDrawnPlaces(entities.length)
+      growShadowData(entities.length)
 
-      // A playing frame draws nearly every entity through the plain path; a
-      // frame whose marks just changed cannot, because every outline has to be
-      // rebuilt. A still frame changes nothing, so the quiet scan answers it in
-      // a function of its own and the full pass runs only for what the scan
-      // could not answer.
-      if (!settledFrame && marksStable) {
-        keylines = syncPlaying(entities, frame, sweep, blend, before, drawAt, drawInto, drawPlace, ringPossible)
-        quietSlotsValid = false
-      } else {
-        const quietKeylines = settledFrame && !marksChanged && quietSlotsValid
-          ? scanQuiet(entities, frame, sweep, ringedId)
-          : null
-        if (quietKeylines !== null) keylines = quietKeylines
-        const changed = quietKeylines === null ? entities.length : dirtyIndices.length
-        keylines += syncChanged(entities, quietKeylines === null ? null : dirtyIndices, changed, frame, sweep,
-          blend, settledFrame, drawAt, drawInto, drawPlace, painters)
-        // A full pass rewrote every slot it visited, so the quiet scan may
-        // trust them again on a still frame.
-        if (quietKeylines === null) quietSlotsValid = true
-      }
+      // A still frame changes nothing, so the quiet scan answers it in a function
+      // of its own and the full pass runs only for what the scan could not answer.
+      // A playing frame moves everything, so the moving scan answers what only
+      // moved; the full pass is left for the first frame, a list that changed
+      // under it, or an entity whose look did.
+      let scanned = null
+      if (settledFrame && !marksChanged) scanned = scanQuiet(entities, frame, sweep, ringedId)
+      else if (!sweep && drawAt) scanned = scanMoving(entities, blend, drawAt, ringedId)
+      if (scanned !== null) keylines = scanned
+      const changed = scanned === null ? entities.length : dirtyIndices.length
+      keylines += syncChanged(entities, scanned === null ? null : dirtyIndices, changed, frame, sweep,
+        blend, settledFrame, drawAt, drawInto, drawPlace, painters)
 
       // A sweep only when the counts disagree. When they agree but a fresh id
       // was built during the loop, the living set is rebuilt once instead; the
@@ -3155,7 +3032,7 @@ export async function makeRenderer(canvas, view, viewport) {
       // exists to be honest about.
       stats.entities = world.entities.length
       stats.keylines = keylines
-      stats.contactShadows = shadowPlaces.count
+      stats.contactShadows = shadowCount
       stats.groundRings = ringPlaces.count
       stats.merged = 0
       stats.batches = 0
