@@ -63,8 +63,9 @@ Measured on one machine at 1280×720 through WebGPU. The shape is the finding;
 the numbers are that machine's. The table is in the detail file.
 
 - **The thread is the ceiling, not the card.** CPU grows faster than the entity
-  count; GPU barely moves. A 16.7 ms budget runs out near five thousand
-  entities.
+  count; GPU barely moves. The per-entity sync was reworked after these numbers:
+  `profile.sync` now prices fifty thousand entities at about sixteen milliseconds
+  headless, so the table below is a floor. Re-measure before quoting it.
 - **Draw calls stay flat** because merging holds them there. Eleven calls for
   twelve thousand boxes.
 - **A shader's cost is its maths, not its language.** At 64 covering layers,
