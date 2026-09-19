@@ -1,43 +1,62 @@
 import { boundsOf, facingOffset, boxesTouch } from '../../../engine/frame-facts.js'
+import { projectedShape } from './screen-area.js'
+import { screenMap } from './projection-map.js'
 const round = value => Math.round(value * 100) / 100
+const round4 = value => Math.round(value * 10000) / 10000
+const screenWidth = hull => Math.max(...hull.map(point => point[0])) - Math.min(...hull.map(point => point[0]))
+const screenHeight = hull => Math.max(...hull.map(point => point[1])) - Math.min(...hull.map(point => point[1]))
 
+/** Area in percent-squared below which an on-screen sliver is not listed. */
+const PRESENT_AREA = 0.01
+
+/**
+ * One entry per entity whose projected shape falls inside the frame, with the
+ * projected hull, the share of the hull on screen, and the hull's clipped area.
+ * Coverage and cut read those numbers, so both come from the drawn shape rather
+ * than from an axis-aligned rectangle a tilted or edge-straddling box defeats.
+ *
+ * The eight corner projections are the whole pass: the hull, the screen
+ * position and the depth all come from them, so no entity is projected twice.
+ */
 export function projectEntities(context, options, subject, view, projector) {
   const visible = []
   const offscreenByType = {}
   const population = {}
-  for (const entity of context.world.entities) {
+  const entities = context.world.entities || []
+  // One camera serves every entity, so its affine pieces are read once and
+  // every corner after that is arithmetic on the map rather than a call.
+  const screen = screenMap(projector, view, entities) || projector
+  for (const entity of entities) {
     if (entity.hidden && !options.includeHidden) continue
     if (subject && options.alone && entity.id !== subject.id) continue
     population[entity.type] = (population[entity.type] || 0) + 1
-    const point = projector.place(entity.x, entity.y, entity.z || 0)
     const bounds = boundsOf(entity)
-    const tilt = projector.mode === 'ortho' ? 0 : Math.abs(view.pitch || 0)
-    const seenHeight = bounds.h * Math.cos(tilt) + bounds.l * Math.sin(tilt)
-    const size = projector.sizeAt(point.depth, bounds.w, seenHeight)
-    const onScreen = point.inFront
-      && point.x > -size.w / 2 && point.x < 100 + size.w / 2
-      && point.y > -size.h / 2 && point.y < 100 + size.h / 2
-    if (!onScreen) {
+    const shape = projectedShape({ x: entity.x, y: entity.y, z: entity.z || 0, ...bounds }, screen)
+    if (!shape || shape.clipped <= PRESENT_AREA) {
       offscreenByType[entity.type] = (offscreenByType[entity.type] || 0) + 1
       continue
     }
     visible.push({
       id: entity.id, type: entity.type,
-      at: [round(point.x), round(point.y)],
-      size: [round(size.w), round(size.h)],
-      depth: round(point.depth),
+      at: [round(shape.at[0]), round(shape.at[1])],
+      size: [round(screenWidth(shape.hull)), round(screenHeight(shape.hull))],
+      depth: round(shape.depth),
+      _share: shape.share,
+      _coverage: shape.clipped / 100,
+      _hull: shape.hull,
       _world: { x: entity.x, y: entity.y, z: entity.z || 0, ...bounds }
     })
   }
   return { visible, offscreenByType, population }
 }
 
+/** Per type, the screen area its entities cover, as a percent of the frame. */
 export function screenCoverage(visible) {
   const coverage = {}
   for (const entry of visible) {
-    coverage[entry.type] = round((coverage[entry.type] || 0)
-      + Math.min(100, entry.size[0]) * Math.min(100, entry.size[1]) / 100)
+    coverage[entry.type] = (coverage[entry.type] || 0) + entry._coverage
   }
+  for (const type of Object.keys(coverage)) coverage[type] = round4(coverage[type])
   return coverage
 }
 

@@ -38,7 +38,9 @@ export function selectMarks(visible, population, subject) {
 
 export function addHulls(marked, projector) {
   for (const entry of marked) {
-    const hull = screenHull(entry._world, projector)
+    // The hull was projected for coverage, so marks reuse it rather than
+    // projecting the same corners a second time.
+    const hull = entry._hull || screenHull(entry._world, projector)
     if (hull) {
       const simplified = simplifyHull(hull, Math.max(entry.size[0], entry.size[1]))
       if (simplified) entry.hull = simplified
@@ -72,15 +74,23 @@ export function markPalette(visible, marked) {
   return { markedTypes, palette }
 }
 
-/** The share of a marked box that is on screen, as a fraction of its own area. */
+/**
+ * The share of an entry's own projected shape that is on screen, as a fraction.
+ *
+ * The share measured from the hull was written beside the entry, so both the
+ * frame answer and a dossier read the same number. The rectangle is the
+ * fallback for an entry that was built without a hull.
+ */
 export function clippedShare(entry) {
+  if (Number.isFinite(entry._share)) return entry._share
+  if (Number.isFinite(entry.cut)) return entry.cut / 100
   const width = Math.min(100, entry.at[0] + entry.size[0] / 2) - Math.max(0, entry.at[0] - entry.size[0] / 2)
   const height = Math.min(100, entry.at[1] + entry.size[1] / 2) - Math.max(0, entry.at[1] - entry.size[1] / 2)
   return Math.max(0, width) * Math.max(0, height) / (entry.size[0] * entry.size[1] || 1)
 }
 
-export function addClipping(marked) {
-  for (const entry of marked) {
+export function addClipping(entries) {
+  for (const entry of entries) {
     const shown = clippedShare(entry)
     if (shown < 0.999) entry.cut = round(shown * 100)
   }

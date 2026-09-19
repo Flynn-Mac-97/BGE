@@ -29,7 +29,9 @@ export function describe(context, options = {}) {
 
   const regions = screenRegions(visible)
 
-  addClipping(marked)
+  // Cut belongs to every visible entity, not only the marked few: the frame
+  // answer reports a share for each entity it lists.
+  addClipping(visible)
 
   const between = describeBetween(context, options, projector)
 
@@ -40,7 +42,13 @@ export function describe(context, options = {}) {
   const sizeOutliers = findSizeOutliers(context, options)
   const stackedEntities = findStackedEntities(context, options)
 
-  for (const entry of visible) delete entry._world
+  // `_share` stays: a caller measuring one subject reads the same share the
+  // frame answer used. The hull and world box were only inputs to those facts.
+  for (const entry of visible) {
+    delete entry._world
+    delete entry._coverage
+    delete entry._hull
+  }
 
   const listed = options.brief ? visible.filter(entry => entry.mark) : visible
 
