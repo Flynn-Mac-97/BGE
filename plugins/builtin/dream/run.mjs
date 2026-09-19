@@ -77,6 +77,9 @@ export function listRuns({ checkout }) {
   if (!existsSync(runs)) return []
   return readdirSync(runs)
     .filter(name => name.startsWith(RUN_PREFIX))
+    // A run has target.json; a scratch folder or log that happens to be named
+    // dream-* does not, and listing one shows a phantom run with no target.
+    .filter(name => existsSync(path.join(runs, name, 'target.json')))
     .sort()
     .reverse()
     .map(name => readRun(checkout, name))

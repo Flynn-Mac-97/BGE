@@ -11,7 +11,11 @@ interval="${INTERVAL:-3}"
 once="${2:-}"
 
 if [[ -z "$run_directory" ]]; then
-  run_directory="$(find agent-runs -maxdepth 1 -type d -name 'dream-*' -print | sort | tail -n 1)"
+  # A run writes run.json or rsi.json; a scratch folder named dream-* does not,
+  # and it would otherwise win the name sort and show an empty frame.
+  run_directory="$(find agent-runs -maxdepth 1 -type d -name 'dream-*' -print | sort | while read -r candidate; do
+    [[ -f "$candidate/run.json" || -f "$candidate/rsi.json" ]] && printf '%s\n' "$candidate"
+  done | tail -n 1)"
 fi
 
 if [[ -z "$run_directory" || ! -d "$run_directory" ]]; then
@@ -20,7 +24,9 @@ if [[ -z "$run_directory" || ! -d "$run_directory" ]]; then
 fi
 
 while true; do
-  clear
+  # ANSI rather than `clear`: this runs from a cmd window too, where TERM may be
+  # unset and terminfo has nothing to read.
+  printf '\033[H\033[2J\033[3J'
   node --input-type=module - "$run_directory" <<'NODE'
 import fs from 'node:fs'
 import path from 'node:path'
