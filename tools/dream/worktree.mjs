@@ -21,9 +21,17 @@ import { mainWorktree, readAgentRegistry } from '../../engine/agent-workspace-no
 /** Where worktrees live, relative to the checkout. */
 const WORKTREES = '.agent-worktrees'
 
-/** Run one git command in a checkout and return its output. */
+/**
+ * Run one git command in a checkout and return its output.
+ *
+ * The buffer is raised far past node's one megabyte default: a candidate's diff
+ * is read through here, and a large one threw ENOBUFS, which lost the round's
+ * patch and with it every round that built on it.
+ */
 export function git(checkout, args) {
-  return execFileSync('git', ['-C', checkout, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  return execFileSync('git', ['-C', checkout, ...args], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024
+  })
 }
 
 /**
