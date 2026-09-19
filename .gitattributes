@@ -3,6 +3,11 @@
 # whole-file diff.
 * text=auto eol=lf
 
+# A Windows batch launcher is read by cmd.exe, not diffed by an agent. It must
+# check out CRLF or a parenthesized if block is misread.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 # The pain log is append-only and every parallel lane writes to it, so a merge
 # takes both sides' lines instead of asking. Recording friction must not create
 # friction.
