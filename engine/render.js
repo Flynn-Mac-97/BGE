@@ -63,7 +63,7 @@ import * as TSL from 'three/tsl'
 import { assetURL } from './ui.js'
 import {
   number, meshOf, totalScale, turnRadians, spinRadians, partsOf, meshShape, drawSize,
-  source, tilingOf, materialNameFor, materialLook, describeEntity, mergeSignature
+  source, tilingOf, materialNameFor, materialLook, entityPlan
 } from './frame-plan.js'
 
 // Re-exported because the turn test reaches the reader here, where it used to
@@ -804,10 +804,6 @@ const namedNodes = new WeakMap()
  */
 const attachedModels = new WeakMap()
 
-/** Where each entity is drawn this frame, filled by `sync`. See `world.drawnPlace`. */
-const drawnPlaces = new Map()
-let placeOf = entity => entity
-
 /** Every named node of a freshly cloned model, so pose and attachments can find one. */
 function indexNodes(holder, instance) {
   const nodes = {}
@@ -1090,6 +1086,191 @@ export async function makeRenderer(canvas, view, viewport) {
 
   const meshes = new Map()   // entity id -> the object standing for it
 
+  /**
+   * What `sync` already knows about one entity, keyed by the entity itself.
+   *
+   * `sync` used to re-measure and re-stringify everything for every entity on
+   * every frame: the look, the turn, the stillness signature. Almost all of that
+   * answer is the same one it gave last frame, so it is kept here beside the
+   * object it stands for. Keyed by the entity object rather than its id because
+   * the id is a string and hashing fifty thousand of them a frame is exactly the
+   * cost this exists to remove.
+   */
+  const records = new WeakMap()
+
+  /** Bumped once per sync; the frame an object was last seen in. */
+  let frameCounter = 0
+
+  /**
+   * The keyline colour the drawn outlines were built with.
+   *
+   * An idling entity keeps the outline it already has, so a colour changed on
+   * `readability` has to force one full pass to rebuild them.
+   */
+  let drawnKeylineColour
+
+  /** Set when a sync builds an object for an id that had none. */
+  let objectsGrew = false
+
+  /** The per-entity frame state, created on first sight. */
+  function recordFor(entity) {
+    let record = records.get(entity)
+    if (record) return record
+    record = {
+      object: null,
+      // True once the merge decision is final for the current look, so a frame
+      // that changes nothing can skip the entity entirely.
+      settled: false,
+      moved: false,
+      simple: false,
+      idle: false,
+      keyline: false,
+      haveSignature: false,
+      frames: 0,
+      sigX: 0, sigY: 0, sigZ: 0,
+      sigScale: 1, sigTurnX: 0, sigTurnY: 0, sigTurnZ: 0, sigLook: null,
+      // The last state a skip would have to prove unchanged.
+      mesh: undefined, collider: undefined, type: undefined,
+      x: NaN, y: NaN, z: NaN, scale: NaN, yaw: undefined,
+      hidden: undefined, opacity: undefined, rotation: undefined,
+      turn: null, turnRotation: undefined, turnYaw: undefined,
+      turnObject: null, appliedTurnX: NaN, appliedTurnY: NaN, appliedTurnZ: NaN
+    }
+    records.set(entity, record)
+    return record
+  }
+
+  /**
+   * Turn an entity the cheap way while its declaration and angles hold still.
+   *
+   * `turnRadians` builds a fresh object for every mesh entity every frame. The
+   * angles only change when `rotation` or `yaw` does, and those are numbers for
+   * almost every entity, so the object is kept and handed back.
+   */
+  function turnFor(entity, record) {
+    if (record.turn && typeof entity.rotation !== 'object'
+        && record.turnRotation === entity.rotation && record.turnYaw === entity.yaw) return record.turn
+    const turn = turnRadians(entity)
+    record.turn = turn
+    record.turnRotation = entity.rotation
+    record.turnYaw = entity.yaw
+    return turn
+  }
+
+  // ------------------------------------------- the per-entity quiet snapshot
+
+  /**
+   * One entity's frame state, in one flat array of fixed-size slots.
+   *
+   * `sync` visits every entity every frame, and the common frame changes
+   * nothing: proving that is the whole cost. Parallel arrays — one per field —
+   * put one entity's values in a dozen separate regions of the heap, so every
+   * visit paid a dozen cache misses for a dozen compares. A slot here holds them
+   * together, so one entity is a couple of cache lines, and the array is walked
+   * in order. At fifty thousand entities that is most of the scan.
+   *
+   * A slot belongs to the entity it held last: the first cell is the test. A slot
+   * whose entity changed — a spawn, a removal that shifted the rest, a reorder —
+   * falls through to the full pass, which rewrites it. The WeakMap record stays
+   * the authority for slow-path state; this only answers "is this still the
+   * entity the last pass drew".
+   */
+  const SLOT_STRIDE = 13
+  const SLOT_OBJECT = 1
+  const SLOT_MESH = 2
+  const SLOT_COLLIDER = 3
+  const SLOT_TYPE = 4
+  const SLOT_X = 5
+  const SLOT_Y = 6
+  const SLOT_Z = 7
+  const SLOT_SCALE = 8
+  const SLOT_YAW = 9
+  const SLOT_HIDDEN = 10
+  const SLOT_OPACITY = 11
+  const SLOT_FLAGS = 12
+  /** What the quiet test needs set, and the one thing it reports. */
+  const SLOT_QUIET = 1
+  const SLOT_KEYLINE = 2
+
+  const snapshot = []
+
+  /** Forget slots past the end of the entity list, so a removed entity is not held. */
+  function trimSlots(length) {
+    snapshot.length = length * SLOT_STRIDE
+  }
+
+  /**
+   * Record what the full pass just drew for one entity, for the next frame to
+   * compare against.
+   *
+   * `sprite` is deliberately absent. A mesh entity draws from its mesh, and the
+   * plan ignores a sprite while one is present, so a changed sprite cannot change
+   * what this frame shows and does not have to be compared.
+   */
+  function saveSlot(index, entity, object, record) {
+    const at = index * SLOT_STRIDE
+    snapshot[at] = entity
+    snapshot[at + SLOT_OBJECT] = object
+    snapshot[at + SLOT_MESH] = record.mesh
+    snapshot[at + SLOT_COLLIDER] = record.collider
+    snapshot[at + SLOT_TYPE] = record.type
+    snapshot[at + SLOT_X] = record.x
+    snapshot[at + SLOT_Y] = record.y
+    snapshot[at + SLOT_Z] = record.z
+    snapshot[at + SLOT_SCALE] = record.scale
+    snapshot[at + SLOT_YAW] = record.yaw
+    snapshot[at + SLOT_HIDDEN] = record.hidden
+    snapshot[at + SLOT_OPACITY] = record.opacity
+    // Settled, idle and never moved: the answers that let the next frame skip
+    // this entity, and whether it draws an outline while skipped.
+    snapshot[at + SLOT_FLAGS] =
+      (record.settled && record.idle && !record.moved ? SLOT_QUIET : 0)
+      | (record.keyline ? SLOT_KEYLINE : 0)
+  }
+
+  /** The entities the quiet scan could not answer, filled by `scanQuiet`. */
+  const dirtyIndices = []
+
+  /**
+   * The per-entity cost of a still frame, in a function of its own.
+   *
+   * Every entity that did not change is answered here and never reaches the full
+   * pass. This is the hot loop, and it is deliberately small: V8 optimizes a
+   * function as one unit, and the same compares inlined into `sync` are large
+   * enough to be left in the interpreter, which costs about three times as much.
+   *
+   * Returns how many quiet entities draw an outline, and leaves the indices of
+   * everything else in `dirtyIndices`.
+   */
+  function scanQuiet(entities, frame, sweep, ringedId) {
+    dirtyIndices.length = 0
+    let keylines = 0
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i]
+      const at = i * SLOT_STRIDE
+      if (snapshot[at] === entity
+          && (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0
+          && typeof entity.rotation !== 'object'
+          && snapshot[at + SLOT_MESH] === entity.mesh
+          && snapshot[at + SLOT_COLLIDER] === entity.collider
+          && snapshot[at + SLOT_TYPE] === entity.type
+          && snapshot[at + SLOT_X] === entity.x
+          && snapshot[at + SLOT_Y] === entity.y
+          && snapshot[at + SLOT_Z] === entity.z
+          && snapshot[at + SLOT_SCALE] === entity.scale
+          && snapshot[at + SLOT_YAW] === entity.yaw
+          && snapshot[at + SLOT_HIDDEN] === entity.hidden
+          && snapshot[at + SLOT_OPACITY] === entity.opacity
+          && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))) {
+        if (sweep) snapshot[at + SLOT_OBJECT].userData.seen = frame
+        if (snapshot[at + SLOT_FLAGS] & SLOT_KEYLINE) keylines++
+        continue
+      }
+      dirtyIndices.push(i)
+    }
+    return keylines
+  }
+
   const DRAWN = 0            // layer the camera renders
   const MERGED = 1           // layer only the raycaster looks at
 
@@ -1370,8 +1551,15 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /** The scene object for one entity, rebuilt when its look changed. */
-  function objectFor(entity, described) {
-    let object = meshes.get(entity.id)
+  function objectFor(entity, described, record) {
+    const known = meshes.has(entity.id)
+    let object = record.object
+    // A discarded object is stale but still remembered; forget it here.
+    if (object && object.userData.stale) object = null
+    if (!object) {
+      const found = meshes.get(entity.id)
+      if (found && !found.userData.stale) object = found
+    }
     if (object && object.userData.look !== described.look) {
       // Changing a texture — or a box size — in the inspector has to show up
       // without a reload. Rebuilding rather than patching is what lets a sprite,
@@ -1381,10 +1569,13 @@ export async function makeRenderer(canvas, view, viewport) {
       meshes.delete(entity.id)
       object = null
     }
-    if (object) return object
+    if (object) { record.object = object; return object }
     object = buildObject(entity, described)
     scene.add(object)
     meshes.set(entity.id, object)
+    record.object = object
+    // An id that had nothing before may mean an old object is now dead.
+    if (!known) objectsGrew = true
     return object
   }
 
@@ -1643,7 +1834,7 @@ export async function makeRenderer(canvas, view, viewport) {
    * It tightens and darkens as the thing nears the ground, which is what says
    * a bird is flying and a rat is walking.
    */
-  function noteContactShadow(entity, declared, shape, moved) {
+  function noteContactShadow(entity, declared, shape, moved, place) {
     const asked = declared.shadow ?? (moved && readability.shadow)
     if (!asked || !shape) return
     const scale = entity.scale ?? 1
@@ -1653,8 +1844,8 @@ export async function makeRenderer(canvas, view, viewport) {
 
     const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - readability.groundY) / readability.shadowRange))
     shadowPlaces.push({
-      x: placeOf(entity).x,
-      z: placeOf(entity).z || 0,
+      x: place.x,
+      z: place.z || 0,
       radius: stated * (1 + lift * 0.7),
       strength: (declared.shadowStrength ?? readability.shadowStrength) * (1 - lift) ** 1.5
     })
@@ -1667,8 +1858,7 @@ export async function makeRenderer(canvas, view, viewport) {
    * Scenery leaves in the first three lines. Several hundred props that never
    * move must not pay to read their own shape again on every frame.
    */
-  function updateReadability(entity, object, declared) {
-    const moved = stillness.get(entity.id)?.moved === true
+  function updateReadability(entity, object, declared, shape, moved, place) {
     const asks = declared.keyline !== undefined || declared.shadow !== undefined
       || declared.ring !== undefined
     // The ringed actor is named, so it is entitled to a ring on the frame it
@@ -1677,11 +1867,10 @@ export async function makeRenderer(canvas, view, viewport) {
     // that asked for it is taken away.
     if (!moved && !asks && !ringNames(entity) && !object.userData.keylineMesh) return false
 
-    const shape = meshShape(entity)
     updateKeyline(entity, object, declared, shape, moved)
     if (!entity.hidden) {
-      noteContactShadow(entity, declared, shape, moved)
-      noteGroundRing(entity, declared, shape)
+      noteContactShadow(entity, declared, shape, moved, place)
+      noteGroundRing(entity, declared, shape, place)
     }
     return !!object.userData.keylineMesh
   }
@@ -1815,7 +2004,7 @@ export async function makeRenderer(canvas, view, viewport) {
    * states a position on the ground, and one that grew with height would blur
    * the only fact it carries.
    */
-  function noteGroundRing(entity, declared, shape) {
+  function noteGroundRing(entity, declared, shape, place) {
     const asked = declared.ring ?? ringNames(entity)
     if (!asked || !shape) return
     const scale = entity.scale ?? 1
@@ -1826,8 +2015,8 @@ export async function makeRenderer(canvas, view, viewport) {
     if (!(stated > 0)) return
 
     ringPlaces.push({
-      x: placeOf(entity).x,
-      z: placeOf(entity).z || 0,
+      x: place.x,
+      z: place.z || 0,
       radius: stated,
       colour: declared.ringColour ?? readability.ringColour,
       strength: declared.ringStrength ?? readability.ringStrength
@@ -1876,17 +2065,21 @@ export async function makeRenderer(canvas, view, viewport) {
   const SETTLE = 45          // frames of stillness before a thing counts as static
 
   const batches = new Map()  // batch key -> { material, members, object, dirty }
-  const stillness = new Map() // entity id -> { signature, frames, batch }
 
-  /** Take an entity out of its batch and put its own mesh back on the drawn layer. */
+  /**
+   * Take an entity out of its batch and put its own mesh back on the drawn layer.
+   *
+   * The batch key is kept on the object rather than in the frame record, so the
+   * dead-object sweep can leave a batch without having an entity to hand.
+   */
   function leaveBatch(id) {
-    const record = stillness.get(id)
-    if (!record?.batch) return
-    const batch = batches.get(record.batch)
-    if (batch) { batch.members.delete(id); batch.dirty = true }
-    record.batch = null
     const object = meshes.get(id)
-    if (object) drawOn(object, DRAWN)
+    const key = object?.userData.batch
+    if (!key) return
+    const batch = batches.get(key)
+    if (batch) { batch.members.delete(id); batch.dirty = true }
+    object.userData.batch = null
+    drawOn(object, DRAWN)
   }
 
   /** Put an object and its keyline on one layer. A layer is not inherited. */
@@ -1896,7 +2089,7 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /** Add an entity to the batch for its key, creating the batch if needed. */
-  function joinBatch(entity, record, key, materialKey) {
+  function joinBatch(entity, object, key, materialKey) {
     let batch = batches.get(key)
     if (!batch) {
       batch = { material: null, members: new Set(), object: null, dirty: true }
@@ -1908,7 +2101,7 @@ export async function makeRenderer(canvas, view, viewport) {
     batch.material = meshMaterial(entity, materialKey)
     batch.members.add(entity.id)
     batch.dirty = true
-    record.batch = key
+    object.userData.batch = key
   }
 
   /** Rebuild every dirty batch's merged mesh, or drop one below the merge minimum. */
@@ -1946,45 +2139,60 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /** Whether this entity is standing still enough, and plainly enough, to merge. */
-  function considerForMerging(entity, described, opacity, isModel, turn) {
+  function considerForMerging(entity, object, described, opacity, isModel, turn, record) {
     // A model is a scene graph rather than one box, so there is nothing here to
     // merge; a dimmed entity has its own material and would take the whole batch
     // with it; a hidden one has to be able to disappear on its own. An outlined
     // one keeps its own mesh because the keyline hangs off it, and a merged
     // entity draws on a layer the camera ignores — the outline would go with it.
     const canMerge = !isModel && opacity >= 1 && !entity.hidden
-      && !(Number(described?.keyline) > 0)
-    const signature = mergeSignature(entity, described, turn)
+      && !(described.keyline > 0)
 
-    let record = stillness.get(entity.id)
-    if (!record) stillness.set(entity.id, record = { signature: null, frames: 0, batch: null, moved: false })
+    // The stillness signature, compared as numbers instead of assembled into a
+    // string and compared back. The look is one shared string while the
+    // declaration holds, so that compare finds the same instance.
+    const moved = record.sigX !== entity.x || record.sigY !== entity.y
+      || record.sigZ !== (entity.z || 0)
+      || record.sigTurnX !== turn.x || record.sigTurnY !== turn.y || record.sigTurnZ !== turn.z
+      || record.sigScale !== (entity.scale ?? 1)
+      || record.sigLook !== described.look
 
-    if (record.signature !== signature) {
+    if (moved) {
       // It moved. Leave the batch this frame, before anything is drawn, or the
       // merged copy stays behind at the old place as a ghost.
       leaveBatch(entity.id)
       // The first signature is where it appeared, not a move. Every one after
       // it is, and the answer sticks: an enemy that stops to bite must not
       // drop its keyline and its shadow for as long as it stands still.
-      if (record.signature !== null) record.moved = true
-      record.signature = signature
+      if (record.haveSignature) record.moved = true
+      record.haveSignature = true
+      record.sigX = entity.x
+      record.sigY = entity.y
+      record.sigZ = entity.z || 0
+      record.sigTurnX = turn.x
+      record.sigTurnY = turn.y
+      record.sigTurnZ = turn.z
+      record.sigScale = entity.scale ?? 1
+      record.sigLook = described.look
       record.frames = 0
+      record.settled = !canMerge
       return
     }
     if (record.frames < SETTLE) record.frames++
 
     const wanted = canMerge && record.frames >= SETTLE
-    if (wanted && !record.batch) {
+    if (wanted && !object.userData.batch) {
       const cellX = Math.floor(entity.x / MERGE_CELL)
       const cellZ = Math.floor((entity.z || 0) / MERGE_CELL)
       // Casting is part of the key, not just material and cell. One merged mesh
       // has one castShadow flag, so a batch holding both a caster and a
       // non-caster has to pick one and is wrong for half its members.
-      const casts = meshes.get(entity.id)?.castShadow === false ? 'flat' : 'casts'
-      joinBatch(entity, record, `${described.material}|${casts}|${cellX},${cellZ}`, described.material)
-    } else if (!wanted && record.batch) {
+      const casts = object.castShadow === false ? 'flat' : 'casts'
+      joinBatch(entity, object, `${described.material}|${casts}|${cellX},${cellZ}`, described.material)
+    } else if (!wanted && object.userData.batch) {
       leaveBatch(entity.id)
     }
+    if (record.frames >= SETTLE || !canMerge) record.settled = true
   }
 
   // ------------------------------------------------------------- the viewmodel
@@ -2339,28 +2547,72 @@ export async function makeRenderer(canvas, view, viewport) {
      * fixed steps, so motion is smooth on a screen faster than the step rate.
      */
     sync(world, blend = 1) {
-      drawnPlaces.clear()
-      placeOf = entity => {
-        let place = drawnPlaces.get(entity)
-        if (!place) drawnPlaces.set(entity, place = world.drawnPlace ? world.drawnPlace(entity, blend) : entity)
-        return place
-      }
       const painters = flat()
-      const live = new Set()
+      const frame = ++frameCounter
       shadowPlaces.length = 0
       ringPlaces.length = 0
       let keylines = 0
 
-      world.entities.forEach((entity, i) => {
-        live.add(entity.id)
-        const described = describeEntity(entity)
-        const object = objectFor(entity, described)
-        const place = placeOf(entity)
+      // A body is drawn at `world.drawnPlace` only between two fixed steps. At
+      // blend 1 that place is the entity itself, so reading it directly saves an
+      // object per entity per frame — and lets an entity that did not change at
+      // all be skipped below.
+      const settledFrame = blend >= 1
+      // A changed default outline colour has to reach the outlines already
+      // drawn, and nothing else on `readability` applies to an entity that has
+      // never moved and declares no mark.
+      const marksChanged = readability.keylineColour !== drawnKeylineColour
+      drawnKeylineColour = readability.keylineColour
+      // The one entity named by the ring rule. Everything else that is never
+      // moved and declares no mark can be left exactly as it was last frame.
+      const ringRule = readability.ring
+      const ringedId = ringRule === 'followed'
+        ? (view.mode === 'first-person' ? null : view.follows ?? null)
+        : (typeof ringRule === 'string' ? ringRule : null)
+
+      const entities = world.entities
+      // One object stands for every entity, so equal counts mean nothing has
+      // died. Then no object needs a seen marker and the sweep at the end is
+      // skipped; `objectsGrew` catches an id swapped for a fresh one.
+      const sweep = meshes.size !== entities.length
+      objectsGrew = false
+      // A shorter list means entities went; drop their slots so nothing is held.
+      if (snapshot.length > entities.length * SLOT_STRIDE) trimSlots(entities.length)
+
+      // A still frame changes nothing, so the quiet scan answers it in a function
+      // of its own and the full pass runs only for what the scan could not answer.
+      const quietKeylines = settledFrame && !marksChanged
+        ? scanQuiet(entities, frame, sweep, ringedId)
+        : null
+      if (quietKeylines !== null) keylines = quietKeylines
+      const changed = quietKeylines === null ? entities.length : dirtyIndices.length
+      for (let c = 0; c < changed; c++) {
+        const i = quietKeylines === null ? c : dirtyIndices[c]
+        const entity = entities[i]
+        const record = recordFor(entity)
+        const plan = entityPlan(entity)
+        const described = plan.described
+        const object = objectFor(entity, described, record)
+        if (sweep) object.userData.seen = frame
+        const place = settledFrame ? entity
+          : (world.drawnPlace ? world.drawnPlace(entity, blend) : entity)
         object.position.set(place.x, place.y + anchorOffset(entity), place.z || 0)
         object.visible = !entity.hidden
 
+        record.mesh = entity.mesh
+        record.collider = entity.collider
+        record.type = entity.type
+        record.x = entity.x
+        record.y = entity.y
+        record.z = entity.z
+        record.scale = entity.scale
+        record.yaw = entity.yaw
+        record.hidden = entity.hidden
+        record.opacity = entity.opacity
+
         if (entity.mesh) {
           const declared = meshOf(entity)
+          const shape = plan.shape
           // Solid geometry carries its own size, so scale multiplies rather
           // than sets.
           const s = totalScale(entity)
@@ -2368,9 +2620,18 @@ export async function makeRenderer(canvas, view, viewport) {
           // One turn, read once and passed on: the merge signature needs the
           // same three angles, and reading them twice was two allocations a
           // mesh entity a frame.
-          const turn = turnRadians(entity)
-          object.rotation.set(turn.x, turn.y, turn.z, 'YXZ')
-          if (Number.isFinite(place.yaw)) object.rotation.y = place.yaw
+          const turn = turnFor(entity, record)
+          const yaw = Number.isFinite(place.yaw) ? place.yaw : turn.y
+          // A static thing that kept its angles must not rebuild its quaternion
+          // every frame; only a changed turn is written.
+          if (record.turnObject !== object || record.appliedTurnX !== turn.x
+              || record.appliedTurnY !== yaw || record.appliedTurnZ !== turn.z) {
+            object.rotation.set(turn.x, yaw, turn.z, 'YXZ')
+            record.turnObject = object
+            record.appliedTurnX = turn.x
+            record.appliedTurnY = yaw
+            record.appliedTurnZ = turn.z
+          }
           // The editor dims a hovered entity to preview it.
           const opacity = entity.opacity ?? 1
           dim(object, opacity)
@@ -2384,12 +2645,18 @@ export async function makeRenderer(canvas, view, viewport) {
           if (declared.model) applyAttachments(object, entity.attachments)
           // Depth decides what covers what, so there is nothing to order.
           object.renderOrder = 0
-          considerForMerging(entity, described, opacity, !!declared.model || Array.isArray(declared.parts), turn)
+          record.simple = !declared.model && !Array.isArray(declared.parts)
+          record.idle = record.simple && declared.shadow === undefined && declared.ring === undefined
+          considerForMerging(entity, object, described, opacity, !record.simple, turn, record)
           // After merging, which is where "has this ever moved" is answered.
-          if (updateReadability(entity, object, declared)) keylines++
-          return
+          record.keyline = updateReadability(entity, object, declared, shape, record.moved, place)
+          if (record.keyline) keylines++
+          saveSlot(i, entity, object, record)
+          continue
         }
 
+        record.simple = false
+        record.idle = false
         const { w, h } = drawSize(entity)
         object.rotation.set(0, 0, spinRadians(entity))
         object.scale.set(w, h, 1)
@@ -2417,14 +2684,28 @@ export async function makeRenderer(canvas, view, viewport) {
         // Facing is a mirror, not a rotation: negative X scale flips the art
         // without touching the collider or the transform gizmo.
         if (entity.flip) object.scale.x = -object.scale.x
-      })
+        saveSlot(i, entity, object, record)
+      }
 
-      for (const [id, object] of meshes) {
-        if (live.has(id)) continue
-        leaveBatch(id)
-        stillness.delete(id)
-        discard(object)
-        meshes.delete(id)
+      // A sweep only when the counts disagree. When they agree but a fresh id
+      // was built during the loop, the living set is rebuilt once instead; the
+      // markers were not written on that path.
+      if (sweep) {
+        for (const [id, object] of meshes) {
+          if (object.userData.seen === frame) continue
+          leaveBatch(id)
+          discard(object)
+          meshes.delete(id)
+        }
+      } else if (objectsGrew) {
+        const living = new Set()
+        for (let i = 0; i < entities.length; i++) living.add(entities[i].id)
+        for (const [id, object] of meshes) {
+          if (living.has(id)) continue
+          leaveBatch(id)
+          discard(object)
+          meshes.delete(id)
+        }
       }
 
       rebuildBatches()

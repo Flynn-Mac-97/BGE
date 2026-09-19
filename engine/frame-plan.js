@@ -195,6 +195,83 @@ function subdivisionOf(declared, entity) {
 }
 
 /**
+ * What one declaration draws as, measured once: its shape and its look.
+ *
+ * A level's entities mostly share one type declaration, so the same box, the
+ * same material key and the same merge string were rebuilt for every one of
+ * them every frame. Keyed by the declaration object, because editing a type
+ * replaces that object rather than mutating it. The collider and the type name
+ * are validated on the way out: two entities can share a declaration and still
+ * differ in either.
+ */
+const planCache = new WeakMap()
+const planTextCache = new Map()
+
+/**
+ * The cached plan for one entity, keyed by its declaration object.
+ *
+ * Exported so a caller that wants both the shape and the look gets them from a
+ * single lookup rather than one each.
+ */
+export function entityPlan(entity) {
+  const mesh = entity.mesh
+  const sprite = entity.sprite
+  let weak = null
+  let text = null
+  if (mesh) {
+    if (typeof mesh === 'object') weak = mesh
+    else text = `m:${mesh}`
+  } else if (sprite && typeof sprite === 'object') {
+    weak = sprite
+  } else {
+    text = `t:${entity.type}`
+  }
+  const store = weak ? planCache : planTextCache
+  const found = store.get(weak || text)
+  if (found && found.mesh === mesh && found.sprite === sprite
+      && found.type === entity.type && found.collider === entity.collider) return found.plan
+
+  const plan = measurePlan(entity)
+  store.set(weak || text, { mesh, sprite, type: entity.type, collider: entity.collider, plan })
+  return plan
+}
+
+/** Measure the shape and the look of one entity's current declaration. */
+function measurePlan(entity) {
+  if (!entity.mesh) {
+    const picture = source(entity.sprite)
+    return {
+      shape: null,
+      described: {
+        material: null,
+        keyline: 0,
+        look: picture
+          ? `${picture}|${entity.sprite.tile ?? 0}|${entity.sprite.sheet ? 'sheet' : 'one'}`
+          : `tint:${entity.type}`
+      }
+    }
+  }
+  const declared = meshOf(entity)
+  const parts = declared.model ? null : partsOf(declared, `${entity.type}.mesh`)
+  const shape = shapeOf(entity, declared, parts)
+  if (parts) {
+    // Every part carries its own material, so the entity has no single one —
+    // and nothing to be merged into. The signature says when the shape changed.
+    return { shape, described: { material: null, keyline: 0, look: `parts|${parts.signature}` } }
+  }
+  const material = materialLook(entity, declared, shape)
+  return {
+    shape,
+    described: {
+      material,
+      keyline: Number(declared.keyline) > 0 ? Number(declared.keyline) : 0,
+      look: ['mesh', shape.kind, shape.w, shape.h, shape.d,
+        declared.model || '', declared.scale ?? 1, material].join('|')
+    }
+  }
+}
+
+/**
  * What an entity's mesh is: a shape and three numbers, or null for a sprite.
  *
  * `box` and `quad` say it outright. `parts` is measured from the boxes it lists,
@@ -204,11 +281,12 @@ function subdivisionOf(declared, entity) {
  * last resort, and it is deliberately a size you can see.
  */
 export function meshShape(entity) {
-  const declared = meshOf(entity)
-  if (!declared) return null
-  const collider = Array.isArray(entity.collider?.box) ? entity.collider.box : []
+  return entityPlan(entity).shape
+}
 
-  const parts = partsOf(declared, `${entity.type}.mesh`)
+/** The same measurement, against a declaration that has already been read. */
+function shapeOf(entity, declared, parts) {
+  const collider = Array.isArray(entity.collider?.box) ? entity.collider.box : []
   if (parts && !declared.model) {
     const stated = Array.isArray(declared.box) ? declared.box : null
     if (!stated) return { kind: 'parts', ...parts.size }
@@ -381,30 +459,7 @@ export function materialLook(entity, declared, shape) {
  * a thing must not hand it a contact shadow.
  */
 export function describeEntity(entity) {
-  if (!entity.mesh) {
-    return {
-      material: null,
-      keyline: 0,
-      look: source(entity.sprite)
-        ? `${source(entity.sprite)}|${entity.sprite.tile ?? 0}|${entity.sprite.sheet ? 'sheet' : 'one'}`
-        : `tint:${entity.type}`
-    }
-  }
-  const declared = meshOf(entity)
-  const parts = declared.model ? null : partsOf(declared, `${entity.type}.mesh`)
-  if (parts) {
-    // Every part carries its own material, so the entity has no single one —
-    // and nothing to be merged into. The signature says when the shape changed.
-    return { material: null, keyline: 0, look: `parts|${parts.signature}` }
-  }
-  const shape = meshShape(entity)
-  const material = materialLook(entity, declared, shape)
-  return {
-    material,
-    keyline: Number(declared.keyline) > 0 ? Number(declared.keyline) : 0,
-    look: ['mesh', shape.kind, shape.w, shape.h, shape.d,
-      declared.model || '', declared.scale ?? 1, material].join('|')
-  }
+  return entityPlan(entity).described
 }
 
 /**
