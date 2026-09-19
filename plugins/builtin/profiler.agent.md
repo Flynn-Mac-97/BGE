@@ -25,6 +25,14 @@ node bin/engine.mjs --headless --project <path> --level <name> run profile.steps
 ```sh
 node bin/engine.mjs --headless --project <path> --level <name> run profile.plan
 ```
+- `profile.sync` times the whole per-entity `sync` over a real scene graph built
+  with no canvas: placement, merging, the readability marks. It is the thread
+  cost `profile.frames` reports as `cpu`, minus the GPU render call, so it runs
+  wherever there is a level and no tab.
+
+```sh
+node bin/engine.mjs --headless --project <path> --level <name> run profile.sync
+```
 - `profile.fill` stacks quads covering the frame on one material and reports
   what its **pixels** cost. One surface over a twelfth of the screen is too
   cheap for any timer here to see; this is the only way to price a shader.

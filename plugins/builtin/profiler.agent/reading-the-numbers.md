@@ -9,6 +9,10 @@
 
 ## What one machine measured
 
+**These runs predate the warm-up fix (pain p325).** The harness did not throw
+its warm frames away, so the numbers below include the engine settling and read
+two to three times high. The shape is what holds; re-measure before quoting one.
+
 1280×720 through WebGPU, steady state, boxes on one material.
 
 | entities | cpu ms | gpu ms | draw calls |

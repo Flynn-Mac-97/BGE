@@ -973,6 +973,26 @@ function wantsWebGL() {
  * session, which exists whether or not anything is drawing. The renderer reads
  * the same two objects the game does.
  */
+/**
+ * The no-op renderer a headless frame is built over.
+ *
+ * The scene graph and `sync` never touch the card, so a headless run can build
+ * the real one and measure it. This stands in for the few properties the
+ * drawing half reads, and every drawing call does nothing.
+ */
+function headlessRenderer() {
+  return {
+    setSize() {}, setPixelRatio() {}, getMaxAnisotropy: () => 1,
+    autoClear: false, shadowMap: { enabled: false, type: THREE.PCFShadowMap },
+    backend: null, hasFeature: () => false,
+    info: { autoReset: false, reset() {}, render: {}, memory: {}, programs: [] },
+    render() {}, clear() {}, clearDepth() {},
+    setRenderTarget() {}, getRenderTarget: () => null,
+    setClearColor() {}, getClearColor: color => color, getClearAlpha: () => 0,
+    dispose() {}
+  }
+}
+
 export async function makeRenderer(canvas, view, viewport) {
   // WebGPU where the browser has it, WebGL 2 where it does not. The backend
   // is chosen during init, which is why this function is async and why the
@@ -983,31 +1003,39 @@ export async function makeRenderer(canvas, view, viewport) {
   // time measures how long it took to describe a frame, which is a different
   // question and answers neither "is this shader heavy" nor "how many of these
   // can I draw".
-  const renderer = new THREE.WebGPURenderer({
+  const headless = !canvas
+  const renderer = headless ? headlessRenderer() : new THREE.WebGPURenderer({
     canvas, antialias: true, alpha: true, trackTimestamp: true,
     // Raw GLSL is inserted into the shader three generates, and the WebGPU
     // backend generates WGSL, so a project drawing GLSL-only shaders asks for
     // WebGL. Read here because the backend is chosen once, during init.
     forceWebGL: wantsWebGL()
   })
-  await renderer.init()
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
-  maxAnisotropy = renderer.getMaxAnisotropy()
-  // The world and the viewmodel are two passes over one frame, so clearing is
-  // this file's job rather than three's — and the counters have to survive both
-  // renders to be worth reading.
-  renderer.autoClear = false
-  renderer.info.autoReset = false
+  if (headless) {
+    // The counters survive both passes in a drawing world; a headless one still
+    // reports them, as zero.
+    renderer.autoClear = false
+    renderer.info.autoReset = false
+  } else {
+    await renderer.init()
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+    maxAnisotropy = renderer.getMaxAnisotropy()
+    // The world and the viewmodel are two passes over one frame, so clearing is
+    // this file's job rather than three's — and the counters have to survive
+    // both renders to be worth reading.
+    renderer.autoClear = false
+    renderer.info.autoReset = false
 
-  // Shadows cost nothing until a light asks for one — the shadow pass walks the
-  // lights that cast and there are none by default — so the switch is on and
-  // which lights cast is left to whoever owns the lights. Setting `castShadow`
-  // on a light and having nothing happen, with no way to find out why, is the
-  // failure this avoids.
-  renderer.shadowMap.enabled = true
-  // The node renderer dropped the soft variant and falls back to this one with
-  // a warning. Asking for it directly says what is actually drawn.
-  renderer.shadowMap.type = THREE.PCFShadowMap
+    // Shadows cost nothing until a light asks for one — the shadow pass walks
+    // the lights that cast and there are none by default — so the switch is on
+    // and which lights cast is left to whoever owns the lights. Setting
+    // `castShadow` on a light and having nothing happen, with no way to find out
+    // why, is the failure this avoids.
+    renderer.shadowMap.enabled = true
+    // The node renderer dropped the soft variant and falls back to this one with
+    // a warning. Asking for it directly says what is actually drawn.
+    renderer.shadowMap.type = THREE.PCFShadowMap
+  }
 
   const scene = new THREE.Scene()
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000)
@@ -1669,12 +1697,16 @@ export async function makeRenderer(canvas, view, viewport) {
    * whatever stands in front of it — and each keeps its own geometry, because an
    * instanced attribute belongs to the geometry.
    */
-  function placeMarks(places, { mesh, matrix, height, grow, write, attributes = [] }) {
+  function placeMarks(places, { meshOf, matrix, height, grow, write, attributesOf = () => [] }) {
     if (!places.length) {
+      const mesh = meshOf()
       if (mesh) mesh.count = 0
       return
     }
     grow(places.length)
+    // `grow` may have built the mesh and its instanced attributes on this very
+    // call, so both are read after it rather than before.
+    const mesh = meshOf()
     for (let i = 0; i < places.length; i++) {
       const place = places[i]
       matrix.makeScale(place.radius * 2, 1, place.radius * 2)
@@ -1684,18 +1716,18 @@ export async function makeRenderer(canvas, view, viewport) {
     }
     mesh.count = places.length
     mesh.instanceMatrix.needsUpdate = true
-    for (const attribute of attributes) attribute.needsUpdate = true
+    for (const attribute of attributesOf()) attribute.needsUpdate = true
   }
 
   /** Write the frame's shadows into the instanced mesh. Called once per sync. */
   function placeContactShadows() {
     placeMarks(shadowPlaces, {
-      mesh: contactShadows,
+      meshOf: () => contactShadows,
       matrix: shadowMatrix,
       // Just clear of the floor, or the two surfaces fight for the same pixels.
       height: readability.groundY + 0.015,
       grow: growContactShadows,
-      attributes: [contactStrengths],
+      attributesOf: () => [contactStrengths],
       write: (place, i) => contactStrengths.setX(i, place.strength)
     })
   }
@@ -1807,12 +1839,12 @@ export async function makeRenderer(canvas, view, viewport) {
   /** Write the frame's rings into the instanced mesh. Called once per sync. */
   function placeGroundRings() {
     placeMarks(ringPlaces, {
-      mesh: groundRings,
+      meshOf: () => groundRings,
       matrix: ringMatrix,
       // Above the contact shadow's 0.015, so the colour wins where they meet.
       height: readability.groundY + 0.02,
       grow: growGroundRings,
-      attributes: [ringTints, ringStrengths],
+      attributesOf: () => [ringTints, ringStrengths],
       write: (place, i) => {
         const colour = ringColour(place.colour)
         ringTints.setXYZ(i, colour.r, colour.g, colour.b)
@@ -2472,6 +2504,8 @@ export async function makeRenderer(canvas, view, viewport) {
 
     /** Draw one frame: the world, then the post chain, then the viewmodel in its own pass. */
     draw() {
+      // A headless frame has no card to draw into; `sync` is what it measures.
+      if (headless) return
       const startedAt = performance.now()
       const camera = readyCamera()
       renderer.info.reset()

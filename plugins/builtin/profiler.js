@@ -39,6 +39,12 @@ const STEP_WARM = 60
 /** Frame plans timed; the median is reported so one GC pause is not the answer. */
 const PLAN_SAMPLES = 30
 
+/** Frames synced; the first builds every object and the rest reach a steady one. */
+const SYNC_SAMPLES = 30
+
+/** Syncs thrown away first. Merging waits 45 still frames, so this settles it. */
+const SYNC_WARM = 60
+
 /** A fixed step is 1/60 s, so this is the whole budget one step may spend. */
 const BUDGET_MS = 1000 / 60
 
@@ -103,7 +109,7 @@ async function measure(context, options = {}) {
   if (!renderer?.draw) return { error: 'nothing is drawing — no renderer in this world' }
 
   const frames = Math.min(2000, Math.max(1, Math.round(Number(options.frames) || FRAMES)))
-  const warm = Math.min(frames, Math.max(0, Math.round(Number(options.warm) ?? WARM)))
+  const warm = Math.min(frames, Math.max(0, Math.round(Number(options.warm ?? WARM))))
 
   // Reported on its own and kept out of the average. It catches a pending
   // compile or a scene not yet built — but only if the loop has not already
@@ -205,7 +211,7 @@ function measureSteps(context, options = {}) {
   if (!loop?.step) return { error: 'no loop in this world' }
 
   const steps = Math.min(20000, Math.max(1, Math.round(Number(options.steps) || STEPS)))
-  const warm = Math.min(steps, Math.max(0, Math.round(Number(options.warm) ?? STEP_WARM)))
+  const warm = Math.min(steps, Math.max(0, Math.round(Number(options.warm ?? STEP_WARM))))
   const systems = context.loader.contrib.systems
   const timed = timeSystems(systems)
 
@@ -286,6 +292,45 @@ function measurePlan(context, options = {}) {
   }
 }
 
+/**
+ * What the renderer's whole per-entity frame costs, with no GL context.
+ *
+ * `profile.plan` prices the description. This prices everything `sync` does
+ * with it — placing objects, deciding what merges, writing the readability
+ * marks — over a real three scene graph built without a card. The GPU render
+ * call is the only part left to `profile.frames` in a tab.
+ */
+async function measureSync(context, options = {}) {
+  const world = context.world
+  const entities = world?.entities || []
+  if (!entities.length) return { error: 'the world holds no entities to sync' }
+  const { makeRenderer } = await import('../../engine/render.js')
+  const frame = await makeRenderer(null, context.view, context.viewport)
+  const samples = Math.min(120, Math.max(1, Math.round(Number(options.samples) || SYNC_SAMPLES)))
+  const warm = Math.max(0, Math.round(Number(options.warm ?? SYNC_WARM)))
+  // The first sync builds every object and merging waits 45 still frames, so
+  // both are thrown away before the number is taken.
+  for (let index = 0; index < warm; index++) frame.sync(world)
+  const times = []
+  for (let index = 0; index < samples; index++) {
+    const at = performance.now()
+    frame.sync(world)
+    times.push(performance.now() - at)
+  }
+  const sync = spread(times)
+  const stats = frame.stats
+  return {
+    samples,
+    syncMs: sync,
+    budgetMs: round(BUDGET_MS),
+    entities: entities.length,
+    merged: stats.merged,
+    batches: stats.batches,
+    keylines: stats.keylines,
+    perEntityMicroseconds: round((sync.median / Math.max(1, entities.length)) * 1000)
+  }
+}
+
 export default {
   name: 'Profiler',
   category: 'agents',
@@ -298,7 +343,8 @@ export default {
       measure: options => measure(context, options),
       fill: options => measureFill(context, options),
       steps: options => measureSteps(context, options),
-      plan: options => measurePlan(context, options)
+      plan: options => measurePlan(context, options),
+      sync: options => measureSync(context, options)
     }
     if (scope) {
       const service = context.profiler
@@ -331,5 +377,11 @@ export default {
     // run profile.plan
     // run profile.plan '{"samples": 50}'
     run: (context, options) => measurePlan(context, options || {})
+  }, {
+    id: 'profile.sync',
+    label: 'Cost per-entity sync',
+    // run profile.sync
+    // run profile.sync '{"samples": 60}'
+    run: (context, options) => measureSync(context, options || {})
   }]
 }
