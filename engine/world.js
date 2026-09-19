@@ -461,19 +461,6 @@ export function makeWorld(bus) {
   const beforePlace = Symbol('before place')
 
   /**
-   * The same places by position, for the renderer.
-   *
-   * The renderer walks the entity list in order, so a position answers where a
-   * body was before the step without a lookup per entity. The stored entity is
-   * the test: a reorder falls back to the symbol.
-   */
-  const beforeEntities = []
-  const beforeX = []
-  const beforeY = []
-  const beforeZ = []
-  const beforeYaw = []
-
-  /**
    * Write the place between two steps into `target` rather than a new object.
    *
    * A body with no earlier place, or a blend of one, is drawn where it is.
@@ -531,18 +518,6 @@ export function makeWorld(bus) {
         before.y = entity.y
         before.z = entity.z || 0
         before.yaw = entity.yaw
-        beforeEntities[index] = entity
-        beforeX[index] = entity.x
-        beforeY[index] = entity.y
-        beforeZ[index] = entity.z || 0
-        beforeYaw[index] = entity.yaw
-      }
-      if (beforeEntities.length > list.length) {
-        beforeEntities.length = list.length
-        beforeX.length = list.length
-        beforeY.length = list.length
-        beforeZ.length = list.length
-        beforeYaw.length = list.length
       }
     },
 
@@ -563,28 +538,6 @@ export function makeWorld(bus) {
      * the heap per frame. `drawnPlace` is this plus the one object it returns.
      */
     drawnPlaceInto(target, entity, blend = 1) {
-      return drawnPlaceInto(target, entity, blend)
-    },
-
-    /**
-     * The interpolated place for the body at one position in the entity list.
-     *
-     * The renderer already walks that list in order, so the position answers
-     * where the body was before the step and saves a WeakMap probe per entity.
-     * The stored entity is the test for a list that changed under the caller.
-     */
-    drawnPlaceAt(target, index, entity, blend = 1) {
-      if (beforeEntities[index] === entity && blend < 1) {
-        target.x = beforeX[index] + (entity.x - beforeX[index]) * blend
-        target.y = beforeY[index] + (entity.y - beforeY[index]) * blend
-        const z = entity.z || 0
-        target.z = beforeZ[index] + (z - beforeZ[index]) * blend
-        const beforeYawAt = beforeYaw[index]
-        target.yaw = Number.isFinite(beforeYawAt) && Number.isFinite(entity.yaw)
-          ? beforeYawAt + Math.atan2(Math.sin(entity.yaw - beforeYawAt), Math.cos(entity.yaw - beforeYawAt)) * blend
-          : entity.yaw
-        return target
-      }
       return drawnPlaceInto(target, entity, blend)
     },
 

@@ -1,4 +1,4 @@
-<!-- Generated from plugins/builtin/panel-scene.js; sha256 cd44e567b47053f4b65d62732b69c68cf79c8ec313dbbaa76ae75e868427233f. Do not edit. -->
+<!-- Generated from plugins/builtin/panel-scene.js; sha256 45d2a32d05cbbe6aec0700d6268ac3e8ae514819ac59cc7c7e050fb999186048. Do not edit. -->
 **Interface, parsed from source** (plugins/builtin/panel-scene.js). Where the prose below it disagrees, this is the code.
 
 ```
@@ -9,5 +9,5 @@
              scene.deleteSelected (Delete selection)
   arguments  scene.selectAll: none
   arguments  scene.deleteSelected: none
-  source     59 lines
+  source     77 lines
 ```

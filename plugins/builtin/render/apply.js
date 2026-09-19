@@ -135,6 +135,19 @@ function probePosition(THREE, scene) {
 }
 
 /**
+ * One PMREM generator per renderer, kept for every capture.
+ *
+ * A generator owns its blur meshes and materials, and the renderer keeps a
+ * record for each of them until they are disposed. A new generator per capture
+ * left twenty of those records behind on every level load.
+ */
+const generators = new WeakMap()
+function generatorFor(THREE, renderer) {
+  if (!generators.has(renderer)) generators.set(renderer, new THREE.PMREMGenerator(renderer))
+  return generators.get(renderer)
+}
+
+/**
  * Capture the level into the environment: walls, floor and lights, with the
  * sky seen past them.
  *
@@ -154,7 +167,7 @@ export function captureProbe(context, THREE) {
   if (!background?.isTexture) scene.background = sky
   useEnvironment(scene, sky)
   try {
-    const next = new THREE.PMREMGenerator(renderer).fromScene(scene, 0, 0.1, 200, { position: probePosition(THREE, scene) })
+    const next = generatorFor(THREE, renderer).fromScene(scene, 0, 0.1, 200, { position: probePosition(THREE, scene) })
     probe?.dispose()
     probe = next
   } finally {

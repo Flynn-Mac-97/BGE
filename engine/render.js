@@ -873,6 +873,7 @@ function applyAttachments(holder, declared) {
     if (wanted && wanted.model === entry.model) continue
     entry.group.userData.stale = true
     entry.group.parent?.remove(entry.group)
+    release(entry.group)
     record.delete(name)
   }
 
@@ -1332,6 +1333,28 @@ export async function makeRenderer(canvas, view, viewport) {
       | (record.steady ? SLOT_STEADY : 0)
   }
 
+  /**
+   * Whether the entity in slot `at` is the one the last full pass drew, has
+   * never moved, and has not changed since. Such an entity is drawn exactly as
+   * it was, on a still frame and on a playing frame alike.
+   */
+  function isQuiet(entity, at, ringedId) {
+    return snapshot[at] === entity
+      && (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0
+      && typeof entity.rotation !== 'object'
+      && snapshot[at + SLOT_MESH] === entity.mesh
+      && snapshot[at + SLOT_COLLIDER] === entity.collider
+      && snapshot[at + SLOT_TYPE] === entity.type
+      && snapshot[at + SLOT_X] === entity.x
+      && snapshot[at + SLOT_Y] === entity.y
+      && snapshot[at + SLOT_Z] === entity.z
+      && snapshot[at + SLOT_SCALE] === entity.scale
+      && snapshot[at + SLOT_YAW] === entity.yaw
+      && snapshot[at + SLOT_HIDDEN] === entity.hidden
+      && snapshot[at + SLOT_OPACITY] === entity.opacity
+      && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))
+  }
+
   /** The entities the quiet scan could not answer, filled by `scanQuiet`. */
   const dirtyIndices = []
 
@@ -1352,20 +1375,7 @@ export async function makeRenderer(canvas, view, viewport) {
     for (let i = 0; i < entities.length; i++) {
       const entity = entities[i]
       const at = i * SLOT_STRIDE
-      if (snapshot[at] === entity
-          && (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0
-          && typeof entity.rotation !== 'object'
-          && snapshot[at + SLOT_MESH] === entity.mesh
-          && snapshot[at + SLOT_COLLIDER] === entity.collider
-          && snapshot[at + SLOT_TYPE] === entity.type
-          && snapshot[at + SLOT_X] === entity.x
-          && snapshot[at + SLOT_Y] === entity.y
-          && snapshot[at + SLOT_Z] === entity.z
-          && snapshot[at + SLOT_SCALE] === entity.scale
-          && snapshot[at + SLOT_YAW] === entity.yaw
-          && snapshot[at + SLOT_HIDDEN] === entity.hidden
-          && snapshot[at + SLOT_OPACITY] === entity.opacity
-          && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))) {
+      if (isQuiet(entity, at, ringedId)) {
         if (sweep) snapshot[at + SLOT_OBJECT].userData.seen = frame
         if (snapshot[at + SLOT_FLAGS] & SLOT_KEYLINE) keylines++
         continue
@@ -1386,7 +1396,7 @@ export async function makeRenderer(canvas, view, viewport) {
    * exactly as the last full pass left it. Whatever it cannot answer goes to
    * the full pass through `dirtyIndices`.
    */
-  function scanMoving(entities, blend, drawAt, ringedId) {
+  function scanMoving(entities, blend, drawInto, ringedId) {
     dirtyIndices.length = 0
     let keylines = 0
     for (let i = 0; i < entities.length; i++) {
@@ -1394,6 +1404,12 @@ export async function makeRenderer(canvas, view, viewport) {
       const at = i * SLOT_STRIDE
       const drawn = i * DRAWN_STRIDE
       const flags = snapshot[at + SLOT_FLAGS]
+      // A level in play is mostly things that never move. Their place before
+      // the step is their place now, so they are drawn as the last pass left them.
+      if (isQuiet(entity, at, ringedId)) {
+        if (flags & SLOT_KEYLINE) keylines++
+        continue
+      }
       if (snapshot[at] === entity
           && (flags & SLOT_STEADY) !== 0
           && typeof entity.rotation !== 'object'
@@ -1408,7 +1424,7 @@ export async function makeRenderer(canvas, view, viewport) {
           && snapshot[at + SLOT_HIDDEN] === entity.hidden
           && snapshot[at + SLOT_OPACITY] === entity.opacity
           && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))) {
-        const place = drawAt(drawnPlaceScratch, i, entity, blend)
+        const place = drawInto(drawnPlaceScratch, entity, blend)
         const object = snapshot[at + SLOT_OBJECT]
         object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
         // The keyline hangs off the object and moves with it, so only the
@@ -1436,14 +1452,13 @@ export async function makeRenderer(canvas, view, viewport) {
    * baseline tier, where nothing it calls is inlined; the per-entity loop is the
    * whole cost of a playing frame, so it lives where it can be optimized.
    */
-  function syncEntity(i, entity, frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters) {
+  function syncEntity(i, entity, frame, sweep, blend, settledFrame, drawInto, drawPlace, painters) {
     const record = recordAt(i, entity)
     const plan = planFor(entity, record)
     const described = plan.described
     const object = objectFor(entity, described, record)
     if (sweep) object.userData.seen = frame
     const place = settledFrame ? entity
-      : drawAt ? drawAt(drawnPlaceScratch, i, entity, blend)
       : drawInto ? drawInto(drawnPlaceScratch, entity, blend)
       : drawPlace ? drawPlace(entity, blend)
       : entity
@@ -1545,11 +1560,11 @@ export async function makeRenderer(canvas, view, viewport) {
    * stays small; a loop that large kept `sync` deoptimizing once a frame, which
    * left the per-entity call in the interpreter.
    */
-  function syncChanged(entities, indices, count, frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters) {
+  function syncChanged(entities, indices, count, frame, sweep, blend, settledFrame, drawInto, drawPlace, painters) {
     let keylines = 0
     for (let c = 0; c < count; c++) {
       const i = indices === null ? c : indices[c]
-      keylines += syncEntity(i, entities[i], frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters)
+      keylines += syncEntity(i, entities[i], frame, sweep, blend, settledFrame, drawInto, drawPlace, painters)
     }
     return keylines
   }
@@ -1813,6 +1828,7 @@ export async function makeRenderer(canvas, view, viewport) {
       const instance = cloneModel(loaded)
       indexNodes(holder, instance)
       holder.remove(waiting)
+      release(waiting)
       holder.add(instance)
       // Whatever was asked for while the file was in flight. Without this an
       // entity that declared its attachment once, before the body existed,
@@ -1825,9 +1841,23 @@ export async function makeRenderer(canvas, view, viewport) {
     return holder
   }
 
+  /**
+   * Tell three that an object and everything under it are gone for good.
+   *
+   * The WebGPU renderer keeps its own record for every object it has drawn, and
+   * drops it only on the object's `dispose` event. Removing an object from the
+   * scene, or disposing its geometry, leaves that record and the arrays it holds.
+   * `Object3D.dispose` only fires the event, so shared geometry and materials are
+   * left alone.
+   */
+  function release(object) {
+    object.traverse(node => node.dispose())
+  }
+
   /** Remove an object from the scene and revoke anything private it still holds. */
   function discard(object) {
     scene.remove(object)
+    release(object)
     namedNodes.delete(object)
     attachedModels.delete(object)
     // Anything still in flight for this object — a model being fetched — checks
@@ -2070,7 +2100,7 @@ export async function makeRenderer(canvas, view, viewport) {
 
     const drawn = record.keylineMesh ?? object.userData.keylineMesh
     if (width <= 0) {
-      if (drawn) object.remove(drawn)
+      if (drawn) { object.remove(drawn); release(drawn) }
       record.keylineMesh = null
       record.keylineWidth = 0
       record.keylineColour = colour
@@ -2078,7 +2108,7 @@ export async function makeRenderer(canvas, view, viewport) {
       object.userData.keylineMesh = null
       return
     }
-    if (drawn) object.remove(drawn)
+    if (drawn) { object.remove(drawn); release(drawn) }
 
     const geometry = hullFor(entity, object, declared, shape)
     // A model still loading. The next frame builds it, and there is no state
@@ -2515,6 +2545,7 @@ export async function makeRenderer(canvas, view, viewport) {
         // The merged geometry belongs to this batch alone, unlike the cached
         // box geometry it was built from.
         batch.object.geometry.dispose()
+        release(batch.object)
         batch.object = null
       }
 
@@ -2633,6 +2664,7 @@ export async function makeRenderer(canvas, view, viewport) {
   function clearViewmodel() {
     if (!viewmodelHeld) return
     viewmodelRoot.remove(viewmodelHeld)
+    release(viewmodelHeld)
     // Anything still in flight for this pair of hands — the hands themselves, or
     // the weapon hanging off them — checks this before it does its work.
     viewmodelHeld.userData.stale = true
@@ -2960,7 +2992,6 @@ export async function makeRenderer(canvas, view, viewport) {
       // all be skipped below. The playing path writes the blended place into one
       // object reused for every entity, so a moving frame allocates nothing.
       const settledFrame = blend >= 1
-      const drawAt = settledFrame ? null : (world.drawnPlaceAt || null)
       const drawInto = settledFrame ? null : (world.drawnPlaceInto || null)
       const drawPlace = settledFrame ? null : (world.drawnPlace || null)
       // A changed default outline colour or width has to reach the outlines
@@ -2995,11 +3026,11 @@ export async function makeRenderer(canvas, view, viewport) {
       // under it, or an entity whose look did.
       let scanned = null
       if (settledFrame && !marksChanged) scanned = scanQuiet(entities, frame, sweep, ringedId)
-      else if (!sweep && drawAt) scanned = scanMoving(entities, blend, drawAt, ringedId)
+      else if (!sweep && drawInto) scanned = scanMoving(entities, blend, drawInto, ringedId)
       if (scanned !== null) keylines = scanned
       const changed = scanned === null ? entities.length : dirtyIndices.length
       keylines += syncChanged(entities, scanned === null ? null : dirtyIndices, changed, frame, sweep,
-        blend, settledFrame, drawAt, drawInto, drawPlace, painters)
+        blend, settledFrame, drawInto, drawPlace, painters)
 
       // A sweep only when the counts disagree. When they agree but a fresh id
       // was built during the loop, the living set is rebuilt once instead; the
