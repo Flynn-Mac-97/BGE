@@ -449,15 +449,23 @@ export function makeWorld(bus) {
     catch (err) { console.error(`[${e.type}] ${which}`, err) }
   }
 
-  // Keyed by the entity object, so a destroyed body's entry goes with it.
-  const previousPlaces = new WeakMap()
+  /**
+   * Where a body was before the last step, kept on the body itself.
+   *
+   * A non-enumerable symbol, so `Object.keys`, a save, a checkpoint copy and a
+   * spread all pass over it — a place between steps is runtime state and
+   * nothing serialises it. It used to be a `WeakMap`, and a probe plus a write
+   * for every entity every step was a third of the step at fifty thousand
+   * entities.
+   */
+  const beforePlace = Symbol('before place')
 
   /**
    * The same places by position, for the renderer.
    *
    * The renderer walks the entity list in order, so a position answers where a
-   * body was before the step without a WeakMap probe per entity. The stored
-   * entity is the test: a reorder falls back to the map.
+   * body was before the step without a lookup per entity. The stored entity is
+   * the test: a reorder falls back to the symbol.
    */
   const beforeEntities = []
   const beforeX = []
@@ -471,7 +479,7 @@ export function makeWorld(bus) {
    * A body with no earlier place, or a blend of one, is drawn where it is.
    */
   function drawnPlaceInto(target, entity, blend) {
-    const before = previousPlaces.get(entity)
+    const before = entity[beforePlace]
     const z = entity.z || 0
     if (!before || blend >= 1) {
       target.x = entity.x
@@ -510,7 +518,19 @@ export function makeWorld(bus) {
       const list = entities
       for (let index = 0; index < list.length; index++) {
         const entity = list[index]
-        previousPlaces.set(entity, { x: entity.x, y: entity.y, z: entity.z || 0, yaw: entity.yaw })
+        // The before place lives on the entity, reused rather than replaced: a
+        // fresh object — or a map probe — for every entity every step is what
+        // stopped a large level running smoothly. Non-enumerable, so nothing
+        // that copies or saves an entity sees it.
+        let before = entity[beforePlace]
+        if (before === undefined) {
+          before = {}
+          Object.defineProperty(entity, beforePlace, { value: before, writable: true, configurable: true })
+        }
+        before.x = entity.x
+        before.y = entity.y
+        before.z = entity.z || 0
+        before.yaw = entity.yaw
         beforeEntities[index] = entity
         beforeX[index] = entity.x
         beforeY[index] = entity.y

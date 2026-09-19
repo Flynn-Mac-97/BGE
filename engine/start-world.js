@@ -356,8 +356,13 @@ export async function startWorld({
         try { s.run(world, seconds, context) } catch (e) { loader.fail(s.plugin, e) }
       }
       // world.hook runs the attached behaviours first, then the type's own
-      // update — so a type always gets the last word on what it composed.
-      for (const e of [...world.entities]) world.hook(e, 'update', seconds, context)
+      // update — so a type always gets the last word on what it composed. An
+      // entity with no behaviours and no update hook has nothing to ask, and at
+      // a large entity count asking every one of them is most of the step.
+      for (const e of [...world.entities]) {
+        if (!e.behaviours.length && typeof e._definition?.update !== 'function') continue
+        world.hook(e, 'update', seconds, context)
+      }
     },
     /**
      * @desc Advance one rendered frame: frame-time systems, then draw.
