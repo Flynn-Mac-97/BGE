@@ -96,6 +96,27 @@ const percentile = (values, share) => {
 }
 const round = value => value === null ? null : Math.round(value * 100) / 100
 
+/**
+ * Wait until the page draws a frame with no post chain compiling, and keeps
+ * drawing the same number of calls and triangles for three seconds.
+ *
+ * Models load after the level does, so the first drawn frame can still be
+ * missing some of them.
+ */
+async function waitForDrawing(page, what) {
+  let last = null
+  let steadySince = Date.now()
+  await waitFor(what, async () => {
+    const drawn = await page.evaluate(`(() => {
+      const stats = window.engine?.renderStats?.()
+      if (!stats || stats.error || stats.drawCalls === 0 || String(stats.post).includes('compiling')) return null
+      return stats.drawCalls + ' ' + stats.triangles
+    })()`)
+    if (drawn !== last) { last = drawn; steadySince = Date.now() }
+    return drawn !== null && Date.now() - steadySince >= 3000
+  }, 240000)
+}
+
 /** Mean colour difference between two PNG data URLs, 0 to 1, measured in the page. */
 const COMPARE = `async (first, second) => {
   const pixels = async url => {
@@ -169,11 +190,10 @@ export async function browserFrames(checkout, project, options = {}) {
     if (level) {
       await waitFor('the editor', () => page.evaluate('!!window.engine?.editor?.loadLevel'), 120000)
       await page.evaluate(`window.engine.editor.loadLevel(${JSON.stringify(level)})`)
+      // The stats still describe the last level until the new one draws.
+      await sleep(3000)
     }
-    await waitFor('a drawn frame', () => page.evaluate(`(() => {
-      const stats = window.engine?.renderStats?.()
-      return !!stats && !stats.error && stats.drawCalls > 0 && !String(stats.post).includes('compiling')
-    })()`), 240000)
+    await waitForDrawing(page, 'a drawn frame')
     const measures = { loadSeconds: round((Date.now() - started) / 1000) }
 
     const answer = { measures, difference: null, picture: null, problem: null }
@@ -222,6 +242,9 @@ async function stillPicture(page, camera, file, compareTo) {
 /** Frame costs while the game plays, after `warmSeconds` of play. */
 async function playingFrames(page, warmSeconds, frames) {
   await page.evaluate('window.engine.play()')
+  // Play draws through another camera, and nothing draws while its chain compiles.
+  await sleep(1000)
+  await waitForDrawing(page, 'a drawn playing frame')
   await sleep(warmSeconds * 1000)
   const samples = await page.evaluate(`new Promise(resolve => {
     const cpu = [], gpu = [], gaps = []
