@@ -42,6 +42,22 @@ in its field. Options: `{ files, rounds, candidates, timeout, model }`.
 run is refused when the tracked tree is dirty or when another agent holds a live
 lane, because candidates branch from HEAD.
 
+## Design, read the evaluator, then spend
+
+`dream.improve` designs the evaluator and starts paying for candidates in one
+call. The tools split it, so the evaluator is read before it costs anything:
+
+```sh
+node tools/dream/setup.mjs --target "<what to improve>"     # design and check, then stop
+node tools/dream/loop.mjs --run agent-runs/dream-<stamp>-<slug> --rounds 2 --candidates 1
+```
+
+`loop.mjs` skips the design phase when the run directory already holds a
+`setup.mjs`, so the setup is frozen the same way in two commands. Read
+`setup.mjs` and `setup-check.json` between them: a setup that passes its control
+can still measure the wrong thing, and the candidates are the expensive half.
+The design phase alone costs a fraction of one candidate.
+
 ## What it leaves behind
 
 One directory per run under `agent-runs/dream-<stamp>-<target>/`. It is the
