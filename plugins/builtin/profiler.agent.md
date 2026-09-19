@@ -17,6 +17,14 @@ category: engine
 ```sh
 node bin/engine.mjs --headless --project <path> --level <name> run profile.steps
 ```
+- `profile.plan` times the per-entity **description** the renderer builds every
+  frame, from `engine/frame-plan.js`: look, turn, drawn size, stillness
+  signature. No card is needed, so it measures the thread's own ceiling where
+  `profile.frames` cannot run.
+
+```sh
+node bin/engine.mjs --headless --project <path> --level <name> run profile.plan
+```
 - `profile.fill` stacks quads covering the frame on one material and reports
   what its **pixels** cost. One surface over a twelfth of the screen is too
   cheap for any timer here to see; this is the only way to price a shader.

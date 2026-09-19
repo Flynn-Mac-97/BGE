@@ -36,10 +36,14 @@ const STEPS = 600
 /** Steps run and thrown away first, so a grid being built once is not a step cost. */
 const STEP_WARM = 60
 
+/** Frame plans timed; the median is reported so one GC pause is not the answer. */
+const PLAN_SAMPLES = 30
+
 /** A fixed step is 1/60 s, so this is the whole budget one step may spend. */
 const BUDGET_MS = 1000 / 60
 
 import { fillWith } from './profiler/fill.js'
+import { planFrame } from '../../engine/frame-plan.js'
 
 const sorted = list => [...list].sort((a, b) => a - b)
 
@@ -248,6 +252,40 @@ function measureSteps(context, options = {}) {
 /** The fill measurement, given the helpers every profiler number is made with. */
 const measureFill = fillWith({ measure, drawOnce, round })
 
+/**
+ * What the renderer's per-entity description costs, with no GL context.
+ *
+ * `profile.frames` needs a card. This does not: it times `planFrame`, the same
+ * pure pass `sync` makes for every entity — the look, the turn, the drawn size
+ * and the stillness signature — so the thread's own ceiling can be measured in
+ * a headless run, on the machine doing the work rather than a GPU.
+ */
+function measurePlan(context, options = {}) {
+  const world = context.world
+  const entities = world?.entities || []
+  if (!entities.length) return { error: 'the world holds no entities to plan' }
+  const samples = Math.min(200, Math.max(1, Math.round(Number(options.samples) || PLAN_SAMPLES)))
+  // One pass thrown away, so the caches a first frame fills are not the answer.
+  planFrame(world)
+  const times = []
+  let counted = null
+  for (let index = 0; index < samples; index++) {
+    const at = performance.now()
+    counted = planFrame(world)
+    times.push(performance.now() - at)
+  }
+  const plan = spread(times)
+  return {
+    samples,
+    planMs: plan,
+    budgetMs: round(BUDGET_MS),
+    entities: counted.entities,
+    meshes: counted.meshes,
+    sprites: counted.sprites,
+    perEntityMicroseconds: round((plan.median / Math.max(1, counted.entities)) * 1000)
+  }
+}
+
 export default {
   name: 'Profiler',
   category: 'agents',
@@ -259,7 +297,8 @@ export default {
     context.profiler = {
       measure: options => measure(context, options),
       fill: options => measureFill(context, options),
-      steps: options => measureSteps(context, options)
+      steps: options => measureSteps(context, options),
+      plan: options => measurePlan(context, options)
     }
     if (scope) {
       const service = context.profiler
@@ -286,5 +325,11 @@ export default {
     // run profile.steps
     // run profile.steps '{"steps": 1200, "warm": 120}'
     run: (context, options) => measureSteps(context, options || {})
+  }, {
+    id: 'profile.plan',
+    label: 'Cost per-entity description',
+    // run profile.plan
+    // run profile.plan '{"samples": 50}'
+    run: (context, options) => measurePlan(context, options || {})
   }]
 }
