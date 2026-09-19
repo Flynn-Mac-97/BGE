@@ -452,6 +452,43 @@ export function makeWorld(bus) {
   // Keyed by the entity object, so a destroyed body's entry goes with it.
   const previousPlaces = new WeakMap()
 
+  /**
+   * The same places by position, for the renderer.
+   *
+   * The renderer walks the entity list in order, so a position answers where a
+   * body was before the step without a WeakMap probe per entity. The stored
+   * entity is the test: a reorder falls back to the map.
+   */
+  const beforeEntities = []
+  const beforeX = []
+  const beforeY = []
+  const beforeZ = []
+  const beforeYaw = []
+
+  /**
+   * Write the place between two steps into `target` rather than a new object.
+   *
+   * A body with no earlier place, or a blend of one, is drawn where it is.
+   */
+  function drawnPlaceInto(target, entity, blend) {
+    const before = previousPlaces.get(entity)
+    const z = entity.z || 0
+    if (!before || blend >= 1) {
+      target.x = entity.x
+      target.y = entity.y
+      target.z = z
+      target.yaw = entity.yaw
+      return target
+    }
+    target.x = before.x + (entity.x - before.x) * blend
+    target.y = before.y + (entity.y - before.y) * blend
+    target.z = before.z + (z - before.z) * blend
+    target.yaw = Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
+      ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
+      : entity.yaw
+    return target
+  }
+
   const world = {
     get entities() { return entities },
     types,
@@ -470,8 +507,22 @@ export function makeWorld(bus) {
 
     /** Store every body's place before a fixed step moves it. The loop calls this. */
     rememberPlaces() {
-      for (const entity of entities) {
+      const list = entities
+      for (let index = 0; index < list.length; index++) {
+        const entity = list[index]
         previousPlaces.set(entity, { x: entity.x, y: entity.y, z: entity.z || 0, yaw: entity.yaw })
+        beforeEntities[index] = entity
+        beforeX[index] = entity.x
+        beforeY[index] = entity.y
+        beforeZ[index] = entity.z || 0
+        beforeYaw[index] = entity.yaw
+      }
+      if (beforeEntities.length > list.length) {
+        beforeEntities.length = list.length
+        beforeX.length = list.length
+        beforeY.length = list.length
+        beforeZ.length = list.length
+        beforeYaw.length = list.length
       }
     },
 
@@ -481,18 +532,40 @@ export function makeWorld(bus) {
      * and is drawn where it is. Game code reads `x`, `y` and `z`, never this.
      */
     drawnPlace(entity, blend = 1) {
-      const before = previousPlaces.get(entity)
-      const z = entity.z || 0
-      if (!before || blend >= 1) return { x: entity.x, y: entity.y, z, yaw: entity.yaw }
-      const between = (from, to) => from + (to - from) * blend
-      return {
-        x: between(before.x, entity.x),
-        y: between(before.y, entity.y),
-        z: between(before.z, z),
-        yaw: Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
-          ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
+      return drawnPlaceInto({}, entity, blend)
+    },
+
+    /**
+     * The same answer, written into `target`.
+     *
+     * The renderer asks this for every moving entity every frame, and returning
+     * a fresh object each time spread fifty thousand short-lived objects through
+     * the heap per frame. `drawnPlace` is this plus the one object it returns.
+     */
+    drawnPlaceInto(target, entity, blend = 1) {
+      return drawnPlaceInto(target, entity, blend)
+    },
+
+    /**
+     * The interpolated place for the body at one position in the entity list.
+     *
+     * The renderer already walks that list in order, so the position answers
+     * where the body was before the step and saves a WeakMap probe per entity.
+     * The stored entity is the test for a list that changed under the caller.
+     */
+    drawnPlaceAt(target, index, entity, blend = 1) {
+      if (beforeEntities[index] === entity && blend < 1) {
+        target.x = beforeX[index] + (entity.x - beforeX[index]) * blend
+        target.y = beforeY[index] + (entity.y - beforeY[index]) * blend
+        const z = entity.z || 0
+        target.z = beforeZ[index] + (z - beforeZ[index]) * blend
+        const beforeYawAt = beforeYaw[index]
+        target.yaw = Number.isFinite(beforeYawAt) && Number.isFinite(entity.yaw)
+          ? beforeYawAt + Math.atan2(Math.sin(entity.yaw - beforeYawAt), Math.cos(entity.yaw - beforeYawAt)) * blend
           : entity.yaw
+        return target
       }
+      return drawnPlaceInto(target, entity, blend)
     },
 
     /** Put a type definition in the registry, for the next spawn to read. */

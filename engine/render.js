@@ -1129,15 +1129,72 @@ export async function makeRenderer(canvas, view, viewport) {
       frames: 0,
       sigX: 0, sigY: 0, sigZ: 0,
       sigScale: 1, sigTurnX: 0, sigTurnY: 0, sigTurnZ: 0, sigLook: null,
-      // The last state a skip would have to prove unchanged.
-      mesh: undefined, collider: undefined, type: undefined,
-      x: NaN, y: NaN, z: NaN, scale: NaN, yaw: undefined,
-      hidden: undefined, opacity: undefined, rotation: undefined,
       turn: null, turnRotation: undefined, turnYaw: undefined,
-      turnObject: null, appliedTurnX: NaN, appliedTurnY: NaN, appliedTurnZ: NaN
+      turnObject: null, appliedTurnX: NaN, appliedTurnY: NaN, appliedTurnZ: NaN,
+      // The plan and the declaration it was measured from, so the per-entity
+      // lookup is four identity compares rather than a map keyed by a string.
+      plan: null, planMesh: undefined, planSprite: undefined,
+      planType: undefined, planCollider: undefined,
+      // The look string the object was built with, so a frame that changed
+      // nothing compares one record field instead of reaching into `userData`.
+      drawnLook: null,
+      // The keyline already hanging off this entity's object, and the width and
+      // colour it was built with. Read here rather than off `userData`, whose
+      // shape grows a new property for every feature this file gains.
+      keylineMesh: null, keylineWidth: -1, keylineColour: null,
+      // The batch this entity is in, or null. Mirrors `userData.batch` so the
+      // moving path does not have to reach into the object to find out.
+      batchKey: null,
+      // The entity this record answered for last, so the position-indexed array
+      // can tell a stable list from a reordered one.
+      entity: null
     }
     records.set(entity, record)
     return record
+  }
+
+  /**
+   * The record for the entity at one position in the world's list.
+   *
+   * `sync` walks the list in order, so the position is stable and an array of
+   * records is one load instead of a WeakMap probe per entity. The stored entity
+   * is the test: a reorder, a spawn or a removal falls back to the WeakMap.
+   */
+  const recordByIndex = []
+  function recordAt(index, entity) {
+    const known = recordByIndex[index]
+    if (known !== undefined && known.entity === entity) return known
+    const record = recordFor(entity)
+    record.entity = entity
+    recordByIndex[index] = record
+    return record
+  }
+
+  /** The one object an interpolated place is written into, reused every entity. */
+  const drawnPlaceScratch = { x: 0, y: 0, z: 0, yaw: undefined }
+
+  /**
+   * The plan for one entity, kept on its record.
+   *
+   * `entityPlan` is already cached by declaration, but answering it per entity
+   * built a `t:<type>` key for every entity with no mesh object — a string per
+   * entity per frame. The record holds the four things the plan depends on, so a
+   * stable entity answers with identity compares and a string is built only when
+   * a declaration actually changed.
+   */
+  function planFor(entity, record) {
+    if (record.plan !== null
+        && record.planMesh === entity.mesh && record.planSprite === entity.sprite
+        && record.planType === entity.type && record.planCollider === entity.collider) {
+      return record.plan
+    }
+    const plan = entityPlan(entity)
+    record.plan = plan
+    record.planMesh = entity.mesh
+    record.planSprite = entity.sprite
+    record.planType = entity.type
+    record.planCollider = entity.collider
+    return plan
   }
 
   /**
@@ -1211,16 +1268,16 @@ export async function makeRenderer(canvas, view, viewport) {
     const at = index * SLOT_STRIDE
     snapshot[at] = entity
     snapshot[at + SLOT_OBJECT] = object
-    snapshot[at + SLOT_MESH] = record.mesh
-    snapshot[at + SLOT_COLLIDER] = record.collider
-    snapshot[at + SLOT_TYPE] = record.type
-    snapshot[at + SLOT_X] = record.x
-    snapshot[at + SLOT_Y] = record.y
-    snapshot[at + SLOT_Z] = record.z
-    snapshot[at + SLOT_SCALE] = record.scale
-    snapshot[at + SLOT_YAW] = record.yaw
-    snapshot[at + SLOT_HIDDEN] = record.hidden
-    snapshot[at + SLOT_OPACITY] = record.opacity
+    snapshot[at + SLOT_MESH] = entity.mesh
+    snapshot[at + SLOT_COLLIDER] = entity.collider
+    snapshot[at + SLOT_TYPE] = entity.type
+    snapshot[at + SLOT_X] = entity.x
+    snapshot[at + SLOT_Y] = entity.y
+    snapshot[at + SLOT_Z] = entity.z
+    snapshot[at + SLOT_SCALE] = entity.scale
+    snapshot[at + SLOT_YAW] = entity.yaw
+    snapshot[at + SLOT_HIDDEN] = entity.hidden
+    snapshot[at + SLOT_OPACITY] = entity.opacity
     // Settled, idle and never moved: the answers that let the next frame skip
     // this entity, and whether it draws an outline while skipped.
     snapshot[at + SLOT_FLAGS] =
@@ -1267,6 +1324,123 @@ export async function makeRenderer(canvas, view, viewport) {
         continue
       }
       dirtyIndices.push(i)
+    }
+    return keylines
+  }
+
+  /**
+   * Draw one entity the quiet scan could not answer: it moved, or its look
+   * changed, so every field is read and written.
+   *
+   * Returns 1 when the entity draws an outline, 0 when it does not. This is its
+   * own function because `sync` is large enough that V8 leaves it in the
+   * baseline tier, where nothing it calls is inlined; the per-entity loop is the
+   * whole cost of a playing frame, so it lives where it can be optimized.
+   */
+  function syncEntity(i, entity, frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters) {
+    const record = recordAt(i, entity)
+    const plan = planFor(entity, record)
+    const described = plan.described
+    const object = objectFor(entity, described, record)
+    if (sweep) object.userData.seen = frame
+    const place = settledFrame ? entity
+      : drawAt ? drawAt(drawnPlaceScratch, i, entity, blend)
+      : drawInto ? drawInto(drawnPlaceScratch, entity, blend)
+      : drawPlace ? drawPlace(entity, blend)
+      : entity
+    const declared = entity.mesh ? meshOf(entity) : null
+    const anchor = declared?.anchor == null ? 0 : anchorOffset(entity)
+    object.position.set(place.x, place.y + anchor, place.z || 0)
+    object.visible = !entity.hidden
+
+    if (entity.mesh) {
+      const shape = plan.shape
+      // Solid geometry carries its own size, so scale multiplies rather
+      // than sets.
+      const s = totalScale(entity)
+      object.scale.set(s, s, s)
+      // One turn, read once and passed on: the merge signature needs the
+      // same three angles, and reading them twice was two allocations a
+      // mesh entity a frame.
+      const turn = turnFor(entity, record)
+      const yaw = Number.isFinite(place.yaw) ? place.yaw : turn.y
+      // A static thing that kept its angles must not rebuild its quaternion
+      // every frame; only a changed turn is written.
+      if (record.turnObject !== object || record.appliedTurnX !== turn.x
+          || record.appliedTurnY !== yaw || record.appliedTurnZ !== turn.z) {
+        object.rotation.set(turn.x, yaw, turn.z, 'YXZ')
+        record.turnObject = object
+        record.appliedTurnX = turn.x
+        record.appliedTurnY = yaw
+        record.appliedTurnZ = turn.z
+      }
+      // The editor dims a hovered entity to preview it.
+      const opacity = entity.opacity ?? 1
+      dim(object, opacity)
+      // A named part of a body built from boxes poses exactly as a named
+      // node of a model does, so a run cycle is the same four numbers
+      // either way and game code never asks which the body is made of.
+      if (entity.pose && (declared.model || declared.parts)) applyPose(object, entity.pose)
+      // Unconditional for a model, because taking an attachment off is as
+      // much a state as putting one on: a body that dropped its rifle stops
+      // declaring one, and the hand has to empty.
+      if (declared.model) applyAttachments(object, entity.attachments)
+      // Depth decides what covers what, so there is nothing to order.
+      object.renderOrder = 0
+      record.simple = !declared.model && !Array.isArray(declared.parts)
+      record.idle = record.simple && declared.shadow === undefined && declared.ring === undefined
+      considerForMerging(entity, object, described, opacity, !record.simple, turn, record)
+      // After merging, which is where "has this ever moved" is answered.
+      record.keyline = updateReadability(entity, object, declared, shape, record.moved, place, record)
+      saveSlot(i, entity, object, record)
+      return record.keyline ? 1 : 0
+    }
+
+    record.simple = false
+    record.idle = false
+    const { w, h } = drawSize(entity)
+    object.rotation.set(0, 0, spinRadians(entity))
+    object.scale.set(w, h, 1)
+    object.material.opacity = entity.opacity ?? 1
+    // Painter's order is the layering in 2D: z first, then the order the
+    // level lists them in. In a first-person scene the world in front is
+    // real geometry, so a sprite has to be tested against it.
+    object.renderOrder = (entity.z || 0) * 1000 + i
+    object.material.depthTest = !painters
+
+    // A tiled sprite repeats once per world unit unless told otherwise.
+    if (entity.sprite?.tile && object.material.map) {
+      object.material.map.repeat.set(w / entity.sprite.tile, h / entity.sprite.tile)
+    }
+
+    // A sheet shows one cell. `entity.frame` is set by whoever is animating
+    // it — the animation plugin, or game code directly.
+    const image = object.material.map?.image
+    if (entity.sprite?.sheet && image?.width) {
+      const win = frameWindow(entity.sprite, entity.frame, image)
+      object.material.map.repeat.set(win.repeat[0], win.repeat[1])
+      object.material.map.offset.set(win.offset[0], win.offset[1])
+    }
+
+    // Facing is a mirror, not a rotation: negative X scale flips the art
+    // without touching the collider or the transform gizmo.
+    if (entity.flip) object.scale.x = -object.scale.x
+    saveSlot(i, entity, object, record)
+    return 0
+  }
+
+  /**
+   * Walk the entities the quiet scan could not answer.
+   *
+   * The loop is here rather than in `sync` so the function V8 has to optimize
+   * stays small; a loop that large kept `sync` deoptimizing once a frame, which
+   * left the per-entity call in the interpreter.
+   */
+  function syncChanged(entities, indices, count, frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters) {
+    let keylines = 0
+    for (let c = 0; c < count; c++) {
+      const i = indices === null ? c : indices[c]
+      keylines += syncEntity(i, entities[i], frame, sweep, blend, settledFrame, drawAt, drawInto, drawPlace, painters)
     }
     return keylines
   }
@@ -1331,7 +1505,11 @@ export async function makeRenderer(canvas, view, viewport) {
    */
   function invalidateEverything() {
     sharedMaterials.clear()
-    for (const object of meshes.values()) object.userData.look = null
+    for (const object of meshes.values()) {
+      object.userData.look = null
+      const record = object.userData.record
+      if (record) record.drawnLook = null
+    }
   }
 
   /**
@@ -1546,34 +1724,52 @@ export async function makeRenderer(canvas, view, viewport) {
     // Anything still in flight for this object — a model being fetched — checks
     // this before it does its work.
     object.userData.stale = true
+    // The record that stood for this object must stop answering with it, or the
+    // fast path would hand back an object that is no longer in the scene.
+    const record = object.userData.record
+    if (record) { record.object = null; record.drawnLook = null }
     if (!object.userData.privateMaterial) return
     object.traverse(node => eachMaterial(node, material => material.dispose()))
   }
 
   /** The scene object for one entity, rebuilt when its look changed. */
   function objectFor(entity, described, record) {
-    const known = meshes.has(entity.id)
     let object = record.object
-    // A discarded object is stale but still remembered; forget it here.
-    if (object && object.userData.stale) object = null
-    if (!object) {
+    // The record's own object answers almost every frame, and `drawnLook` is on
+    // the record rather than in `userData`, where every feature this file gains
+    // grows the object's shape. The id lookup into `meshes` runs only when there
+    // is none — a first sight, or an object discarded behind the record's back.
+    if (object !== null && record.drawnLook === described.look) return object
+    if (object === null) {
       const found = meshes.get(entity.id)
       if (found && !found.userData.stale) object = found
     }
-    if (object && object.userData.look !== described.look) {
+    if (object !== null) {
+      if (object.userData.look === described.look) {
+        record.object = object
+        record.drawnLook = described.look
+        object.userData.record = record
+        record.keylineMesh = object.userData.keylineMesh ?? null
+        return object
+      }
       // Changing a texture — or a box size — in the inspector has to show up
       // without a reload. Rebuilding rather than patching is what lets a sprite,
       // a box and a model all be the same entity at different moments.
       leaveBatch(entity.id)
       discard(object)
       meshes.delete(entity.id)
-      object = null
     }
-    if (object) { record.object = object; return object }
+    const known = meshes.has(entity.id)
     object = buildObject(entity, described)
     scene.add(object)
     meshes.set(entity.id, object)
     record.object = object
+    record.drawnLook = described.look
+    object.userData.record = record
+    // The new object carries no keyline yet, whatever the old one had.
+    record.keylineMesh = null
+    record.keylineWidth = -1
+    record.keylineColour = null
     // An id that had nothing before may mean an old object is now dead.
     if (!known) objectsGrew = true
     return object
@@ -1754,17 +1950,24 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /** Add, resize or remove an entity's keyline so it matches the width it now declares. */
-  function updateKeyline(entity, object, declared, shape, moved) {
+  function updateKeyline(entity, object, declared, shape, moved, record) {
     const width = keylineWidth(declared, moved)
-    const drawn = object.userData.keylineMesh
     const colour = declared.keylineColour ?? readability.keylineColour
+    // Almost every moving entity keeps the outline it already has, so the answer
+    // is kept on the record. Reading it off `userData` meant a property whose
+    // shape grows with every feature this file gains, once per entity per frame.
+    if (record.keylineWidth === width && record.keylineColour === colour
+        && (width <= 0 || record.keylineMesh !== null)) return
 
+    const drawn = record.keylineMesh ?? object.userData.keylineMesh
     if (width <= 0) {
-      if (drawn) { object.remove(drawn); object.userData.keylineMesh = null }
+      if (drawn) object.remove(drawn)
+      record.keylineMesh = null
+      record.keylineWidth = 0
+      record.keylineColour = colour
+      object.userData.keylineMesh = null
       return
     }
-    const flat = shape?.kind === 'quad'
-    if (drawn && drawn.userData.width === width && drawn.userData.colour === colour) return
     if (drawn) object.remove(drawn)
 
     const geometry = hullFor(entity, object, declared, shape)
@@ -1772,13 +1975,16 @@ export async function makeRenderer(canvas, view, viewport) {
     // to keep.
     if (!geometry) return
 
-    const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour, flat))
+    const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour, shape?.kind === 'quad'))
     // Read by hullGeometry, and by the batcher deciding what to hide.
     hull.userData.keyline = true
     hull.userData.width = width
     hull.userData.colour = colour
     object.add(hull)
     object.userData.keylineMesh = hull
+    record.keylineMesh = hull
+    record.keylineWidth = width
+    record.keylineColour = colour
   }
 
   /**
@@ -1789,7 +1995,20 @@ export async function makeRenderer(canvas, view, viewport) {
    * back: a horde that peaked at three hundred will peak again.
    */
   const SHADOW_QUAD = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
-  const shadowPlaces = []
+
+  /**
+   * One frame's floor marks, as parallel numeric arrays.
+   *
+   * A growing array of `{x, z, radius, strength}` objects meant fifty thousand
+   * short-lived objects a frame on a moving level, and the collector paid for
+   * every one. The fields are written by index instead, so nothing is allocated
+   * once the arrays have reached their high-water mark.
+   */
+  function placeList() {
+    return { count: 0, x: [], z: [], radius: [], colour: [], strength: [] }
+  }
+
+  const shadowPlaces = placeList()
   let contactShadows = null
   let contactStrengths = null
 
@@ -1843,12 +2062,11 @@ export async function makeRenderer(canvas, view, viewport) {
     if (!(stated > 0)) return
 
     const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - readability.groundY) / readability.shadowRange))
-    shadowPlaces.push({
-      x: place.x,
-      z: place.z || 0,
-      radius: stated * (1 + lift * 0.7),
-      strength: (declared.shadowStrength ?? readability.shadowStrength) * (1 - lift) ** 1.5
-    })
+    const at = shadowPlaces.count++
+    shadowPlaces.x[at] = place.x
+    shadowPlaces.z[at] = place.z || 0
+    shadowPlaces.radius[at] = stated * (1 + lift * 0.7)
+    shadowPlaces.strength[at] = (declared.shadowStrength ?? readability.shadowStrength) * (1 - lift) ** 1.5
   }
 
   /**
@@ -1858,24 +2076,23 @@ export async function makeRenderer(canvas, view, viewport) {
    * Scenery leaves in the first three lines. Several hundred props that never
    * move must not pay to read their own shape again on every frame.
    */
-  function updateReadability(entity, object, declared, shape, moved, place) {
+  function updateReadability(entity, object, declared, shape, moved, place, record) {
     const asks = declared.keyline !== undefined || declared.shadow !== undefined
       || declared.ring !== undefined
     // The ringed actor is named, so it is entitled to a ring on the frame it
     // appears, before it has moved. An object already drawing a keyline is not
     // scenery either: leaving early would strand the hull when the declaration
     // that asked for it is taken away.
-    if (!moved && !asks && !ringNames(entity) && !object.userData.keylineMesh) return false
+    if (!moved && !asks && !ringNames(entity) && record.keylineMesh === null) return false
 
-    updateKeyline(entity, object, declared, shape, moved)
+    updateKeyline(entity, object, declared, shape, moved, record)
     if (!entity.hidden) {
       noteContactShadow(entity, declared, shape, moved, place)
       noteGroundRing(entity, declared, shape, place)
     }
-    return !!object.userData.keylineMesh
-  }
+    return record.keylineMesh !== null
 
-  const shadowMatrix = new THREE.Matrix4()
+  }
 
   /**
    * Write this frame's marks into an instanced quad mesh: a disc of the mark's
@@ -1885,26 +2102,46 @@ export async function makeRenderer(canvas, view, viewport) {
    * Both floor marks are the same kind of thing — a flat disc occluded by
    * whatever stands in front of it — and each keeps its own geometry, because an
    * instanced attribute belongs to the geometry.
+   *
+   * The instance matrix is written element by element. `Matrix4.makeScale` and
+   * `setPosition` build one matrix and `setMatrixAt` copies it, which is three
+   * calls and a copy per mark where the mark is only a scale and a translation.
    */
-  function placeMarks(places, { meshOf, matrix, height, grow, write, attributesOf = () => [] }) {
-    if (!places.length) {
+  function placeMarks(places, { meshOf, height, grow, write, attributesOf = () => [] }) {
+    if (!places.count) {
       const mesh = meshOf()
       if (mesh) mesh.count = 0
       return
     }
-    grow(places.length)
+    grow(places.count)
     // `grow` may have built the mesh and its instanced attributes on this very
     // call, so both are read after it rather than before.
     const mesh = meshOf()
-    for (let i = 0; i < places.length; i++) {
-      const place = places[i]
-      matrix.makeScale(place.radius * 2, 1, place.radius * 2)
-      matrix.setPosition(place.x, height, place.z)
-      mesh.setMatrixAt(i, matrix)
-      write(place, i)
+    const matrix = mesh.instanceMatrix
+    const array = matrix.array
+    for (let i = 0; i < places.count; i++) {
+      const at = i * 16
+      const wide = places.radius[i] * 2
+      array[at] = wide
+      array[at + 1] = 0
+      array[at + 2] = 0
+      array[at + 3] = 0
+      array[at + 4] = 0
+      array[at + 5] = 1
+      array[at + 6] = 0
+      array[at + 7] = 0
+      array[at + 8] = 0
+      array[at + 9] = 0
+      array[at + 10] = wide
+      array[at + 11] = 0
+      array[at + 12] = places.x[i]
+      array[at + 13] = height
+      array[at + 14] = places.z[i]
+      array[at + 15] = 1
+      if (write) write(places, i)
     }
-    mesh.count = places.length
-    mesh.instanceMatrix.needsUpdate = true
+    mesh.count = places.count
+    matrix.needsUpdate = true
     for (const attribute of attributesOf()) attribute.needsUpdate = true
   }
 
@@ -1912,12 +2149,11 @@ export async function makeRenderer(canvas, view, viewport) {
   function placeContactShadows() {
     placeMarks(shadowPlaces, {
       meshOf: () => contactShadows,
-      matrix: shadowMatrix,
       // Just clear of the floor, or the two surfaces fight for the same pixels.
       height: readability.groundY + 0.015,
       grow: growContactShadows,
       attributesOf: () => [contactStrengths],
-      write: (place, i) => contactStrengths.setX(i, place.strength)
+      write: (places, i) => contactStrengths.setX(i, places.strength[i])
     })
   }
 
@@ -1933,7 +2169,7 @@ export async function makeRenderer(canvas, view, viewport) {
    * per-instance values.
    */
   const RING_QUAD = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
-  const ringPlaces = []
+  const ringPlaces = placeList()
   const ringColours = new Map()
   let groundRings = null
   let ringTints = null
@@ -2014,30 +2250,26 @@ export async function makeRenderer(canvas, view, viewport) {
     const stated = typeof asked === 'number' ? asked : across * 0.85
     if (!(stated > 0)) return
 
-    ringPlaces.push({
-      x: place.x,
-      z: place.z || 0,
-      radius: stated,
-      colour: declared.ringColour ?? readability.ringColour,
-      strength: declared.ringStrength ?? readability.ringStrength
-    })
+    const at = ringPlaces.count++
+    ringPlaces.x[at] = place.x
+    ringPlaces.z[at] = place.z || 0
+    ringPlaces.radius[at] = stated
+    ringPlaces.colour[at] = declared.ringColour ?? readability.ringColour
+    ringPlaces.strength[at] = declared.ringStrength ?? readability.ringStrength
   }
-
-  const ringMatrix = new THREE.Matrix4()
 
   /** Write the frame's rings into the instanced mesh. Called once per sync. */
   function placeGroundRings() {
     placeMarks(ringPlaces, {
       meshOf: () => groundRings,
-      matrix: ringMatrix,
       // Above the contact shadow's 0.015, so the colour wins where they meet.
       height: readability.groundY + 0.02,
       grow: growGroundRings,
       attributesOf: () => [ringTints, ringStrengths],
-      write: (place, i) => {
-        const colour = ringColour(place.colour)
+      write: (places, i) => {
+        const colour = ringColour(places.colour[i])
         ringTints.setXYZ(i, colour.r, colour.g, colour.b)
-        ringStrengths.setX(i, place.strength)
+        ringStrengths.setX(i, places.strength[i])
       }
     })
   }
@@ -2070,11 +2302,14 @@ export async function makeRenderer(canvas, view, viewport) {
    * Take an entity out of its batch and put its own mesh back on the drawn layer.
    *
    * The batch key is kept on the object rather than in the frame record, so the
-   * dead-object sweep can leave a batch without having an entity to hand.
+   * dead-object sweep can leave a batch without having an entity to hand. The
+   * record's copy is cleared when the caller has one, which lets the moving path
+   * answer "is this in a batch" without reaching into the object.
    */
-  function leaveBatch(id) {
+  function leaveBatch(id, record) {
     const object = meshes.get(id)
     const key = object?.userData.batch
+    if (record) record.batchKey = null
     if (!key) return
     const batch = batches.get(key)
     if (batch) { batch.members.delete(id); batch.dirty = true }
@@ -2089,7 +2324,7 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /** Add an entity to the batch for its key, creating the batch if needed. */
-  function joinBatch(entity, object, key, materialKey) {
+  function joinBatch(entity, object, key, materialKey, record) {
     let batch = batches.get(key)
     if (!batch) {
       batch = { material: null, members: new Set(), object: null, dirty: true }
@@ -2102,6 +2337,7 @@ export async function makeRenderer(canvas, view, viewport) {
     batch.members.add(entity.id)
     batch.dirty = true
     object.userData.batch = key
+    record.batchKey = key
   }
 
   /** Rebuild every dirty batch's merged mesh, or drop one below the merge minimum. */
@@ -2159,8 +2395,9 @@ export async function makeRenderer(canvas, view, viewport) {
 
     if (moved) {
       // It moved. Leave the batch this frame, before anything is drawn, or the
-      // merged copy stays behind at the old place as a ghost.
-      leaveBatch(entity.id)
+      // merged copy stays behind at the old place as a ghost. A moving entity is
+      // almost never in a batch, so the record answers without a map lookup.
+      if (record.batchKey !== null) leaveBatch(entity.id, record)
       // The first signature is where it appeared, not a move. Every one after
       // it is, and the answer sticks: an enemy that stops to bite must not
       // drop its keyline and its shadow for as long as it stands still.
@@ -2181,16 +2418,16 @@ export async function makeRenderer(canvas, view, viewport) {
     if (record.frames < SETTLE) record.frames++
 
     const wanted = canMerge && record.frames >= SETTLE
-    if (wanted && !object.userData.batch) {
+    if (wanted && record.batchKey === null) {
       const cellX = Math.floor(entity.x / MERGE_CELL)
       const cellZ = Math.floor((entity.z || 0) / MERGE_CELL)
       // Casting is part of the key, not just material and cell. One merged mesh
       // has one castShadow flag, so a batch holding both a caster and a
       // non-caster has to pick one and is wrong for half its members.
       const casts = object.castShadow === false ? 'flat' : 'casts'
-      joinBatch(entity, object, `${described.material}|${casts}|${cellX},${cellZ}`, described.material)
-    } else if (!wanted && object.userData.batch) {
-      leaveBatch(entity.id)
+      joinBatch(entity, object, `${described.material}|${casts}|${cellX},${cellZ}`, described.material, record)
+    } else if (!wanted && record.batchKey !== null) {
+      leaveBatch(entity.id, record)
     }
     if (record.frames >= SETTLE || !canMerge) record.settled = true
   }
@@ -2549,15 +2786,19 @@ export async function makeRenderer(canvas, view, viewport) {
     sync(world, blend = 1) {
       const painters = flat()
       const frame = ++frameCounter
-      shadowPlaces.length = 0
-      ringPlaces.length = 0
+      shadowPlaces.count = 0
+      ringPlaces.count = 0
       let keylines = 0
 
       // A body is drawn at `world.drawnPlace` only between two fixed steps. At
       // blend 1 that place is the entity itself, so reading it directly saves an
       // object per entity per frame — and lets an entity that did not change at
-      // all be skipped below.
+      // all be skipped below. The playing path writes the blended place into one
+      // object reused for every entity, so a moving frame allocates nothing.
       const settledFrame = blend >= 1
+      const drawAt = settledFrame ? null : (world.drawnPlaceAt || null)
+      const drawInto = settledFrame ? null : (world.drawnPlaceInto || null)
+      const drawPlace = settledFrame ? null : (world.drawnPlace || null)
       // A changed default outline colour has to reach the outlines already
       // drawn, and nothing else on `readability` applies to an entity that has
       // never moved and declares no mark.
@@ -2586,106 +2827,8 @@ export async function makeRenderer(canvas, view, viewport) {
         : null
       if (quietKeylines !== null) keylines = quietKeylines
       const changed = quietKeylines === null ? entities.length : dirtyIndices.length
-      for (let c = 0; c < changed; c++) {
-        const i = quietKeylines === null ? c : dirtyIndices[c]
-        const entity = entities[i]
-        const record = recordFor(entity)
-        const plan = entityPlan(entity)
-        const described = plan.described
-        const object = objectFor(entity, described, record)
-        if (sweep) object.userData.seen = frame
-        const place = settledFrame ? entity
-          : (world.drawnPlace ? world.drawnPlace(entity, blend) : entity)
-        object.position.set(place.x, place.y + anchorOffset(entity), place.z || 0)
-        object.visible = !entity.hidden
-
-        record.mesh = entity.mesh
-        record.collider = entity.collider
-        record.type = entity.type
-        record.x = entity.x
-        record.y = entity.y
-        record.z = entity.z
-        record.scale = entity.scale
-        record.yaw = entity.yaw
-        record.hidden = entity.hidden
-        record.opacity = entity.opacity
-
-        if (entity.mesh) {
-          const declared = meshOf(entity)
-          const shape = plan.shape
-          // Solid geometry carries its own size, so scale multiplies rather
-          // than sets.
-          const s = totalScale(entity)
-          object.scale.set(s, s, s)
-          // One turn, read once and passed on: the merge signature needs the
-          // same three angles, and reading them twice was two allocations a
-          // mesh entity a frame.
-          const turn = turnFor(entity, record)
-          const yaw = Number.isFinite(place.yaw) ? place.yaw : turn.y
-          // A static thing that kept its angles must not rebuild its quaternion
-          // every frame; only a changed turn is written.
-          if (record.turnObject !== object || record.appliedTurnX !== turn.x
-              || record.appliedTurnY !== yaw || record.appliedTurnZ !== turn.z) {
-            object.rotation.set(turn.x, yaw, turn.z, 'YXZ')
-            record.turnObject = object
-            record.appliedTurnX = turn.x
-            record.appliedTurnY = yaw
-            record.appliedTurnZ = turn.z
-          }
-          // The editor dims a hovered entity to preview it.
-          const opacity = entity.opacity ?? 1
-          dim(object, opacity)
-          // A named part of a body built from boxes poses exactly as a named
-          // node of a model does, so a run cycle is the same four numbers
-          // either way and game code never asks which the body is made of.
-          if (entity.pose && (declared.model || declared.parts)) applyPose(object, entity.pose)
-          // Unconditional for a model, because taking an attachment off is as
-          // much a state as putting one on: a body that dropped its rifle stops
-          // declaring one, and the hand has to empty.
-          if (declared.model) applyAttachments(object, entity.attachments)
-          // Depth decides what covers what, so there is nothing to order.
-          object.renderOrder = 0
-          record.simple = !declared.model && !Array.isArray(declared.parts)
-          record.idle = record.simple && declared.shadow === undefined && declared.ring === undefined
-          considerForMerging(entity, object, described, opacity, !record.simple, turn, record)
-          // After merging, which is where "has this ever moved" is answered.
-          record.keyline = updateReadability(entity, object, declared, shape, record.moved, place)
-          if (record.keyline) keylines++
-          saveSlot(i, entity, object, record)
-          continue
-        }
-
-        record.simple = false
-        record.idle = false
-        const { w, h } = drawSize(entity)
-        object.rotation.set(0, 0, spinRadians(entity))
-        object.scale.set(w, h, 1)
-        object.material.opacity = entity.opacity ?? 1
-        // Painter's order is the layering in 2D: z first, then the order the
-        // level lists them in. In a first-person scene the world in front is
-        // real geometry, so a sprite has to be tested against it.
-        object.renderOrder = (entity.z || 0) * 1000 + i
-        object.material.depthTest = !painters
-
-        // A tiled sprite repeats once per world unit unless told otherwise.
-        if (entity.sprite?.tile && object.material.map) {
-          object.material.map.repeat.set(w / entity.sprite.tile, h / entity.sprite.tile)
-        }
-
-        // A sheet shows one cell. `entity.frame` is set by whoever is animating
-        // it — the animation plugin, or game code directly.
-        const image = object.material.map?.image
-        if (entity.sprite?.sheet && image?.width) {
-          const win = frameWindow(entity.sprite, entity.frame, image)
-          object.material.map.repeat.set(win.repeat[0], win.repeat[1])
-          object.material.map.offset.set(win.offset[0], win.offset[1])
-        }
-
-        // Facing is a mirror, not a rotation: negative X scale flips the art
-        // without touching the collider or the transform gizmo.
-        if (entity.flip) object.scale.x = -object.scale.x
-        saveSlot(i, entity, object, record)
-      }
+      keylines += syncChanged(entities, quietKeylines === null ? null : dirtyIndices, changed, frame, sweep,
+        blend, settledFrame, drawAt, drawInto, drawPlace, painters)
 
       // A sweep only when the counts disagree. When they agree but a fresh id
       // was built during the loop, the living set is rebuilt once instead; the
@@ -2718,8 +2861,8 @@ export async function makeRenderer(canvas, view, viewport) {
       // exists to be honest about.
       stats.entities = world.entities.length
       stats.keylines = keylines
-      stats.contactShadows = shadowPlaces.length
-      stats.groundRings = ringPlaces.length
+      stats.contactShadows = shadowPlaces.count
+      stats.groundRings = ringPlaces.count
       stats.merged = 0
       stats.batches = 0
       for (const batch of batches.values()) {
