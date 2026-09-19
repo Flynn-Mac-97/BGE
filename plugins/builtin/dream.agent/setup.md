@@ -37,7 +37,20 @@ helpers.packetCharacters(checkout, request)
 helpers.sessionTokens(sessionDirectory)
   // what a harness session spent, summed from its transcript
   // { totalTokens, inputTokens, outputTokens, steps } or { error }
+
+helpers.browserFrames(checkout, project, { level, size, camera, picture, compareTo, warmSeconds, frames, cycles })
+  // the project drawn in a hidden Chrome served from `checkout`, playing
+  // { measures: { cpuMs, cpuMsP95, gpuMs, frameMs, drawCalls, triangles, loadSeconds,
+  //   heapMB, heapGrowthMB }, difference: { meanDifference, changedShare }, picture, problem }
 ```
+
+`browserFrames` is the one helper that needs a browser and a GPU. Use it only
+when the target is what a frame costs to draw. It takes about a minute per call,
+so call it once per task. `cpuMs` and `frameMs` repeat within a few percent;
+`gpuMs` does not, so never weight it. `camera` aims the editor's 3D view for the
+still picture, taken before play so engine time has not moved; `compareTo`
+compares it with a reference PNG and guards against a candidate that draws less.
+`cycles` plays and stops that many times and reports `heapGrowthMB`.
 
 Task code runs in the dream process, not in an agent, so it may do anything node
 may do. Keep it deterministic: a score that moves between two identical runs is
@@ -45,7 +58,8 @@ not a score.
 
 ## The rules a run enforces
 
-- Three to six tasks, each headless, no model, no dev server.
+- Three to six tasks, each headless, no model, no dev server — except a task
+  that calls `helpers.browserFrames`, which starts and stops its own.
 - Every task passes on the target as it stands.
 - At least one task reports a measure, or the score cannot change.
 - At least one task is a holdout: different instances, paths or route, so a

@@ -31,12 +31,13 @@ import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { browserFrames } from './browser-frames.mjs'
 import { engineProcess, packetCharacters, sessionTokens } from './measures.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** The helpers a task is run with. A setup names these rather than importing them. */
-export const HELPERS = { engineProcess, packetCharacters, sessionTokens }
+export const HELPERS = { engineProcess, packetCharacters, sessionTokens, browserFrames }
 
 /** One text for any value, so a digest covers functions and weights as well as data. */
 function stableText(value) {

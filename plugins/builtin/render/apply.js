@@ -167,14 +167,17 @@ export function captureProbe(context, THREE) {
   if (!background?.isTexture) scene.background = sky
   useEnvironment(scene, sky)
   try {
-    const next = generatorFor(THREE, renderer).fromScene(scene, 0, 0.1, 200, { position: probePosition(THREE, scene) })
-    probe?.dispose()
-    probe = next
+    // Drawn into the last probe's target: the renderer keeps a record per object
+    // per target, so a new target on every capture leaves the old records behind.
+    probe = generatorFor(THREE, renderer).fromScene(scene, 0, 0.1, 200, {
+      position: probePosition(THREE, scene), renderTarget: probe
+    })
   } finally {
     scene.background = background
     for (const object of hidden) object.visible = true
   }
   useEnvironment(scene, probe.texture)
+  context.renderer.forgetDrawRecords?.()
   return Math.round(performance.now() - started)
 }
 

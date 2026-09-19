@@ -56,7 +56,14 @@ wrong and is required when `pass` is false.
 
 ## The evaluator
 
-- Three to six tasks. Each runs headless with no model and no dev server.
+- Three to six tasks. Each runs headless with no model and no dev server, except
+  a task that must price drawing on a graphics card: it calls
+  `helpers.browserFrames(checkout, project, options)`, which starts its own dev
+  server and hidden Chrome from the candidate's checkout and stops them after.
+  One call takes about a minute. Score `cpuMs` and `frameMs`; `gpuMs` moves by
+  several times between identical runs, so report it and never weight it. Pass
+  `compareTo` with a reference PNG and fail a `difference.meanDifference` above
+  a small bound, or a candidate wins by drawing less.
 - Every task must pass on the checkout as it is now. A setup whose tasks fail
   before any candidate exists measures nothing.
 - At least one task carries a measure, or the value cannot change.

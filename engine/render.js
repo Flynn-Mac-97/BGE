@@ -1851,7 +1851,38 @@ export async function makeRenderer(canvas, view, viewport) {
    * left alone.
    */
   function release(object) {
-    object.traverse(node => node.dispose())
+    object.traverse(node => {
+      node.dispose()
+      if (compilesRunning > 0) releasedWhileCompiling.add(node)
+    })
+  }
+
+  /**
+   * Objects released while a post chain compiles, to be released again after.
+   *
+   * three's `compileAsync` lists every object in the scene when it starts and
+   * makes a render record for each one when it ends. An object released between
+   * the two gets a new record that nothing frees.
+   */
+  let compilesRunning = 0
+  const releasedWhileCompiling = new Set()
+
+  function releaseAgainAfterCompile() {
+    for (const node of releasedWhileCompiling) node.dispose()
+    if (compilesRunning === 0) releasedWhileCompiling.clear()
+  }
+
+  /**
+   * Drop every render record the scene's objects hold, so the next frame makes
+   * only the ones it draws with.
+   *
+   * three keeps a record per object per render target and frees them only when
+   * the object is disposed. Each level load brings a new room probe and a new
+   * post chain, and the records for the old ones stayed: about 1,500 per load on
+   * a heavy scene. Compiled pipelines are cached apart, so nothing compiles again.
+   */
+  function forgetDrawRecords() {
+    scene.traverse(node => node.dispose())
   }
 
   /** Remove an object from the scene and revoke anything private it still holds. */
@@ -2780,35 +2811,70 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   /**
+   * Compiled chains for the current pass list, one per camera.
+   *
+   * The editor draws through the orthographic camera and play through the
+   * perspective one, so every play and stop swaps cameras. Keeping the chain
+   * for each means a swap back draws at once instead of compiling again: a
+   * heavy scene took over six seconds per compile and drew nothing meanwhile.
+   */
+  const readyChains = new Map()
+  // A camera asked for while another chain compiles, built when that one ends.
+  let warmNext = null
+
+  /**
    * Build the chain for this list and camera, and swap it in once its scene
    * shaders are compiled.
    *
    * Compiling on first draw blocks the page: the character scene builds about
    * 90 GPU pipelines and froze the editor for 9 seconds on the switch to 3D.
    * `compileAsync` builds them off the page's thread, and the old chain keeps
-   * drawing until they are ready.
+   * drawing until they are ready. One compile runs at a time: overlapping ones
+   * made records for objects the scene had already dropped.
    */
   function warmPost(camera) {
     if (warming?.list === passList && warming.camera === camera) return
-    if (warming) warming.chain.dispose?.()
+    const ready = readyChains.get(camera)
+    if (ready?.list === passList) { built = ready; return }
+    if (warming) { warmNext = camera; return }
     const next = buildPost(passList, camera)
     warming = next
     // One pass at a time: each keeps its target and outputs set on the
     // renderer until it finishes, and shaders are built against those.
+    compilesRunning++
     next.passes.reduce((before, one) => before.then(() => one.compileAsync(renderer)), Promise.resolve())
       .catch(error => report(`[render] passes: shaders could not be compiled ahead — ${error?.message || error}. They compile on first draw instead.`))
       .finally(() => {
+        compilesRunning--
+        releaseAgainAfterCompile()
         if (warming !== next) return
         warming = null
-        built?.chain.dispose?.()
-        built = next
+        keepChain(next)
+        const camera = warmNext
+        warmNext = null
+        if (camera) warmPost(camera)
       })
   }
 
-  /** Dispose both post chains and forget them, so the next draw builds fresh. */
+  /** Draw with a compiled chain, and dispose any built for an older pass list. */
+  function keepChain(entry) {
+    let dropped = false
+    for (const [camera, old] of readyChains) {
+      if (old.list !== passList) { old.chain.dispose?.(); readyChains.delete(camera); dropped = true }
+    }
+    if (dropped) forgetDrawRecords()
+    if (entry.list !== passList) { entry.chain.dispose?.(); return }
+    readyChains.get(entry.camera)?.chain.dispose?.()
+    readyChains.set(entry.camera, entry)
+    built = entry
+  }
+
+  /** Dispose every post chain and forget them, so the next draw builds fresh. */
   function dropPost() {
     warming?.chain.dispose?.()
-    built?.chain.dispose?.()
+    for (const entry of readyChains.values()) entry.chain.dispose?.()
+    readyChains.clear()
+    warmNext = null
     warming = built = null
   }
 
@@ -2972,6 +3038,7 @@ export async function makeRenderer(canvas, view, viewport) {
 
     resize,
     frameSize,
+    forgetDrawRecords,
 
     /**
      * Push entity state into the scene graph. Called every frame.
