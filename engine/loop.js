@@ -429,6 +429,23 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   }
 
   /**
+   * A tab whose dev server is gone stops simulating.
+   *
+   * The page cannot reload and cannot be driven any more, but the world kept
+   * stepping and drawing behind the disconnection notice. A dream run leaves
+   * many such tabs, and each one holds a whole scene on the graphics card.
+   */
+  if (import.meta.hot) {
+    import.meta.hot.on('vite:ws:disconnect', () => {
+      running = false
+      driver = 'stopped (the dev server is gone)'
+      if (canAnimate) cancelAnimationFrame(raf)
+      clearInterval(timer)
+      timer = 0
+    })
+  }
+
+  /**
    * One animation frame or timer tick: run the fixed steps the elapsed wall
    * time has earned, up to MAX_CATCHUP, then draw.
    *
