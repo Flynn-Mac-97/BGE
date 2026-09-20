@@ -227,7 +227,7 @@ export function attemptPatchName({ round, cell }) {
  * The parent's patch is the workspace the attempt continues from, which is what
  * makes a branch a line of work rather than a series of unrelated tries.
  */
-export function realAttempt({ checkout, runDirectory, setup, target, files, setupHash, timeoutSeconds, model, round = 1 }) {
+export function realAttempt({ checkout, runDirectory, setup, target, files, setupHash, timeoutSeconds, model, harness, round = 1 }) {
   return async ({ cell, parent, id }) => {
     const record = await runCandidate({
       checkout,
@@ -244,7 +244,8 @@ export function realAttempt({ checkout, runDirectory, setup, target, files, setu
       parent: parent ? { id: `${cell.branch}:${cell.attempt - 1}`, patch: parent.patchPath ?? null, depth: cell.attempt } : null,
       depth: cell.attempt,
       timeoutSeconds,
-      model
+      model,
+      harness
     })
 
     // The patch is written beside the run's records so the next attempt on this

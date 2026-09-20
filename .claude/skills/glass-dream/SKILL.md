@@ -42,7 +42,11 @@ node bin/engine.mjs dream.improve "make the agent context packet smaller without
 ```
 
 In the editor the command is `ctrl+alt+d`, and the Dream panel takes the target
-in its field. Options: `{ files, rounds, candidates, timeout, model }`.
+in its field. Options: `{ files, rounds, candidates, timeout, model, harness }`.
+
+`harness` picks the coding agent every attempt is spent on: `dsh` by default, or
+`pi`. Both wrappers print the same envelope, so a run reads the same either way,
+and `tools/dream/harness.mjs` is the one place a third is added.
 
 `dream.status`, `dream.stop`, `dream.report` and `dream.forget` act on runs. A
 run is refused when the tracked tree is dirty or when another agent holds a live

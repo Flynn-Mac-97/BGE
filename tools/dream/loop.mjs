@@ -90,7 +90,8 @@ export async function dreamRun({
   candidates = DEFAULT_CANDIDATES,
   patience = DEFAULT_PATIENCE,
   timeoutSeconds,
-  model
+  model,
+  harness
 } = {}) {
   const ready = preflight(checkout)
   if (ready.error) return { error: ready.error }
@@ -107,7 +108,7 @@ export async function dreamRun({
   const designed = await fs.access(setupPath).then(() => true, () => false)
 
   if (!designed) {
-    const design = await designSetup({ checkout, runDirectory: directory, target, timeoutSeconds, model })
+    const design = await designSetup({ checkout, runDirectory: directory, target, timeoutSeconds, model, harness })
     await fs.writeFile(path.join(directory, 'design.json'), `${JSON.stringify(design, null, 2)}\n`, 'utf8')
     if (!design.ok) {
       await writeStatus(directory, { status: 'setup-failed', why: `the design agent did not finish: ${design.status}` })
@@ -197,7 +198,8 @@ export async function dreamRun({
         parent: incumbent,
         depth: incumbent.depth,
         timeoutSeconds,
-        model
+        model,
+        harness
       })
       // The frozen digest is what makes a candidate's own edits to the checks
       // visible: a mismatch is refused rather than compared.
@@ -394,7 +396,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     candidates: Number(argument('candidates') ?? DEFAULT_CANDIDATES),
     patience: Number(argument('patience') ?? DEFAULT_PATIENCE),
     timeoutSeconds: argument('timeout') ? Number(argument('timeout')) : undefined,
-    model: argument('model')
+    model: argument('model'),
+    harness: argument('harness')
   })
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)

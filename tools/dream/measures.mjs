@@ -16,7 +16,7 @@
  * located by their magic bytes and decoded one at a time.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 
@@ -136,9 +136,54 @@ export function addUsage(frames, totals) {
   return totals
 }
 
-/** Tokens a session spent, summed from its per-step usage records. */
+/**
+ * Add pi's usage records to `totals`.
+ *
+ * pi writes plain JSONL and names the same counts differently, so the keys are
+ * mapped here and the totals keep one shape for every harness.
+ */
+export function addPiUsage(text, totals) {
+  for (const line of text.split('\n')) {
+    if (!line.includes('totalTokens')) continue
+    let record
+    try {
+      record = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const usage = record?.message?.usage
+    if (!usage || typeof usage.totalTokens !== 'number') continue
+    totals.steps++
+    totals.inputTokens += usage.input ?? 0
+    totals.outputTokens += usage.output ?? 0
+    totals.cacheReadTokens += usage.cacheRead ?? 0
+    totals.reasoningTokens += usage.reasoning ?? 0
+    totals.totalTokens += usage.totalTokens
+  }
+  return totals
+}
+
+/**
+ * Tokens a session spent, summed from its per-step usage records.
+ *
+ * The harness is told apart by what it wrote: dsh keeps one compressed
+ * transcript under a fixed name, pi keeps one JSONL file per session.
+ */
 export function sessionTokens(directory) {
-  const path = join(directory, TRANSCRIPT)
-  if (!existsSync(path)) return { error: `no transcript in ${directory}` }
-  return addUsage(transcriptFrames(readFileSync(path)), usageTotals())
+  const dshTranscript = join(directory, TRANSCRIPT)
+  if (existsSync(dshTranscript)) {
+    return addUsage(transcriptFrames(readFileSync(dshTranscript)), usageTotals())
+  }
+  let piTranscripts = []
+  try {
+    piTranscripts = readdirSync(directory).filter(name => name.endsWith('.jsonl'))
+  } catch {
+    return { error: `no transcript in ${directory}` }
+  }
+  if (!piTranscripts.length) return { error: `no transcript in ${directory}` }
+  const totals = usageTotals()
+  for (const name of piTranscripts) {
+    addPiUsage(readFileSync(join(directory, name), 'utf8'), totals)
+  }
+  return totals
 }

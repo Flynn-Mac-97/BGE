@@ -8,7 +8,7 @@ attempts that were already made. This file is about the second.
 node bin/engine.mjs dream.rsi "make working inside this engine's own source cheap for an agent"
 ```
 
-Options: `{ rounds, versions, parallelism, timeout, model }`. One round is:
+Options: `{ rounds, versions, parallelism, timeout, model, harness }`. One round is:
 
 1. **Plan a grid.** How many branches and how deep, from what earlier rounds did —
    a win at a branch root widens, a late win deepens, early gains narrow it. Never

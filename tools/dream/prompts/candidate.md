@@ -13,6 +13,22 @@ algorithm, command route, or workflow. Keep the current layout only when it is
 the best fit for the contract. If current external techniques matter, use the
 available authoritative research and carry the useful constraint into the code.
 
+## The rules of this checkout
+
+This is the engine's own instruction packet for your target and your files. It
+is the whole packet, not a summary, and it holds the style, the design rules and
+the checks this repository expects. Follow it.
+
+{{PACKET}}
+
+The engine already provides most of what you might otherwise build by hand. Ask
+it before writing a script of your own:
+
+```
+node bin/engine.mjs --headless run tools.list
+node bin/engine.mjs agent.context '{"task":"<your task>","files":["<file>"]}'
+```
+
 ## What you may change
 
 {{FILES}}
@@ -49,6 +65,14 @@ Objective: {{OBJECTIVE}}
 ## The record so far
 
 {{HISTORY}}
+
+Every earlier attempt kept its patch and its record beside `{{SETUP}}`, under
+`rounds/r<round>/`. A `.patch` file is the diff that attempt produced; the
+`.json` beside it holds its measures and the four lines its agent wrote about
+what worked and what did not. Read them before you design: they are outside your
+worktree, so reading them changes nothing, and repeating an idea that already
+failed spends your whole budget for nothing. Take what measured well, leave what
+broke the checks.
 
 ## How a candidate is scored
 

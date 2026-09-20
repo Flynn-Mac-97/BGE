@@ -183,6 +183,7 @@ export async function rsiRun({
   maxParallelism = DEFAULT_MAX_PARALLELISM,
   timeoutSeconds,
   model,
+  harness,
   attempt = null,
   revise = undefined,
   fixedPlan = null,
@@ -225,7 +226,7 @@ export async function rsiRun({
 
   const setupPath = path.join(directory, 'setup.mjs')
   if (!(await fs.access(setupPath).then(() => true, () => false))) {
-    const design = await designSetup({ checkout, runDirectory: directory, target, timeoutSeconds, model })
+    const design = await designSetup({ checkout, runDirectory: directory, target, timeoutSeconds, model, harness })
     await fs.writeFile(path.join(directory, 'design.json'), `${JSON.stringify(design, null, 2)}\n`, 'utf8')
     if (!design.ok) {
       await writeStatus({ phase: 'setup-failed', why: `the design agent did not finish: ${design.status}` })
@@ -263,6 +264,7 @@ export async function rsiRun({
     setupHash: checkRecord.digest,
     timeoutSeconds,
     model,
+    harness,
     round
   })
 
@@ -406,7 +408,7 @@ export async function rsiRun({
       beta1,
       beta2,
       startPolicyFile: hasPolicy ? currentPolicyFile : null,
-      ...(revise ? { revise } : { timeoutSeconds, model })
+      ...(revise ? { revise } : { timeoutSeconds, model, harness })
     })
     if (dreamed.error) {
       await writeStatus({ phase: 'dreaming-failed', round, why: dreamed.error })
@@ -504,6 +506,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     beta2: argument('beta2') ? Number(argument('beta2')) : 0.5,
     timeoutSeconds: argument('timeout') ? Number(argument('timeout')) : undefined,
     model: argument('model'),
+    harness: argument('harness'),
     seed: Number(argument('seed') ?? 0),
     // Pinning the plan is how a first run keeps its cost knowable: cells are
     // attempts, and attempts are the expensive part.

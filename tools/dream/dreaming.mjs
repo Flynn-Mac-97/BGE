@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 import { sessionTokens } from './measures.mjs'
 import { loadPolicy, policySource } from './policy.mjs'
 import { replaySweep, scorePolicy } from './replay.mjs'
+import { DEFAULT_HARNESS, harnessWrapper } from './harness.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -71,10 +72,10 @@ async function revisionPrompt({ checkout, runDirectory, policyFile, source, repl
  * can be driven by a scripted reviser when the point is the machinery rather
  * than the model.
  */
-export async function reviseWithAgent({ checkout, runDirectory, policyFile, source, replay, timeoutSeconds, model }) {
+export async function reviseWithAgent({ checkout, runDirectory, policyFile, source, replay, timeoutSeconds, model, harness = DEFAULT_HARNESS }) {
   const prompt = await revisionPrompt({ checkout, runDirectory, policyFile, source, replay })
   const args = [
-    path.join(checkout, 'tools/dsh-agent.mjs'),
+    harnessWrapper(checkout, harness),
     '--json',
     '--cwd', checkout,
     '--timeout', String(timeoutSeconds ?? DEFAULT_REVISION_TIMEOUT_SECONDS),

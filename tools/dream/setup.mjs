@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 import { copyProject, digestOf, loadSetup, scoreRun } from './scoring.mjs'
 import { sessionTokens } from './measures.mjs'
 import { baselineState, createWorktree, laneIsLive, removeWorktree, replaceOnce } from './worktree.mjs'
+import { DEFAULT_HARNESS, harnessWrapper } from './harness.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -86,14 +87,14 @@ export function preflight(checkout = CHECKOUT) {
  * The prompt names the file to write and the shape to write, and nothing else:
  * a design agent that edited the target would score its own work.
  */
-export async function designSetup({ checkout = CHECKOUT, runDirectory, target, timeoutSeconds = DEFAULT_DESIGN_TIMEOUT_SECONDS, model } = {}) {
+export async function designSetup({ checkout = CHECKOUT, runDirectory, target, timeoutSeconds = DEFAULT_DESIGN_TIMEOUT_SECONDS, model, harness = DEFAULT_HARNESS } = {}) {
   const template = await fs.readFile(path.join(CHECKOUT, 'tools/dream/prompts/design-setup.md'), 'utf8')
   const prompt = template
     .replaceAll('{{TARGET}}', String(target))
     .replaceAll('{{RUN_DIR}}', path.relative(checkout, runDirectory).split(path.sep).join('/'))
 
   const args = [
-    path.join(CHECKOUT, 'tools/dsh-agent.mjs'),
+    harnessWrapper(CHECKOUT, harness),
     '--json',
     '--cwd', checkout,
     '--timeout', String(timeoutSeconds),
@@ -238,7 +239,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     runDirectory,
     target,
     timeoutSeconds: Number(argument('timeout') ?? DEFAULT_DESIGN_TIMEOUT_SECONDS),
-    model: argument('model')
+    model: argument('model'),
+    harness: argument('harness')
   })
   await fs.writeFile(path.join(runDirectory, 'design.json'), `${JSON.stringify(designed, null, 2)}\n`, 'utf8')
   if (!designed.ok) {

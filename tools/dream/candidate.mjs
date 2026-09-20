@@ -10,7 +10,7 @@
  * a candidate that edited a check is refused when the digest is compared rather
  * than trusted to have behaved.
  */
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +18,7 @@ import { copyProject, digestOf, scoreRun } from './scoring.mjs'
 import { sessionTokens } from './measures.mjs'
 import { costBands } from './pricing.mjs'
 import { applyPatch, createWorktree, patchOf, removeWorktree } from './worktree.mjs'
+import { DEFAULT_HARNESS, harnessWrapper } from './harness.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -30,6 +31,28 @@ function historyLines(history = []) {
   return history
     .map(entry => `- ${entry.id}: value ${entry.value}, ${entry.pass ? 'every task passed' : `score zero — ${entry.reason}`}`)
     .join('\n')
+}
+
+/**
+ * The engine's instruction packet for this target, as text the prompt carries.
+ *
+ * A candidate that is handed no packet rediscovers the checkout by writing its
+ * own probe scripts, which spends its budget on work the engine already did.
+ * A packet that fails to build is reported in place of the rules, so the
+ * attempt still runs and the record says what was missing.
+ */
+function packetText(checkout, target, files) {
+  try {
+    const output = execFileSync(
+      process.execPath,
+      ['bin/engine.mjs', 'agent.context', JSON.stringify({ task: String(target), files })],
+      { cwd: checkout, encoding: 'utf8', timeout: 120000, maxBuffer: 64 * 1024 * 1024 }
+    )
+    const envelope = JSON.parse(output)
+    return envelope.text ?? output
+  } catch (error) {
+    return `The packet could not be built: ${String(error?.message || error).slice(0, 200)}`
+  }
 }
 
 /** What one candidate's agent is told: the target, the limits, and the score so far. */
@@ -55,6 +78,7 @@ async function candidatePrompt({ checkout, runDirectory, setup, workspace, targe
     .replaceAll('{{FILES}}', files.length ? files.map(file => `- \`${file}\``).join('\n') : '- The files the target lives in. Find them; the target names no file.')
     .replaceAll('{{MEASURES}}', `${measures}\n\nWeights: ${weights || 'none declared'}`)
     .replaceAll('{{HISTORY}}', historyLines(history))
+    .replaceAll('{{PACKET}}', packetText(checkout, target, files))
 }
 
 /**
@@ -76,7 +100,8 @@ export async function runCandidate({
   parent = null,
   depth = 0,
   timeoutSeconds = DEFAULT_CANDIDATE_TIMEOUT_SECONDS,
-  model
+  model,
+  harness = DEFAULT_HARNESS
 } = {}) {
   // The round is part of the name: attempt numbers restart every round, and two
   // candidates answering to one id would draw on top of each other in the tree
@@ -127,7 +152,7 @@ export async function runCandidate({
   try {
     const prompt = await candidatePrompt({ checkout, runDirectory, setup, workspace: made.workspace, target, files, history })
     const args = [
-      path.join(checkout, 'tools/dsh-agent.mjs'),
+      harnessWrapper(checkout, harness),
       '--json',
       '--cwd', made.workspace,
       '--timeout', String(timeoutSeconds),
