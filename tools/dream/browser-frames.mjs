@@ -15,8 +15,8 @@ import fs from 'node:fs'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { findChrome } from '../../engine/chrome-path.mjs'
 
-const CHROME = process.env.DREAM_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 /** A port nothing is listening on. */
@@ -204,7 +204,10 @@ export async function browserFrames(checkout, project, options = {}) {
     })
     await waitFor('the dev server', async () => (await fetch(`http://localhost:${serverPort}/api/project`)).ok, 180000)
 
-    chrome = spawn(CHROME, [
+    // Named here so the record says which browser measured, and so a run that
+    // fell back to the installed Chrome is visible rather than silent.
+    const browser = findChrome(checkout)
+    chrome = spawn(browser, [
       '--headless=new', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', '--disk-cache-size=1',
       `--remote-debugging-port=${cdpPort}`, `--user-data-dir=${profile}`, '--no-first-run',
       '--no-default-browser-check', `--window-size=${size[0]},${size[1]}`,
@@ -219,7 +222,7 @@ export async function browserFrames(checkout, project, options = {}) {
       await sleep(3000)
     }
     await waitForDrawing(page, 'a drawn frame')
-    const measures = { loadSeconds: round((Date.now() - started) / 1000) }
+    const measures = { loadSeconds: round((Date.now() - started) / 1000), browser: path.basename(path.dirname(browser)) }
 
     const answer = { measures, difference: null, picture: null, problem: null }
     if (picture || compareTo) Object.assign(answer, await stillPicture(page, camera, picture, compareTo))

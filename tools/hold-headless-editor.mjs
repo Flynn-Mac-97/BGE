@@ -8,8 +8,9 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { findChrome } from '../engine/chrome-path.mjs'
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+const CHROME = findChrome(process.cwd())
 const BASE = process.argv[2] || 'http://localhost:5180/'
 const PORT = Number(process.argv[3] || 9333)
 const [WIDTH, HEIGHT] = (process.argv[4] || '540x960').split('x').map(Number)

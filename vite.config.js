@@ -16,6 +16,7 @@ import { readLaneBrowsers } from './engine/lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './engine/work-lock.mjs'
 import { PROJECT_PREFIX } from './engine/asset-path.js'
 import { pluginGuides } from './engine/plugin-guides.mjs'
+import { openPage } from './engine/open-page.mjs'
 import { ensureProject, isUntitled, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './engine/project-path.mjs'
 
 const ROOT = process.cwd()
@@ -904,6 +905,32 @@ function serverRegistry() {
 // Returns nothing on purpose: Vite treats whatever `configureServer` resolves
 // to as a hook to call after its middlewares, and the writer answers the list
 // of paths it wrote.
+/**
+ * Open the editor in the engine's own browser once the server is listening.
+ *
+ * Vite's `server.open` uses the system opener, which gives the page to the
+ * browser the person already has open. The engine opens its own Chrome for
+ * Testing instead, so its windows carry their own profile and are separate
+ * from the person's tabs. ENGINE_NO_OPEN keeps a headless or CI run from
+ * opening a window at all.
+ */
+function openEditorWindow() {
+  return {
+    name: 'engine-open-editor',
+    configureServer(server) {
+      if (process.env.ENGINE_NO_OPEN) return
+      server.httpServer?.once('listening', () => {
+        const address = server.httpServer.address()
+        const port = typeof address === 'object' ? address.port : server.config.server.port
+        const opened = openPage(`http://localhost:${port}/`, { checkout: ROOT, profile: 'editor' })
+        console.log(opened.opened
+          ? `[engine] editor opened in ${opened.chrome}`
+          : `[engine] could not open the editor: ${opened.problem}`)
+      })
+    }
+  }
+}
+
 const writeAgentDoc = async () => {
   await writeGeneratedAgentFiles(ROOT, PROJECT)
   for (const node of await pluginGuides(ROOT, PROJECT)) {
@@ -921,17 +948,19 @@ export default defineConfig({
     serverRegistry(),
     serveProject(),
     api(),
-    { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() }
+    { name: 'engine-agent-doc', configureServer: () => writeAgentDoc() },
+    openEditorWindow()
   ],
   // Nothing about the project is baked into the page. It asks `/api/project`
   // for the name and fetches everything else under `/project/`, so a server
   // that repoints itself is followed rather than remembered.
-  // ENGINE_NO_OPEN keeps a headless or CI run from launching a visible browser.
   // ENGINE_PORT is the same variable `bin/engine.mjs` reads, so naming a port
   // once puts the server and the commands that drive it on the same one.
   server: {
     port: Number(process.env.ENGINE_PORT) || 5180,
-    open: !process.env.ENGINE_NO_OPEN,
+    // `engine-open-editor` opens the window. Vite's own `open` uses the system
+    // opener, which gives the page to the browser the person already has open.
+    open: false,
     watch: { ignored: file => !watched(file) },
     // The project may be outside the checkout, and `/@fs` refuses anything not
     // named here. The projects root is listed too, so opening another project

@@ -14,7 +14,6 @@
  * Usage: node tools/dream/inspect.mjs [--run <directory>] [--port 4317] [--open]
  */
 import http from 'node:http'
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +21,7 @@ import { parseRecord } from './report.mjs'
 import { PRICING, costBands, sumCosts } from './pricing.mjs'
 import { addUsage, transcriptFrames, usageTotals } from './measures.mjs'
 import { liveCalls, sessionsFor } from './live.mjs'
+import { openPage } from '../../engine/open-page.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const RUNS = path.join(CHECKOUT, 'agent-runs')
@@ -750,9 +750,11 @@ server.listen(port, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${port}/`
   process.stdout.write(`watching ${directory}\n${url}\n`)
   if (argument('open')) {
-    const opener = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]]
-    try {
-      execFileSync(opener[0], opener[1], { stdio: 'ignore' })
-    } catch { /* a browser that will not open does not stop the page being served */ }
+    // The engine's own browser, not the system opener: that hands the page to
+    // the browser the person already has open.
+    const opened = openPage(url, { profile: 'inspect' })
+    // A browser that will not open does not stop the page being served, but it
+    // is said, because the reader is waiting for a window.
+    if (!opened.opened) process.stderr.write(`inspect: could not open a browser — ${opened.problem}\n`)
   }
 })

@@ -25,25 +25,9 @@ import net from 'node:net'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { mainWorktree } from './agent-workspace-node.mjs'
+import { findChrome } from './chrome-path.mjs'
 
-/** Where Chrome is, in the order worth trying. */
-const CHROME_PLACES = [
-  process.env.CHROME_PATH,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-].filter(Boolean)
-
-/** The first Chrome on this machine that exists, or a message naming every place tried. */
-export function findChrome() {
-  const found = CHROME_PLACES.find(place => fs.existsSync(place))
-  if (!found) {
-    throw new Error(`no Chrome found. Tried:\n  ${CHROME_PLACES.join('\n  ')}\nSet CHROME_PATH to point at one.`)
-  }
-  return found
-}
+export { findChrome }
 
 const mainCheckouts = new Map()
 
@@ -323,7 +307,7 @@ export const laneBrowserArguments = ({ port, profile, width, height, page }) => 
  * means this lane's own browser answered, not that the port answered.
  */
 export async function startLaneBrowser(root, {
-  client, url, port, width = 540, height = 960, chrome = findChrome()
+  client, url, port, width = 540, height = 960, chrome = findChrome(root)
 }) {
   if (!client) throw new Error('a lane browser needs a client name')
   await freeLaneName(root, client)
@@ -340,6 +324,9 @@ export async function startLaneBrowser(root, {
 
   const entry = {
     client, port: debuggingPort, url: page, pid: browser.pid, profile, serves: root,
+    // Which binary rendered. A lane that fell back to an installed Chrome is
+    // then visible in the registry rather than silent.
+    chrome,
     // What Chrome was told, not what any frame measures. `recordLaneViewport`
     // adds what the page reports, under its own name.
     windowAsked: `${width}x${height}`, startedAt: new Date().toISOString()
