@@ -29,6 +29,7 @@ while true; do
   printf '\033[H\033[2J\033[3J'
   node --input-type=module - "$run_directory" <<'NODE'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { costBands, sumCosts } from './tools/dream/pricing.mjs'
 import { workingAttempts } from './tools/dream/live.mjs'
@@ -39,6 +40,10 @@ const readJson = file => {
 }
 const relative = path.relative(process.cwd(), runDirectory) || runDirectory
 const run = readJson(path.join(runDirectory, 'run.json')) ?? {}
+// An RSI run writes rsi.json and rsi/round-00N/, where dream.improve writes
+// run.json and rounds/. Both are read so one watcher shows either loop.
+const rsi = readJson(path.join(runDirectory, 'rsi.json'))
+const rsiSummary = readJson(path.join(runDirectory, 'rsi-summary.json'))
 const target = readJson(path.join(runDirectory, 'target.json')) ?? {}
 const design = readJson(path.join(runDirectory, 'design.json')) ?? {}
 const winner = readJson(path.join(runDirectory, 'winner.json'))
@@ -78,6 +83,62 @@ if (design.tokens) {
   lanes.push({ round: '-', lane: '-', id: 'design', state: run.status === 'designing' ? 'working' : 'done', score: '-', tokens: design.tokens.totalTokens, spent: cost.now, steps: design.tokens.steps })
 }
 let maxSteps = 0
+
+// The RSI loop records a round's attempts in one file, keyed by grid cell.
+const rsiDirectory = path.join(runDirectory, 'rsi')
+const rsiRounds = fs.existsSync(rsiDirectory)
+  ? fs.readdirSync(rsiDirectory).filter(name => name.startsWith('round-')).sort()
+  : []
+for (const round of rsiRounds) {
+  const number = round.replace(/^round-0*/, '') || '0'
+  // A round writes attempts.json only when it ends, so an in-progress round is
+  // read from its grid instead: a cell gains its outcome as soon as it scores.
+  const attempts = readJson(path.join(rsiDirectory, round, 'attempts.json'))
+  if (!attempts) {
+    const grid = readJson(path.join(rsiDirectory, round, 'grid.json'))
+    for (const [id, cell] of Object.entries(grid?.cells ?? {}).sort()) {
+      lanes.push({
+        round: number,
+        lane: id,
+        id: `cell ${id}`,
+        state: cell.outcome?.verdict ?? 'working',
+        score: cell.outcome?.score ?? '?',
+        tokens: cell.outcome?.tokens ?? null,
+        spent: null,
+        steps: null
+      })
+    }
+  }
+  for (const attempt of attempts ?? []) {
+    const cost = attempt.cost ?? (attempt.tokens ? costBands(attempt.tokens) : null)
+    if (cost) totalCosts.push(cost)
+    if (attempt.tokens?.steps) maxSteps = Math.max(maxSteps, attempt.tokens.steps)
+    lanes.push({
+      round: number,
+      lane: attempt.cell ?? '?',
+      id: attempt.cell ? `cell ${attempt.cell}` : '?',
+      state: attempt.verdict ?? 'working',
+      score: attempt.value == null ? '?' : attempt.value,
+      tokens: attempt.tokens?.totalTokens,
+      spent: cost?.now ?? null,
+      steps: attempt.tokens?.steps ?? null
+    })
+  }
+  const dreamed = readJson(path.join(rsiDirectory, round, 'dreaming.json'))
+  for (const version of dreamed?.versions ?? []) {
+    lanes.push({
+      round: number,
+      lane: `v${version.version}`,
+      id: version.policy ?? `version ${version.version}`,
+      state: version.failure ? 'failed' : 'scored',
+      score: version.score ?? '?',
+      tokens: null,
+      spent: null,
+      steps: null
+    })
+  }
+}
+
 for (const round of rounds) {
   const directory = path.join(roundsDirectory, round)
   for (const file of fs.readdirSync(directory).filter(name => name.endsWith('.json') && name !== 'round.json').sort()) {
@@ -102,10 +163,80 @@ for (const round of rounds) {
 // Lanes working now, from each attempt's own transcript.
 const working = workingAttempts({ checkout: process.cwd(), runName: path.basename(runDirectory) })
 
+/**
+ * Attempts the pi harness is running now.
+ *
+ * pi writes one session directory per attempt under the system temp directory,
+ * and its first line names the working directory, which is the attempt's
+ * worktree. That is the only handle on a pi attempt: the run directory gains
+ * nothing until the attempt finishes.
+ */
+function workingPiAttempts(checkout) {
+  const root = os.tmpdir()
+  let names = []
+  try { names = fs.readdirSync(root).filter(name => name.startsWith('pi-agent-')) } catch { return [] }
+  const found = []
+  for (const name of names) {
+    const directory = path.join(root, name)
+    let file
+    try { file = fs.readdirSync(directory).find(entry => entry.endsWith('.jsonl')) } catch { continue }
+    if (!file) continue
+    const transcript = path.join(directory, file)
+    let text
+    let modified
+    try {
+      text = fs.readFileSync(transcript, 'utf8')
+      modified = fs.statSync(transcript).mtimeMs
+    } catch { continue }
+
+    let workspace = null
+    let steps = 0
+    let tool = null
+    for (const line of text.split(SPLIT_ON_NEWLINE)) {
+      if (!line) continue
+      let entry
+      try { entry = JSON.parse(line) } catch { continue }
+      if (entry.type === 'session') workspace = entry.cwd
+      if (entry.message?.role !== 'assistant') continue
+      steps++
+      for (const part of entry.message.content ?? []) {
+        if (part.type && /tool/i.test(part.type) && part.name) tool = part.name
+      }
+    }
+    // Only this checkout's worktrees, and only an attempt still working. The
+    // worktree is removed when an attempt ends, so a transcript that outlives
+    // its worktree belongs to an agent that has already finished.
+    if (!workspace || !workspace.startsWith(path.join(checkout, '.agent-worktrees'))) continue
+    if (!fs.existsSync(workspace)) continue
+    found.push({ cell: path.basename(workspace), steps, tool, quietSeconds: Math.round((Date.now() - modified) / 1000) })
+  }
+  return found.sort((first, second) => first.cell.localeCompare(second.cell))
+}
+
+const SPLIT_ON_NEWLINE = String.fromCharCode(10)
+const workingPi = workingPiAttempts(process.cwd())
+
 console.log(`╭${rule}╮`)
-console.log(box(`DREAM · ${run.status ?? 'unknown'}${stopping ? paint(' · stopping', 'yellow') : ''} · round ${run.round ?? '-'}`))
+const phase = run.status ?? rsi?.phase ?? 'unknown'
+const roundNow = run.round ?? rsi?.round ?? '-'
+console.log(box(`DREAM · ${phase}${stopping ? paint(' · stopping', 'yellow') : ''} · round ${roundNow}`))
+if (rsi?.plan) {
+  console.log(box(paint(`plan ${rsi.plan.branchCount}x${rsi.plan.refineCount} by ${rsi.plan.source} · policy ${rsi.policy ?? '-'} · pool ${rsi.pool?.grids ?? 0} grids`, 'dim')))
+}
 console.log(box(paint(relative, 'dim')))
 console.log(box(`target: ${String(target.target ?? run.target ?? '-').slice(0, 76)}`))
+
+if (workingPi.length) {
+  console.log(`├${rule}┤`)
+  console.log(box(paint('WORKING NOW', 'bold')))
+  for (const attempt of workingPi) {
+    const spin = '|/-'[Math.floor(Date.now() / 250) % 3]
+    const quiet = attempt.quietSeconds < 60
+      ? `wrote ${attempt.quietSeconds}s ago`
+      : paint(`quiet ${elapsed(attempt.quietSeconds * 1000)}`, 'yellow')
+    console.log(box(`${paint(spin, 'cyan')} ${attempt.cell.padEnd(26)} ${String(attempt.steps).padStart(3)} steps  ${String(attempt.tool ?? '-').padEnd(8)} ${quiet}`))
+  }
+}
 
 if (working.length) {
   console.log(`├${rule}┤`)
@@ -156,6 +287,9 @@ for (const lane of lanes) {
 console.log(`╰${rule}╯`)
 if (winner) {
   console.log(box(paint(`winner  ${winner.id}  value ${winner.value}  patch ${winner.patch ?? 'none'}`, 'green')))
+}
+if (rsiSummary?.improvement != null) {
+  console.log(box(paint(`improvement  ${rsiSummary.improvement}  patch ${rsiSummary.winnerPatch ?? 'none'}`, 'green')))
 }
 NODE
 

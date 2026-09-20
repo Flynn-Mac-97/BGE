@@ -123,6 +123,10 @@ holdout routes remain available.
 
 ## Before you finish
 
+Bound every command you run. A scorer or a suite that hangs spends the whole
+attempt waiting, and the attempt is then recorded as a failure that never
+happened. Put `timeout 600` in front of anything that measures.
+
 Run this in your workspace and make it exit 0:
 
 ```
