@@ -39,11 +39,33 @@ function viteScript(checkout) {
 
 /** Stop a process and every process it started. Vite leaves esbuild running otherwise. */
 function stopTree(child) {
-  if (!child || child.exitCode !== null) return
+  if (!child) return
   try {
+    // The tree is killed even when the process this holds has already exited:
+    // Chrome's launcher exits as soon as the browser it started is up, and the
+    // browser itself is what holds a whole scene on the graphics card.
     if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
-    else child.kill('SIGKILL')
+    else if (child.exitCode === null) child.kill('SIGKILL')
   } catch { /* already gone */ }
+}
+
+/**
+ * Ask Chrome itself to quit, through the debugging port it was started with.
+ *
+ * Killing the process the helper spawned is not enough on Windows: that process
+ * is a launcher which exits as soon as the browser is up, so the browser that
+ * holds the scene is left behind with no parent to kill it. Browser.close ends
+ * every process of that browser.
+ */
+async function closeBrowser(cdpPort) {
+  try {
+    const version = await (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).json()
+    const socket = new WebSocket(version.webSocketDebuggerUrl)
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject })
+    socket.send(JSON.stringify({ id: 1, method: 'Browser.close' }))
+    await sleep(500)
+    socket.close()
+  } catch { /* the browser is already gone, or never came up */ }
 }
 
 /** Poll until `check` answers something truthy, or throw after `ms`. */
@@ -209,6 +231,7 @@ export async function browserFrames(checkout, project, options = {}) {
     return { measures: {}, difference: null, picture: null, problem: String(error?.message || error) }
   } finally {
     page?.close()
+    await closeBrowser(cdpPort)
     stopTree(chrome)
     stopTree(server)
     await sleep(1000)
