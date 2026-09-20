@@ -338,7 +338,11 @@ export async function runCandidate({
       '--permission-mode', 'workspace-write'
     ]
     if (model) args.push('--model', model)
-    args.push(prompt)
+    // The prompt goes to the harness as a file: Windows caps a command line at
+    // about 32767 characters, well under the prompt budget.
+    const promptPath = path.join(runDirectory, `${name}.prompt.txt`)
+    await fs.writeFile(promptPath, prompt, 'utf8')
+    args.push('--task-file', promptPath)
 
     const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
     let envelope = null

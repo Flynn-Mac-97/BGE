@@ -20,7 +20,7 @@
  * Exit codes: 0 completed, 1 agent error, 2 usage error, 124 timed out.
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -51,7 +51,7 @@ function toolArguments(permissionMode) {
 }
 
 function usage(stream) {
-  stream.write('usage: pi-agent [--json] [--cwd <dir>] [--timeout <seconds>] [--permission-mode <mode>] [--model <name>] [--session-dir <dir>] "task"\n')
+  stream.write('usage: pi-agent [--json] [--cwd <dir>] [--timeout <seconds>] [--permission-mode <mode>] [--model <name>] [--session-dir <dir>] [--task-file <path>] "task"\n')
 }
 
 function usageError(message) {
@@ -68,6 +68,7 @@ function parseArguments(argv) {
     permissionMode: 'workspace-write',
     model: undefined,
     sessionDir: undefined,
+    taskFile: undefined,
     task: []
   }
   let help = false
@@ -80,6 +81,7 @@ function parseArguments(argv) {
     else if (argument === '--permission-mode') options.permissionMode = argv[++at]
     else if (argument === '--model') options.model = argv[++at]
     else if (argument === '--session-dir') options.sessionDir = argv[++at]
+    else if (argument === '--task-file') options.taskFile = argv[++at]
     else options.task.push(argument)
   }
   return { options, help }
@@ -91,7 +93,9 @@ async function main() {
     usage(process.stdout)
     process.exit(0)
   }
-  const task = options.task.join(' ')
+  // Windows caps a command line at about 32767 characters, so a long task is
+  // handed over as a file instead of an argument.
+  const task = options.taskFile ? readFileSync(options.taskFile, 'utf8') : options.task.join(' ')
   if (task.trim() === '') usageError('error: a task is required, for example: pi-agent "run the tests"')
   if (!existsSync(options.cwd)) usageError(`error: --cwd directory does not exist: ${options.cwd}`)
 

@@ -25,7 +25,7 @@
  * it when it contains spaces: dsh-agent "run the tests".
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,7 @@ function usage(stream, error) {
     "  --timeout <seconds>       abort the run after N seconds (exit 124)",
     "  --permission-mode <mode>  read-only | workspace-write | danger-full-access",
     "  --model <name>            override the model (default: the harness default, deepseek-flash)",
+    "  --task-file <path>        read the task from a file, for a task past the command line limit",
     "  --help                    show this help",
     "",
     "Examples:",
@@ -158,6 +159,7 @@ function parseArgs(argv) {
     permissionMode: DEFAULT_PERMISSION_MODE,
     provider: "deepseek-official",
     model: undefined,
+    taskFile: undefined,
     task: []
   };
   let help = false;
@@ -191,6 +193,10 @@ function parseArgs(argv) {
         options.model = argv[++i];
         if (options.model === undefined) usageError("error: --model needs a model name");
         break;
+      case "--task-file":
+        options.taskFile = argv[++i];
+        if (options.taskFile === undefined) usageError("error: --task-file needs a path");
+        break;
       case "--provider":
         options.provider = argv[++i];
         if (options.provider === undefined) usageError("error: --provider needs a provider name");
@@ -208,7 +214,9 @@ async function main() {
     usage(process.stdout);
     process.exit(0);
   }
-  const task = options.task.join(" ");
+  // Windows caps a command line at about 32767 characters, so a long task is
+  // handed over as a file instead of an argument.
+  const task = options.taskFile ? readFileSync(options.taskFile, "utf8") : options.task.join(" ");
   if (task.trim() === "") usageError("error: a task is required, for example: dsh-agent \"run the tests\"");
   if (!existsSync(options.cwd)) usageError(`error: --cwd directory does not exist: ${options.cwd}`);
   if (!DSH_BIN) usageError(`error: cannot locate dsh lib/bin.js near ${WRAPPER_DIR}; is @deepseek-ai/dsh installed?`);
