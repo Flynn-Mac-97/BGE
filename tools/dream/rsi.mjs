@@ -3,9 +3,11 @@
  *
  * This is the paper's figure 1 in code. One round is:
  *
- *   1. plan a grid — how many branches and how deep, from what earlier rollouts
- *      did, never from this round's outcomes, because how wide to work is a
- *      decision about the next rollout;
+ *   1. plan a grid — the policy chooses how many branches and how deep from
+ *      earlier rollouts, never from this round's outcomes, because how wide to
+ *      work is a decision about the next rollout. The runner uses its own
+ *      history rule only when the policy has no `plan_grid`, validates the plan
+ *      against the caps, and records which side chose;
  *   2. explore online — the current policy names batches, every cell in a batch
  *      becomes a real attempt, and the outcomes build a grid;
  *   3. construct a simulator — the grid joins the pool, and the pool is frozen
@@ -52,17 +54,96 @@ const DEFAULT_MAX_PARALLELISM = 3
 /** Where a round's records go. */
 const roundDirectory = (runDirectory, round) => path.join(runDirectory, 'rsi', `round-${String(round).padStart(3, '0')}`)
 
+/** Which asker a refused plan is named by, so an error says who asked. */
+const PLAN_SOURCE_LABEL = {
+  policy: 'the policy',
+  runner: 'the runner',
+  pinned: 'the pinned plan'
+}
+
 /**
- * The plan for one round, from the rounds before it.
+ * What a policy may read before it plans a grid.
  *
- * `bestAttempt` is the attempt index of the best cell in the last grid, which is
- * what tells `planFromHistory` whether gains are arriving early or late.
+ * Only prefix-safe facts: completed earlier rounds, the fallback, the hard caps,
+ * the worker cap, and the replay support fields. The current round's outcomes
+ * are absent, so a plan is a decision about the next rollout rather than a
+ * reaction to this one.
  */
-export function planRound({ history, fallback = { branchCount: 2, refineCount: 2 }, fixed = null }) {
+export function planContext({
+  history = [],
+  fallback,
+  hardMaxBranchCount,
+  hardMaxRefineCount,
+  maxParallelism,
+  traceBranchCount = null,
+  traceRefineCount = null
+}) {
+  return { history, fallback, hardMaxBranchCount, hardMaxRefineCount, maxParallelism, traceBranchCount, traceRefineCount }
+}
+
+/**
+ * A plan the runner will use: whole numbers inside the caps, with a reason.
+ *
+ * Refused rather than repaired. The paper forbids the runner from choosing the
+ * grid, so a policy that cannot state a legal plan stops the round instead of
+ * having one invented for it. Returns the plan or `{ error }`.
+ */
+export function validatePlan({ plan, hardMaxBranchCount, hardMaxRefineCount, source }) {
+  const label = PLAN_SOURCE_LABEL[source] ?? 'the plan'
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return { error: `${label} returned no grid plan` }
+
+  const checked = gridPlan({ branchCount: plan.branchCount, refineCount: plan.refineCount, reason: plan.reason })
+  if (checked.error) return { error: `${label}'s grid plan is invalid: ${checked.error}` }
+  if (checked.branchCount < 1) return { error: `${label}'s grid plan asks for ${checked.branchCount} branches, below the minimum of 1` }
+  if (checked.branchCount > hardMaxBranchCount) return { error: `${label}'s grid plan asks for ${checked.branchCount} branches, over the hard cap of ${hardMaxBranchCount}` }
+  if (checked.refineCount < 0) return { error: `${label}'s grid plan asks for ${checked.refineCount} refinements, below the minimum of 0` }
+  if (checked.refineCount > hardMaxRefineCount) return { error: `${label}'s grid plan asks for ${checked.refineCount} refinements, over the hard cap of ${hardMaxRefineCount}` }
+  return { ...checked, source }
+}
+
+/**
+ * The plan for one round.
+ *
+ * The policy plans its own grid, as the paper requires; the runner's history
+ * rule answers only when the policy has no `plan_grid`. A pinned plan wins over
+ * both, because it is how a first run's cost is known in advance.
+ */
+export function planRound({
+  policy = null,
+  history = [],
+  fallback = { branchCount: 2, refineCount: 2 },
+  fixed = null,
+  hardMaxBranchCount = HARD_MAX_BRANCH_COUNT,
+  hardMaxRefineCount = HARD_MAX_REFINE_COUNT,
+  maxParallelism = DEFAULT_MAX_PARALLELISM,
+  traceBranchCount = null,
+  traceRefineCount = null
+} = {}) {
   // A pinned plan bounds what a first run costs: the number of attempts a round
   // can make is the number of cells, and that is the expensive part.
-  if (fixed) return gridPlan({ branchCount: fixed.branchCount, refineCount: fixed.refineCount, reason: 'pinned for this run, so its cost is bounded in advance' })
-  return planFromHistory({ history, fallback, hardMaxBranchCount: HARD_MAX_BRANCH_COUNT, hardMaxRefineCount: HARD_MAX_REFINE_COUNT })
+  if (fixed) {
+    return validatePlan({
+      plan: { ...fixed, reason: 'pinned for this run, so its cost is bounded in advance' },
+      hardMaxBranchCount,
+      hardMaxRefineCount,
+      source: 'pinned'
+    })
+  }
+
+  if (typeof policy?.plan_grid === 'function') {
+    const context = planContext({ history, fallback, hardMaxBranchCount, hardMaxRefineCount, maxParallelism, traceBranchCount, traceRefineCount })
+    const asked = policy.plan_grid(context)
+    // The paper's plan_grid is synchronous: it runs before the grid exists and
+    // reads no outcome. A promise means it is deciding from something else.
+    if (asked && typeof asked.then === 'function') {
+      return { error: `${PLAN_SOURCE_LABEL.policy}'s plan_grid returned a promise; a grid plan is chosen before the round starts` }
+    }
+    return validatePlan({ plan: asked, hardMaxBranchCount, hardMaxRefineCount, source: 'policy' })
+  }
+
+  const planned = planFromHistory({ history, fallback, hardMaxBranchCount, hardMaxRefineCount })
+  if (planned.error) return { error: planned.error }
+  return validatePlan({ plan: planned, hardMaxBranchCount, hardMaxRefineCount, source: 'runner' })
 }
 
 /**
@@ -111,6 +192,44 @@ export function bestAttemptOf(grid) {
 }
 
 /**
+ * What a grid's cells actually opened: how many branches hold a cell, and the
+ * deepest attempt reached. The plan is the bound; this is what the policy used.
+ */
+export function openedGridOf(grid) {
+  const cells = Object.values(grid?.cells ?? {})
+  const branches = new Set(cells.map(cell => cell.branch))
+  const depth = cells.reduce((highest, cell) => Math.max(highest, cell.attempt), 0)
+  return { width: branches.size, depth }
+}
+
+/**
+ * One round as the next plan's context reads it.
+ *
+ * A resumed run builds this from the round's files and a live run builds it from
+ * the round in memory, so both read the same facts: planned and effective grids,
+ * opened width and depth, probes, decision rounds, score and beta.
+ */
+export function historyOfRound({ number, rollout, grid }) {
+  const opened = openedGridOf(grid)
+  return {
+    number,
+    plannedBranchCount: rollout?.plan?.branchCount ?? null,
+    plannedRefineCount: rollout?.plan?.refineCount ?? null,
+    planSource: rollout?.plan?.source ?? null,
+    planReason: rollout?.plan?.reason ?? null,
+    effectiveBranchCount: rollout?.effective?.branchCount ?? null,
+    effectiveRefineCount: rollout?.effective?.refineCount ?? null,
+    openedWidth: opened.width,
+    openedDepth: opened.depth,
+    probes: rollout?.rollout?.probes ?? null,
+    decisionRounds: rollout?.rollout?.rounds ?? null,
+    attained: rollout?.rollout?.attained ?? null,
+    beta: rollout?.policy?.beta ?? null,
+    bestAttempt: grid ? bestAttemptOf(grid) : null
+  }
+}
+
+/**
  * What a Dream-RSI run has already done, from its own round records.
  *
  * The evolutionary loop's `recordedState` reads `rounds/r####`, which a
@@ -128,17 +247,9 @@ export async function recordedRsiRounds(runDirectory) {
     const read = async file => JSON.parse(await fs.readFile(path.join(roundsDirectory, name, file), 'utf8').catch(() => 'null'))
     const rollout = await read('rollout.json')
     const grid = await read('grid.json')
-    rounds.push({
-      number: Number(match[1]),
-      name,
-      rollout,
-      // The fields `planFromHistory` reads, so a resumed run plans from what the
-      // rounds before it did rather than from nothing.
-      plannedBranchCount: rollout?.plan?.branchCount ?? null,
-      plannedRefineCount: rollout?.plan?.refineCount ?? null,
-      bestAttempt: grid ? bestAttemptOf(grid) : null,
-      attained: rollout?.rollout?.attained ?? null
-    })
+    // The manifest rides beside the summary because a resumed run's own summary
+    // is rebuilt from this read rather than from a second projection.
+    rounds.push({ ...historyOfRound({ number: Number(match[1]), rollout, grid }), name, rollout })
   }
   return rounds.sort((left, right) => left.number - right.number)
 }
@@ -273,15 +384,7 @@ export async function rsiRun({
   // come from the run's own layout, so a resume continues rather than restarting.
   const priorRounds = await recordedRsiRounds(directory)
   const firstRound = priorRounds.reduce((highest, round) => Math.max(highest, round.number), 0) + 1
-  const history = priorRounds
-    .filter(round => round.plannedBranchCount !== null)
-    .map(round => ({
-      round: round.number,
-      plannedBranchCount: round.plannedBranchCount,
-      plannedRefineCount: round.plannedRefineCount,
-      bestAttempt: round.bestAttempt,
-      attained: round.attained
-    }))
+  const history = priorRounds.filter(round => round.plannedBranchCount !== null)
   const spent = []
   const record = {
     target: targetText,
@@ -314,12 +417,6 @@ export async function rsiRun({
       return { runDirectory: directory, error: why, rounds: record.rounds }
     }
 
-    const plan = planRound({ history, fallback: { branchCount: 2, refineCount: 2 }, fixed: fixedPlan })
-    if (plan.error) {
-      await writeStatus({ phase: 'plan-failed', why: plan.error })
-      return { runDirectory: directory, error: plan.error }
-    }
-
     // The policy this round plays: the one dreaming deployed last round, or the
     // shipping one for the first round.
     const currentPolicyFile = path.join(policyDirectory, 'current.mjs')
@@ -330,6 +427,15 @@ export async function rsiRun({
     if (!policy) {
       await writeStatus({ phase: 'policy-failed', round })
       return { runDirectory: directory, error: `the deployed policy at ${currentPolicyFile} will not load` }
+    }
+
+    // The policy plans the grid, as the paper requires. The runner's history
+    // rule answers only when the policy has no `plan_grid` at all, and a plan
+    // outside the caps stops the round rather than being clamped in silence.
+    const plan = planRound({ policy, history, fallback: { branchCount: 2, refineCount: 2 }, fixed: fixedPlan, maxParallelism })
+    if (plan.error) {
+      await writeStatus({ phase: 'plan-failed', why: plan.error })
+      return { runDirectory: directory, error: plan.error }
     }
 
     await writeStatus({ phase: 'exploring', round, plan, policy: policy.NAME })
@@ -372,6 +478,11 @@ export async function rsiRun({
     const roundRecord = {
       round,
       plan,
+      // The plan is the bound; `effective` is the grid the runner made from it.
+      // They differ only when a later runner clamps a plan, but the record keeps
+      // both so a cross-cycle rule reads the pair rather than inferring it.
+      effective: { branchCount: grid.branchCount, refineCount: grid.refineCount },
+      opened: openedGridOf(grid),
       policy: { name: policy.NAME, beta: policy.beta ?? null },
       rollout: { probes: rollout.probes, rounds: rollout.rounds, attained: rollout.attained, failure: rollout.failure, durationMs: rollout.durationMs },
       pool: added,
@@ -427,11 +538,8 @@ export async function rsiRun({
     record.rounds.push(roundRecord)
 
     history.push({
-      round,
-      plannedBranchCount: plan.branchCount,
-      plannedRefineCount: plan.refineCount,
-      bestAttempt: bestAttemptOf(grid),
-      attained: rollout.attained,
+      ...historyOfRound({ number: round, rollout: roundRecord, grid }),
+      name: path.basename(roundDirectory(directory, round)),
       policy: dreamed.winner ? dreamed.winner.file : null,
       policyScore: dreamed.winner ? dreamed.winner.score : null
     })
