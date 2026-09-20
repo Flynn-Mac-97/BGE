@@ -96,12 +96,15 @@ const percentile = (values, share) => {
 }
 const round = value => value === null ? null : Math.round(value * 100) / 100
 
+/** How long the drawn frame must stay the same before it counts as settled. */
+const STEADY_MS = 6000
+
 /**
- * Wait until the page draws a frame with no post chain compiling, and keeps
- * drawing the same number of calls and triangles for three seconds.
+ * Wait until the page draws a frame with no post chain compiling, and draws the
+ * same calls, triangles and merged count for `STEADY_MS`.
  *
- * Models load after the level does, so the first drawn frame can still be
- * missing some of them.
+ * Models load after the level does, and merging takes 45 still frames after
+ * that, so an earlier frame draws a different scene from the one that settles.
  */
 async function waitForDrawing(page, what) {
   let last = null
@@ -110,11 +113,11 @@ async function waitForDrawing(page, what) {
     const drawn = await page.evaluate(`(() => {
       const stats = window.engine?.renderStats?.()
       if (!stats || stats.error || stats.drawCalls === 0 || String(stats.post).includes('compiling')) return null
-      return stats.drawCalls + ' ' + stats.triangles
+      return [stats.drawCalls, stats.triangles, stats.merged, stats.batches].join(' ')
     })()`)
     if (drawn !== last) { last = drawn; steadySince = Date.now() }
-    return drawn !== null && Date.now() - steadySince >= 3000
-  }, 240000)
+    return drawn !== null && Date.now() - steadySince >= STEADY_MS
+  }, 300000)
 }
 
 /** Mean colour difference between two PNG data URLs, 0 to 1, measured in the page. */
@@ -177,7 +180,7 @@ export async function browserFrames(checkout, project, options = {}) {
     server = spawn(process.execPath, [viteScript(checkout), '--port', String(serverPort), '--strictPort'], {
       cwd: checkout, env: { ...process.env, ENGINE_PROJECT: project }, stdio: 'ignore'
     })
-    await waitFor('the dev server', async () => (await fetch(`http://localhost:${serverPort}/api/project`)).ok, 90000)
+    await waitFor('the dev server', async () => (await fetch(`http://localhost:${serverPort}/api/project`)).ok, 180000)
 
     chrome = spawn(CHROME, [
       '--headless=new', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', '--disk-cache-size=1',
@@ -188,7 +191,7 @@ export async function browserFrames(checkout, project, options = {}) {
     page = await connect(cdpPort)
 
     if (level) {
-      await waitFor('the editor', () => page.evaluate('!!window.engine?.editor?.loadLevel'), 120000)
+      await waitFor('the editor', () => page.evaluate('!!window.engine?.editor?.loadLevel'), 240000)
       await page.evaluate(`window.engine.editor.loadLevel(${JSON.stringify(level)})`)
       // The stats still describe the last level until the new one draws.
       await sleep(3000)

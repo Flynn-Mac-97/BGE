@@ -28,7 +28,6 @@
  * Usage: node tools/dream/scoring.mjs --setup tools/dream/examples/agent-connection.mjs [--checkout <dir>] [--hash <digest>]
  */
 import fs from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { browserFrames } from './browser-frames.mjs'
@@ -61,10 +60,15 @@ export function digestOf(value) {
  * A writable copy of a project, without its built index.
  *
  * A task may write to the project, and a candidate's tasks must not see the
- * previous candidate's writes.
+ * previous candidate's writes. The copy is made beside the checkout: on the
+ * same drive, because on Windows the dev server answers every file of a project
+ * on another drive with the editor page; and outside it, because a project
+ * inside the served root reloads the page on each of its own writes.
  */
 export async function copyProject(source, tag = `dream-project-${process.pid}-`) {
-  const directory = await fs.mkdtemp(path.join(tmpdir(), tag))
+  const parent = path.resolve(CHECKOUT, '..', '.dream-projects')
+  await fs.mkdir(parent, { recursive: true })
+  const directory = await fs.mkdtemp(path.join(parent, tag))
   await fs.cp(source, directory, { recursive: true, filter: from => !from.includes('.engine') })
   return directory
 }
