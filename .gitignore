@@ -40,3 +40,8 @@ archive/
 # belongs to the machine it was written on, so a copy here is wrong for anyone
 # else and goes stale the moment a tool moves.
 **/.mcp.json
+
+# Written by the project index from the plugin sources. A checked-in copy goes
+# stale the moment a plugin registers a type, and the index is only useful when
+# it is never behind.
+plugins/builtin/registered-types.generated.json
