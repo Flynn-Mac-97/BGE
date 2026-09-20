@@ -75,6 +75,40 @@ worktree, so reading them changes nothing, and repeating an idea that already
 failed spends your whole budget for nothing. Take what measured well, leave what
 broke the checks.
 
+## Read the complete history first
+
+Read every earlier attempt, in full — not only the ones this block carries,
+not only the recent rounds, not only the branch you continue from. For each,
+read its record and its patch, and for a failure its reason, so you have the
+mechanism and the measured result. Trust the measured result over what the
+attempt claimed about itself: a report that says a change worked is not
+evidence.
+
+## Learn from successes and failures
+
+For every earlier attempt, note the mechanism and how it did. For a failure,
+decide which kind it was: a flawed core idea, or a sound idea let down by a
+bug, a bad parameter, or a slip. Never repeat the first kind. The second kind
+is worth another attempt, but only after you have found the fault in the code
+rather than guessed it from the report, and only with a specific fix in hand.
+
+## Do not converge into a local optimum
+
+Read the shape of what has been tried. When most attempts are small variations
+of one mechanism and the returns flatten, that place is a local optimum: resist
+another small tweak there. Deliberately prefer a structurally different
+mechanism, or an untried combination of pieces that already worked, over a
+safer marginal refinement. Variety in what you try is worth as much as the next
+small gain.
+
+## What counts as a new proposal
+
+A proposal is new when it is a genuinely new mechanism, a new combination of
+previously successful pieces, or a targeted fix to a specific fault found
+above. It is never a repeat or a rename of something already tried. Implement
+it, but do not claim it is correct or beats the target until the frozen setup
+has measured it.
+
 ## How a candidate is scored
 
 A failed check scores zero, and the run keeps the attempt; it is not a crash, and
