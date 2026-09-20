@@ -21,9 +21,37 @@
  */
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { legalActions, observationOf } from './grid.mjs'
+import { gridCeiling, legalActions, observationOf } from './grid.mjs'
 import { readPool } from './pool.mjs'
 import { loadPolicy } from './policy.mjs'
+
+/** The objective the paper's evaluator ranks by. `legacy` keeps the body-of-paper equation. */
+export const DEFAULT_OBJECTIVE = 'pareto'
+
+/** Every objective a sweep may use. Their numbers are not comparable with each other. */
+export const OBJECTIVES = ['pareto', 'legacy']
+
+/**
+ * The evaluator's price on parallel waste.
+ *
+ * `pareto.auc` and `parallel_penalty` both lie in [0, 1], a serial policy pays
+ * nearly 1 and a full batch of W pays near 1/W. Half a unit of area is a stated
+ * default fixed by the evaluator; a policy cannot set it.
+ */
+export const DEFAULT_LAMBDA = 0.5
+
+/**
+ * The sequential rounds a batch of `cellCount` cells costs on `workerCount` workers.
+ *
+ * The paper charges one decision round per batch and `ceil(k / W)` effective
+ * sequential rounds. The question refuses a batch above the worker count, so the
+ * formula also states what a plan larger than the workers would cost.
+ */
+export function effectiveSequentialRounds(cellCount, workerCount) {
+  const workers = Math.max(1, Math.floor(Number(workerCount) || 1))
+  const cells = Math.max(0, Math.floor(Number(cellCount) || 0))
+  return Math.ceil(cells / workers)
+}
 
 /**
  * The question a policy is solved against.
@@ -143,21 +171,19 @@ export function makeQuestion({ grid, maxParallelism = 3, onReveal = null }) {
         const recorded = grid.cells[id]
         revealed.set(id, recorded ?? { branch, attempt, outcome: null })
         probes++
+        const value = recorded?.outcome?.score
+        if (typeof value === 'number' && value > bestSoFar) bestSoFar = Number(value.toFixed(6))
         const answer = { id, ...question.meta(id) }
         answers.push(answer)
         // The paper's `on_reveal` fires per revealed cell, which is where a
         // policy records its curve: attainment after each probe, not per batch.
+        // The evaluator reads the same moments through `onReveal` to compute the
+        // area under the attainment curve.
         onRevealOne?.(answer)
         onReveal?.(answer, { probes, sequentialRounds })
       }
 
-      const score = answers.reduce((highest, answer) => {
-        const value = answer.outcome?.score
-        return typeof value === 'number' && value > highest ? value : highest
-      }, bestSoFar)
-      bestSoFar = Number(score.toFixed(6))
-
-      const effective = Math.ceil(wanted.length / maxParallelism)
+      const effective = effectiveSequentialRounds(wanted.length, maxParallelism)
       sequentialRounds += effective
       // The attainment is stored per round as it stood then. Reading it later
       // from the final reveal set would report the best score of the whole replay
@@ -187,14 +213,55 @@ export function makeQuestion({ grid, maxParallelism = 3, onReveal = null }) {
 }
 
 /**
+ * The area under the attainment-against-probes curve.
+ *
+ * Attainment is a step function of the probes spent: after probe `p` it is the
+ * best revealed score, normalised so the baseline is 0 and the grid's ceiling is
+ * 1. The area under a step is the mean height over the probes, which is what
+ * makes reaching the same score in fewer probes score higher.
+ */
+function attainmentAuc({ curve, baseline, ceiling }) {
+  const span = ceiling - baseline
+  if (!(span > 0) || !curve.length) return 0
+  const height = point => Math.min(1, Math.max(0, (point.attainment - baseline) / span))
+  const total = curve.reduce((sum, point) => sum + height(point), 0)
+  return Number((total / curve.length).toFixed(6))
+}
+
+/**
  * Score one policy over one recorded grid.
  *
- * The paper scores a replay by its best discovered quality, attempt cost, and
- * parallelism bonus. `beta1` prices represented attempts. `beta2` rewards more
- * attempts per decision round. The recorded curve remains for diagnostics.
+ * Two objectives are computed side by side and kept apart. The paper's ranks a
+ * route by `pareto.auc - lambda * parallel_penalty`: the mean attainment over the
+ * probes spent, less the price of not filling the workers. The other is the
+ * equation the body of the paper states, kept because earlier sweeps were
+ * recorded with it and its numbers are not comparable with the paper's.
+ *
+ * Only one of them is called `reward`, and `objective` names which, so a sweep
+ * recorded under one is never compared with a sweep made under the other.
  */
-export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds = 50, beta1 = 0.01, beta2 = 0.5, budget = null } = {}) {
-  const question = makeQuestion({ grid, maxParallelism })
+export async function replayGrid({
+  grid,
+  policy,
+  maxParallelism = 3,
+  maxRounds = 50,
+  objective = DEFAULT_OBJECTIVE,
+  lambda = DEFAULT_LAMBDA,
+  beta1 = 0.01,
+  beta2 = 0.5,
+  budget = null
+} = {}) {
+  if (!OBJECTIVES.includes(objective)) throw new Error(`unknown objective ${objective}; expected ${OBJECTIVES.join(' or ')}`)
+
+  // The evaluator reads attainment after every probe, where the paper's AUC is
+  // defined. The policy reads the same moments through its own recorded curve.
+  const attainmentCurve = []
+  let question = null
+  question = makeQuestion({
+    grid,
+    maxParallelism,
+    onReveal: (answer, usage) => attainmentCurve.push({ probes: usage.probes, attainment: question.best_so_far })
+  })
   let failure = null
 
   question.reset()
@@ -214,21 +281,32 @@ export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds =
 
   // The curve starts at the baseline, before any probe: a policy that never
   // probes has still not lost the target it started from.
-  const curve = [baseline, ...trace.map(round => round.attainment)]
-  const best = Math.max(...curve)
+  const attainments = [baseline, ...trace.map(round => round.attainment)]
+  const best = Math.max(...attainments)
   const attempts = trace.reduce((total, round) => total + round.batch.filter(id => Number(String(id).split(':')[1]) > 0).length, 0)
   const parallelBonus = attempts ? Number((attempts / Math.max(1, trace.length)).toFixed(6)) : 0
-  const reward = Number((best - beta1 * attempts + beta2 * parallelBonus).toFixed(6))
+  const legacyReward = Number((best - beta1 * attempts + beta2 * parallelBonus).toFixed(6))
+
+  const auc = attainmentAuc({ curve: attainmentCurve, baseline, ceiling: gridCeiling(grid) })
+  const parallelPenalty = probes > 0 ? Number((sequentialRounds / probes).toFixed(6)) : 0
+  const paretoReward = Number((auc - lambda * parallelPenalty).toFixed(6))
+  const reward = objective === 'legacy' ? legacyReward : paretoReward
 
   return {
     grid: grid.id,
     policy: policy.NAME ?? policy.name ?? policy.constructor?.name ?? 'unnamed',
     beta: policy.beta ?? null,
+    objective,
     maxParallelism,
     reward,
     quality: Number(best.toFixed(6)),
+    lambda,
     beta1,
     beta2,
+    auc,
+    parallelPenalty,
+    paretoReward,
+    legacyReward,
     parallelBonus,
     attempts,
     attainment: Number(best.toFixed(6)),
@@ -250,17 +328,34 @@ export async function replayGrid({ grid, policy, maxParallelism = 3, maxRounds =
  * spread is reported too: a policy that wins only on average is worth less than
  * one that wins everywhere.
  */
-export async function replayPool({ grids, policy, maxParallelism = 3, maxRounds = 50, beta1 = 0.01, beta2 = 0.5, budget = null } = {}) {
+export async function replayPool({
+  grids,
+  policy,
+  maxParallelism = 3,
+  maxRounds = 50,
+  objective = DEFAULT_OBJECTIVE,
+  lambda = DEFAULT_LAMBDA,
+  beta1 = 0.01,
+  beta2 = 0.5,
+  budget = null
+} = {}) {
   const replays = []
-  for (const grid of grids) replays.push(await replayGrid({ grid, policy, maxParallelism, maxRounds, beta1, beta2, budget }))
+  for (const grid of grids) replays.push(await replayGrid({ grid, policy, maxParallelism, maxRounds, objective, lambda, beta1, beta2, budget }))
+  const mean = field => Number((replays.reduce((total, replay) => total + (replay[field] ?? 0), 0) / Math.max(1, replays.length)).toFixed(6))
   const rewards = replays.map(replay => replay.reward)
   return {
     policy: policy.NAME ?? policy.name ?? policy.constructor?.name ?? 'unnamed',
     beta: policy.beta ?? null,
+    objective,
+    lambda,
     grids: replays.length,
-    reward: Number((rewards.reduce((total, value) => total + value, 0) / Math.max(1, rewards.length)).toFixed(6)),
+    reward: mean('reward'),
     worst: rewards.length ? Math.min(...rewards) : 0,
     best: rewards.length ? Math.max(...rewards) : 0,
+    auc: mean('auc'),
+    parallelPenalty: mean('parallelPenalty'),
+    paretoReward: mean('paretoReward'),
+    legacyReward: mean('legacyReward'),
     failures: replays.filter(replay => replay.failure).length,
     replays
   }
@@ -277,29 +372,64 @@ export async function replayPool({ grids, policy, maxParallelism = 3, maxRounds 
  * `makePolicy(beta)` is used rather than mutating one policy, so a sweep cannot
  * leave an instance holding the last beta it was tried at.
  */
-export async function replaySweep({ grids, makePolicy, betas = [0, 0.25, 0.5, 0.75, 1], maxParallelism = 3, maxRounds = 50, beta1 = 0.01, beta2 = 0.5 } = {}) {
+export async function replaySweep({
+  grids,
+  makePolicy,
+  betas = [0, 0.25, 0.5, 0.75, 1],
+  maxParallelism = 3,
+  maxRounds = 50,
+  objective = DEFAULT_OBJECTIVE,
+  lambda = DEFAULT_LAMBDA,
+  beta1 = 0.01,
+  beta2 = 0.5
+} = {}) {
   const points = []
-  for (const beta of betas) points.push({ beta, ...(await replayPool({ grids, policy: makePolicy(beta), maxParallelism, maxRounds, beta1, beta2 })) })
+  for (const beta of betas) points.push({ beta, ...(await replayPool({ grids, policy: makePolicy(beta), maxParallelism, maxRounds, objective, lambda, beta1, beta2 })) })
+  const mean = field => Number((points.reduce((total, point) => total + (point[field] ?? 0), 0) / Math.max(1, points.length)).toFixed(6))
   const rewards = points.map(point => point.reward)
   const spread = rewards.length ? Number((Math.max(...rewards) - Math.min(...rewards)).toFixed(6)) : 0
   const best = points.reduce((winner, point) => (!winner || point.reward > winner.reward ? point : winner), null)
+
+  // The paper's reward for the sweep: the mean attainment over the probes spent,
+  // less lambda times the mean parallel penalty over the sweep. Both are means of
+  // the same per-beta quantities, so the two objectives stay separable.
+  const paretoAuc = mean('auc')
+  const parallelPenalty = mean('parallelPenalty')
+  const paretoReward = Number((paretoAuc - lambda * parallelPenalty).toFixed(6))
+
   return {
     betas,
     points,
+    objective,
+    lambda,
+    paretoAuc,
+    parallelPenalty,
+    paretoReward,
+    legacyReward: mean('legacyReward'),
     // Non-degenerate means beta changed something. A policy whose sweep is flat
     // is not choosing; it is obeying a constant.
     degenerate: spread === 0,
     spread,
     bestBeta: best ? best.beta : null,
     bestReward: best ? best.reward : null,
-    meanReward: rewards.length ? Number((rewards.reduce((total, value) => total + value, 0) / rewards.length).toFixed(6)) : 0
+    meanReward: mean('reward')
   }
 }
 
 /** One version's score: the sweep, summarised the way a dreaming phase ranks it. */
-export async function scorePolicy({ grids, Class, instance = null, betas, maxParallelism = 3, beta1 = 0.01, beta2 = 0.5 } = {}) {
+export async function scorePolicy({
+  grids,
+  Class,
+  instance = null,
+  betas,
+  maxParallelism = 3,
+  objective = DEFAULT_OBJECTIVE,
+  lambda = DEFAULT_LAMBDA,
+  beta1 = 0.01,
+  beta2 = 0.5
+} = {}) {
   const makePolicy = beta => (Class ? new Class({ beta, name: instance?.NAME }) : { ...instance, beta })
-  const sweep = await replaySweep({ grids, makePolicy, betas, maxParallelism, beta1, beta2 })
+  const sweep = await replaySweep({ grids, makePolicy, betas, maxParallelism, objective, lambda, beta1, beta2 })
   return {
     policy: instance?.NAME ?? Class?.name ?? 'unnamed',
     score: sweep.meanReward,
@@ -317,7 +447,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const policyFile = argument('policy')
   const runDirectory = argument('run')
   if (!policyFile || !runDirectory) {
-    process.stderr.write('usage: node tools/dream/replay.mjs --policy <file> --run <run directory> [--beta1 0.01] [--beta2 0.5]\n')
+    process.stderr.write('usage: node tools/dream/replay.mjs --policy <file> --run <run directory> [--objective pareto|legacy] [--lambda 0.5] [--beta1 0.01] [--beta2 0.5]\n')
     process.exit(2)
   }
 
@@ -337,16 +467,23 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     grids,
     Class: loaded.Class,
     instance: loaded.policy,
+    objective: argument('objective') ?? DEFAULT_OBJECTIVE,
+    lambda: argument('lambda') ? Number(argument('lambda')) : DEFAULT_LAMBDA,
     beta1: argument('beta1') ? Number(argument('beta1')) : 0.01,
     beta2: argument('beta2') ? Number(argument('beta2')) : 0.5,
     maxParallelism: argument('parallelism') ? Number(argument('parallelism')) : 3
   })
   process.stdout.write(`${JSON.stringify({
     policy: scored.policy,
+    objective: scored.objective,
+    lambda: scored.lambda,
     grids: grids.length,
     meanReward: scored.score,
     bestReward: scored.bestReward,
     bestBeta: scored.bestBeta,
+    paretoAuc: scored.paretoAuc,
+    parallelPenalty: scored.parallelPenalty,
+    legacyReward: scored.legacyReward,
     spread: scored.spread,
     degenerate: scored.degenerate,
     perBeta: scored.points.map(point => ({ beta: point.beta, reward: point.reward, probes: point.replays.reduce((total, replay) => total + replay.probes, 0), failures: point.failures }))

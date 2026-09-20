@@ -125,7 +125,9 @@ test('the whole loop explores, pools, dreams, redeploys and names a winner', asy
 
   // Round one played the shipping policy; round two played what dreaming deployed.
   assert.equal(result.rounds[0].policy.name, 'parallel-refine')
-  assert.equal(result.rounds[1].policy.name, 'parallel-refine', 'the redeployed policy was not the one dreaming selected')
+  const winnerVersion = result.rounds[0].dreaming.winner.version
+  const winnerName = result.rounds[0].dreaming.versions.find(version => version.version === winnerVersion).policy
+  assert.equal(result.rounds[1].policy.name, winnerName, 'the redeployed policy was not the one dreaming selected')
   assert.ok(result.rounds[0].dreaming.winner, 'round one did not select a policy')
   // Round two's revision writes the same policy again, so the version it started
   // from ties with it — and a tie keeps the policy already deployed, which is the

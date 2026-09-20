@@ -91,7 +91,7 @@ test('max_parallelism is a limit, not a suggestion', () => {
   assert.equal(question.probe_batch(['0:0', '1:0']).length, 2)
 })
 
-test('the paper reward counts non-root attempts and rewards batching', async () => {
+test('the legacy reward counts non-root attempts and rewards batching', async () => {
   const grid = gridWithOneGoodBranch()
   const serial = await replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
   const roots = serial.trace.reduce((total, round) => total + round.batch.filter(id => Number(String(id).split(':')[1]) === 0).length, 0)
@@ -100,9 +100,15 @@ test('the paper reward counts non-root attempts and rewards batching', async () 
 
   // A policy that always fills the batch: the paper's other stated check.
   const greedy = { NAME: 'full-batches', solve(question) { question.reset(); while (question.legal_actions().length) question.probe_batch(question.legal_actions().slice(0, question.max_parallelism)) } }
-  const filled = await replayGrid({ grid, policy: greedy, maxParallelism: 3 })
+  const filled = await replayGrid({ grid, policy: greedy, maxParallelism: 3, objective: 'legacy' })
   assert.ok(filled.parallelBonus >= 0, 'the batching term was not recorded')
+  assert.equal(filled.objective, 'legacy', 'the legacy sweep did not name its objective')
   assert.equal(filled.reward, Number((filled.quality - 0.01 * filled.attempts + 0.5 * filled.parallelBonus).toFixed(6)))
+  assert.equal(filled.legacyReward, filled.reward, 'the legacy objective did not return the body-of-paper equation')
+
+  const paper = await replayGrid({ grid, policy: greedy, maxParallelism: 3 })
+  assert.equal(paper.objective, 'pareto')
+  assert.equal(paper.reward, paper.paretoReward, 'the default objective is not the paper reward')
 })
 
 test('a policy that opens branches and fills batches beats one that only refines', async () => {
