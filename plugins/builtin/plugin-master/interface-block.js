@@ -32,7 +32,10 @@ const commandLine = command => {
     command.key ? `[${command.key}]` : null,
     command.refusesWithoutHost ? 'refuses without a host' : null
   ].filter(Boolean).join(', ')
-  if (!command.label && !said) return command.id
+  // A command with no key and no refusal is only its id: the label describes
+  // what the id already names, and printing it for every command is most of the
+  // block. A key or a refusal must stay, because neither is on the id.
+  if (!said) return command.id
   return `${command.id} (${[command.label, said].filter(Boolean).join(', ')})`
 }
 
@@ -40,7 +43,7 @@ const commandLine = command => {
  * The interface of one plugin, as markdown.
  *
  * @param {object} facts What `source-facts.js` read from the file.
- * @param {object} where `file` is the path shown, `lines` its length.
+ * @param {object} where `lines` is the source length.
  * @returns {string} The block, without a trailing newline.
  */
 export function interfaceBlock(facts = {}, where = {}) {
@@ -61,11 +64,22 @@ export function interfaceBlock(facts = {}, where = {}) {
   const callable = [...(facts.commands || []), ...(facts.menus || [])]
   const commands = callable.map(commandLine)
   if (commands.length) rows.push(['commands', commands[0]], ...commands.slice(1).map(line => ['', line]))
+  // One row per kind, not per command: the label repeated for every command
+  // costs more than the arguments it announces, and the id is what is read.
+  const argumentLines = []
+  const inputLines = []
   for (const command of callable) {
-    if (command.arguments !== undefined) rows.push(['arguments', `${command.id}: ${command.arguments === null ? 'read run in source' : command.arguments || 'none'}`])
-    if (command.inputSchema) rows.push(['input', `${command.id}: ${command.inputSchema.replace(/\s+/g, ' ')}`])
+    // A command that takes nothing still needs its `id:` so a reader can find it;
+    // writing `: none` after every one costs more than the missing argument says.
+    if (command.arguments !== undefined) {
+      const value = command.arguments === null ? ' read run in source' : command.arguments ? ` ${command.arguments}` : ''
+      argumentLines.push(`${command.id}:${value}`)
+    }
+    if (command.inputSchema) inputLines.push(`${command.id}: ${command.inputSchema.replace(/\s+/g, ' ')}`)
   }
-  if (facts.context?.length) rows.push(['context', facts.context.map(key => `context.${key}`).join(', ')])
+  if (argumentLines.length) rows.push(['arguments', argumentLines.join(';')])
+  if (inputLines.length) rows.push(['input', inputLines.join(';')])
+  if (facts.context?.length) rows.push(['context', facts.context.join(', ')])
   if (facts.systems?.length) rows.push(['systems', facts.systems.join(', ')])
   if (facts.listens?.length) rows.push(['listens', facts.listens.join(', ')])
   const emits = (facts.emits || []).map(entry =>
@@ -79,11 +93,12 @@ export function interfaceBlock(facts = {}, where = {}) {
   // reads as "not measured", and this block is measured.
   const shown = rows.filter(([, value]) => value !== null && value !== undefined && value !== '')
   if (!shown.length) shown.push(['declared', 'no contribution point, and nothing on context'])
-  const width = Math.max(...shown.map(([name]) => name.length))
-  const body = shown.map(([name, value]) => `  ${name.padEnd(width)}  ${value}`.trimEnd()).join('\n')
-  return `**Interface, parsed from source** (${where.file || 'the plugin'}).`
-    + ` Where the prose below it disagrees, this is the code.\n\n`
-    + `\`\`\`\n${body}\n\`\`\``
+  // A label and its value, one space apart. Aligning the values into columns
+  // costs ten characters a row and tells an agent nothing the label does not.
+  const body = shown.map(([name, value]) => `  ${name ? `${name} ` : ''}${value}`.trimEnd()).join('\n')
+  // The rows are the interface. A heading and a fence around them are
+  // presentation, and the packet already prints the guide title above.
+  return `parsed from source\n${body}`
 }
 
 /**
@@ -126,7 +141,7 @@ export async function makeInterfaceReader({ root, projectDirectory }) {
     await fs.promises.mkdir(directory, { recursive: true })
     const realDirectory = await fs.promises.realpath(directory)
     if (!realDirectory.startsWith(realBase + path.sep)) throw new Error('interface directory leaves its scope')
-    const stamp = `<!-- Generated from ${file}; sha256 ${fingerprint(source)}. Do not edit. -->\n`
+    const stamp = `<!--${fingerprint(source).slice(0, 8)}-->\n`
     const existing = await fs.promises.readFile(output, 'utf8').catch(() => '')
     if (existing.startsWith(stamp)) return existing
     reader ??= makeSourceReader()

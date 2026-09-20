@@ -177,8 +177,11 @@ export async function contextFromDisk(root, request, projectPath = 'project', in
     return fs.promises.readFile(target, 'utf8')
   }
   const transport = onDisk(project, root)
+  // A packet's checks run from the checkout, so the project they name is the
+  // path from there. The absolute path is longer and moves with the worktree.
+  const projectLabel = normal(path.relative(root, project)) || '.'
   const packet = await resolveAgentContext(
-    read, request, await transport.agentPlugins(), project, interfaceText || transport.agentInterface)
+    read, request, await transport.agentPlugins(), projectLabel, interfaceText || transport.agentInterface)
   // A request that names no files has given the agent nothing to point at. The
   // file tree in the packet answers that, so finding a path costs no second
   // engine process (`tree`). A request that names files needs no tree.

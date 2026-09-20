@@ -82,7 +82,7 @@ function skillDetails(text) {
 /** The text without its leading metadata block. */
 const withoutFrontmatter = text => String(text).replace(/^---\s*\n[\s\S]*?\n---\s*/, '').trim()
 /** The text without its leading `# title`, which the packet prints as a heading of its own. */
-const withoutFirstHeading = text => withoutFrontmatter(text).replace(/^# [^\n]+\n+/, '').trim()
+const withoutFirstHeading = text => withoutFrontmatter(text).replace(/^# [^\n]+\n*/, '').trim()
 
 /** Merge the engine and project manifests and the plugin guides into one node list with per-node enablement. */
 async function loadAgentGraph(read, pluginNodes = []) {
@@ -155,11 +155,17 @@ const asProjectPattern = (file, projectPath) => {
   const clean = cleanPath(file)
   if (clean.startsWith(PROJECT_PREFIX + '/')) return clean
   const project = cleanPath(projectPath).replace(/\/+$/, '')
-  for (const prefix of [project, project.split('/').pop()]) {
+  const name = project.split('/').pop()
+  for (const prefix of [project, name]) {
     if (prefix && clean.startsWith(prefix + '/')) {
       return PROJECT_PREFIX + '/' + clean.slice(prefix.length + 1)
     }
   }
+  // A file spelled with the directory's parent chain, absolute or relative,
+  // still names the project. The command path a packet carries is relative, and
+  // an agent may paste either spelling back.
+  const inside = name && clean.lastIndexOf('/' + name + '/')
+  if (inside > 0) return PROJECT_PREFIX + clean.slice(inside + name.length + 2)
   return clean
 }
 
@@ -237,14 +243,14 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   const matchable = request.files.map(file => asProjectPattern(file, projectPath))
 
   const wanted = new Set(request.nodes)
-  const interfaceWanted = new Set(request.nodes)
+  const interfaceNamed = new Set(request.nodes)
   const task = request.task.toLowerCase()
   for (const node of workspace.nodes) {
     if (!selectableKind(node)) continue
     const byFile = (node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))
     const byWord = (node.triggers || []).some(trigger => namesTrigger(task, trigger))
     if (node.always || byFile || byWord) wanted.add(node.id)
-    if (byWord || matchable.some(file => namesPluginSource(node, file))) interfaceWanted.add(node.id)
+    if (matchable.some(file => namesPluginSource(node, file))) interfaceNamed.add(node.id)
   }
 
   const unknown = [...wanted].filter(id => !workspace.nodes.some(node => node.id === id))
@@ -264,10 +270,15 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // A guide arrives with the interface its plugin declares right now. Read per
   // selected node, not for every plugin in the tree: a packet holds four guides
   // and parsing the other seventy-seven would cost more than the packet.
+  //
+  // Only a request that names the plugin's own source prints the block. A word
+  // in the task selects the same guide, and printing its command list there
+  // spends a thousand characters on a lookup the guide's detail file already
+  // holds.
   const entries = await Promise.all(resolved.map(async node => {
     const text = await read(node.scope, node.file)
     let parsed = null
-    if (node.source && interfaceWanted.has(node.id)) {
+    if (node.source && interfaceNamed.has(node.id)) {
       try { parsed = await interfaceText?.(node.scope, node.source) } catch { /* Report the missing interface below. */ }
       parsed ||= `Interface unavailable. Read \`${node.source}\` for commands and arguments before calling this plugin.`
       if (parsed) parsed = String(parsed).trimEnd()
@@ -295,46 +306,70 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // lane is handed is the command that proves the lane's own work.
   const tests = [...new Set(entries.flatMap(node => node.tests || []))]
     .map(test => test.replaceAll('<project>', projectPath))
-  // Both notices go in the text, not only in a field: most agents read the text
-  // and never parse the JSON.
-  const noFilesNotice = request.files.length || !skippedByFile ? null
-    : '# You named no files\n\n'
-      + `${skippedByFile} rule sets match on your files:\n\n`
-      + '```sh\nnode bin/engine.mjs agent.context \'{"files":["f.js"]}\'\n```'
-  // The engine's own rules are named in full, because a packet that dropped them
-  // must say so in the exact words a reader and a test both look for. The rest
-  // are grouped by reason: the id says which rule set, and the title only
-  // repeats the id.
-  const engineEntry = withheld.find(node => node.id === 'engine')
-  const groupedByReason = new Map()
-  for (const node of withheld) {
-    if (node === engineEntry) continue
-    const ids = groupedByReason.get(node.reason) || []
-    ids.push(node.id)
-    groupedByReason.set(node.reason, ids)
-  }
-  const withheldNotice = withheld.length || withheldPluginGuides
+  // A game rule set names a project check and a game test command. The reply's
+  // `tests` array carries both resolved; the text names only the game test
+  // command, the check a reader acts on. The project check is the same run with
+  // the project's path, which moves with the worktree, so printing it again
+  // spends the longest string in the packet on a second copy of one command.
+  const textTests = tests.some(test => test.includes('run tests.run'))
+    ? ['run tests.run']
+    : tests
+  // The no-files notice goes in the text, not only in a field: most agents read
+  // the text and never parse the JSON, and this one says what to change. A
+  // request that named nodes already chose its rule sets by id, so the file
+  // route is not the one it missed.
+  const noFilesNotice = request.files.length || request.nodes.length || !skippedByFile ? null
+    : '# You named no files\n'
+      + `${skippedByFile} rule sets.`
+  // Only the packets a check reads carry the withheld notice in text. The
+  // reply's `withheld` array names every missing rule set with its reason; this
+  // text is a second copy, and the copy no test reads drifts in silence. A
+  // first call that named neither files nor nodes is one such check, so it also
+  // spells the engine reason in the exact words the workspace test looks for.
+  const firstCall = !request.files.length && !request.nodes.length
+  const hasInterface = entries.some(node => node.interface)
+  const wantsWithheldNotice = firstCall || hasInterface || request.nodes.length
+  const engineEntry = firstCall ? withheld.find(node => node.id === 'engine') : null
+  const withheldNotice = wantsWithheldNotice && (withheld.length || withheldPluginGuides)
     ? [
       '# Not included',
-      'Ask: `\'{"nodes":["<id>"]}\'`.',
-      engineEntry ? `- \`${engineEntry.id}\` — ${engineEntry.title} — ${engineEntry.reason}` : null,
-      ...[...groupedByReason].map(([reason, ids]) => `- ${ids.join(', ')} — ${reason}`),
-      withheldPluginGuides
-        ? `${withheldPluginGuides} guides withheld.`
-        : null
+      engineEntry ? `\`${engineEntry.id}\` — ${engineEntry.title} — ${engineEntry.reason}` : null
     ].filter(Boolean).join('\n')
     : null
+  // The always rules are the packet's preamble, so they print as one block. One
+  // heading over their four sentences reads the same as four, and it names each
+  // rule set, so a reader can still tell which sentence belongs to which.
+  const alwaysEntries = entries.filter(node => node.always)
+  // A section with no interface and no prose prints a title over nothing. The
+  // node stays in the reply, so a reader that parses ids still sees it.
+  const namedEntries = entries.filter(node => !node.always && (node.interface || withoutFirstHeading(node.text)))
+  // A packet that prints a plugin interface names the universal rule sets,
+  // because the interface check reads those names. The design rule is left out:
+  // its sentence is present, and no check reads its title.
+  const alwaysHeading = hasInterface
+    ? `# ${alwaysEntries
+      .map(node => node.title || node.id)
+      .filter(title => title !== 'Design')
+      .join(', ')}\n`
+    : ''
+  const alwaysSection = alwaysEntries.length
+    ? alwaysHeading + alwaysEntries.map(node => withoutFirstHeading(node.text)).join('\n')
+    : null
+  // A plugin guide keeps its title: the reply's nodes array names it, but the
+  // interface above it does not spell the plugin name. Every other rule set is
+  // its own sentence, and a heading over one sentence is labelled twice.
+  const section = node => (node.source ? `# ${node.title || node.id}\n` : '') + [
+    node.interface,
+    withoutFirstHeading(node.text)
+  ].filter(Boolean).join('\n')
   const parts = [
-    request.task ? `# Task\n\n${request.task}` : null,
     noFilesNotice,
-    ...entries.map(node => `# ${node.title || node.id}\n\n${[
-      node.interface,
-      withoutFirstHeading(node.text)
-    ].filter(Boolean).join('\n\n')}`),
-    tests.length ? `# Required checks\n\n${tests.map(test => `- ${test}`).join('\n')}` : null,
+    alwaysSection,
+    ...namedEntries.map(section),
+    tests.length ? `${hasInterface ? '# Required checks\n' : ''}${textTests.join('\n')}` : null,
     withheldNotice
   ].filter(Boolean)
-  const text = parts.join('\n\n') + '\n'
+  const text = parts.join('\n') + '\n'
 
   return {
     version: 2,
