@@ -35,25 +35,78 @@ export const BETA_GRID = [0, 0.25, 0.5, 0.75, 1]
 /** How long one revision agent may take, in seconds. */
 const DEFAULT_REVISION_TIMEOUT_SECONDS = 900
 
+/** How many replay rounds per grid the prompt carries. */
+const TRACE_ROUNDS = 12
+
 /**
- * What the revising agent is told: the policy, how it scored, and the pool.
+ * Budget for the earlier revisions in the prompt: the last few, with a short
+ * report each.
  *
- * The replayed trace is summarised rather than dumped. A trace of every probe on
- * every grid is thousands of lines, and an agent that cannot see the shape of
- * what happened will not improve the policy that produced it.
+ * The counts are capped so the prompt cannot grow with the number of revisions,
+ * a cost every later revision would pay.
  */
-async function revisionPrompt({ checkout, runDirectory, policyFile, source, replay }) {
-  const template = await fs.readFile(path.join(checkout, 'tools/dream/prompts/policy.md'), 'utf8')
+const HISTORY_LIMIT = 4
+const HISTORY_REPORT_CHARS = 400
+
+/**
+ * One earlier version, reduced to what the next revision needs: what it changed
+ * and what the sweep gave it. Its route is dropped; the route that decides the
+ * next change is the last version's, which the prompt carries in full.
+ */
+function earlierVersion(version) {
+  return {
+    version: version.version,
+    policy: version.policy,
+    score: version.score,
+    bestBeta: version.bestBeta,
+    failure: version.failure ?? null,
+    said: version.revision?.said ?? ''
+  }
+}
+
+/** The earlier-revision lines, oldest first, cut to HISTORY_LIMIT versions. */
+function earlierRevisionLines(versions) {
+  if (!versions.length) return ['(none — this is the first revision)']
   const lines = []
+  for (const version of versions.slice(-HISTORY_LIMIT)) {
+    const score = typeof version.score === 'number' ? version.score : 'none'
+    const beta = typeof version.bestBeta === 'number' ? `, best at beta ${version.bestBeta}` : ''
+    lines.push(`- version ${version.version}: score ${score}${beta}${version.failure ? `, FAILED: ${version.failure}` : ''}`)
+    const said = String(version.said ?? '').trim()
+    if (version.version === 0) lines.push('  started the phase; no revision was applied')
+    else if (said) lines.push(`  changed: ${said.slice(0, HISTORY_REPORT_CHARS)}`)
+    else lines.push('  changed: (the reviser reported nothing)')
+  }
+  return lines
+}
+
+/**
+ * What the revising agent is told: the route the last version took, what earlier
+ * revisions changed and scored, the source, and the file it writes.
+ *
+ * The paper hands the development agent the current trajectories together with
+ * feedback from earlier revisions, so a change that already lost is not made
+ * again. Both are cut to a fixed budget rather than dumped: a trace of every
+ * probe on every grid is thousands of lines, and an agent that cannot see the
+ * shape of what happened will not improve the policy that produced it.
+ */
+export async function revisionPrompt({ checkout, runDirectory, policyFile, source, replay, history = [] }) {
+  const template = await fs.readFile(path.join(checkout, 'tools/dream/prompts/policy.md'), 'utf8')
+  const lines = [
+    'Earlier revisions, newest last, with what each changed and scored:',
+    ...earlierRevisionLines(history),
+    '',
+    'The route the last version took:'
+  ]
   for (const point of replay.points) {
     lines.push(`### beta ${point.beta}: mean reward ${point.reward}`)
     for (const grid of point.replays) {
       lines.push(`- grid ${grid.grid}: reward ${grid.reward}, quality ${grid.quality}, probes ${grid.probes}, rounds ${grid.rounds}, `
         + `bonus ${grid.parallelBonus}${grid.failure ? `, FAILED: ${grid.failure}` : ''}`)
-      for (const round of grid.trace.slice(0, 12)) {
+      for (const round of grid.trace.slice(0, TRACE_ROUNDS)) {
         lines.push(`  - round ${round.round}: probed ${round.batch.join(', ')} → attainment ${round.attainment}`)
       }
-      if (grid.trace.length > 12) lines.push(`  - … ${grid.trace.length - 12} more rounds`)
+      if (grid.trace.length > TRACE_ROUNDS) lines.push(`  - … ${grid.trace.length - TRACE_ROUNDS} more rounds`)
     }
   }
 
@@ -72,8 +125,8 @@ async function revisionPrompt({ checkout, runDirectory, policyFile, source, repl
  * can be driven by a scripted reviser when the point is the machinery rather
  * than the model.
  */
-export async function reviseWithAgent({ checkout, runDirectory, policyFile, source, replay, timeoutSeconds, model, harness = DEFAULT_HARNESS }) {
-  const prompt = await revisionPrompt({ checkout, runDirectory, policyFile, source, replay })
+export async function reviseWithAgent({ checkout, runDirectory, policyFile, source, replay, history, timeoutSeconds, model, harness = DEFAULT_HARNESS }) {
+  const prompt = await revisionPrompt({ checkout, runDirectory, policyFile, source, replay, history })
   const args = [
     harnessWrapper(checkout, harness),
     '--json',
@@ -240,7 +293,11 @@ export async function dreamPolicies({
       runDirectory,
       policyFile: nextFile,
       source,
-      replay: sweeps.get(version - 1) ?? { points: [] }
+      replay: sweeps.get(version - 1) ?? { points: [] },
+      // Every version scored so far, including the one being replaced: the
+      // paper gives the development agent the feedback from earlier revisions,
+      // and without it a failed change is invisible to the next revision.
+      history: record.versions.map(earlierVersion)
     })
 
     const evaluated = await evaluate(version, nextFile)

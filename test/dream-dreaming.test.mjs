@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { emptyGrid, record } from '../tools/dream/grid.mjs'
 import { addGrid, readPool, poolSummary } from '../tools/dream/pool.mjs'
-import { dreamPolicies, selectVersion } from '../tools/dream/dreaming.mjs'
+import { dreamPolicies, revisionPrompt, selectVersion } from '../tools/dream/dreaming.mjs'
 import { loadPolicy } from '../tools/dream/policy.mjs'
 
 /** A grid where branch 1 holds the win, so a policy's route is visible in its score. */
@@ -158,4 +158,70 @@ test('a revision that leaves the file unchanged scores what the last version sco
   assert.equal(record.versions[1].score, record.versions[0].score, 'an unchanged file scored differently')
   assert.equal(record.improved, false)
   assert.equal(record.gain, 0)
+})
+
+/**
+ * A reviser that captures the prompt each version is handed, without editing.
+ *
+ * It renders the prompt the way `reviseWithAgent` does, so the test reads the
+ * text the development agent would read.
+ */
+function capturingReviser(prompts) {
+  return async ({ checkout, runDirectory, policyFile, source, replay, history }) => {
+    prompts.push(await revisionPrompt({ checkout, runDirectory, policyFile, source, replay, history }))
+    return { ok: true, status: 'completed', text: 'widened the batch to three', durationMs: 1, tokens: null }
+  }
+}
+
+test('the replay block hands the next reviser the route and the earlier revisions', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-feedback-'))
+  await seededPool(directory)
+
+  const prompts = []
+  await dreamPolicies({
+    checkout: process.cwd(),
+    runDirectory: directory,
+    versions: 3,
+    revise: capturingReviser(prompts)
+  })
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(prompts.length, 2, 'the phase did not ask for the versions it scored')
+  // The first revision reads the version it started from, and no other.
+  assert.match(prompts[0], /- version 0: score [\d.]+, best at beta [\d.]+/)
+  assert.doesNotMatch(prompts[0], /- version 1:/, 'the first revision was handed a version that did not exist yet')
+
+  const second = prompts[1]
+  // The route: which cells were probed, in which batch, in which round, and
+  // what that batch bought.
+  assert.match(second, /- round 1: probed \d+:\d+ → attainment /)
+  // Earlier revisions: what each changed and what it scored.
+  assert.match(second, /- version 0: score [\d.]+, best at beta [\d.]+/)
+  assert.match(second, /- version 1: score [\d.]+, best at beta [\d.]+/)
+  assert.match(second, /changed: widened the batch to three/)
+})
+
+test('the earlier-revision budget cuts the oldest revisions and long reports', async () => {
+  const history = Array.from({ length: 6 }, (_, index) => ({
+    version: index,
+    policy: `p${index}`,
+    score: index / 10,
+    bestBeta: 0.5,
+    said: index === 5 ? 'x'.repeat(600) : `change ${index}`
+  }))
+
+  const prompt = await revisionPrompt({
+    checkout: process.cwd(),
+    runDirectory: 'agent-runs/nowhere',
+    policyFile: 'agent-runs/nowhere/policy/v006.mjs',
+    source: 'class P {}',
+    replay: { points: [] },
+    history
+  })
+
+  assert.doesNotMatch(prompt, /- version [01]:/, 'the budget did not cut the oldest revisions')
+  assert.match(prompt, /- version 2: score 0\.2/, 'the newest revision inside the budget is missing')
+  assert.match(prompt, /- version 5: score 0\.5/)
+  assert.match(prompt, new RegExp(`changed: x{400}`), 'the report was not cut to the budget')
+  assert.doesNotMatch(prompt, /x{401}/, 'the report ran past the budget')
 })

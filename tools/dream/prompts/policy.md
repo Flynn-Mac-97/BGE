@@ -64,6 +64,9 @@ continuations when the policy has evidence for them.
 
 ## What the last version did
 
+Earlier revisions come first: what each changed and what it scored, so a change
+that already lost is not made again. Then the route the last version took.
+
 {{REPLAY}}
 
 ## How the last version is written
