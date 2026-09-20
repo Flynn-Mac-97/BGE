@@ -253,6 +253,7 @@ export async function dreamPolicies({
       // joining it back onto the checkout produces nonsense.
       absolute: file,
       policy: scored.policy,
+      objective: scored.objective,
       score: scored.score,
       bestReward: scored.bestReward,
       bestBeta: scored.bestBeta,
@@ -266,7 +267,15 @@ export async function dreamPolicies({
       replays: scored.points.flatMap(point => point.replays.map(replay => ({
         beta: point.beta,
         grid: replay.grid,
+        // The objective travels with every number it produced. A reward scored
+        // under `pareto` is not comparable with one scored under `legacy`, and a
+        // record that does not say which would be compared with the wrong runs.
+        objective: replay.objective,
         reward: replay.reward,
+        auc: replay.auc,
+        parallelPenalty: replay.parallelPenalty,
+        paretoReward: replay.paretoReward,
+        legacyReward: replay.legacyReward,
         probes: replay.probes,
         rounds: replay.rounds,
         quality: replay.quality,

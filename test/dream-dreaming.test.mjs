@@ -225,3 +225,30 @@ test('the earlier-revision budget cuts the oldest revisions and long reports', a
   assert.match(prompt, new RegExp(`changed: x{400}`), 'the report was not cut to the budget')
   assert.doesNotMatch(prompt, /x{401}/, 'the report ran past the budget')
 })
+
+test('a recorded replay carries the objective and the terms that made its reward', async () => {
+  const directory = path.join(os.tmpdir(), `dream-objective-${process.pid}`)
+  await fs.rm(directory, { recursive: true, force: true })
+  await seededPool(directory)
+
+  const record = await dreamPolicies({
+    checkout: process.cwd(),
+    runDirectory: directory,
+    versions: 1,
+    revise: writesConstantPolicy
+  })
+
+  // A reward scored under one objective is not comparable with one scored under
+  // the other, so every record that carries a number carries its objective too.
+  const version = record.versions[0]
+  assert.equal(version.objective, 'pareto', 'the version does not name the objective it was scored under')
+  for (const replay of version.replays) {
+    assert.equal(replay.objective, 'pareto', 'a replay does not name its objective')
+    assert.equal(typeof replay.auc, 'number', 'the replay dropped the area under the attainment curve')
+    assert.equal(typeof replay.parallelPenalty, 'number', 'the replay dropped the parallel penalty')
+    assert.equal(replay.reward, replay.paretoReward, 'the reward is not the objective the record names')
+    assert.notEqual(replay.legacyReward, undefined, 'the replay dropped the legacy number')
+  }
+
+  await fs.rm(directory, { recursive: true, force: true })
+})
