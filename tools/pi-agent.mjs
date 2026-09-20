@@ -110,14 +110,17 @@ async function main() {
   const startedAtMs = Date.now()
   const args = ['-p', '--approve', '--session-dir', sessionDir, ...toolArguments(options.permissionMode)]
   if (options.model !== undefined) args.push('--model', options.model)
-  args.push('--', task)
 
+  // The task is written to pi's stdin rather than passed as an argument, because
+  // Windows caps a command line at about 32767 characters and a task can be
+  // longer than that.
   const child = spawn(process.execPath, [bundle, ...args], {
     cwd: options.cwd,
     env: process.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true
   })
+  child.stdin.end(task)
 
   let stdout = ''
   let stderr = ''
