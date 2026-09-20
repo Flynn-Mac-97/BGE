@@ -66,8 +66,9 @@ Objective: {{OBJECTIVE}}
 
 {{HISTORY}}
 
-Every earlier attempt kept its patch and its record beside `{{SETUP}}`, under
-`rounds/r<round>/`. A `.patch` file is the diff that attempt produced; the
+This block is capped so the prompt stays affordable, so it may leave attempts
+out. Every earlier attempt kept its patch and its record beside `{{SETUP}}`,
+under `rounds/r<round>/`. A `.patch` file is the diff that attempt produced; the
 `.json` beside it holds its measures and the four lines its agent wrote about
 what worked and what did not. Read them before you design: they are outside your
 worktree, so reading them changes nothing, and repeating an idea that already
