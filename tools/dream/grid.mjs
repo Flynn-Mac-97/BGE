@@ -63,6 +63,21 @@ export function gridSize(grid) {
 }
 
 /**
+ * The highest score this grid holds: the best any policy could attain on it.
+ *
+ * The evaluator reads it to put attainment on one scale across grids, where 0 is
+ * the baseline and 1 is the recorded best. A grid with no scored cell attains the
+ * baseline, so the span is zero and no route can gain.
+ */
+export function gridCeiling(grid) {
+  const baseline = grid.baseline?.value ?? 0
+  const scores = Object.values(grid.cells ?? {})
+    .map(cell => cell.outcome?.score)
+    .filter(score => typeof score === 'number')
+  return scores.length ? Math.max(baseline, ...scores) : baseline
+}
+
+/**
  * The attempt after the last revealed one on a branch, or null when the branch
  * is full.
  *
