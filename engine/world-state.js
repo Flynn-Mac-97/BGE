@@ -6,9 +6,14 @@
  * moment; `levelFromWorld` writes the level shape, so a save keeps every decision
  * the level file can hold.
  *
+ * The walk over a single value lives in `value-projection.js`, under the policy
+ * below. This file adds what a checkpoint is: which entity fields to carry, and
+ * how to put an entity back without handing out a new object.
+ *
  * Both read `world.entities`, `world.state`, `world.types` and `world.behaviours`
  * and do not own them. `world.js` owns the store and puts the entities back.
  */
+import { makeValueProjection } from './value-projection.js'
 import { round3 } from './round3.js'
 import { expand, sameLook, lookDiff } from './world-look.js'
 
@@ -23,55 +28,28 @@ const CHECKPOINT_DEPTH = 6
 /** Bumped when the shape of a checkpoint changes, so an old one is refused rather than misread. */
 const CHECKPOINT_VERSION = 1
 
-/** A value a checkpoint could not carry, kept apart from `null`, which is a value. */
-const LOST = Symbol('lost')
-
 /**
- * What a value becomes on the way into a checkpoint.
+ * What a checkpoint keeps and loses.
  *
- * Plain data is COPIED, because a checkpoint that shares a live object changes
- * when the world carries on and is then no longer a checkpoint. A reference to
- * another entity is written down as its id and resolved again on the way back:
- * a state object holding two entities is a graph, and copying it would quietly
- * split it into two. Anything else — a function, a node from outside — is
- * counted and named, because a checkpoint that dropped something in silence is
- * worse than one that says what it could not keep.
+ * The moment is held in memory, so Set and Map and the primitives JSON cannot
+ * write all survive. Only a function, a value past the depth, and an object that
+ * is not plain data are left behind, and one array element at a time.
  */
-function asCopy(value, live, lost, where, depth = 0) {
-  if (value === null) return null
-  if (typeof value === 'function') { lost.push(`${where} is a function`); return LOST }
-  if (typeof value !== 'object') return value
-  if (live.has(value)) return { $entity: value.id }
-  if (depth >= CHECKPOINT_DEPTH) { lost.push(`${where} is deeper than ${CHECKPOINT_DEPTH}`); return LOST }
-  if (Array.isArray(value)) return value.map((item, at) => asCopy(item, live, lost, `${where}[${at}]`, depth + 1))
-  if (value instanceof Set) return { $set: [...value].map((item, at) => asCopy(item, live, lost, `${where}<${at}>`, depth + 1)) }
-  if (value instanceof Map) return {
-    $map: [...value].map(([key, item]) => [
-      asCopy(key, live, lost, `${where} key`, depth + 1),
-      asCopy(item, live, lost, `${where}[${String(key)}]`, depth + 1)])
+const { project, resolve } = makeValueProjection({
+  maxDepth: CHECKPOINT_DEPTH,
+  keepContainers: true,
+  keepLostKeys: true,
+  loseWholeArray: false,
+  keepUndefined: true,
+  keepNonFinite: true,
+  keepOtherPrimitives: true,
+  entityTag: '$entity',
+  report(lost, loss) {
+    if (loss.reason === 'function') lost.push(`${loss.where} is a function`)
+    else if (loss.reason === 'deep') lost.push(`${loss.where} is deeper than ${loss.maxDepth}`)
+    else if (loss.reason === 'notPlain') lost.push(`${loss.where} is a ${loss.name || 'object'}, which a checkpoint cannot copy`)
   }
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) {
-    lost.push(`${where} is a ${value.constructor?.name || 'object'}, which a checkpoint cannot copy`)
-    return LOST
-  }
-  const copy = {}
-  for (const key of Object.keys(value)) copy[key] = asCopy(value[key], live, lost, `${where}.${key}`, depth + 1)
-  return copy
-}
-
-/** The other direction. A reference to an entity resolves against the world it goes back into. */
-function asValue(copy, byId) {
-  if (copy === LOST) return undefined
-  if (copy === null || typeof copy !== 'object') return copy
-  if (Array.isArray(copy)) return copy.map(item => asValue(item, byId))
-  if (typeof copy.$entity === 'string') return byId.get(copy.$entity) || null
-  if (Array.isArray(copy.$set)) return new Set(copy.$set.map(item => asValue(item, byId)))
-  if (Array.isArray(copy.$map)) return new Map(copy.$map.map(([key, item]) => [asValue(key, byId), asValue(item, byId)]))
-  const value = {}
-  for (const key of Object.keys(copy)) value[key] = asValue(copy[key], byId)
-  return value
-}
+})
 
 /**
  * Everything about this world that a checkpoint has to carry.
@@ -100,7 +78,7 @@ export function captureWorld(world) {
       // again on the way back. A behaviour's bag is carried with its record
       // rather than twice, once as `e[name]` and once as the bag.
       if (key === '_definition' || key === 'behaviours' || names.has(key)) continue
-      fields[key] = asCopy(entity[key], live, lost, `${entity.id}.${key}`)
+      fields[key] = project(entity[key], live, lost, `${entity.id}.${key}`)
     }
     return {
       fields,
@@ -109,14 +87,14 @@ export function captureWorld(world) {
         own: !!record.own,
         overrides: [...record.overrides],
         error: record.error,
-        bag: asCopy(record.bag, live, lost, `${entity.id}.${record.name}`)
+        bag: project(record.bag, live, lost, `${entity.id}.${record.name}`)
       }))
     }
   })
   return {
     version: CHECKPOINT_VERSION,
     simulated: world.simulated,
-    state: asCopy(world.state, live, lost, 'world.state'),
+    state: project(world.state, live, lost, 'world.state'),
     entities: taken,
     lost
   }
@@ -146,6 +124,7 @@ export function captureWorld(world) {
 export function restoreWorld(world, capture, makeEntity) {
   if (capture?.version !== CHECKPOINT_VERSION) throw new Error(`checkpoint version ${capture?.version} is not ${CHECKPOINT_VERSION}`)
   const byId = new Map(world.entities.map(entity => [entity.id, entity]))
+  const resolveEntity = id => byId.get(id)
 
   const rebuilt = capture.entities.map(entry => {
     const fields = entry.fields
@@ -156,7 +135,7 @@ export function restoreWorld(world, capture, makeEntity) {
   })
 
   for (const { entity, entry } of rebuilt) {
-    for (const key of Object.keys(entry.fields)) entity[key] = asValue(entry.fields[key], byId)
+    for (const key of Object.keys(entry.fields)) entity[key] = resolve(entry.fields[key], resolveEntity)
     entity._definition = world.types.get(entity.type) || {}
     entity.behaviours = entry.behaviours.map(record => ({
       name: record.name,
@@ -164,7 +143,7 @@ export function restoreWorld(world, capture, makeEntity) {
       overrides: [...record.overrides],
       error: record.error,
       definition: world.behaviours.get(record.name) || {},
-      bag: asValue(record.bag, byId)
+      bag: resolve(record.bag, resolveEntity)
     }))
     for (const record of entity.behaviours) entity[record.name] = record.bag
   }
@@ -172,7 +151,7 @@ export function restoreWorld(world, capture, makeEntity) {
   // The state object keeps its identity: a plugin that read it once still has
   // the same object, holding the values from before.
   for (const key of Object.keys(world.state)) delete world.state[key]
-  Object.assign(world.state, asValue(capture.state, byId))
+  Object.assign(world.state, resolve(capture.state, resolveEntity))
   world.simulated = !!capture.simulated
   return { entities: rebuilt.map(one => one.entity), lost: capture.lost.length }
 }

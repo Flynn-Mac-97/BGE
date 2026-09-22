@@ -24,10 +24,12 @@
  * Scheduled callbacks are closures and cannot be written down. State a plugin
  * holds outside the world is rebuilt from boot. Nothing here guesses.
  *
- * This is the sessionStorage projection, deliberately separate from
- * world-state.js, the checkpoint projection: a checkpoint keeps Set and Map in
- * memory, and this one drops whatever JSON cannot hold.
+ * The walk over a single value is shared with the checkpoint projection in
+ * world-state.js; what differs is the policy, stated below. A checkpoint keeps
+ * Set and Map because a solver's bytes never leave memory, while this one drops
+ * whatever JSON cannot hold because sessionStorage is text.
  */
+import { makeValueProjection, LOST } from './value-projection.js'
 import { round3 } from './round3.js'
 
 /** The shape written to storage. A capture from an older engine is discarded rather than guessed at. */
@@ -35,9 +37,6 @@ export const CAPTURE_VERSION = 1
 
 /** How deep a captured value may nest before it is treated as something other than data. */
 const DATA_DEPTH = 8
-
-/** Marks a value that is not plain data and so was left behind. */
-const DROPPED = Symbol('dropped')
 
 /** A captured reference to another entity, put back by id once the world is whole again. */
 const ENTITY_REFERENCE = '#entity'
@@ -63,82 +62,32 @@ const MODELLED = new Set([
   '_definition', '_detached', '_setByPlacement', '_extraKeys'
 ])
 
-/** Whether a value is data: a plain or null-prototype object, not an array or an instance. */
-const isPlainObject = value =>
-  !!value && typeof value === 'object' && !Array.isArray(value) &&
-  (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
-
 /**
- * Copy a value if it is data, and say what it was if it is not.
+ * What the sessionStorage projection drops.
  *
- * Only primitives, arrays and plain objects cross the boundary. A function, a
- * class instance, a Three object or a DOM node cannot be written to storage and
- * must not be replaced by a hollow copy that looks like the real thing, so it is
- * dropped and its name goes into the report.
- *
- * An entity is the exception worth making: a reference to one is kept as its id
- * and looked up again after the world is rebuilt, which is exact whenever the
- * entity it points at also came back.
+ * JSON holds primitives, arrays and plain objects and nothing else, so a Set, a
+ * Map, a function, a symbol, a bigint and the non-finite numbers all go, and a
+ * whole array goes with one unusable element because a shorter array is a
+ * different array. A field that is not there is not a loss, so `undefined` is
+ * dropped without being named.
  */
-function asData(value, report, where, live, depth = 0) {
-  if (value === null) return null
-  // A field that is not there is not a loss. A 3D thing has no sprite and a 2D
-  // thing has no mesh, and reporting either as something that could not be kept
-  // would bury the fields that really were lost.
-  if (value === undefined) return DROPPED
-  const kind = typeof value
-  if (kind === 'boolean' || kind === 'string') return value
-  if (kind === 'number') {
-    if (Number.isFinite(value)) return value
-    report.push(`${where} (${String(value)})`)
-    return DROPPED
+const { project, resolve } = makeValueProjection({
+  maxDepth: DATA_DEPTH,
+  keepContainers: false,
+  keepLostKeys: false,
+  loseWholeArray: true,
+  keepUndefined: false,
+  keepNonFinite: false,
+  keepOtherPrimitives: false,
+  entityTag: ENTITY_REFERENCE,
+  report(lost, loss) {
+    if (loss.reason === 'number') lost.push(`${loss.where} (${String(loss.value)})`)
+    else if (loss.reason === 'kind') lost.push(`${loss.where} (a ${loss.kind})`)
+    else if (loss.reason === 'function') lost.push(`${loss.where} (a function)`)
+    else if (loss.reason === 'deep') lost.push(`${loss.where} (nested deeper than ${loss.maxDepth})`)
+    else if (loss.reason === 'notPlain') lost.push(`${loss.where} (a ${loss.name || 'thing that is not data'})`)
   }
-  if (kind !== 'object') {
-    report.push(`${where} (a ${kind})`)
-    return DROPPED
-  }
-  if (live?.has(value)) return { [ENTITY_REFERENCE]: value.id }
-  if (depth >= DATA_DEPTH) {
-    report.push(`${where} (nested deeper than ${DATA_DEPTH})`)
-    return DROPPED
-  }
-  if (Array.isArray(value)) {
-    const out = []
-    for (let i = 0; i < value.length; i++) {
-      const item = asData(value[i], report, `${where}[${i}]`, live, depth + 1)
-      // One unusable element makes the whole list untrue, because a shorter list
-      // is a different list. Drop it whole and say so.
-      if (item === DROPPED) return DROPPED
-      out.push(item)
-    }
-    return out
-  }
-  if (!isPlainObject(value)) {
-    report.push(`${where} (a ${value.constructor?.name || 'thing that is not data'})`)
-    return DROPPED
-  }
-  const out = {}
-  for (const [key, item] of Object.entries(value)) {
-    const copy = asData(item, report, `${where}.${key}`, live, depth + 1)
-    if (copy !== DROPPED) out[key] = copy
-  }
-  return out
-}
-
-/** Put entity references back, now that the world holds the entities again. */
-function fromData(value, world, missing, where) {
-  if (!value || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map((item, i) => fromData(item, world, missing, `${where}[${i}]`))
-  if (typeof value[ENTITY_REFERENCE] === 'string') {
-    const entity = world.byId(value[ENTITY_REFERENCE])
-    if (entity) return entity
-    missing.push(`${where} pointed at "${value[ENTITY_REFERENCE]}", which is not in the restored world`)
-    return null
-  }
-  const out = {}
-  for (const [key, item] of Object.entries(value)) out[key] = fromData(item, world, missing, `${where}.${key}`)
-  return out
-}
+})
 
 /**
  * Everything that makes this moment this moment.
@@ -191,18 +140,18 @@ export function captureWorld({ world, loop, editor, view }, cause = {}) {
     // "there is no type for this entity" is only a loss when there was one
     // before, and this is what makes the two cases tellable apart.
     types: [...world.types.keys()],
-    state: asData(world.state, dropped, 'world.state', live),
+    state: project(world.state, live, dropped, 'world.state'),
     entities: world.entities.map(entity => {
       const named = new Set(entity.behaviours.map(b => b.name))
       const fields = {}
       for (const key of Object.keys(entity)) {
         if (MODELLED.has(key) || named.has(key)) continue
-        const copy = asData(entity[key], dropped, `${entity.id}.${key}`, live)
-        if (copy !== DROPPED) fields[key] = copy
+        const copy = project(entity[key], live, dropped, `${entity.id}.${key}`)
+        if (copy !== LOST) fields[key] = copy
       }
       const take = (value, where) => {
-        const copy = asData(value, dropped, `${entity.id}.${where}`, live)
-        return copy === DROPPED ? null : copy
+        const copy = project(value, live, dropped, `${entity.id}.${where}`)
+        return copy === LOST ? null : copy
       }
       return {
         id: entity.id,
@@ -230,7 +179,7 @@ export function captureWorld({ world, loop, editor, view }, cause = {}) {
     }),
     dropped
   }
-  if (capture.state === DROPPED) capture.state = {}
+  if (capture.state === LOST) capture.state = {}
   return capture
 }
 
@@ -275,14 +224,14 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
         notRestored.push(`"${held.id}" lost its "${bag.name}" behaviour`)
         continue
       }
-      Object.assign(record.bag, fromData(bag.bag, world, missing, `${held.id}.${bag.name}`))
+      Object.assign(record.bag, readField(bag.bag, world, missing, `${held.id}.${bag.name}`))
     }
   }
 
   // Mutated rather than replaced: a plugin that took a reference to the shared
   // state at boot must still be looking at the same object.
   for (const key of Object.keys(world.state)) delete world.state[key]
-  Object.assign(world.state, fromData(capture.state || {}, world, missing, 'world.state'))
+  Object.assign(world.state, readField(capture.state || {}, world, missing, 'world.state'))
   world.simulated = !!capture.simulated
 
   if (capture.playing && !loop.running) {
@@ -361,6 +310,17 @@ function placementOf(held) {
 }
 
 /**
+ * Put one projected field back, naming any entity reference the world no longer
+ * holds. The name says where the reference was, so a missing one is found
+ * rather than guessed at.
+ */
+function readField(value, world, missing, where) {
+  return resolve(value, id => world.byId(id), (at, id) => {
+    missing.push(`${at} pointed at "${id}", which is not in the restored world`)
+  }, where)
+}
+
+/**
  * The live values of one restored entity, written over what the level placed.
  *
  * The id is restored rather than inferred from the placement: an entity spawned
@@ -381,9 +341,9 @@ function applyLiveValues(entity, held, world, missing) {
   if (held.sprite) entity.sprite = held.sprite
   if (held.mesh) entity.mesh = held.mesh
   if (held.collider) entity.collider = held.collider
-  Object.assign(entity.properties, fromData(held.properties, world, missing, `${held.id}.properties`))
+  Object.assign(entity.properties, readField(held.properties, world, missing, `${held.id}.properties`))
   for (const [key, value] of Object.entries(held.fields)) {
-    entity[key] = fromData(value, world, missing, `${held.id}.${key}`)
+    entity[key] = readField(value, world, missing, `${held.id}.${key}`)
   }
 }
 
