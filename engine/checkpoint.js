@@ -28,7 +28,7 @@
  */
 
 /** Bumped when the shape of a moment changes, so an older one is refused rather than misread. */
-export const MOMENT_VERSION = 2
+const MOMENT_VERSION = 2
 
 /**
  * What each plugin holds, by its own name.
