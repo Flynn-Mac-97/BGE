@@ -9,7 +9,7 @@ const info = () => ({
   suite: 'test/cli.bridge.mjs',
   run: 'node test/cli.bridge.mjs',
   full: 'npm test',
-  offline: 'node --test test/cli.offline.test.mjs && node --test test/agent-workspace.test.mjs',
+  offline: 'node --test test/core/cli.offline.test.mjs && node --test test/agent-workspace.test.mjs',
   needs: ['a dev server', 'one open editor tab', 'the editor on level1 (the demo level)'],
   covers: ['argument coercion', 'exit codes', 'command fallback', 'determinism', 'bridge failure modes'],
   note: 'the bridge suite needs the editor; the offline suite runs with nothing — exit codes, coercion, the lint, and the pain lifecycle'
@@ -20,7 +20,7 @@ export default {
   category: 'agents',
   about: 'The CLI test suites, bridge and offline.',
   inspect: () => [
-    { title: 'How to run', rows: [['bridge', 'node test/cli.bridge.mjs'], ['offline', 'node --test test/cli.offline.test.mjs'], ['full', 'npm test']] },
+    { title: 'How to run', rows: [['bridge', 'node test/cli.bridge.mjs'], ['offline', 'node --test test/core/cli.offline.test.mjs'], ['full', 'npm test']] },
     { title: 'Needs', rows: info().needs.map(n => [n, '']) }
   ],
   commands: [{

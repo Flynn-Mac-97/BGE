@@ -8,8 +8,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { makeFiles } from '../engine/files.js'
-import { WRITES_A_FILE, WRITING_OPS, permits } from '../engine/work-lock.mjs'
+import { makeFiles } from '../../engine/files.js'
+import { WRITES_A_FILE, WRITING_OPS, permits } from '../../engine/work-lock.mjs'
 
 /** A transport that records instead of writing, so a leak through is visible. */
 const recorder = () => {

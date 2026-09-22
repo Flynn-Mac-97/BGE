@@ -13,9 +13,9 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { CHECKOUT, FIXTURE } from './fixture-project.mjs'
-import { startWorldInNode } from '../engine/start-world-node.mjs'
-import { stateHash } from '../engine/world.js'
+import { CHECKOUT, FIXTURE } from '../fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
+import { stateHash } from '../../engine/world.js'
 
 const boot = async () => (await startWorldInNode({ root: CHECKOUT, project: FIXTURE })).context
 

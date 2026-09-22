@@ -9,7 +9,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { PROJECT_PREFIX, assetPath, assetURL } from '../engine/asset-path.js'
+import { PROJECT_PREFIX, assetPath, assetURL } from '../../engine/asset-path.js'
 
 /** The six folders a project owns. Only these make a reference project-relative. */
 const PROJECT_FOLDERS = ['assets', 'levels', 'types', 'behaviours', 'tests', 'plugins']

@@ -14,9 +14,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { CHECKOUT, temporaryProject } from './fixture-project.mjs'
-import { startWorldInNode } from '../engine/start-world-node.mjs'
-import { stateHash } from '../engine/world.js'
+import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
+import { stateHash } from '../../engine/world.js'
 
 /** Every plugin definition the finder would register, read from the files on disk. */
 async function builtinDefinitions() {

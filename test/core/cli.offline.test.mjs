@@ -17,10 +17,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { lint, invariantProblems } from '../engine/project-index.mjs'
-import { FIXTURE, temporaryProject } from './fixture-project.mjs'
+import { lint, invariantProblems } from '../../engine/project-index.mjs'
+import { FIXTURE, temporaryProject } from '../fixture-project.mjs'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const CLI = path.join(ROOT, 'bin/engine.mjs')
 
 const run = (args, options = {}) => {
@@ -461,7 +461,7 @@ test('a headless run that stepped a solver exits 0', async () => {
 
 /** A read surface over a loader and nothing else. Enough to ask what it says. */
 async function inspectOver(loader, bus, log) {
-  const { makeInspect } = await import('../engine/inspect.js')
+  const { makeInspect } = await import('../../engine/inspect.js')
   return makeInspect({
     world: { types: new Map(), entities: [], behaviours: new Map(), all: () => [] },
     loader,
@@ -481,8 +481,8 @@ async function inspectOver(loader, bus, log) {
  * — hunting a command that was never missing, only broken.
  */
 test('a plugin that failed to import is named everywhere a command turns up missing', async () => {
-  const { makeLoader } = await import('../engine/loader.js')
-  const { makeBus } = await import('../engine/bus.js')
+  const { makeLoader } = await import('../../engine/loader.js')
+  const { makeBus } = await import('../../engine/bus.js')
 
   const bus = makeBus()
   const healthy = makeLoader(bus)
@@ -525,9 +525,9 @@ test('a plugin that failed to import is named everywhere a command turns up miss
  * wiring that fixes the ordering would double every boot-time error.
  */
 test('a log that was listening from the start records a failed plugin exactly once', async () => {
-  const { makeLoader } = await import('../engine/loader.js')
-  const { makeBus } = await import('../engine/bus.js')
-  const { makeLog } = await import('../engine/inspect.js')
+  const { makeLoader } = await import('../../engine/loader.js')
+  const { makeBus } = await import('../../engine/bus.js')
+  const { makeLog } = await import('../../engine/inspect.js')
 
   const bus = makeBus()
   const log = makeLog(bus)

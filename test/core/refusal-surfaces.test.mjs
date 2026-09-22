@@ -10,9 +10,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { makeBus } from '../engine/bus.js'
-import { makeFiles } from '../engine/files.js'
-import { makeInspect, makeLog } from '../engine/inspect.js'
+import { makeBus } from '../../engine/bus.js'
+import { makeFiles } from '../../engine/files.js'
+import { makeInspect, makeLog } from '../../engine/inspect.js'
 
 const HELD = '"code.save" is held: 2 lanes are working: alpha, beta.'
 

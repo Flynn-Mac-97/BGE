@@ -14,8 +14,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three/webgpu'
 
-import { makeProjector } from '../engine/camera-project.js'
-import { makeCamera } from '../engine/render/camera.js'
+import { makeProjector } from '../../engine/camera-project.js'
+import { makeCamera } from '../../engine/render/camera.js'
 
 const VIEWPORT = { width: 1280, height: 720 }
 

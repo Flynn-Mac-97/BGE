@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-import { workLock, permits, roleOfClient } from '../engine/work-lock.mjs'
+import { workLock, permits, roleOfClient } from '../../engine/work-lock.mjs'
 
 function checkout(t, { runs = [], browsers = [] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-work-lock-'))

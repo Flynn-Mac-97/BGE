@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { buildIndex } from '../engine/project-index.mjs'
+import { buildIndex } from '../../engine/project-index.mjs'
 
 /**
  * What the editor alone acts on, per record kind.

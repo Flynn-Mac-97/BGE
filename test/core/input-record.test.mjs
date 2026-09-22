@@ -12,9 +12,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import { CHECKOUT, temporaryProject } from './fixture-project.mjs'
-import { startWorldInNode } from '../engine/start-world-node.mjs'
-import { stateHash } from '../engine/world.js'
+import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
+import { stateHash } from '../../engine/world.js'
 
 /** A game whose only source of motion is the keyboard. */
 const PROJECT = {

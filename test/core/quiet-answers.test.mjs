@@ -1,13 +1,14 @@
 /**
- * Three places the engine used to give a confidently wrong answer.
+ * The engine must not answer confidently when it is wrong.
  *
- * p105 — a hidden tab drives the loop from a clamped timer and the game runs in
- *        slow motion while every other number reads healthy. `loop.state` now
- *        names the driver and measures the speed.
- * p85  — a tint on a type multiplies into every textured placement that did not
- *        state its own. `check` now reports the pair.
- *
- * Run: node --test test/quiet-answers.test.mjs
+ * Three places it once did, and the rule each now keeps:
+ * - a hidden tab drives the loop from a clamped timer, so the game runs slow
+ *   while every other number reads healthy; `loop.state` names the driver and
+ *   measures the speed, and a slow run is reported.
+ * - a tint on a type multiplies into every textured placement that did not state
+ *   its own; `check` reports the pair without failing the build.
+ * - a three-axis rotation is a list, and a list rounded as a number is NaN; a
+ *   level round trip keeps every axis and rounds each one.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -15,12 +16,13 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { makeLoop } from '../engine/loop.js'
-import { makeWorld } from '../engine/world.js'
-import { buildIndex, tintProblems } from '../engine/project-index.mjs'
-import { problemsIn, fatal } from '../engine/project-problems.mjs'
+import { makeLoop } from '../../engine/loop.js'
+import { makeWorld } from '../../engine/world.js'
+import { buildIndex } from '../../engine/project-index.mjs'
+import { tintProblems } from '../../engine/index-invariants.js'
+import { problemsIn, fatal } from '../../engine/project-problems.mjs'
 
-// ------------------------------------------------------------------ p105
+// ------------------------------------------------------- the loop's own report
 
 /**
  * A loop with every clock it touches under the test's control.
@@ -92,7 +94,7 @@ test('a visible tab reports requestAnimationFrame at real speed, and warns about
   try {
     driven.loop.start()
     assert.equal(driven.loop.state.driver, 'requestAnimationFrame')
-    for (let i = 0; i < 90; i++) driven.tick(1000 / 60)
+    for (let index = 0; index < 90; index++) driven.tick(1000 / 60)
 
     const state = driven.loop.state
     assert.equal(state.driver, 'requestAnimationFrame')
@@ -109,9 +111,9 @@ test('a hidden tab names the timer, measures the crawl, and reports it as an err
     driven.loop.start()
     assert.equal(driven.loop.state.driver, 'setInterval (tab hidden)')
 
-    // Chrome clamps a background timer to roughly this. Every tick is then
-    // capped at 0.25s of catch-up and MAX_CATCHUP throws the rest away.
-    for (let i = 0; i < 4; i++) driven.tick(3000)
+    // A background timer is clamped to roughly this. Every tick is then capped
+    // at 0.25s of catch-up and the rest is thrown away.
+    for (let index = 0; index < 4; index++) driven.tick(3000)
 
     const state = driven.loop.state
     assert.equal(state.driver, 'setInterval (tab hidden)')
@@ -131,8 +133,7 @@ test('the clock really does fall behind, so the run is not just under-reported',
   const driven = drivenLoop({ hidden: true })
   try {
     driven.loop.start()
-    for (let i = 0; i < 4; i++) driven.tick(3000)
-    // Twelve wall seconds in, and MAX_CATCHUP has let through five steps a tick.
+    for (let index = 0; index < 4; index++) driven.tick(3000)
     assert.ok(driven.loop.time < 1, `engine clock reached ${driven.loop.time}s in 12 wall seconds`)
   } finally { driven.restore() }
 })
@@ -141,7 +142,7 @@ test('a driver that stops firing collapses the rate, not holds the speed it used
   const driven = drivenLoop({ hidden: false })
   try {
     driven.loop.start()
-    for (let i = 0; i < 90; i++) driven.tick(1000 / 60)
+    for (let index = 0; index < 90; index++) driven.tick(1000 / 60)
     assert.ok(driven.loop.state.gameSpeed > 0.9)
 
     // The open window wins once it is longer than a full one, so a hundred
@@ -158,14 +159,14 @@ test('reset re-baselines the measurement instead of claiming the run is hours be
   const driven = drivenLoop({ hidden: false })
   try {
     driven.loop.start()
-    for (let i = 0; i < 120; i++) driven.tick(1000 / 60)
+    for (let index = 0; index < 120; index++) driven.tick(1000 / 60)
     driven.loop.reset()
     assert.ok(driven.loop.state.behindSeconds < 0.001,
       `behindSeconds ${driven.loop.state.behindSeconds} after reset`)
   } finally { driven.restore() }
 })
 
-// ------------------------------------------------------------------- p85
+// ------------------------------------------------------ the tint lint
 
 /** An index shaped the way buildIndex shapes one, with a single tinted type. */
 const indexWithTintedType = (tint = '#7a3cff') => ({
@@ -207,7 +208,7 @@ test('a type with no tint is not reported', () => {
   assert.deepEqual(tintProblems(index, { arena: [textured] }), [])
 })
 
-// ------------------------------------------------------------------ p272
+// ----------------------------------------------------- the level round trip
 
 /** One entity in a world, saved back out. The bus is only emitted to. */
 function savedPlacement(placement) {
@@ -237,7 +238,7 @@ test('positions still round to three places', () => {
   assert.deepEqual(savedPlacement({ at: [1.00049, 2.5, 3.12349] }).at, [1, 2.5, 3.123])
 })
 
-// --------------------------------------------------- p85, through buildIndex
+// ------------------------------------------------- the lint through a project
 
 /** A whole project on disk, so the index build and `check` are exercised for real. */
 async function temporaryProject(typeSource, placements) {

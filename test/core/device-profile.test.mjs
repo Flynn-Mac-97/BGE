@@ -12,8 +12,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { startWorldInNode } from '../engine/start-world-node.mjs'
-import { FIXTURE, temporaryProject } from './fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
+import { FIXTURE, temporaryProject } from '../fixture-project.mjs'
 
 /**
  * A project that declares a portrait screen.
@@ -26,7 +26,7 @@ const PORTRAIT = await temporaryProject({
   'game.json': { title: 'portrait', startLevel: 'main', device: { width: 540, height: 960 } }
 }, 'engine-device-')
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** A PNG's own pixels, from its IHDR: width at byte 16, height at 20. */
 function pngPixels(file) {

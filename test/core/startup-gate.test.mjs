@@ -17,8 +17,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import { CHECKOUT, temporaryProject } from './fixture-project.mjs'
-import { startWorldInNode } from '../engine/start-world-node.mjs'
+import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
 
 const FALL_FROM = 40
 const SECONDS = 0.5

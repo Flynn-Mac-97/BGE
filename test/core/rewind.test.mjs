@@ -19,10 +19,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import { CHECKOUT, temporaryProject } from './fixture-project.mjs'
-import { startWorldInNode } from '../engine/start-world-node.mjs'
-import { makeRewind } from '../engine/rewind.js'
-import { stateHash } from '../engine/world.js'
+import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
+import { makeRewind } from '../../engine/rewind.js'
+import { stateHash } from '../../engine/world.js'
 
 const PROJECT = {
   'game.json': { title: 'rewind', startLevel: 'main' },

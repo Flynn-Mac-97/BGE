@@ -15,9 +15,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { CHECKOUT, temporaryProject } from './fixture-project.mjs'
-import { startWorldInNode } from '../engine/start-world-node.mjs'
-import { takeReloadNote } from '../engine/reload-notice.js'
+import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { startWorldInNode } from '../../engine/start-world-node.mjs'
+import { takeReloadNote } from '../../engine/reload-notice.js'
 
 /** A game whose entity carries a value written at runtime, and nothing else. */
 const PROJECT = {

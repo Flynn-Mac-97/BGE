@@ -10,8 +10,8 @@
  */
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
-import { assetURL, makeUI } from '../engine/ui.js'
-import { assetURL as assetURLFromPath } from '../engine/asset-path.js'
+import { assetURL, makeUI } from '../../engine/ui.js'
+import { assetURL as assetURLFromPath } from '../../engine/asset-path.js'
 
 /** The base of the fake DOM, so `ui.js`'s `instanceof Node` check passes. */
 class FakeNode {

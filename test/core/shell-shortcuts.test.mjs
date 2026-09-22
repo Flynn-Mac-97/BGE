@@ -1,25 +1,26 @@
 /**
  * The shortcut matcher, without a browser.
  *
- * `shell.js` owns the one keyboard listener, and the two parts that can be wrong
- * on their own are plain functions: the spelling a key event becomes, and the
- * table a plugin's declaration goes into. The listener itself needs a document;
- * these do not, so this presses keys at them directly.
+ * `shell.js` owns the one keyboard listener, and the parts that can be wrong on
+ * their own are plain functions in `shell-shortcuts.js`: the spelling a key
+ * event becomes, the table a plugin's declaration goes into, and whether the
+ * focus is somewhere that is typing. The listener itself needs a document; these
+ * do not, so this presses keys at them directly.
  *
  * The collision case is why the shell owns the listener at all: two plugins on
  * one key have to be reported by name, because neither can see the other.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from '../engine/shell.js'
+import { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from '../../engine/shell-shortcuts.js'
 
 /** A key event with the modifiers a browser reports. */
 const keyEvent = (key, { ctrl = false, shift = false, alt = false, meta = false } = {}) =>
   ({ key, ctrlKey: ctrl, shiftKey: shift, altKey: alt, metaKey: meta })
 
-test('a key event spells into the contract order', () => {
+test('a key event spells into the declared order', () => {
   assert.equal(shortcutFromEvent(keyEvent('z', { ctrl: true })), 'ctrl+z')
-  assert.equal(shortcutFromEvent(keyEvent('z', { meta: true })), 'ctrl+z')
+  assert.equal(shortcutFromEvent(keyEvent('z', { meta: true })), 'ctrl+z', 'Command means ctrl')
   assert.equal(shortcutFromEvent(keyEvent('Z', { ctrl: true, shift: true })), 'ctrl+shift+z')
   assert.equal(shortcutFromEvent(keyEvent('Delete')), 'delete')
   assert.equal(shortcutFromEvent(keyEvent('ArrowLeft', { alt: true, shift: true, ctrl: true })), 'ctrl+shift+alt+arrowleft')
