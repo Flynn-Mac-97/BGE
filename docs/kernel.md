@@ -4,22 +4,23 @@
 
 ## Shape
 
-About 5,200 lines. Roughly half kernel, half plugins — and the plugins have no
-privileges the kernel does not give everyone.
+The kernel's boot closure is 28 modules, 12,335 lines. The top-level
+`plugins/builtin/*.js` are 22,681 more. The plugins have no privileges the
+kernel does not give everyone.
 
 ```
-engine/     world.js 414   start-world.js 323  render.js 291  ui.js 244
-            project-index.mjs 236   loop.js 229   inspect.js 216
-            shell.js 183   start-world-node.mjs 117   index.js 95
-            loader.js 82   files.js 58    bus.js 22
+engine/     world.js 882   start-world.js 863   render.js 3833
+            ui.js 315   project-index.mjs 794   loop.js 812
+            inspect.js 537   shell.js 576   start-world-node.mjs 396
+            index.js 214   loader.js 221   files.js 221   bus.js 25
 
 plugins/builtin/
-            tool-transform 370   tests 269    panel-inspector 238
-            new-file 195         hud 191      panel-plugins 174
-            audio 149            camera 144   panel-project 144
-            place 116            hot 107      panel-code 105
-            physics-2d 103       bridge 98    behaviours 87
-            anim 87              panel-scene 57  input 54
+            tool-transform 386   tests 348    panel-inspector 323
+            new-file 207         hud 169      panel-plugins 227
+            audio 166            camera 676   panel-project 145
+            place 117            hot 123      panel-code 112
+            physics-2d 226       bridge 98    behaviours 88
+            anim 88              panel-scene 76  input 75
 ```
 
 Physics is a plugin. The inspector is a plugin. Delete both and the engine still
@@ -46,9 +47,30 @@ in `ARCHITECTURE.md`.
 | `start-world-node.mjs` | the same world in node: disk, readdir, paths | game rules |
 | `project-index.mjs` | what is in a project, and the determinism lint | the browser — node only |
 | `asset-path.js` | where a named asset points, as a path and as a URL | anything else — both halves import it |
+| `camera-project.js` | world to screen from `view` alone, with no renderer | meshes, materials, or any plugin |
+| `command-schema.js` | the command-input subset the execution boundary checks | what a command does |
+| `document-store.mjs` | reading and writing session documents | what a document means |
+| `frame-plan.js` | what each entity is drawn as, without a GL context | meshes, materials, shading |
+| `host-node.mjs` | the project directory and running a program, node only | anything the browser half can do; it is `null` there |
+| `plugin-guides.mjs` | the `.agent.md` guides beside every plugin, as instruction nodes | the plugins themselves |
+| `plugin-import.js` | importing one plugin file, and reporting why it would not | which finder asked, or what the plugin does |
+| `plugin-runtime.js` | compiling system schedules, and the resources a plugin owns | any specific plugin |
+| `project-path.mjs` | where a project is on disk, from what a person typed | the browser — node only |
+| `reload-notice.js` | carrying a world through a page reload, and saying so either way | what the game means by the world |
+| `source-files.mjs` | reading and writing engine and project source | how the edited code behaves |
+| `work-lock.mjs` | whether a lane may write, derived from what is running | how a write reaches disk; the routes enforce it |
 
-The last three are the split. Everything above `start-world.js` runs identically
-either side of it.
+The twelve rows after `asset-path.js` are boot plumbing the original table left
+out: the modules the two entries pull in. Six are node only —
+`project-path.mjs` `document-store.mjs` `source-files.mjs` `work-lock.mjs`
+`plugin-guides.mjs` `host-node.mjs`. `index.js` and `start-world-node.mjs` are
+the entries, and `start-world.js` is the runtime they both call.
+
+Four files claim `Kernel:` in their header without being in the boot closure:
+`vector.js`, `frame-facts.js`, `frame-sketch.js` and `scene-query.js` — plugins
+import them and nothing in `engine/` does. The dependency edge decides, not the
+header comment. `project-index.mjs` is the reverse: no header claim, but node
+boot imports it, so it is in the closure.
 
 The shell also owns four dock resize handles because they change the frame, not
 panel content. Sizes are browser-local layout state and survive reloads; they
