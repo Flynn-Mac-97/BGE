@@ -419,8 +419,8 @@ Nothing else is privileged.
 
 | Module | Owns |
 |---|---|
-| `world.js` | entities and the shared vocabulary |
-| `loop.js` | the clock, the schedule and the random stream |
+| `world.js` | entities, types and behaviours; the look vocabulary is `world-look.js` |
+| `loop.js` | the clock and the holds; the random stream is `loop-random.js`, input `loop-input.js`, timers `loop-timers.js` |
 | `bus.js` | the channel plugins talk through |
 | `files.js` | the only writer to disk |
 | `loader.js` | plugin loading, dependency order, failure containment |
@@ -429,11 +429,11 @@ Nothing else is privileged.
 | `start-world.js` | boot, and the `context` everything receives |
 | `index.js` | the browser half: shell, renderer, the paint loop |
 | `start-world-node.mjs` | the same world in node, with no screen |
-| `project-index.mjs` | what is in a project, and the determinism lint |
+| `project-index.mjs` | what is in a project; the determinism lint is `index-lint.js` |
 
 The last three are the split that lets a world run without a browser. Put new
-runtime behaviour in `start-world.js`; anything added to `index.js` is something
-a headless world cannot do.
+runtime behaviour in the module beside `start-world.js` that owns it; anything
+added to `index.js` is something a headless world cannot do.
 
 ## Plugins
 
@@ -717,7 +717,8 @@ resetting only some of them is the subtle version of the same bug.
 `engine.seed(n)` re-seeds and restarts the clock. Varying the seed is how you
 check behaviour holds generally rather than by luck.
 
-The clock, the schedule and the random stream are in one kernel module because
+The clock, the schedule and the random stream are kernel modules beside each
+other — `loop.js`, `loop-timers.js`, `loop-random.js`, `loop-input.js` — because
 they are the same concern: whether a run repeats.
 
 ## Editing

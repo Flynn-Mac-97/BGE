@@ -4,15 +4,16 @@
 
 ## Shape
 
-The kernel's boot closure is 28 modules, 12,335 lines. The top-level
+The kernel's boot closure is 81 modules, 13,386 lines. The top-level
 `plugins/builtin/*.js` are 22,681 more. The plugins have no privileges the
 kernel does not give everyone.
 
 ```
-engine/     world.js 882   start-world.js 863   render.js 3833
-            ui.js 315   project-index.mjs 794   loop.js 812
-            inspect.js 537   shell.js 576   start-world-node.mjs 396
+engine/     world.js 609   start-world.js 263   render.js 375
+            ui.js 315   project-index.mjs 612   loop.js 571
+            inspect.js 263   shell.js 290   start-world-node.mjs 137
             index.js 214   loader.js 221   files.js 221   bus.js 25
+            render/     28 files  3981
 
 plugins/builtin/
             tool-transform 386   tests 348    panel-inspector 323
@@ -32,20 +33,20 @@ in `ARCHITECTURE.md`.
 | Module | Owns | Does not know about |
 |---|---|---|
 | `bus.js` | an event channel | anything |
-| `world.js` | entities, types, behaviours, the shared vocabulary | rendering, physics, files |
-| `loop.js` | the clock, the schedule, the random stream | what it is stepping |
+| `world.js` | entities, types, behaviours, and the hooks that run them | rendering, physics, files; the look vocabulary is `world-look.js` |
+| `loop.js` | the clock, the schedule, the holds | what it is stepping; the random stream, the input record and the timers are `loop-random.js`, `loop-input.js` and `loop-timers.js` |
 | `checkpoint.js` | a whole moment of a run: taken and put back | which plugin holds what, or how it is stored |
 | `rewind.js` | the last minutes of a run, as marks, and the walk to a step count | what a game does with a step |
 | `files.js` | the only writer to disk | what a level is, or how disk is reached |
 | `loader.js` | plugin order, contribution points, failure containment | any specific plugin |
 | `render.js` | one GL context, one draw order | game rules, or where the camera is |
 | `ui.js` | the vocabulary panels compose from | any specific panel |
-| `shell.js` | four docks, a toolbar, a status line, the one keyboard listener | what goes in them, or what a key does |
+| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js` and the keyboard is `shell-shortcuts.js` |
 | `inspect.js` | the read-and-drive surface | whether anything is drawing |
 | `start-world.js` | boot, and the `context` everything receives | screens |
 | `index.js` | the browser: shell, renderer, the paint loop | game rules |
 | `start-world-node.mjs` | the same world in node: disk, readdir, paths | game rules |
-| `project-index.mjs` | what is in a project, and the determinism lint | the browser — node only |
+| `project-index.mjs` | what is in a project | the browser — node only; the determinism lint is `index-lint.js` and the invariant checks are `index-invariants.js` |
 | `asset-path.js` | where a named asset points, as a path and as a URL | anything else — both halves import it |
 | `camera-project.js` | world to screen from `view` alone, with no renderer | meshes, materials, or any plugin |
 | `command-schema.js` | the command-input subset the execution boundary checks | what a command does |
@@ -59,6 +60,64 @@ in `ARCHITECTURE.md`.
 | `reload-notice.js` | carrying a world through a page reload, and saying so either way | what the game means by the world |
 | `source-files.mjs` | reading and writing engine and project source | how the edited code behaves |
 | `work-lock.mjs` | whether a lane may write, derived from what is running | how a write reaches disk; the routes enforce it |
+| `world-look.js` | the look and merge vocabulary, shared by placing an entity and saving it | the store, or the level file |
+| `world-state.js` | the checkpoint projection and the level shape | the store itself |
+| `value-projection.js` | one value written down and put back, under a stated policy | what a checkpoint is |
+| `loop-random.js` | the deterministic random stream | every other part of the run |
+| `loop-input.js` | the input record and its replay | what an input means |
+| `loop-timers.js` | timers on the fixed clock | the wall clock |
+| `shell-layout.js` | the dock sizes and the four resize handles | what goes in the docks |
+| `shell-shortcuts.js` | the shortcut table, and the one keyboard listener | what a key does |
+| `log.js` | the process-wide error channels, and how a world's log reads them | what an error means |
+| `snapshot.js` | the snapshot projection | driving the engine |
+| `device-profile.js` | the screen shape a game declares | drawing it |
+| `plugin-startup.js` | hold the world until a plugin has finished starting | any plugin |
+| `plugin-boot.js` | find the plugins, decide which run, and boot them | what a plugin contributes |
+| `world-context.js` | the surface a plugin reads and drives the project through | what a command does |
+| `world-editor.js` | the editor's own state, and the two commands on it | the world's rules |
+| `world-project.js` | the project's types, behaviours and levels, and play mode | the store |
+| `frame-wiring.js` | what one step and one frame do to the world | the clock itself |
+| `on-disk.mjs` | reaching a project directly, on disk, and the guard on its writes | the browser — node only |
+| `null-renderer.mjs` | the screen a node world pretends to have | real pixels |
+| `index-lint.js` | the determinism lint over a project's JavaScript | building the index |
+| `index-invariants.js` | the invariant checks on raw level placements | loading the types it reads |
+| `reload-projection.js` | a live world written as plain data, and put back | when a reload happens |
+| `reload-notice-writer.js` | the notice that a page reloaded, written before it goes and offered once after | the world it describes |
+| `report-once.js` | say a message once, then stay quiet | what the message means |
+| `round3.js` | round a number to three decimals before it is written down | anything else |
+| `render/batching.js` | static entities merged by material and grid cell | per-entity look |
+| `render/camera.js` | the two world cameras, and the viewport they are built from | meshes, materials |
+| `render/contact-shadows.js` | the contact shadow, all of them in one draw call | a model's own materials |
+| `render/entity-look.js` | what one thing is: its turn, origin, sheet cell and fallback colour | how it is built |
+| `render/entity-record.js` | what a frame already knows about one entity, kept beside it | the entity's own fields |
+| `render/entity-scan.js` | the quiet snapshot and the two scans over it | building scene objects |
+| `render/entity-sync.js` | turning the entity list into scene objects | the world's rules |
+| `render/floor-mark.js` | the shape both floor marks share: the instanced unit quad | what either mark draws |
+| `render/frame-draw.js` | one frame out of the card, and what the last one cost | what is drawn |
+| `render/geometry-cache.js` | solid geometry cached by its dimensions, and the one merge | materials |
+| `render/ground-band.js` | the TSL of a flat mark on the floor | the ring that uses it |
+| `render/ground-rings.js` | the ground ring, one actor named by a rule | a model's own materials |
+| `render/keyline-hull.js` | the geometry a keyline is drawn from, and the vertex node that grows it | the line that uses it |
+| `render/keyline-marks.js` | the keyline, a dark line of constant screen width | a model's own materials |
+| `render/lighting.js` | what the level says about light, fog and sky | what is lit |
+| `render/material-registry.js` | what a surface is made of, contributed by plugins | which entity uses it |
+| `render/material-vocabulary.js` | the two ways this renderer touches a material | what a material means |
+| `render/model-cache.js` | a model file, fetched once, cloned per entity | where it is placed |
+| `render/model-nodes.js` | a loaded model addressed by node name | the rest of the entity |
+| `render/object-builder.js` | the scene object that stands for one entity | the world's rules |
+| `render/picking.js` | a ray into the scene, and the world-point-to-pixel mapping | drawing |
+| `render/post-chain.js` | an ordered list of passes | what a pass does |
+| `render/read-value.js` | what a declared colour, intensity or vector means | the surface it lands on |
+| `render/readability-marks.js` | the three readability marks, and who gets them | a model's own materials |
+| `render/report.js` | the renderer's one history of messages already said | what each message means |
+| `render/scene-layers.js` | the two layers the scene draws on | what is on them |
+| `render/texture-cache.js` | one texture, cached, in three readings of the same file | what it is drawn on |
+| `render/viewmodel.js` | the weapon in first person, in its own pass | where the player is |
+
+The rows after `work-lock.mjs` are the newer, smaller kernel modules: the
+pieces the largest files were split into, plus the two helpers those splits
+produced. Every one is in the boot closure, so this table and the shape block
+count the same 81 modules.
 
 The twelve rows after `asset-path.js` are boot plumbing the original table left
 out: the modules the two entries pull in. Six are node only —

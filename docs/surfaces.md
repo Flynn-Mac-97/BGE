@@ -106,8 +106,8 @@ places, and a write reaching disk any other way is not covered by any of them:
   `423 {code:"held"}`.
 - `engine/files.js`, a kernel guard, so a lane's page refuses its own write
   before it reaches the wire.
-- `engine/start-world-node.mjs`, a guard on the node file transport, so a
-  `--headless` run refuses a write to a project file and the CLI exits 1.
+- `engine/on-disk.mjs`, a guard on the node file transport, so a `--headless`
+  run refuses a write to a project file and the CLI exits 1.
 
 `node bin/engine.mjs lock` says who holds it.
 
