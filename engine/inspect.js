@@ -1,164 +1,23 @@
 /**
- * Kernel: the read and drive surface.
+ * Kernel: the command surface, and the read-and-drive seam.
  *
  * Everything the editor can do is a command, so `engine.run(id, args)` is a
- * complete way to drive it. Everything the editor knows is in `engine.snapshot()`,
- * which is deliberately summarised by default and detailed on request — a full
- * entity dump every time would be the expensive thing to read.
+ * complete way to drive it. What `engine.snapshot()` returns is projected in
+ * `snapshot.js`, and the world's log is wired in `log.js`; this file is the
+ * surface those two meet at.
  *
  * Exposed as window.engine so an agent driving the browser can inspect state
  * and act without screenshots.
  */
 import { validateCommandInput } from './command-schema.js'
-import { stateHash } from './world.js'
 import { round3 } from './round3.js'
-const RING = 200
+import { makeLog, reasonFor } from './log.js'
+import { asColumns, entityView, note, plainReply, projectSnapshot, wantedFields } from './snapshot.js'
+
+export { makeLog } from './log.js'
 
 /** Half a fixed step. Below this, a simulation ran the time it was asked for. */
 const STEP_TOLERANCE = 1 / 120
-
-/**
- * Every log in this process, held weakly.
- *
- * A world wants what the console would not have caught, and node and the browser
- * both report an uncaught throw and a rejected promise on one process-wide
- * channel. Wiring that up per world meant eleven worlds installed eleven pairs of
- * listeners — which node warns about at eleven — each one collecting every other
- * world's errors, and each one holding its own world's log reachable for the life
- * of the process. Weak, because the thing that reports errors must never be the
- * reason a world cannot be let go of.
- */
-const LOGS = new Set()
-
-/** Whether the process-wide channels are wired. One set, however many worlds. */
-let wired = false
-
-/** Say something to every log still alive, and forget the ones that are not. */
-function reportToLogs(level, source, message, extra) {
-  for (const reference of LOGS) {
-    const log = reference.deref()
-    if (log) log.push(level, source, message, extra)
-    else LOGS.delete(reference)
-  }
-}
-
-/**
- * Wire the channels a world cannot listen for itself, once.
- *
- * `console.error` only catches what someone remembered to log. An uncaught throw
- * or a rejected promise in game code would otherwise be invisible — the log would
- * say the run was clean while the run was not — and that is the worst thing to
- * hand an agent working without a screen. Wrapped once rather than once per world,
- * so eleven worlds are not eleven nested wrappers passing everything along.
- */
-function wireOnce() {
-  if (wired) return
-  wired = true
-
-  const uncaught = (error, at) => reportToLogs('error', 'uncaught',
-    error?.stack || error?.message || String(error), { at })
-  const rejected = reason => reportToLogs('error', 'rejection',
-    reason?.stack || reason?.message || String(reason))
-
-  if (typeof addEventListener === 'function') {
-    addEventListener('error', event => uncaught(event.error || event.message,
-      event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined))
-    addEventListener('unhandledrejection', event => rejected(event.reason))
-  } else if (typeof process !== 'undefined' && typeof process.on === 'function') {
-    process.on('uncaughtException', error => uncaught(error))
-    process.on('unhandledRejection', reason => rejected(reason))
-  }
-
-  const original = console.error
-  console.error = (...args) => {
-    reportToLogs('error', 'console', args.map(a => (a?.stack || a?.message || String(a))).join(' '))
-    original.apply(console, args)
-  }
-}
-
-/**
- * The world's log, and everything that has to be listening before there is a
- * world to read.
- *
- * It is made apart from the read surface because the read surface is built
- * last — after the plugins have been found, imported and booted. A world that
- * breaks while it is starting is exactly the world whose errors an agent most
- * needs, and it was the one case where `snapshot().errors` came back empty.
- * Make this first, hand it to `makeInspect` at the end, and everything that
- * went wrong on the way is already in it.
- */
-export function makeLog(bus) {
-  const lines = []
-
-  const push = (level, source, message, extra) => {
-    lines.push({ t: Math.round(performance.now()), level, source, message, ...extra })
-    if (lines.length > RING) lines.shift()
-  }
-
-  bus.on('plugin:error', failure =>
-    push('error', failure.file ? 'plugin' : `plugin:${failure.name}`, reasonFor(failure)))
-  bus.on('files:written', ({ path }) => push('info', 'files', `wrote ${path}`))
-  // An error, not a note: a write that did not land is the one thing a reader
-  // must not miss, and the reason names who is holding the file.
-  bus.on('files:refused', ({ message }) => push('error', 'files', message))
-
-  // "I wrote the file — did it take?" has to be answerable from the log, or an
-  // agent has no way to tell a hot swap that worked from one that never ran.
-  bus.on('hot:applied', c => push('info', 'hot',
-    `${c.file} ${c.removed ? 'removed' : c.entities != null ? `→ ${c.entities} entities` : c.skipped || 'applied'}`))
-  bus.on('hot:failed', c => push('error', 'hot', `${c.file} — ${c.error}`))
-
-  const log = { lines, push }
-  // This world is now one of the logs a process-wide error is reported to, and
-  // the wiring is installed if this is the first world to ask.
-  LOGS.add(new WeakRef(log))
-  wireOnce()
-  return log
-}
-
-/**
- * The columns one row of a bulk entity list can carry.
- *
- * Named here rather than discovered from the first row, so a projection can refuse a
- * field that does not exist instead of answering with a column of nulls — which reads
- * as a world where nothing has a rotation.
- */
-const ENTITY_COLUMNS = ['id', 'type', 'at', 'rotation', 'note', 'properties', 'behaviours']
-
-/**
- * Rows as columns: the field names once, then one array per row.
- *
- * A dump of four hundred and forty entities is 22 KB as rows of objects and 14 KB as
- * columns, because the names are a third of it. The projection is the larger half —
- * the same dump of `id` and `at` is 9 KB — and it is the same data, so a caller that
- * asks for two columns gets two columns rather than reading seven and discarding five.
- *
- * @param {object[]} rows One object per row.
- * @param {string[]} fields Which of its fields to keep, in this order.
- * @returns {object} `{ columns, rows }`.
- */
-const asColumns = (rows, fields) => ({
-  columns: fields,
-  rows: rows.map(row => fields.map(field => row[field]))
-})
-
-/**
- * The fields a projection named, checked.
- *
- * @param {string|string[]} asked Field names, or one string of them separated by commas.
- * @param {string[]} known Every field this reply's rows can carry.
- * @returns {string[]} The names, in the order asked for.
- * @throws When a name is not a field of this row, naming the ones that are.
- */
-function wantedFields(asked, known) {
-  const fields = (Array.isArray(asked) ? asked : String(asked).split(','))
-    .map(field => String(field).trim())
-    .filter(Boolean)
-  if (!fields.length) throw new Error(`name the fields to keep, separated by commas — this row carries ${known.join(', ')}`)
-  const wrong = fields.filter(field => !known.includes(field))
-  if (wrong.length) throw new Error(`no field "${wrong.join('", "')}" — this row carries ${known.join(', ')}`)
-  return fields
-}
 
 /**
  * The read and drive surface: `snapshot`, `run`, `simulate`, and the direct
@@ -170,25 +29,6 @@ function wantedFields(asked, known) {
  * it and then stops.
  */
 export function makeInspect({ world, loader, loop, files, bus, editor, view, log, reload, rewind }) {
-  /**
-   * Add the reload note to a reply, once.
-   *
-   * A page reload rebuilds the world. Unreported, an agent keeps reading the
-   * new world as the old one. The field is named for the outcome —
-   * `worldWasRestored` or `worldWasReset` — and is absent when there is
-   * nothing to report, so it never becomes noise.
-   */
-  const note = out => {
-    const said = reload?.()
-    if (said) out[said.key] = said.sentence
-    return out
-  }
-
-  /** A reply with room for one more key: a plain object, not a number or a list. */
-  const plainReply = value =>
-    !!value && typeof value === 'object' && !Array.isArray(value) &&
-    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
-
   // A log made here started after the plugins did, so it heard none of what
   // they raised. Read that back out of the loader. A log passed in was already
   // listening and has it all, in the order it happened.
@@ -198,117 +38,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     for (const failure of loader.failures()) log.push('error', 'plugin', reasonFor(failure))
   }
 
-  /**
-   * `bulk` trims properties to the overridden ones. In a list of fifty entities the
-   * type defaults are the same fifty times and are already in the index, so
-   * repeating them is the single most wasteful thing this surface can do.
-   * A single-entity lookup is cheap, so that one stays complete.
-   */
-  const entityView = (e, bulk = false) => {
-    const out = {
-      id: e.id, type: e.type,
-      at: [round3(e.x), round3(e.y), round3(e.z)],
-      ...(e.rotation ? { rotation: round3(e.rotation) } : {}),
-      // Why this one is placed here. In a bulk list it is the only description
-      // that appears, and only on the placements that wrote one — what the type
-      // IS is said once per type, not once per entity.
-      ...(e.note ? { note: e.note } : {})
-    }
-    if (bulk) {
-      // In bulk, properties IS the override list — naming the keys twice is waste.
-      if (e.overrides.length) out.properties = Object.fromEntries(e.overrides.map(k => [k, e.properties[k]]))
-      // Names only. What each one holds is in the index, once, rather than
-      // repeated on every entity that attached it.
-      if (e.behaviours.length) out.behaviours = e.behaviours.map(b => b.name)
-    } else {
-      // What the author wrote this type IS, read through the definition rather
-      // than copied onto the entity, so editing the type file reaches every
-      // live entity with nothing to re-sync. Identity comes before the numbers
-      // because a reader has to know what the thing is to read them.
-      const definition = e._definition || {}
-      if (definition.about) out.about = definition.about
-      if (definition.appearance) out.appearance = definition.appearance
-      if (definition.looksWrongWhen) out.looksWrongWhen = definition.looksWrongWhen
-      out.properties = e.properties
-      if (e.overrides.length) out.overrides = e.overrides
-      if (e.behaviours.length) {
-        out.behaviours = Object.fromEntries(e.behaviours.map(b =>
-          [b.name, b.error ? { error: b.error } : b.bag]))
-      }
-    }
-    return out
-  }
-
   const api = {
-    /**
-     * Compact by default. Pass `{ entities: true, log: true, plugins: true }` for detail.
-     *
-     * `entities` may also name the fields to keep — `{ entities: ['id', 'at'] }` — and
-     * the reply comes back as columns: the names once, then one array per entity. Same
-     * world, a fifth of the reading.
-     */
     snapshot(options = {}) {
-      // `snapshot --entities id,at` reaches here as a string first argument, because
-      // the flag parser keeps a bare flag boolean on purpose. Answering the compact
-      // reply then reads as the projection having done nothing.
-      if (typeof options !== 'object' || options === null) {
-        throw new Error(`snapshot takes an options object — for some fields as columns: snapshot '{"entities":["id","at"]}'`)
-      }
-      const types = [...world.types.keys()]
-      const broken = loader.failures()
-      const out = {
-        mode: loop.running ? 'play' : 'edit',
-        // Which project answered. A command that omits `--project` opens the
-        // default one and says nothing, so a reply about the wrong game reads
-        // exactly like a reply about the right one.
-        project: editor.projectName,
-        level: editor.levelName,
-        // Engine time and seed, because "what happened" is only reproducible
-        // if you know where the clock and the random stream were.
-        time: round3(loop.time),
-        // Only when something is holding time still. "Nothing is moving" is the
-        // hardest thing to diagnose without being told who asked for that.
-        ...(loop.paused ? { paused: loop.holds } : {}),
-        seed: loop.random.seed,
-        // One value that changes whenever the world does. Two runs are compared
-        // by this rather than by reading a thousand entities: it is what answers
-        // whether a change altered the simulation at all, and it is what makes a
-        // rewind or a restored world checkable. See `stateHash` in world.js.
-        hash: stateHash(world),
-        camera: { x: round3(view.x), y: round3(view.y), zoom: round3(view.zoom), mode: view.mode },
-        counts: {
-          entities: world.entities.length,
-          types: types.length,
-          behaviours: world.behaviours.size,
-          plugins: [...loader.plugins.values()].filter(p => p.enabled).length
-        },
-        selection: [...editor.selection],
-        byType: types.reduce((a, t) => (a[t] = world.all(t).length, a), {}),
-        errors: log.lines.filter(l => l.level === 'error').slice(-5),
-        // Its own key, not a line in the error ring, because the ring keeps the
-        // last five and a broken plugin must not be pushed out of the summary
-        // by five later complaints. Absent when everything loaded, so the
-        // healthy snapshot is the size it always was.
-        ...(broken.length ? { pluginsFailed: broken.map(reasonFor) } : {}),
-        // A refused write leaves nothing pending, so the count alone reads as
-        // saved. Both halves are needed for `unsaved` to be true.
-        unsaved: files.pending > 0 || !!files.refused,
-        ...(files.refused ? { refused: files.refused.message } : {})
-      }
-      if (options.entities) {
-        const rows = world.entities.map(e => entityView(e, true))
-        out.entities = options.entities === true ? rows : asColumns(rows, wantedFields(options.entities, ENTITY_COLUMNS))
-      }
-      if (options.plugins) out.plugins = [...loader.plugins.entries()]
-        .map(([name, p]) => (p.file
-          // A file that never imported has no name to show. Say what it is
-          // instead of printing a path where a name belongs.
-          ? { file: p.file, loaded: false, builtin: p.builtin, error: p.error }
-          : { name, enabled: p.enabled, error: p.error }))
-      if (options.log) out.log = log.lines.slice(-40)
-      if (options.timers) out.timers = loop.timers
-      if (options.commands) out.commands = loader.contrib.commands.map(c => c.id)
-      return note(out)
+      return projectSnapshot({ world, loader, loop, files, editor, view, log, reload }, options)
     },
 
     /**
@@ -344,7 +76,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       // A waiting note rides on a reply the agent is already reading, but only
       // on a plain object. A command answering with a number or a list answers
       // with exactly that; the note waits for the next reply that can hold it.
-      return plainReply(out) ? note({ ...out }) : out
+      return plainReply(out) ? note(reload, { ...out }) : out
     },
 
     /** One entity in full, or null when no entity has that id. */
@@ -511,11 +243,6 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
 
   return api
 }
-
-/** One plugin failure in a sentence, for a log line or a snapshot. */
-const reasonFor = failure => failure.file
-  ? `${failure.file} failed to import — ${failure.error}. Every command it contributes is missing.`
-  : `plugin "${failure.name}" failed to load — ${failure.error}. Every command it contributes is missing.`
 
 /**
  * Why a command is not here.
