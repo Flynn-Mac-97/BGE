@@ -17,19 +17,16 @@
 const DEFAULT_DEVICE = { width: 1280, height: 720, pixelRatio: 1, orientation: 'landscape' }
 
 /**
- * @desc A declared number only when it is finite and positive, else null.
- * @domain device — the screen shape a game declares.
- * @pure Reads its argument and returns a value.
+ * A declared number only when it is finite and positive, else null.
+ *
  * @param {number} value The number a game declared.
  * @returns {number|null} The number, or null when it cannot be used.
  */
 const positive = value => (Number.isFinite(value) && value > 0 ? value : null)
 
 /**
- * @desc The target device a game declares under `device` in game.json, filled in
+ * The target device a game declares under `device` in game.json, filled in
  * from the default.
- * @domain device — the screen shape a game declares.
- * @pure Reads its argument and returns a new device object.
  *
  * One declaration, read by everything that needs a screen shape: the viewport
  * every camera clamps against, and the size `see.capture` draws at. A game that

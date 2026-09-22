@@ -10,6 +10,11 @@
  * headless world cannot do, and headless is how several agents work at once.
  */
 import { PROJECT_PREFIX } from './asset-path.js'
+import { makeFiles, overHTTP } from './files.js'
+import { importPlugin, reportImportFailure } from './plugin-import.js'
+import { makeRenderer } from './render.js'
+import { makeShell } from './shell.js'
+import { startWorld } from './start-world.js'
 
 /**
  * What the server says it is serving. Where the project is on disk never
@@ -29,11 +34,6 @@ async function openProject() {
   } catch { /* no dev server: the built page carries no name */ }
   return { name: PROJECT_PREFIX, untitled: false }
 }
-import { makeFiles, overHTTP } from './files.js'
-import { importPlugin, reportImportFailure } from './plugin-import.js'
-import { makeRenderer } from './render.js'
-import { makeShell } from './shell.js'
-import { startWorld } from './start-world.js'
 
 let fileVersion = 0
 

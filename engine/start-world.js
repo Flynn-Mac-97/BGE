@@ -54,15 +54,8 @@ const DEFAULT_VIEW = {
 }
 
 /**
- * @desc Build one world and return its surface: context, engine, world, loop,
- *   loader, bus, files, editor, view, viewport and device.
- * @domain world boot — the whole engine minus anything that needs a document.
- * @effects Builds the bus, world, loop, loader and file transport; reads
- *   `game.json`; registers the project's behaviours and types; boots the
- *   enabled plugins; mounts the screen; loads the start level; emits
- *   `world:changed`, `level:loaded`, `selection:changed`, `tool:changed`,
- *   `plugins:changed` and the play events; and may restore a world carried
- *   through a page reload.
+ * Build one world and return its surface: context, engine, world, loop,
+ * loader, bus, files, editor, view, viewport and device.
  *
  * The two halves differ only in what they pass in — a file transport, a plugin
  * finder, an importer, and a screen — so the same boot runs in a browser tab
@@ -158,19 +151,19 @@ export async function startWorld({
   // reading surface, and a plugin that wants to mark a moment uses it.
   Object.assign(context, {
     /**
-     * @desc Take a moment of this world, to come back to.
-     * @domain checkpoint — a whole moment of a run.
-     * @effects Reads the world, the loop and every plugin that registered state.
+     * Take a moment of this world, to come back to.
+     *
      * @returns {object} The moment. In memory, not JSON: a solver's bytes do not
      *   belong in a string.
      */
     capture: () => captureMoment({ world, loop, checkpoints }),
     /**
-     * @desc Put this world back to a moment.
-     * @domain checkpoint — a whole moment of a run.
-     * @effects Restores each registered plugin, then the entities, then the
-     *   clock, the stream and the input record; emits `world:changed` through
-     *   `world.restore`.
+     * Put this world back to a moment.
+     *
+     * Restores each registered plugin, then the entities, then the clock, the
+     * stream and the input record; emits `world:changed` through
+     * `world.restore`.
+     *
      * @param {object} moment From `capture`.
      * @returns {object} What came back, what refused, and what the moment could
      *   not carry.

@@ -11,11 +11,7 @@
 import { round3 } from './round3.js'
 
 /**
- * @desc Import every type and behaviour the index names.
- * @domain project — the types and behaviours a project declares.
- * @effects Clears and refills `world.behaviours` and `world.types`, imports
- * each project file, and logs a file that failed to import without stopping the
- * rest.
+ * Import every type and behaviour the index names.
  *
  * Behaviours load before types, because a type's attachment list is resolved
  * the moment the type registers. The other order reports every attachment as
@@ -46,11 +42,7 @@ export async function loadTypes({ world, editor, importProjectFile }) {
 }
 
 /**
- * @desc Re-import one type and bring its live entities onto the new definition.
- * @domain project — a type file that changed.
- * @effects Re-reads `editor.index`, imports the type's file, unregisters the
- * type when it is gone or retypes its entities when it is not, and emits
- * `world:changed`.
+ * Re-import one type and bring its live entities onto the new definition.
  *
  * @param {object} parts The world, editor, files, importer and bus this writes through.
  * @param {string} name The type name.
@@ -70,12 +62,8 @@ export async function reloadType({ world, editor, files, importProjectFile, bus 
 }
 
 /**
- * @desc The same, for a behaviour. Every entity that attached it moves onto the
+ * The same, for a behaviour. Every entity that attached it moves onto the
  * new file.
- * @domain project — a behaviour file that changed.
- * @effects Re-reads `editor.index`, imports the behaviour's file, unregisters
- * the behaviour when it is gone or rebehaves its entities when it is not, and
- * emits `world:changed`.
  *
  * @param {object} parts The world, editor, files, importer and bus this writes through.
  * @param {string} name The behaviour name.
@@ -94,11 +82,7 @@ export async function reloadBehaviour({ world, editor, files, importProjectFile,
 }
 
 /**
- * @desc Open one level: reset the clock, place every entity, and announce it.
- * @domain level — the level currently open.
- * @effects Reads the level file, stores it in `levelFile.raw`, clears the world,
- * resets the loop, updates `editor.levelName` and the view, spawns every entity,
- * and emits `world:changed` and `level:loaded`.
+ * Open one level: reset the clock, place every entity, and announce it.
  *
  * Ids are position-in-file rather than a counter, so `coin-2` means the same
  * coin after a reload. The raw file is kept for `saveLevel`, which must write
@@ -152,12 +136,8 @@ export async function loadLevel({ world, loop, bus, editor, view, files, levelFi
 }
 
 /**
- * @desc Write the open level back to disk with the entities' start positions,
+ * Write the open level back to disk with the entities' start positions,
  * or refuse when writing would corrupt it.
- * @domain level — saving the level currently open.
- * @effects Writes `levels/<name>.json` and returns its path, or returns a
- * `skipped` reason when the page is a viewer, the project is untitled, the
- * world has been simulated, or the world is playing.
  *
  * A level records starting positions. Once the simulation has run, the world
  * holds where things ended up, so writing it back would quietly replace the
@@ -219,11 +199,7 @@ export async function saveLevel({ world, loop, editor, view, files, levelFile },
 }
 
 /**
- * @desc Start or stop play mode on the open level.
- * @domain play — running the level against the loop.
- * @effects Stops the loop and reloads the level when playing, or emits
- * `play:started`, runs every entity's `start` hook and starts the loop when
- * stopped. Emits `play:stopped` on stop and `plugins:changed` either way.
+ * Start or stop play mode on the open level.
  *
  * @param {object} parts The world, loop, bus, editor and context this writes through.
  * @returns {void}

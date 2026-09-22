@@ -32,10 +32,8 @@ export function makeEditor({ projectDirectory, projectName, projectUntitled, bus
     context: null,
 
     /**
-     * @desc Replace or extend the selection with the given ids.
-     * @domain editor — what the editor has selected.
-     * @effects Clears and adds entries in `editor.selection`, then emits
-     *   `selection:changed` with the ids.
+     * Replace or extend the selection with the given ids.
+     *
      * @param {string|string[]|object|object[]} ids One id, or a list of ids or
      *   objects with an `id`. Falsy entries are dropped.
      * @param {boolean} [additive] Keep the current selection instead of
@@ -50,10 +48,8 @@ export function makeEditor({ projectDirectory, projectName, projectUntitled, bus
     },
 
     /**
-     * @desc Set the active editor tool and announce the change.
-     * @domain editor — which tool the editor is using.
-     * @effects Stores `editor.tool`, then emits `tool:changed` and
-     *   `plugins:changed`.
+     * Set the active editor tool and announce the change.
+     *
      * @param {string} id The tool id.
      * @returns {void}
      */

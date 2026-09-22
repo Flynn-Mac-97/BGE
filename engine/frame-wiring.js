@@ -21,17 +21,15 @@
 export function makeFrameWiring({ world, loader, context }) {
   return {
     /**
-     * @desc Report a loop error without stopping the loop.
-     * @domain loop — errors raised while a step runs.
-     * @effects Writes the error to the console.
+     * Report a loop error without stopping the loop.
+     *
      * @param {Error} e The error the step threw.
      * @returns {void}
      */
     onError(e) { console.error('[timer]', e) },
     /**
-     * @desc Record where every entity is before the step moves it.
-     * @domain world — entity places between steps.
-     * @effects Writes each entity's current place in `world`.
+     * Record where every entity is before the step moves it.
+     *
      * @returns {void}
      */
     onStepStart() {
@@ -42,12 +40,9 @@ export function makeFrameWiring({ world, loader, context }) {
       context.rewind?.observe()
     },
     /**
-     * @desc Advance the world by one fixed step: fixed-time systems, then every
+     * Advance the world by one fixed step: fixed-time systems, then every
      * entity's update.
-     * @domain world — the fixed-step simulation.
-     * @effects Marks `world.simulated`, runs each enabled plugin's fixed
-     * systems, runs each entity's `update` hook, and reports a failing system
-     * through `loader.fail`.
+     *
      * @param {number} seconds The fixed step length in seconds.
      * @returns {void}
      */
@@ -69,11 +64,8 @@ export function makeFrameWiring({ world, loader, context }) {
       }
     },
     /**
-     * @desc Advance one rendered frame: frame-time systems, then draw.
-     * @domain world — the frame step.
-     * @effects Runs each enabled plugin's frame systems, reports a failing
-     * system through `loader.fail`, and syncs and draws `context.renderer` when
-     * the world has one.
+     * Advance one rendered frame: frame-time systems, then draw.
+     *
      * @param {number} seconds The frame length in seconds.
      * @returns {void}
      */

@@ -25,9 +25,8 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
   // context surface plugins actually use — mirrors the game-side context on purpose
   Object.assign(context, {
     /**
-     * @desc The project's assets, optionally filtered by kind.
-     * @domain project — the asset index.
-     * @pure Reads `editor.index.assets` and returns new objects.
+     * The project's assets, optionally filtered by kind.
+     *
      * @param {string} [kind] Keep only assets of this kind.
      * @returns {object[]} One `{ name, ...entry }` per matching asset.
      */
@@ -35,50 +34,43 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
       .filter(([, a]) => !kind || a.kind === kind)
       .map(([name, a]) => ({ name, ...a })),
     /**
-     * @desc The project's types, each with its name.
-     * @domain project — the type index.
-     * @pure Reads `editor.index.types` and returns new objects.
+     * The project's types, each with its name.
+     *
      * @returns {object[]} One `{ name, ...entry }` per type.
      */
     types: () => Object.entries(editor.index.types).map(([name, t]) => ({ name, ...t })),
     /**
-     * @desc The project's behaviours, each with its name.
-     * @domain project — the behaviour index.
-     * @pure Reads `editor.index.behaviours` and returns new objects.
+     * The project's behaviours, each with its name.
+     *
      * @returns {object[]} One `{ name, ...entry }` per behaviour.
      */
     behaviours: () => Object.entries(editor.index.behaviours || {}).map(([name, b]) => ({ name, ...b })),
     /**
-     * @desc The project's levels, each with its name.
-     * @domain project — the level index.
-     * @pure Reads `editor.index.levels` and returns new objects.
+     * The project's levels, each with its name.
+     *
      * @returns {object[]} One `{ name, ...entry }` per level.
      */
     levels: () => Object.entries(editor.index.levels).map(([name, l]) => ({ name, ...l })),
     level: () => editor.levelName,
     select: (x, additive) => editor.select(x, additive),
     /**
-     * @desc Ask the editor to open a file.
-     * @domain editor — the file the editor shows.
-     * @effects Emits `open:file` with the file's path.
+     * Ask the editor to open a file.
+     *
      * @param {string|object} file A file path, or an entry with a `file` path.
      * @returns {void}
      */
     open: file => bus.emit('open:file', typeof file === 'string' ? file : file.file),
     /**
-     * @desc Add an entity to the world and announce it.
-     * @domain world — entities.
-     * @effects Spawns the entity in `world` and emits `world:changed`.
+     * Add an entity to the world and announce it.
+     *
      * @param {string} t The type name.
      * @param {object} [p] The placement.
      * @returns {object} The spawned entity.
      */
     spawn: (t, p) => { const e = world.spawn(t, p); bus.emit('world:changed'); return e },
     /**
-     * @desc Remove an entity from the world and announce it.
-     * @domain world — entities.
-     * @effects Runs the entity's destroy hooks in `world` and emits
-     * `world:changed`.
+     * Remove an entity from the world and announce it.
+     *
      * @param {object} e The entity to remove.
      * @returns {void}
      */
@@ -91,9 +83,8 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
     importProjectFile,
     // A world with no shell has nothing to redraw, and that is not an error.
     /**
-     * @desc Ask the shell to redraw, when the world has a shell.
-     * @domain shell — the browser's rendered view.
-     * @effects Calls `context.shell.draw()` when a shell is attached.
+     * Ask the shell to redraw, when the world has a shell.
+     *
      * @returns {void}
      */
     redraw: () => context.shell?.draw(),
@@ -102,9 +93,8 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
     // by. Offered here because a project is a directory anywhere on disk, so
     // game code cannot reach an engine module by a relative path.
     /**
-     * @desc A projector for the current view and viewport.
-     * @domain camera — world point to screen point.
-     * @pure Builds a projector from `context.view` and `context.viewport`.
+     * A projector for the current view and viewport.
+     *
      * @returns {object} The projector.
      */
     projector: () => makeProjector(context.view, context.viewport),
