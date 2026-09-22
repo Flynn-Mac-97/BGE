@@ -1,6 +1,5 @@
 import { listDocuments, readDocument, writeDocument } from './document-store.mjs'
 import { readSource, sourceCatalog, writeSource } from './source-files.mjs'
-import { makeInterfaceReader } from '../plugins/builtin/plugin-master/interface-block.js'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 // The index builder and the determinism lint live in the engine, not in this
@@ -15,6 +14,7 @@ import { readLaneBrowsers } from './lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './work-lock.mjs'
 import { PROJECT_PREFIX } from './asset-path.js'
 import { pluginGuides } from './plugin-guides.mjs'
+import { pluginInterfaceReader } from './plugin-interface.mjs'
 import { openPage } from './open-page.mjs'
 import { ensureProject, isUntitled, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './project-path.mjs'
 
@@ -124,9 +124,11 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
   async function agentInterface(scope, file) {
     if (!interfaceReader || interfaceProject !== PROJECT) {
       interfaceProject = PROJECT
-      interfaceReader = makeInterfaceReader({ root: ROOT, projectDirectory: PROJECT })
+      interfaceReader = pluginInterfaceReader({ root: ROOT, projectDirectory: PROJECT })
     }
-    return (await interfaceReader)(scope, file)
+    const reader = await interfaceReader
+    // Without Plugin Master there is no parser and no interface to answer with.
+    return reader ? reader(scope, file) : null
   }
 
   function serveProject() {

@@ -19,6 +19,7 @@ import { readSource, sourceCatalog, writeSource } from './source-files.mjs'
 import { buildIndex, walk } from './project-index.mjs'
 import { workLock } from './work-lock.mjs'
 import { pluginGuides } from './plugin-guides.mjs'
+import { pluginInterfaceReader } from './plugin-interface.mjs'
 
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -41,9 +42,11 @@ export function onDisk(projectDirectory, checkout = ROOT) {
   const root = path.resolve(checkout)
   let interfaceReader
   const agentInterface = async (scope, file) => {
-    interfaceReader ??= import('../plugins/builtin/plugin-master/interface-block.js')
-      .then(module => module.makeInterfaceReader({ root, projectDirectory }))
-    return (await interfaceReader)(scope, file)
+    interfaceReader ??= pluginInterfaceReader({ root, projectDirectory })
+    const reader = await interfaceReader
+    // No Plugin Master in this checkout means no parsed interface; the packet
+    // falls back to the guide prose and says the interface is unavailable.
+    return reader ? reader(scope, file) : null
   }
   /** Resolve one project file, refusing any path that climbs outside the project. */
   const inside = rel => {

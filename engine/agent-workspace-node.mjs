@@ -154,6 +154,22 @@ const validateId = id => {
 }
 
 /**
+ * Jev when its plugin is present, null when that directory is gone.
+ *
+ * Jev is a plugin, so the kernel reaches it lazily: a checkout without it
+ * still builds packets, without the advisory block. Any other import fault is
+ * real and must not be swallowed.
+ */
+async function loadJev() {
+  try {
+    return await import('../plugins/builtin/jev/context.mjs')
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error
+    return null
+  }
+}
+
+/**
  * Build a packet for a request by reading the tree off disk.
  *
  * The read refuses any path that leaves the scope it named, so a request cannot
@@ -192,8 +208,8 @@ export async function contextFromDisk(root, request, projectPath = 'project', in
   }
   // Jev is off unless the project switched it on or the request asked for it.
   // It only appends an advisory block: a fault leaves the packet as it was.
-  const { addGuideSuggestions } = await import('../plugins/builtin/jev/context.mjs')
-  const suggested = await addGuideSuggestions({ project, request, packet, pluginNodes, read })
+  const jev = await loadJev()
+  const suggested = jev ? await jev.addGuideSuggestions({ project, request, packet, pluginNodes, read }) : null
   if (suggested) {
     packet.jev = suggested.jev
     if (suggested.suggestions) packet.suggestions = suggested.suggestions

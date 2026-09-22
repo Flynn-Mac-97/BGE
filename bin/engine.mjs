@@ -888,6 +888,10 @@ if (op.startsWith('agent.')) {
    * Made on the first call and kept, because compiling the grammar costs about a
    * tenth of a second and a packet describes only the plugins it selects. A
    * packet built where the parser cannot run carries the guide alone.
+   *
+   * The parser is Plugin Master's, and the CLI is not the kernel, so it names
+   * that plugin here and loads it lazily: only the agent ops that print an
+   * interface pay for it, and a checkout without it answers every other verb.
    */
   let interfaceReader = null
   const interfaceText = async (scope, file) => {
@@ -1024,6 +1028,9 @@ if (op.startsWith('agent.')) {
  * Jev ranks supplied candidates; it never edits the ledger and never decides
  * that work is fixed. Off unless a project switched it on or a call asked for
  * it, and every fault returns the ordinary answer with a short reason.
+ *
+ * Both plugins are loaded here, lazily, so the CLI starts and answers every
+ * other verb without them.
  */
 if (op.startsWith('jev.')) {
   await (async () => {

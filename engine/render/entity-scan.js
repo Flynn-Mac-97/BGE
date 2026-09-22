@@ -93,20 +93,22 @@ export function makeEntityScans(state, records) {
     snapshot[at + SLOT_MESH] = entity.mesh
     snapshot[at + SLOT_COLLIDER] = entity.collider
     snapshot[at + SLOT_TYPE] = entity.type
-    snapshot[at + SLOT_X] = entity.x
-    snapshot[at + SLOT_Y] = entity.y
-    snapshot[at + SLOT_Z] = entity.z
     snapshot[at + SLOT_SCALE] = entity.scale
     snapshot[at + SLOT_YAW] = entity.yaw
     snapshot[at + SLOT_HIDDEN] = entity.hidden
     snapshot[at + SLOT_OPACITY] = entity.opacity
-    snapshot[at + SLOT_ANCHOR] = record.anchor
-    snapshot[at + SLOT_DECLARED] = record.declared
-    snapshot[at + SLOT_SHAPE] = record.shape
+    snapshot[at + SLOT_X] = entity.x
+    snapshot[at + SLOT_Y] = entity.y
+    snapshot[at + SLOT_Z] = entity.z
+    // The slot place and the drawn place hold the same three numbers: the
+    // still scan compares the first, the moving scan the second.
     const drawn = index * DRAWN_STRIDE
     drawnPlaces[drawn] = entity.x
     drawnPlaces[drawn + 1] = entity.y
     drawnPlaces[drawn + 2] = entity.z
+    snapshot[at + SLOT_ANCHOR] = record.anchor
+    snapshot[at + SLOT_DECLARED] = record.declared
+    snapshot[at + SLOT_SHAPE] = record.shape
     // Settled, idle and never moved: the answers that let the next frame skip
     // this entity, and whether it draws an outline while skipped. Steady is the
     // moving counterpart: a simple mesh, out of every batch, whose outline is
@@ -118,6 +120,27 @@ export function makeEntityScans(state, records) {
   }
 
   /**
+   * Whether the slot still holds the entity, turned and declared the same, with
+   * the place left out.
+   *
+   * The still scan answers an entity that has not moved; the moving scan answers
+   * one whose place it can write. Everything else has to match both times, so it
+   * is compared once here. Each caller tests the slot's first cell first, which
+   * is the cheapest way to reject a slot whose entity changed.
+   */
+  function sameApartFromPlace(entity, at, ringedId) {
+    return typeof entity.rotation !== 'object'
+      && snapshot[at + SLOT_MESH] === entity.mesh
+      && snapshot[at + SLOT_COLLIDER] === entity.collider
+      && snapshot[at + SLOT_TYPE] === entity.type
+      && snapshot[at + SLOT_SCALE] === entity.scale
+      && snapshot[at + SLOT_YAW] === entity.yaw
+      && snapshot[at + SLOT_HIDDEN] === entity.hidden
+      && snapshot[at + SLOT_OPACITY] === entity.opacity
+      && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))
+  }
+
+  /**
    * Whether the entity in slot `at` is the one the last full pass drew, has
    * never moved, and has not changed since. Such an entity is drawn exactly as
    * it was, on a still frame and on a playing frame alike.
@@ -125,18 +148,10 @@ export function makeEntityScans(state, records) {
   function isQuiet(entity, at, ringedId) {
     return snapshot[at] === entity
       && (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0
-      && typeof entity.rotation !== 'object'
-      && snapshot[at + SLOT_MESH] === entity.mesh
-      && snapshot[at + SLOT_COLLIDER] === entity.collider
-      && snapshot[at + SLOT_TYPE] === entity.type
       && snapshot[at + SLOT_X] === entity.x
       && snapshot[at + SLOT_Y] === entity.y
       && snapshot[at + SLOT_Z] === entity.z
-      && snapshot[at + SLOT_SCALE] === entity.scale
-      && snapshot[at + SLOT_YAW] === entity.yaw
-      && snapshot[at + SLOT_HIDDEN] === entity.hidden
-      && snapshot[at + SLOT_OPACITY] === entity.opacity
-      && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))
+      && sameApartFromPlace(entity, at, ringedId)
   }
 
   /** The entities the quiet scan could not answer, filled by `scanQuiet`. */
@@ -196,18 +211,10 @@ export function makeEntityScans(state, records) {
       }
       if (snapshot[at] === entity
           && (flags & SLOT_STEADY) !== 0
-          && typeof entity.rotation !== 'object'
-          && snapshot[at + SLOT_MESH] === entity.mesh
-          && snapshot[at + SLOT_COLLIDER] === entity.collider
-          && snapshot[at + SLOT_TYPE] === entity.type
           && (drawnPlaces[drawn] !== entity.x
             || drawnPlaces[drawn + 1] !== entity.y
             || drawnPlaces[drawn + 2] !== entity.z)
-          && snapshot[at + SLOT_SCALE] === entity.scale
-          && snapshot[at + SLOT_YAW] === entity.yaw
-          && snapshot[at + SLOT_HIDDEN] === entity.hidden
-          && snapshot[at + SLOT_OPACITY] === entity.opacity
-          && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))) {
+          && sameApartFromPlace(entity, at, ringedId)) {
         const place = drawInto(drawnPlaceScratch, entity, blend)
         const object = snapshot[at + SLOT_OBJECT]
         object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
