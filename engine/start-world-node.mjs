@@ -11,154 +11,36 @@
  * that differs is how the three outside things are reached — files come off
  * disk instead of over HTTP, plugins are found by reading a directory instead
  * of by a Vite glob, and project files are imported by path instead of by URL.
+ * The first of those is `on-disk.mjs`; this file is the boot that uses it.
  *
  * What it cannot do is draw. There is no canvas, so no screenshot and no
  * picking. Everything else — play, simulate, tests, commands, hot reload of a
  * type — behaves exactly as it does on screen. `renderer: 'null'` adds the
  * renderer SURFACE with nothing behind it, so the draw-time commands run
- * instead of refusing; see `nullRenderer`.
+ * instead of refusing; see `nullRenderer` in `null-renderer.mjs`.
  *
  * Which project it opens is a parameter: a directory path anywhere, or nothing
  * for the untitled project. The checkout is a separate parameter, because the
  * engine's own plugins and instructions are read from it whatever project is
  * open.
  */
-import { listDocuments, readDocument, writeDocument } from './document-store.mjs'
 import path from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
-import { readSource, sourceCatalog, writeSource } from './source-files.mjs'
 import fs from 'node:fs/promises'
 
 import { makeFiles } from './files.js'
 import { importPlugin } from './plugin-import.js'
 import { makeHost } from './host-node.mjs'
 import { startWorld } from './start-world.js'
-import { buildIndex, walk } from './project-index.mjs'
-import { workLock } from './work-lock.mjs'
-import { pluginGuides } from './plugin-guides.mjs'
 import { PROJECT_PREFIX } from './asset-path.js'
 import { ensureProject, isUntitled, projectName, resolveProject } from './project-path.mjs'
+import { onDisk, refuseWritesWhileLanesWork, writesRefusedHere } from './on-disk.mjs'
+import { mountNullScreen, nullRenderer } from './null-renderer.mjs'
+
+export { onDisk, writesRefusedHere, nullRenderer }
 
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-
-/**
- * Reach the project directly rather than through the dev server.
- *
- * Writes rebuild the index, exactly as the server's POST handler does, so a
- * headless session that writes a level sees the new index on the next read.
- * Skipping that is how a world ends up acting on a project that no longer
- * exists.
- *
- * @param {string} projectDirectory The project's real directory on disk.
- * @param {string} [checkout] The repository the engine's files are read from.
- * @returns {object} The transport: index, tree, read, write and agent files.
- */
-export function onDisk(projectDirectory, checkout = ROOT) {
-  // The checkout is passed in, not taken from the project's parent: the project
-  // may be anywhere, and the engine's own instructions are read from here.
-  const root = path.resolve(checkout)
-  let interfaceReader
-  const agentInterface = async (scope, file) => {
-    interfaceReader ??= import('../plugins/builtin/plugin-master/interface-block.js')
-      .then(module => module.makeInterfaceReader({ root, projectDirectory }))
-    return (await interfaceReader)(scope, file)
-  }
-  /** Resolve one project file, refusing any path that climbs outside the project. */
-  const inside = rel => {
-    const abs = path.resolve(projectDirectory, rel)
-    // Same guard the dev server applies. A path that climbs out of the project
-    // is a bug wherever it came from, and answering it quietly would make the
-    // headless runner the weaker door.
-    if (abs !== projectDirectory && !abs.startsWith(projectDirectory + path.sep)) {
-      throw new Error(`path outside project: ${rel}`)
-    }
-    return abs
-  }
-
-  /** Resolve one agent file, from the fixed sets each scope is allowed to read. */
-  const insideAgent = (scope, rel) => {
-    const base = scope === 'engine' ? root : scope === 'project' ? projectDirectory : null
-    const clean = String(rel || '').replaceAll('\\', '/').replace(/^\.\//, '')
-    const allowed = scope === 'engine'
-      ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-      : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-    if (!base || !allowed) throw new Error(`bad agent file path: ${scope}:${rel}`)
-    const abs = path.resolve(base, clean)
-    if (!abs.startsWith(base + path.sep)) throw new Error(`bad agent file path: ${scope}:${rel}`)
-    return abs
-  }
-
-  /** The `.agent.md` guides beside every plugin, in the shape the agent-context builder reads. */
-  const pluginSidecars = () => pluginGuides(root, projectDirectory)
-
-  return {
-    index: () => buildIndex(projectDirectory, root),
-    tree: async () => (await walk(projectDirectory))
-      .filter(f => !f.startsWith('.engine'))
-      .map(f => ({ path: f })),
-    agentPlugins: pluginSidecars,
-    agentInterface,
-    sourceCatalog: selection => sourceCatalog(root, projectDirectory, selection),
-    listDocuments: () => listDocuments(projectDirectory),
-    readDocument: (id, backup) => readDocument(projectDirectory, id, backup),
-    writeDocument: (id, data, revision) => writeDocument(projectDirectory, id, data, revision),
-    writeSource: (scope, file, text, expectedHash) => writeSource(root, projectDirectory, scope, file, text, expectedHash),
-    readSource: (scope, file) => readSource(root, projectDirectory, scope, file),
-    read: rel => fs.readFile(inside(rel), 'utf8'),
-    readAgent: (scope, rel) => fs.readFile(insideAgent(scope, rel), 'utf8'),
-    async write(rel, text) {
-      const abs = inside(rel)
-      await fs.mkdir(path.dirname(abs), { recursive: true })
-      await fs.writeFile(abs, text, 'utf8')
-      // The rebuild is the write's own, so its result is handed back: a caller
-      // that needs the index it just changed does not pay for a second rebuild.
-      return buildIndex(projectDirectory, root)
-    },
-    async writeAgent(scope, rel, text) {
-      const abs = insideAgent(scope, rel)
-      await fs.mkdir(path.dirname(abs), { recursive: true })
-      await fs.writeFile(abs, text, 'utf8')
-      if (scope === 'project') await buildIndex(projectDirectory, root)
-    }
-  }
-}
-
-/**
- * Every write this process refused, oldest first.
- *
- * A caller that swallows the rejection still has to fail: the CLI reads this
- * after the op and exits 1 when anything is in it.
- */
-const refusedWrites = []
-
-/**
- * What the work lock refused in this process, oldest first.
- *
- * @returns {Array} The refusal records.
- */
-export function writesRefusedHere() {
-  return refusedWrites.slice()
-}
-
-/**
- * Refuse every write while a lane holds the checkout.
- *
- * `vite.config.js` asks `permits` at the server's three doors. A headless world
- * reaches disk through none of them, so the same rule is registered here.
- *
- * The lock is read on every write, not once at start-up, so a run that ends
- * mid-session frees the checkout with nothing to reset. Reads never reach a
- * guard, so a locked checkout still answers every question.
- */
-function refuseWritesWhileLanesWork(checkout) {
-  return (file, scope) => {
-    const lock = workLock(checkout)
-    if (!lock.locked) return null
-    refusedWrites.push({ file, scope, why: lock.why })
-    return lock.why
-  }
-}
 
 /**
  * Every plugin file, read from the directories rather than globbed.
@@ -208,139 +90,6 @@ const importProjectFileFrom = projectDirectory => async file =>
   (await import(pathToFileURL(path.join(projectDirectory, file)).href + `?hot=${++fileVersion}`)).default || {}
 
 /**
- * A canvas of a stated size holding no pixels.
- *
- * `see.capture` copies the drawn frame onto one of these and reads it back to
- * check the frame is not blank. Nothing drew, so every pixel is transparent and
- * that check answers blank — which is the truth. `toDataURL` throws rather than
- * hand back an image of nothing.
- */
-function nullCanvas(width = 1, height = 1) {
-  /** A zeroed ImageData of one size, for a readback of a frame nothing drew. */
-  const blankPixels = (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(Math.max(0, w * h * 4)) })
-  const pen = {
-    fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1,
-    font: '', textAlign: 'left', textBaseline: 'top',
-    drawImage() {},
-    fillRect() {},
-    fillText() {},
-    measureText: () => ({ width: 0 }),
-    beginPath() {}, lineTo() {}, closePath() {}, stroke() {},
-    save() {}, restore() {},
-    createImageData: (w, h) => blankPixels(w, h),
-    putImageData() {},
-    getImageData: (x, y, w, h) => blankPixels(w, h)
-  }
-  return {
-    width, height,
-    getContext: () => pen,
-    toDataURL() { throw new Error('nothing drew this frame, so there is no image to encode') }
-  }
-}
-
-/**
- * The renderer surface, with no GL behind it.
- *
- * `see.capture` and `see.moment` hold the See plugin's state-changing code —
- * camera borrow, hidden entities, nulled background and fog, dimmed lights, an
- * emptied post chain, an added light rig — and put every piece back in a
- * `finally`. With no renderer at all they refuse on the first line, so none of
- * that runs anywhere a headless test can reach it. This gives them the surface:
- * every mutation lands, every restore runs, and every readback is empty.
- *
- * `blank` is the flag a caller reads to say the frame is blank. Nothing here
- * may report a frame it did not draw.
- *
- * @param {object} view The camera view.
- * @param {object} viewport The screen size, mutated by `frameSize`.
- * @param {object} shape The frame size `resize` restores.
- * @returns {object} The renderer surface, with `blank` true.
- */
-export function nullRenderer(view, viewport, shape) {
-  const scene = {
-    isScene: true,
-    children: [],
-    background: null,
-    fog: null,
-    add(object) {
-      if (!scene.children.includes(object)) scene.children.push(object)
-      return scene
-    },
-    remove(object) {
-      const at = scene.children.indexOf(object)
-      if (at >= 0) scene.children.splice(at, 1)
-      return scene
-    }
-  }
-
-  // One scene child per entity, so a pass that walks the scene graph — hiding
-  // everything but its subject, dimming the lights — has real children to walk.
-  const objects = new Map()
-  const stats = { entities: 0, frames: 0, readbacks: 0, drawCalls: 0, triangles: 0 }
-  let passList = []
-
-  /** Set the viewport to the frame size a capture asked for. */
-  const frameSize = (width, height) => {
-    viewport.width = Math.max(1, Math.round(width))
-    viewport.height = Math.max(1, Math.round(height))
-  }
-
-  return {
-    blank: true,
-    view,
-    scene,
-    get size() { return { w: viewport.width, h: viewport.height } },
-    get stats() { return { ...stats } },
-    // No camera object, because nothing projects through one here. Headless
-    // screen positions come from engine/camera-project.js and the view.
-    camera: null,
-    // No model is ever loaded, so a capture has nothing to wait for.
-    modelState: () => null,
-    shadowMap: { enabled: false },
-    readability: { keyline: 0, contactShadow: false, groundRing: false },
-    createCanvas: nullCanvas,
-
-    resize() { frameSize(shape.width, shape.height) },
-    frameSize,
-
-    sync(world) {
-      const live = new Set()
-      for (const entity of world.entities) {
-        live.add(entity.id)
-        let object = objects.get(entity.id)
-        if (!object) {
-          object = { visible: true, userData: { entity: entity.id } }
-          objects.set(entity.id, object)
-          scene.add(object)
-        }
-        object.visible = !entity.hidden
-      }
-      for (const [id, object] of objects) {
-        if (live.has(id)) continue
-        objects.delete(id)
-        scene.remove(object)
-      }
-      stats.entities = world.entities.length
-    },
-
-    draw() { stats.frames++ },
-
-    /** Every pixel unwritten, which is what a draw that draws nothing leaves. */
-    drawInto(target, buffer) {
-      buffer.fill(0)
-      stats.readbacks++
-    },
-
-    materials: { register() {}, has: () => false, get names() { return [] } },
-
-    passes: {
-      get list() { return [...passList] },
-      set(list) { passList = Array.isArray(list) ? list.filter(Boolean) : [] }
-    }
-  }
-}
-
-/**
  * Start the same world in node, where files come off disk and nothing draws.
  *
  * @param {string} [root] The checkout. The engine's own plugins and guides
@@ -383,14 +132,6 @@ export async function startWorldInNode({ root = ROOT, project, viewport, rendere
     ...(viewport ? { viewport } : {}),
     // The same hook the browser mounts its shell and renderer through, so the
     // two halves attach a renderer at one point in the start-up order.
-    ...(renderer === 'null'
-      ? {
-        attachScreen(context) {
-          const shape = { width: context.viewport.width, height: context.viewport.height }
-          context.shell = { canvas: nullCanvas(shape.width, shape.height), draw() {} }
-          context.renderer = nullRenderer(context.view, context.viewport, shape)
-        }
-      }
-      : {})
+    ...(renderer === 'null' ? { attachScreen: mountNullScreen } : {})
   })
 }
