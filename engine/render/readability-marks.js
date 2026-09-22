@@ -25,7 +25,7 @@
  */
 import * as THREE from 'three/webgpu'
 import { attribute, oneMinus, smoothstep } from 'three/tsl'
-import { number, partsOf } from '../frame-plan.js'
+import { declaredNumber, meshParts } from '../frame-plan.js'
 import { readColour } from './read-value.js'
 import { hullGeometry, hullCache, keylineGrowth } from './keyline-hull.js'
 import { groundReach, groundRingBand } from './ground-band.js'
@@ -97,7 +97,7 @@ export function makeReadabilityMarks(state) {
       if (!namedNodes.has(object)) return null
       key = `model:${declared.model}`
     } else if (shape?.kind === 'parts') {
-      key = `parts:${partsOf(declared, `${entity.type}.mesh`).signature}`
+      key = `parts:${meshParts(declared, `${entity.type}.mesh`).signature}`
     } else {
       key = `${shape?.kind}:${shape?.w},${shape?.h},${shape?.d}`
     }
@@ -108,7 +108,7 @@ export function makeReadabilityMarks(state) {
   /** How wide this entity's keyline is, in screen pixels. Zero is none. */
   function keylineWidth(declared, moved) {
     if (declared.keyline === undefined) return moved ? state.readability.keyline : 0
-    return Math.max(0, number(declared.keyline, 0, 'mesh.keyline'))
+    return Math.max(0, declaredNumber(declared.keyline, 0, 'mesh.keyline'))
   }
 
   /** Add, resize or remove an entity's keyline so it matches the width it now declares. */

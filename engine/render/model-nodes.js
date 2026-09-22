@@ -7,7 +7,7 @@
  * and a map of live Object3Ds does not survive that trip.
  */
 import * as THREE from 'three/webgpu'
-import { number } from '../frame-plan.js'
+import { declaredNumber } from '../frame-plan.js'
 import { cachedModel, cloneModel } from './model-cache.js'
 import { readVector } from './read-value.js'
 import { reportOnce } from './report.js'
@@ -227,7 +227,7 @@ export function applyAttachments(holder, declared, release) {
     const rotation = readVector(spec.rotation, `${where}.attachments.${name}.rotation`)
     entry.group.position.set(position.x, position.y, position.z)
     entry.group.rotation.set(rotation.x, rotation.y, rotation.z)
-    entry.group.scale.setScalar(number(spec.scale, 1, `${where}.attachments.${name}.scale`))
+    entry.group.scale.setScalar(declaredNumber(spec.scale, 1, `${where}.attachments.${name}.scale`))
     entry.group.updateMatrix()
   }
 }

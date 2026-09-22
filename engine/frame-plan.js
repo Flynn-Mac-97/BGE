@@ -22,7 +22,7 @@ const { report } = makeOnceReporter()
  * the deliberately visible metre cube — so only a value that was written down
  * and cannot be read is worth a line.
  */
-export function number(value, fallback = 1, where = null) {
+export function declaredNumber(value, fallback = 1, where = null) {
   if (Number.isFinite(value)) return value
   if (where && value !== undefined && value !== null) {
     report(`[render] ${where}: ${JSON.stringify(value)} is not a number — using ${fallback}`)
@@ -56,13 +56,13 @@ export function meshOf(entity) {
  */
 export function totalScale(entity) {
   const declared = meshOf(entity)
-  const model = declared?.model ? number(declared.scale, 1, `${entity.type}.mesh.scale`) : 1
+  const model = declared?.model ? declaredNumber(declared.scale, 1, `${entity.type}.mesh.scale`) : 1
   return (entity.scale ?? 1) * model
 }
 
 /** Degrees off a declaration, in radians. A missing axis is zero, not a complaint. */
-export const degrees = (value, where) =>
-  value === undefined || value === null ? 0 : number(value, 0, where) * Math.PI / 180
+export const degreesToRadians = (value, where) =>
+  value === undefined || value === null ? 0 : declaredNumber(value, 0, where) * Math.PI / 180
 
 /**
  * How a body is turned, in radians about X, Y and Z.
@@ -76,11 +76,11 @@ export function turnRadians(entity) {
   const declared = entity.rotation
   const turn = Array.isArray(declared)
     ? {
-      x: degrees(declared[0], `${entity.type}.rotation[0]`),
-      y: degrees(declared[1], `${entity.type}.rotation[1]`),
-      z: degrees(declared[2], `${entity.type}.rotation[2]`)
+      x: degreesToRadians(declared[0], `${entity.type}.rotation[0]`),
+      y: degreesToRadians(declared[1], `${entity.type}.rotation[1]`),
+      z: degreesToRadians(declared[2], `${entity.type}.rotation[2]`)
     }
-    : { x: 0, y: degrees(declared, `${entity.type}.rotation`), z: 0 }
+    : { x: 0, y: degreesToRadians(declared, `${entity.type}.rotation`), z: 0 }
   if (Number.isFinite(entity.yaw)) turn.y = entity.yaw
   return turn
 }
@@ -93,8 +93,8 @@ export function turnRadians(entity) {
  * game and a solid one mean different things by "turned".
  */
 export const spinRadians = entity => Array.isArray(entity.rotation)
-  ? degrees(entity.rotation[2], `${entity.type}.rotation[2]`)
-  : degrees(entity.rotation, `${entity.type}.rotation`)
+  ? degreesToRadians(entity.rotation[2], `${entity.type}.rotation[2]`)
+  : degreesToRadians(entity.rotation, `${entity.type}.rotation`)
 
 const partsCache = new WeakMap()
 
@@ -105,7 +105,7 @@ const partsCache = new WeakMap()
  * box, the offsets and the signature are computed once and handed back. The
  * signature is what tells an edited type to rebuild.
  */
-export function partsOf(declared, where = 'mesh') {
+export function meshParts(declared, where = 'mesh') {
   if (!Array.isArray(declared?.parts) || !declared.parts.length) return null
   const cached = partsCache.get(declared.parts)
   if (cached) return cached
@@ -120,16 +120,16 @@ export function partsOf(declared, where = 'mesh') {
     const box = Array.isArray(part?.box) ? part.box : []
     const shape = {
       kind: 'box',
-      w: number(box[0], 0.1, `${spot}.box[0]`),
-      h: number(box[1], 0.1, `${spot}.box[1]`),
-      d: number(box[2], 0.1, `${spot}.box[2]`)
+      w: declaredNumber(box[0], 0.1, `${spot}.box[0]`),
+      h: declaredNumber(box[1], 0.1, `${spot}.box[1]`),
+      d: declaredNumber(box[2], 0.1, `${spot}.box[2]`)
     }
     const at = Array.isArray(part?.at) ? part.at : []
     const turn = Array.isArray(part?.rotation) ? part.rotation : []
     const offset = {
-      x: number(at[0], 0, `${spot}.at[0]`),
-      y: number(at[1], 0, `${spot}.at[1]`),
-      z: number(at[2], 0, `${spot}.at[2]`)
+      x: declaredNumber(at[0], 0, `${spot}.at[0]`),
+      y: declaredNumber(at[1], 0, `${spot}.at[1]`),
+      z: declaredNumber(at[2], 0, `${spot}.at[2]`)
     }
 
     // Bounds ignore the part's own rotation. They are only used to frame a
@@ -152,9 +152,9 @@ export function partsOf(declared, where = 'mesh') {
       // The same three degrees an entity's own `rotation` array takes, read the
       // same way, because a part and the body it belongs to are turned alike.
       turn: {
-        x: degrees(turn[0], `${spot}.rotation[0]`),
-        y: degrees(turn[1], `${spot}.rotation[1]`),
-        z: degrees(turn[2], `${spot}.rotation[2]`)
+        x: degreesToRadians(turn[0], `${spot}.rotation[0]`),
+        y: degreesToRadians(turn[1], `${spot}.rotation[1]`),
+        z: degreesToRadians(turn[2], `${spot}.rotation[2]`)
       },
       declaration: { ...shared, ...part }
     }
@@ -179,7 +179,7 @@ export function partsOf(declared, where = 'mesh') {
  */
 function subdivisionOf(declared, entity) {
   if (declared.segments === undefined) return 1
-  return number(declared.segments, 1, `${entity.type}.mesh.segments`)
+  return declaredNumber(declared.segments, 1, `${entity.type}.mesh.segments`)
 }
 
 /**
@@ -227,7 +227,7 @@ export function entityPlan(entity) {
 /** Measure the shape and the look of one entity's current declaration. */
 function measurePlan(entity) {
   if (!entity.mesh) {
-    const picture = source(entity.sprite)
+    const picture = spriteSource(entity.sprite)
     return {
       shape: null,
       described: {
@@ -240,7 +240,7 @@ function measurePlan(entity) {
     }
   }
   const declared = meshOf(entity)
-  const parts = declared.model ? null : partsOf(declared, `${entity.type}.mesh`)
+  const parts = declared.model ? null : meshParts(declared, `${entity.type}.mesh`)
   const shape = shapeOf(entity, declared, parts)
   if (parts) {
     // Every part carries its own material, so the entity has no single one —
@@ -280,9 +280,9 @@ function shapeOf(entity, declared, parts) {
     if (!stated) return { kind: 'parts', ...parts.size }
     return {
       kind: 'parts',
-      w: number(stated[0], parts.size.w, `${entity.type}.mesh.box[0]`),
-      h: number(stated[1], parts.size.h, `${entity.type}.mesh.box[1]`),
-      d: number(stated[2], parts.size.d, `${entity.type}.mesh.box[2]`)
+      w: declaredNumber(stated[0], parts.size.w, `${entity.type}.mesh.box[0]`),
+      h: declaredNumber(stated[1], parts.size.h, `${entity.type}.mesh.box[1]`),
+      d: declaredNumber(stated[2], parts.size.d, `${entity.type}.mesh.box[2]`)
     }
   }
 
@@ -292,7 +292,7 @@ function shapeOf(entity, declared, parts) {
   // throwaway strings a second on a real map.
   if (declared.sphere !== undefined) {
     const said = Array.isArray(declared.sphere) ? declared.sphere : [declared.sphere, declared.sphere, declared.sphere]
-    const r = index => number(said[index], 0.5, `${entity.type}.mesh.sphere[${index}]`) * 2
+    const r = index => declaredNumber(said[index], 0.5, `${entity.type}.mesh.sphere[${index}]`) * 2
     return { kind: 'sphere', w: r(0), h: r(1), d: r(2), segments: subdivisionOf(declared, entity) }
   }
 
@@ -302,8 +302,8 @@ function shapeOf(entity, declared, parts) {
     if (Number.isFinite(w) && Number.isFinite(h)) return { kind: 'quad', w, h, d: 0, segments }
     return {
       kind: 'quad',
-      w: number(w, 1, `${entity.type}.mesh.quad[0]`),
-      h: number(h, 1, `${entity.type}.mesh.quad[1]`),
+      w: declaredNumber(w, 1, `${entity.type}.mesh.quad[0]`),
+      h: declaredNumber(h, 1, `${entity.type}.mesh.quad[1]`),
       d: 0,
       segments
     }
@@ -311,7 +311,7 @@ function shapeOf(entity, declared, parts) {
 
   if (declared.model) {
     const stand = Array.isArray(declared.box) ? declared.box : collider
-    return { kind: 'model', w: number(stand[0]), h: number(stand[1]), d: number(stand[2]) }
+    return { kind: 'model', w: declaredNumber(stand[0]), h: declaredNumber(stand[1]), d: declaredNumber(stand[2]) }
   }
 
   const declaredBox = Array.isArray(declared.box)
@@ -325,9 +325,9 @@ function shapeOf(entity, declared, parts) {
   const where = declaredBox ? `${entity.type}.mesh.box` : `${entity.type}.collider.box`
   return {
     kind: 'box',
-    w: number(w, 1, `${where}[0]`),
-    h: number(h, 1, `${where}[1]`),
-    d: number(d, 1, `${where}[2]`)
+    w: declaredNumber(w, 1, `${where}[0]`),
+    h: declaredNumber(h, 1, `${where}[1]`),
+    d: declaredNumber(d, 1, `${where}[2]`)
   }
 }
 
@@ -340,7 +340,7 @@ function shapeOf(entity, declared, parts) {
  * has an honest size, and a circle reports its diameter rather than silently
  * becoming 1x1. `d` is depth: zero for anything flat.
  */
-export function drawSize(entity) {
+export function entityDrawSize(entity) {
   const s = totalScale(entity)
   const shape = meshShape(entity)
   if (shape) return { w: shape.w * s, h: shape.h * s, d: shape.d * s }
@@ -353,7 +353,7 @@ export function drawSize(entity) {
 }
 
 /** The image a sprite points at: a sheet or a single picture. */
-export const source = s => s?.sheet || s?.image || null
+export const spriteSource = s => s?.sheet || s?.image || null
 
 // ------------------------------------------------------------- the material
 
@@ -370,13 +370,13 @@ export function tilingOf(tiling, shape, where = null) {
     const u = tiling[0], v = tiling[1]
     if (Number.isFinite(u) && Number.isFinite(v)) return [u / (shape.w || 1), v / (shape.h || 1)]
     return [
-      number(u, 1, where && `${where}[0]`) / (shape.w || 1),
-      number(v, 1, where && `${where}[1]`) / (shape.h || 1)
+      declaredNumber(u, 1, where && `${where}[0]`) / (shape.w || 1),
+      declaredNumber(v, 1, where && `${where}[1]`) / (shape.h || 1)
     ]
   }
   if (Number.isFinite(tiling)) return [tiling, tiling]
   if (tiling !== undefined && tiling !== null) {
-    const density = number(tiling, 1, where)
+    const density = declaredNumber(tiling, 1, where)
     return [density, density]
   }
   return shape.kind === 'quad' ? [1 / (shape.w || 1), 1 / (shape.h || 1)] : [1, 1]
@@ -479,7 +479,7 @@ export function planFrame(world) {
       mergeSignature(entity, described, turnRadians(entity))
     } else {
       sprites++
-      drawSize(entity)
+      entityDrawSize(entity)
       spinRadians(entity)
     }
   }

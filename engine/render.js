@@ -58,7 +58,7 @@
 // classic build has WebGLRenderer and nothing node-shaped; the two are
 // disjoint, so a shader language choice is a renderer choice.
 import * as THREE from 'three/webgpu'
-import { drawSize } from './frame-plan.js'
+import { entityDrawSize } from './frame-plan.js'
 import { setMaxAnisotropy, forgetTextures } from './render/texture-cache.js'
 import { modelCache, forgetModel } from './render/model-cache.js'
 import { forgetHull } from './render/keyline-hull.js'
@@ -353,7 +353,7 @@ export async function makeRenderer(canvas, view, viewport) {
     pick: state.pick,
     ray: state.ray,
 
-    bounds: drawSize,
+    bounds: entityDrawSize,
 
     /**
      * Drop a cached file so the next draw re-fetches it.

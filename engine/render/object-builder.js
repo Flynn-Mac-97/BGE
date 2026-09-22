@@ -3,7 +3,7 @@
  * changes, and the disposal that goes with it.
  */
 import * as THREE from 'three/webgpu'
-import { number, meshOf, partsOf, materialLook } from '../frame-plan.js'
+import { declaredNumber, meshOf, meshParts, materialLook } from '../frame-plan.js'
 import { solidGeometry } from './geometry-cache.js'
 import { cachedModel, cloneModel } from './model-cache.js'
 import {
@@ -24,7 +24,7 @@ export function makeObjectBuilder(state) {
   function buildObject(entity, described) {
     const declared = meshOf(entity)
     if (declared?.model) return buildModel(entity, declared, described)
-    const parts = partsOf(declared, `${entity.type}.mesh`)
+    const parts = meshParts(declared, `${entity.type}.mesh`)
     if (parts) return buildParts(entity, parts, described)
 
     const object = new THREE.Mesh(
@@ -285,7 +285,7 @@ export function makeObjectBuilder(state) {
       }
       // The fast path: this runs for every limb of every character every frame,
       // and naming the failure costs a string whether or not there is one.
-      const wanted = Number.isFinite(turn) ? turn : number(turn, 0, `pose.${name}`)
+      const wanted = Number.isFinite(turn) ? turn : declaredNumber(turn, 0, `pose.${name}`)
       node.rotation.x = (node.userData.restRotationX || 0) + wanted
       node.updateMatrix()
     }

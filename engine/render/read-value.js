@@ -6,7 +6,7 @@
  * can leave what it already had alone.
  */
 import * as THREE from 'three/webgpu'
-import { number } from '../frame-plan.js'
+import { declaredNumber } from '../frame-plan.js'
 import { reportOnce } from './report.js'
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
@@ -52,7 +52,7 @@ export function readIntensity(value, where) {
 const readAxis = (given, where, axis) => {
   const value = given?.[axis]
   if (value === undefined || value === null) return 0
-  return Number.isFinite(value) ? value : number(value, 0, `${where}.${axis}`)
+  return Number.isFinite(value) ? value : declaredNumber(value, 0, `${where}.${axis}`)
 }
 
 /** A `{x, y, z}` from a declaration, a missing axis being zero rather than a complaint. */

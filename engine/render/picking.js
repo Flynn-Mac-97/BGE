@@ -6,7 +6,7 @@
  * a layer the camera does not draw.
  */
 import * as THREE from 'three/webgpu'
-import { drawSize, spinRadians } from '../frame-plan.js'
+import { entityDrawSize, spinRadians } from '../frame-plan.js'
 
 export function makePicking(state) {
   const raycaster = new THREE.Raycaster()
@@ -97,7 +97,7 @@ export function makePicking(state) {
     if (state.flat()) {
       const p = toWorld(px, py)
       const hits = world.entities.filter(e => {
-        const { w, h } = drawSize(e)
+        const { w, h } = entityDrawSize(e)
         const a = -spinRadians(e)
         const dx = p.x - e.x, dy = p.y - e.y
         const lx = dx * Math.cos(a) - dy * Math.sin(a)

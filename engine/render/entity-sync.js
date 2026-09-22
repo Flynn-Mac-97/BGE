@@ -8,7 +8,7 @@
  * answers what only moved.
  */
 import {
-  meshOf, totalScale, turnRadians, spinRadians, drawSize, entityPlan
+  meshOf, totalScale, turnRadians, spinRadians, entityDrawSize, entityPlan
 } from '../frame-plan.js'
 import { anchorOffset, frameWindow } from './entity-look.js'
 import { applyAttachments } from './model-nodes.js'
@@ -485,7 +485,7 @@ export function makeEntitySync(state) {
     record.simple = false
     record.idle = false
     record.steady = false
-    const { w, h } = drawSize(entity)
+    const { w, h } = entityDrawSize(entity)
     object.rotation.set(0, 0, spinRadians(entity))
     object.scale.set(w, h, 1)
     object.material.opacity = entity.opacity ?? 1

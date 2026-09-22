@@ -7,7 +7,7 @@
  * view space, so nothing has to track where the player is.
  */
 import * as THREE from 'three/webgpu'
-import { number } from '../frame-plan.js'
+import { declaredNumber } from '../frame-plan.js'
 import { cachedModel, cloneModel } from './model-cache.js'
 import {
   namedNodes, attachedModels, indexNodes, applyAttachments
@@ -110,7 +110,7 @@ export function makeViewmodel(state) {
 
       viewmodelBase.position = readVector(spec.position, 'viewmodel.position')
       viewmodelBase.rotation = readVector(spec.rotation, 'viewmodel.rotation')
-      viewmodelBase.scale = number(spec.scale, 1, 'viewmodel.scale')
+      viewmodelBase.scale = declaredNumber(spec.scale, 1, 'viewmodel.scale')
 
       // Setting the weapon you are already holding is a move, not a swap. A
       // plugin that calls this from update() every frame is the obvious way to

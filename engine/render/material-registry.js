@@ -9,7 +9,7 @@
 import * as THREE from 'three/webgpu'
 import { uv as uvAttribute } from 'three/tsl'
 import {
-  number, meshOf, meshShape, tilingOf, materialNameFor, source
+  declaredNumber, meshOf, meshShape, tilingOf, materialNameFor, spriteSource
 } from '../frame-plan.js'
 import { readColour } from './read-value.js'
 import { entityTint } from './entity-look.js'
@@ -143,7 +143,7 @@ export function makeMaterialRegistry(state) {
     const baked = cachedTexture(declared.lightmap, 'lightmap', invalidateEverything)
     baked.channel = 1
     material.lightMap = baked
-    material.lightMapIntensity = number(declared.lightmapIntensity, 1, `${where}.lightmapIntensity`)
+    material.lightMapIntensity = declaredNumber(declared.lightmapIntensity, 1, `${where}.lightmapIntensity`)
   }
 
   /** The unlit, painter-ordered material a sprite draws with, tinted when its file cannot be read. */
@@ -158,7 +158,7 @@ export function makeMaterialRegistry(state) {
       // float in front of a wall it is standing behind.
       depthTest: false
     })
-    const src = source(entity.sprite)
+    const src = spriteSource(entity.sprite)
     if (!src || textureStatus(src, 'sprite') === 'failed') {
       mat.color = entityTint(entity.type)
       return mat
