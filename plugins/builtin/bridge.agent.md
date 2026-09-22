@@ -7,8 +7,8 @@ category: core
 
 - Opens the editor's `window.engine` surface to anything outside the browser,
   so a terminal reads and drives a live page without a screenshot.
-- Transport is Vite's own dev-server websocket. No extra port, no extra
-  dependency, and it dies with the dev server.
+- Use Vite's websocket in development and the engine backend websocket in the
+  packaged desktop. Both carry the same named messages.
 
 ```
 terminal  ->  bin/engine.mjs  ->  POST /api/engine  ->  ws  ->  here
@@ -25,8 +25,7 @@ terminal  ->  bin/engine.mjs  ->  POST /api/engine  ->  ws  ->  here
 
 ## What it refuses, and how
 
-- **No dev server, no bridge.** A production build has no `import.meta.hot`, so
-  `onLoad` returns and nothing is registered. That is not an error.
+- Run a backend with the editor. A static page alone cannot answer CLI calls.
 - An op called before the editor finishes booting throws `engine not ready
   yet`. Retry rather than treating it as a missing verb.
 - An unknown op throws and the message lists every method and every command id,

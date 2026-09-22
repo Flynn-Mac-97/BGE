@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Engine</title>
+  <link rel="stylesheet" href="console.css">
+  <link rel="stylesheet" href="console.bundle.css">
+</head>
+<body>
+  <header><strong>ENGINE</strong><span id="project">Starting…</span><button id="open-project">Open project</button><button id="new-view">New view</button><button id="reload">Reload view</button><span class="grow"></span><span id="health" role="status">Starting backend</span></header>
+  <main><p>The engine view opens here. The console stays available during reloads.</p></main>
+  <section id="console" aria-label="Engine console">
+    <div id="resize" role="separator" aria-label="Resize console" tabindex="0"></div>
+    <nav><button data-page="terminal" aria-selected="true">Terminal</button><button data-page="activity">Activity</button><button data-page="instances">Instances</button><span class="grow"></span><select id="provider" aria-label="Agent provider"></select><button id="start">New session</button><button id="expand">Expand</button></nav>
+    <div id="error" role="alert" hidden></div>
+    <div id="terminal" class="page">
+      <div class="toolbar"><label>Directory <input id="cwd" spellcheck="false"></label><button id="choose-directory">Browse</button><input id="search" aria-label="Search terminal" placeholder="Find in terminal"><button id="interrupt">Interrupt</button><button id="stop">Stop</button></div>
+      <div id="sessions" role="tablist" aria-label="Terminal sessions"></div>
+      <div id="terminal-area"><p id="terminal-empty">Open a shell or choose an installed coding agent. Each session keeps running when you switch views.</p></div>
+    </div>
+    <div id="activity" class="page" hidden><ol id="events"></ol></div>
+    <div id="instances" class="page" hidden><div class="toolbar"><button id="new-dev">Start dev server</button><span>Application services, views, and sessions</span></div><div id="instance-list"></div></div>
+  </section>
+  <script src="console.bundle.js"></script>
+</body>
+</html>

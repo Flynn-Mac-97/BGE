@@ -64,8 +64,10 @@ wrong and is required when `pass` is false.
   several times between identical runs, so report it and never weight it. Pass
   `compareTo` with a reference PNG and fail a `difference.meanDifference` above
   a small bound, or a candidate wins by drawing less.
-- Every task must pass on the checkout as it is now. A setup whose tasks fail
-  before any candidate exists measures nothing.
+- When a task calls `helpers.browserFrames`, the candidate prompt automatically
+tells the candidate about `tools/dream/quick-probe.mjs`, a short exploratory run
+that prints the same measures and can write a CPU profile. The setup does not
+need to mention it; do not ask a candidate to write its own probe.
 - At least one task carries a measure, or the value cannot change.
 - A task that measures a cost must also check the content it paid for. If a task
   only counts, the cheapest candidate is an empty answer. State what the answer

@@ -76,10 +76,10 @@ export function budgetDone(question, budget = null) {
 /**
  * What a policy returns when it stops.
  *
- * The curve is what the evaluator ranks: attainment against probes, so reaching
- * a score early is worth more than reaching it late. `finalize_result` refuses a
- * policy that probed nothing, because an empty route scores the baseline and a
- * run that reported it would look like a working policy.
+ * The curve records attainment against probes, which the experimental objective
+ * reads and the default page-6 equation does not. A policy may stop immediately,
+ * in which case the curve holds only the baseline: the paper permits it, and the
+ * score is the baseline rather than a refusal.
  */
 export class SimResult {
   constructor() {

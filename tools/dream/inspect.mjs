@@ -22,6 +22,7 @@ import { PRICING, costBands, sumCosts } from './pricing.mjs'
 import { addUsage, transcriptFrames, usageTotals } from './measures.mjs'
 import { liveCalls, sessionsFor } from './live.mjs'
 import { openPage } from '../../engine/open-page.mjs'
+import { stopLaneBrowsers } from '../../engine/lane-browsers.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const RUNS = path.join(CHECKOUT, 'agent-runs')
@@ -342,11 +343,14 @@ function snapshot(directory) {
   // so without them the page shows a cost that never moves while the expensive
   // part of the run is running.
   const rsiAttempts = rsiRounds.flatMap(round => round.attempts ?? [])
+  // The offline half: what each dreaming phase's revising agents spent. It is
+  // recorded per round and priced on read like every other token record.
+  const rsiRevisionCosts = rsiRounds.flatMap(round => (round.dreaming?.revisionCosts ?? []).filter(cost => cost?.priced))
   const transcriptAttempts = loop === 'Dream-RSI'
     ? unrecordedAttempts(rsiRounds, runStart, new Set(worktrees.map(worktree => worktree.name)))
     : []
   const workingCosts = transcriptAttempts.filter(one => one.live).map(one => costBands(one.tokens))
-  const attemptCosts = [...rsiAttempts.map(attempt => attempt.cost), ...transcriptAttempts.map(one => costBands(one.tokens))]
+  const attemptCosts = [...rsiAttempts.map(attempt => attempt.cost), ...rsiRevisionCosts, ...transcriptAttempts.map(one => costBands(one.tokens))]
   const rsiTokens = rsiAttempts.reduce((total, attempt) => total + (attempt.tokens?.totalTokens ?? 0), 0)
   const transcriptTokens = transcriptAttempts.reduce((total, one) => total + (one.tokens.totalTokens ?? 0), 0)
   const workingTokens = transcriptAttempts.filter(one => one.live).reduce((total, one) => total + (one.tokens.totalTokens ?? 0), 0)
@@ -354,6 +358,7 @@ function snapshot(directory) {
     design: designCost,
     candidates: sumCosts(rounds.map(one => one.cost)),
     attempts: sumCosts(rsiAttempts.map(attempt => attempt.cost)),
+    revisions: sumCosts(rsiRevisionCosts),
     unrecorded: sumCosts(transcriptAttempts.map(one => costBands(one.tokens))),
     working: sumCosts(workingCosts),
     total: sumCosts([...(designCost ? [designCost] : []), ...rounds.map(one => one.cost), ...attemptCosts]),
@@ -511,6 +516,7 @@ async function refresh() {
     card('design cost', rmb(d.cost.design ? d.cost.design.now : null)),
     card('candidate cost', rmb(d.cost.candidates.now)),
     card('attempt cost', rmb(d.cost.attempts.now)),
+    card('revision cost', rmb(d.cost.revisions.now)),
     card('from transcripts', rmb(d.cost.unrecorded.now)),
     card('working now', rmb(d.cost.working.now), 'warn'),
     card('tokens spent', num(d.tokens.total)),
@@ -708,6 +714,8 @@ if (chosen.error) {
 
 const port = Number(argument('port') ?? 4317)
 const directory = chosen.directory
+/** Whether this inspector started the browser it opened, so it may close it. */
+let inspectorBrowser = false
 
 const server = http.createServer((request, response) => {
   // A viewer must not die because a record is odd. A run with a surprising shape
@@ -746,15 +754,30 @@ server.on('error', error => {
   process.exit(2)
 })
 
-server.listen(port, '127.0.0.1', () => {
+server.listen(port, '127.0.0.1', async () => {
   const url = `http://127.0.0.1:${port}/`
   process.stdout.write(`watching ${directory}\n${url}\n`)
   if (argument('open')) {
     // The engine's own browser, not the system opener: that hands the page to
-    // the browser the person already has open.
-    const opened = openPage(url, { profile: 'inspect' })
+    // the browser the person already has open. openPage records it in the
+    // browser registry, so `lanes` finds and proves it.
+    const opened = await openPage(url, { profile: 'inspect' })
     // A browser that will not open does not stop the page being served, but it
     // is said, because the reader is waiting for a window.
     if (!opened.opened) process.stderr.write(`inspect: could not open a browser — ${opened.problem}\n`)
+    // A window opened in a browser that already lived is not this tool's to
+    // close; only a browser this inspector started is cleaned up on the way out.
+    else if (!opened.reused) inspectorBrowser = true
   }
 })
+
+/** Stop the window this inspector started, and leave nothing in the registry. */
+async function stopInspector() {
+  if (inspectorBrowser) {
+    inspectorBrowser = false
+    try { await stopLaneBrowsers(process.cwd(), 'inspect') } catch { /* already gone */ }
+  }
+  process.exit(0)
+}
+process.on('SIGINT', stopInspector)
+process.on('SIGTERM', stopInspector)

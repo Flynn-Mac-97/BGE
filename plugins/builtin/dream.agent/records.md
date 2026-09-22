@@ -22,17 +22,23 @@ agent-runs/dream-<stamp>-<target>/
 
 ## A Dream-RSI run's directory
 
+Each attempt's `report` is carried into the next candidate's prompt, together
+with the evaluator's measures and the status when a harness cut the attempt off.
+A candidate that names the hotspot it measured, the numbers, and what it
+rejected saves the next attempt from re-profiling the same scene.
+
 `dream.rsi` writes the same target, setup and pictures, and its own records:
 
 ```
 pool/                     one JSON grid per rollout: cells, outcomes, each cell's patch
-policy/v000.mjs           the policy a round started from, and every revision
+policy/r001-v000.mjs      one phase's policy versions; the phase label keeps each round's apart
 policy/current.mjs        the version the next round plays
-replay/v000.json          that version's sweep: mean reward, best beta, spread, failures
-rsi/0-0.patch             one attempt's diff, named by its cell
+replay/r001-v000.json     that version's sweep: mean reward, best beta, spread, failures
+rsi/r001-b0a0.patch       one attempt's diff, named by round, branch and depth
 rsi/round-001/grid.json   the grid as it stood after every attempt, so a rollout is watchable
 rsi/round-001/rollout.json   what exploring cost: probes, decision rounds, attainment
 rsi/round-001/dreaming.json  every version replayed, which won, what was deployed
+rsi/round-001/rsi-b0-r001c1.json  one attempt's full record, written as it ended, with its patch path
 dreaming.json             the last phase's versions and what it deployed
 rsi-summary.json          the whole run: rounds, pool, best cell, improvement, cost
 rsi.json                  live phase, round, plan, pool and policy — what the panel reads

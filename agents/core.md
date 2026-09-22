@@ -8,3 +8,5 @@
 - Test only behaviour that would break silently. A fan-out is a by-hand tool under `tools/`.
 - One writer per workspace; parallel writers need worktrees.
 - Run every check your packet names. Search `insight.list`; record `pain` and `insight`.
+- Improve the engine while building games: make small compatible fixes directly, with a reproduction, regression check, and owning-guide update. Ask before breaking changes, new dependencies, migrations, or broad redesigns.
+- Use `evolve <id or words>` for relevant friction or one milestone review; follow `docs/evolution.md`. Keep unrelated engine work out of the game task.

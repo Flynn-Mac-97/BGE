@@ -4,8 +4,8 @@
  *
  * This is the paper's third stage. The pool is frozen; a development agent
  * revises the policy code; every version is replayed over every grid in the pool
- * and scored by the sweep; the best average is selected and becomes the policy
- * the next online rollout is driven by.
+ * and scored by the sweep; the highest valid reward is selected, the incumbent
+ * included, and becomes the policy the next online rollout is driven by.
  *
  * The order matters and is the paper's. Revisions are made against a frozen
  * pool, so the score of version 3 and the score of version 7 mean the same thing.
@@ -20,6 +20,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sessionTokens } from './measures.mjs'
+import { costBands, sumCosts } from './pricing.mjs'
 import { loadPolicy, policySource } from './policy.mjs'
 import { replaySweep, scorePolicy } from './replay.mjs'
 import { DEFAULT_HARNESS, harnessWrapper } from './harness.mjs'
@@ -127,17 +128,21 @@ export async function revisionPrompt({ checkout, runDirectory, policyFile, sourc
  */
 export async function reviseWithAgent({ checkout, runDirectory, policyFile, source, replay, history, timeoutSeconds, model, harness = DEFAULT_HARNESS }) {
   const prompt = await revisionPrompt({ checkout, runDirectory, policyFile, source, replay, history })
+  // The prompt is a file, not an argument: Windows caps a command line well
+  // under a revision prompt, the same limit the candidate path already avoids.
+  const promptPath = `${policyFile}.prompt.txt`
+  await fs.writeFile(promptPath, prompt, 'utf8')
   const args = [
     harnessWrapper(checkout, harness),
     '--json',
     '--cwd', checkout,
     '--timeout', String(timeoutSeconds ?? DEFAULT_REVISION_TIMEOUT_SECONDS),
-    '--permission-mode', 'workspace-write'
+    '--permission-mode', 'workspace-write',
+    '--task-file', promptPath
   ]
   if (model) args.push('--model', model)
-  args.push(prompt)
 
-  const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true })
   let envelope = null
   try {
     envelope = JSON.parse(String(run.stdout))
@@ -156,33 +161,18 @@ export async function reviseWithAgent({ checkout, runDirectory, policyFile, sour
 /**
  * Which version a dreaming phase deploys.
  *
- * Highest average replay reward, with one exception. A version whose beta sweep
- * is flat has tied its knob to nothing: the online rollout plays exactly one
- * beta, so a policy that ignores beta cannot be steered at all. When such a
- * version wins by a margin small enough to be noise, a version that does respond
- * to its knob is deployed instead, and the record says so.
- *
- * The exception is bounded on purpose. A flat policy that wins by a real margin
- * keeps its win: the reward is the measurement, and degeneracy is a diagnostic
- * about the knob rather than a fault in the route.
+ * The highest replay score among versions that loaded and replayed without a
+ * failure. The paper's candidate set includes the current policy, so version 0
+ * is always in the running and a tie goes to the lower version: the selected
+ * policy is never worse than the one it started from. A flat beta sweep is
+ * recorded as a diagnostic, never a reason to lower the incumbent's score.
  */
-export function selectVersion({ versions = [], epsilon = 0.01 } = {}) {
-  const scored = versions.filter(version => !version.failure && typeof version.score === 'number')
-  if (!scored.length) return { winner: null, rule: 'no version scored' }
+export function selectVersion({ versions = [] } = {}) {
+  const valid = versions.filter(version => version.valid === true && typeof version.score === 'number')
+  if (!valid.length) return { winner: null, rule: 'no valid version scored' }
 
-  const ranked = [...scored].sort((left, right) => right.score - left.score)
-  const best = ranked[0]
-  if (!best.degenerate) return { winner: best, rule: 'highest average replay reward' }
-
-  const responsive = ranked.find(version => !version.degenerate && version.score >= best.score - epsilon)
-  if (responsive) {
-    return {
-      winner: responsive,
-      rule: `beta changes nothing in the best version, so a version that responds to it was preferred within ${epsilon}`,
-      displaced: { version: best.version, score: best.score }
-    }
-  }
-  return { winner: best, rule: 'highest average replay reward; the best version ignores beta, by a margin larger than epsilon' }
+  const ranked = [...valid].sort((left, right) => right.score - left.score || left.version - right.version)
+  return { winner: ranked[0], rule: 'highest valid replay score; a tie keeps the incumbent' }
 }
 
 /**
@@ -195,16 +185,20 @@ export function selectVersion({ versions = [], epsilon = 0.01 } = {}) {
 export async function dreamPolicies({
   checkout = CHECKOUT,
   runDirectory,
+  // Names this phase's version and replay files. One run has many phases, and a
+  // phase that reused the last one's file names would overwrite its records and
+  // score one file while playing another.
+  phase = 'phase',
   versions = DEFAULT_VERSIONS,
   betas = BETA_GRID,
   maxParallelism = 3,
   beta1 = 0.01,
   beta2 = 0.5,
-  degenerateEpsilon = 0.01,
   startPolicyFile = null,
   revise = reviseWithAgent,
   timeoutSeconds,
-  model
+  model,
+  harness = DEFAULT_HARNESS
 } = {}) {
   const { readPool } = await import('./pool.mjs')
   const grids = await readPool(runDirectory)
@@ -215,14 +209,19 @@ export async function dreamPolicies({
   await fs.mkdir(policyDirectory, { recursive: true })
   await fs.mkdir(replayDirectory, { recursive: true })
 
-  // Version 0 is the policy as it stands. Written from the shipping source when
-  // the run has none yet, so the phase has a floor to measure against.
-  const versionFile = version => path.join(policyDirectory, `v${String(version).padStart(3, '0')}.mjs`)
-  let currentFile = startPolicyFile
-  if (!currentFile) {
+  // Version 0 is the policy as it stands. It is written into this phase's own
+  // file even when the run already has one, so the phase archives the policy it
+  // started from rather than leaving it only under the name `current.mjs`,
+  // which the phase's winner overwrites.
+  const versionName = version => `${phase}-v${String(version).padStart(3, '0')}`
+  const versionFile = version => path.join(policyDirectory, `${versionName(version)}.mjs`)
+  const startedFrom = startPolicyFile
+  let currentFile = versionFile(0)
+  if (startedFrom) {
+    await fs.copyFile(startedFrom, currentFile)
+  } else {
     const starter = await policySource('parallel-refine', { into: policyDirectory })
     if (starter.error) return { error: starter.error }
-    currentFile = versionFile(0)
     await fs.writeFile(currentFile, starter.source, 'utf8')
   }
 
@@ -238,16 +237,32 @@ export async function dreamPolicies({
 
   const sweeps = new Map()
   const evaluate = async (version, file) => {
-    const loaded = await loadPolicy(file)
-    if (loaded.error) return { version, file: path.relative(checkout, file), failure: loaded.error, score: null }
-    const scored = await scorePolicy({ grids, Class: loaded.Class, instance: loaded.policy, betas, maxParallelism, beta1, beta2 })
+    const relative = path.relative(checkout, file).split(path.sep).join('/')
+    let loaded
+    try {
+      loaded = await loadPolicy(file)
+    } catch (error) {
+      loaded = { error: `the policy would not load: ${error?.message || error}` }
+    }
+    // A version that will not load, or whose replay throws, is invalid: its
+    // score is partial and it may never win. It is recorded so the next revision
+    // can read what happened, and it never aborts the phase.
+    if (loaded.error) return { version, file: relative, valid: false, failure: loaded.error, score: null }
+    let scored
+    try {
+      scored = await scorePolicy({ grids, Class: loaded.Class, instance: loaded.policy, betas, maxParallelism, beta1, beta2 })
+    } catch (error) {
+      return { version, file: relative, valid: false, failure: `the policy failed to run: ${error?.message || error}`, score: null }
+    }
     // The whole sweep is kept in memory for the next prompt, because a revision
     // is asked to improve on a specific route, not on a number. Only the summary
     // is written to disk: the traces are large and are the input to one decision.
     sweeps.set(version, scored)
+    const failures = scored.points.reduce((total, point) => total + point.failures, 0)
     return {
       version,
-      file: path.relative(checkout, file).split(path.sep).join('/'),
+      file: relative,
+      valid: failures === 0,
       // Kept because a run directory and the checkout can be on different
       // drives, where the relative form is an absolute path in disguise and
       // joining it back onto the checkout produces nonsense.
@@ -259,7 +274,7 @@ export async function dreamPolicies({
       bestBeta: scored.bestBeta,
       spread: scored.spread,
       degenerate: scored.degenerate,
-      failures: scored.points.reduce((total, point) => total + point.failures, 0),
+      failures,
       perBeta: scored.points.map(point => ({ beta: point.beta, reward: point.reward })),
       // The traces are kept so the run's picture can draw what each version
       // reached against the probes it spent. Without them the replay is a number
@@ -272,10 +287,17 @@ export async function dreamPolicies({
         // record that does not say which would be compared with the wrong runs.
         objective: replay.objective,
         reward: replay.reward,
+        // The coefficients that produced the reward, so a record can be
+        // recomputed rather than trusted, and two runs priced differently are
+        // never compared as if they were the same number.
+        beta1: replay.beta1,
+        beta2: replay.beta2,
+        lambda: replay.lambda,
         auc: replay.auc,
         parallelPenalty: replay.parallelPenalty,
         paretoReward: replay.paretoReward,
         legacyReward: replay.legacyReward,
+        attempts: replay.attempts,
         probes: replay.probes,
         rounds: replay.rounds,
         quality: replay.quality,
@@ -286,8 +308,10 @@ export async function dreamPolicies({
     }
   }
 
+  const writeVersion = version => fs.writeFile(path.join(replayDirectory, `${versionName(version)}.json`), `${JSON.stringify(record.versions[version], null, 2)}\n`, 'utf8')
+
   record.versions.push(await evaluate(0, currentFile))
-  await fs.writeFile(path.join(replayDirectory, 'v000.json'), `${JSON.stringify(record.versions[0], null, 2)}\n`, 'utf8')
+  await writeVersion(0)
 
   for (let version = 1; version < versions; version++) {
     const source = await fs.readFile(currentFile, 'utf8')
@@ -297,46 +321,64 @@ export async function dreamPolicies({
     // first, so a revision that fails to write leaves the previous policy in
     // place rather than an empty file that would score as a broken version.
     await fs.writeFile(nextFile, source, 'utf8')
-    const revision = await revise({
-      checkout,
-      runDirectory,
-      policyFile: nextFile,
-      source,
-      replay: sweeps.get(version - 1) ?? { points: [] },
-      // Every version scored so far, including the one being replaced: the
-      // paper gives the development agent the feedback from earlier revisions,
-      // and without it a failed change is invisible to the next revision.
-      history: record.versions.map(earlierVersion)
-    })
+    let revision
+    try {
+      revision = await revise({
+        checkout,
+        runDirectory,
+        policyFile: nextFile,
+        source,
+        replay: sweeps.get(version - 1) ?? { points: [] },
+        // Every version scored so far, including the one being replaced: the
+        // paper gives the development agent the feedback from earlier revisions,
+        // and without it a failed change is invisible to the next revision.
+        history: record.versions.map(earlierVersion),
+        timeoutSeconds,
+        model,
+        harness
+      })
+    } catch (error) {
+      // A reviser that throws must not discard a valid incumbent. The next file
+      // already holds the previous policy, so this version ties it and the
+      // incumbent is deployed; the failure is recorded for the next revision.
+      revision = { ok: false, status: 'threw', text: `the reviser threw: ${error?.message || error}`, durationMs: 0, tokens: null }
+    }
 
     const evaluated = await evaluate(version, nextFile)
     record.versions.push({
       ...evaluated,
       revision: revision
-        ? { ok: revision.ok === true, status: revision.status ?? null, tokens: revision.tokens?.totalTokens ?? null, durationMs: revision.durationMs ?? null, said: (revision.text ?? '').slice(0, 2000) }
+        ? { ok: revision.ok === true, status: revision.status ?? null, tokens: revision.tokens ?? null, durationMs: revision.durationMs ?? null, said: (revision.text ?? '').slice(0, 2000) }
         : null
     })
-    await fs.writeFile(path.join(replayDirectory, `v${String(version).padStart(3, '0')}.json`), `${JSON.stringify(record.versions[version], null, 2)}\n`, 'utf8')
+    await writeVersion(version)
+    // The next revision starts from this one, as the paper's pi^{m+1} chain
+    // does, rather than from the phase's original file.
+    currentFile = nextFile
   }
 
-  const selection = selectVersion({ versions: record.versions, epsilon: degenerateEpsilon })
+  const selection = selectVersion({ versions: record.versions })
   const winner = selection.winner
   const floor = record.versions[0]
 
   record.winner = winner ? { version: winner.version, file: winner.file, score: winner.score, bestBeta: winner.bestBeta } : null
-  record.selection = { rule: selection.rule, epsilon: degenerateEpsilon, displaced: selection.displaced ?? null }
+  record.selection = { rule: selection.rule }
   record.improved = Boolean(winner && floor && typeof floor.score === 'number' && winner.score > floor.score)
   record.gain = winner && floor && typeof floor.score === 'number' ? Number((winner.score - floor.score).toFixed(6)) : 0
-  record.cost = record.versions
-    .map(version => version.revision?.tokens)
-    .filter(tokens => typeof tokens === 'number')
-    .reduce((total, tokens) => total + tokens, 0)
+  // What the revising agents cost, priced from their own transcripts so the run
+  // report includes the offline half of what it spent.
+  record.revisionCosts = record.versions
+    .map(version => (version.revision?.tokens ? costBands(version.revision.tokens) : null))
+    .filter(Boolean)
+  record.cost = sumCosts(record.revisionCosts)
 
   if (winner) {
     // The winner is copied to one name the next rollout reads, so "which policy
-    // is deployed" is answered in one place rather than by a version number.
+    // is deployed" is answered in one place rather than by a version number. An
+    // incumbent that was already loaded from `current.mjs` is that name's own
+    // file, and copying it onto itself is skipped.
     const deployed = path.join(policyDirectory, 'current.mjs')
-    await fs.copyFile(winner.absolute, deployed)
+    if (path.resolve(winner.absolute) !== path.resolve(deployed)) await fs.copyFile(winner.absolute, deployed)
     record.deployed = path.relative(checkout, deployed).split(path.sep).join('/')
   }
 

@@ -41,6 +41,25 @@ const skillPaths = files => files.map(file => file.path)
 const skillText = async (root, name) =>
   fs.readFile(path.join(root, `.claude/skills/glass-${name}/SKILL.md`), 'utf8').catch(() => null)
 
+test('Codex skills match Claude skills and stale copies are removed without deleting personal skills', async () => {
+  const root = await checkout({ alpha: 'core', bravo: 'gameplay' }, { core: true, gameplay: true })
+  const directory = path.join(root, '.agents/skills')
+  await writeGeneratedAgentFiles(root, 'project')
+  const alpha = path.join(directory, 'glass-alpha/SKILL.md')
+  assert.equal(await fs.readFile(alpha, 'utf8'), await skillText(root, 'alpha'))
+  await fs.writeFile(alpha, (await fs.readFile(alpha, 'utf8')) + '\nStale.\n')
+  assert.ok((await agentRegistrationProblems(root, 'project')).some(problem => problem.file === '.agents/skills/glass-alpha/SKILL.md'))
+  await fs.mkdir(path.join(directory, 'personal'), { recursive: true })
+  await fs.writeFile(path.join(directory, 'personal/SKILL.md'), 'Personal skill')
+  await fs.writeFile(path.join(root, 'agents/manifest.json'),
+    JSON.stringify({ version: 2, skillCategories: { core: true, gameplay: false }, nodes: [] }))
+  await writeGeneratedAgentFiles(root, 'project')
+  assert.equal(await fs.readFile(alpha, 'utf8'), await skillText(root, 'alpha'))
+  await assert.rejects(fs.readFile(path.join(directory, 'glass-bravo/SKILL.md')), { code: 'ENOENT' })
+  assert.equal(await fs.readFile(path.join(directory, 'personal/SKILL.md'), 'utf8'), 'Personal skill')
+  assert.deepEqual(await agentRegistrationProblems(root, 'project'), [])
+})
+
 test('a category that is off registers no skill, and comes back when switched on', async () => {
   const root = await checkout({ alpha: 'core', bravo: 'gameplay' }, { core: true, gameplay: false })
 

@@ -137,7 +137,8 @@ export const describeClient = entry =>
 export function explainClientError(error, { wanted, live, where, timeout, chosen } = {}) {
   const named = (live || []).map(describeClient).join('\n  ')
   if (error === 'no-client') {
-    return `no editor attached. Open ${where} and leave the tab open.`
+    return `no editor attached. Open ${where} and leave the tab open, `
+      + 'or start one through the supervisor: node bin/engine.mjs supervisor.open editor-browser'
   }
   if (error === 'unknown-client') {
     return `no attached client "${wanted}". Attached now:\n  ${named}`
@@ -147,7 +148,8 @@ export function explainClientError(error, { wanted, live, where, timeout, chosen
   }
   if (error === 'name-taken') {
     return `"${wanted}" is already attached and answering:\n  ${named}\n` +
-      `Open this page under another name with ?client=<id>.`
+      `Open this page under another name with ?client=<id>, or stop the browser holding it: `
+      + 'node bin/engine.mjs supervisor lists ids, supervisor.stop <id> ends one.'
   }
   if (error === 'many-clients') {
     return `${live.length} clients are attached and none was named, so this call has no one answer. ` +

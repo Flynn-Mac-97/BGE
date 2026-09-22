@@ -42,12 +42,28 @@ const attempt = patchDirectory => async ({ cell, parent, id }) => {
   await fs.mkdir(path.dirname(patchPath), { recursive: true })
   await fs.writeFile(patchPath, `diff for ${id} on top of ${parent?.patchPath ?? 'the target'}\n`, 'utf8')
   const score = TRUTH[id]
+  const outcome = score === undefined
+    ? { score: null, verdict: 'refused', reason: 'nothing here', measures: {} }
+    : { score, verdict: 'scored', reason: null, measures: { characters: 100 } }
+  // The shape a real attempt returns. The loop writes this record beside the
+  // patch so the next attempt in the same round can read it.
   return {
     id,
     patchPath,
-    outcome: score === undefined
-      ? { score: null, verdict: 'refused', reason: 'nothing here', measures: {} }
-      : { score, verdict: 'scored', reason: null, measures: { characters: 100 } }
+    outcome,
+    record: {
+      id: `rsi-b${cell.branch}-r0c${cell.attempt + 1}`,
+      parent: parent ? `${cell.branch}:${cell.attempt - 1}` : 'target',
+      depth: cell.attempt + 1,
+      verdict: outcome.verdict,
+      value: outcome.score,
+      evaluated: outcome.score !== null,
+      reason: outcome.reason,
+      measures: outcome.measures,
+      report: `scripted attempt ${id}`,
+      tokens: null,
+      cost: null
+    }
   }
 }
 
@@ -111,9 +127,18 @@ test('the whole loop explores, pools, dreams, redeploys and names a winner', asy
   const deployed = JSON.parse(await fs.readFile(path.join(directory, 'rsi.json'), 'utf8'))
   const pool = await fs.readdir(path.join(directory, 'pool'))
   const roundFiles = {}
+  const attemptRecords = {}
   for (const name of ['round-001', 'round-002']) {
     roundFiles[name] = await fs.readdir(path.join(directory, 'rsi', name)).catch(() => [])
+    // One full record per attempt, written as it ends so the next attempt in the
+    // same round can read it. Its patch path is what makes the change readable.
+    attemptRecords[name] = await Promise.all(
+      roundFiles[name].filter(file => /^rsi-b\d+-r\d+c\d+\.json$/.test(file))
+        .map(file => fs.readFile(path.join(directory, 'rsi', name, file), 'utf8').then(JSON.parse))
+    )
   }
+  const versionFiles = await fs.readdir(path.join(directory, 'policy')).catch(() => [])
+  const replayFiles = await fs.readdir(path.join(directory, 'replay')).catch(() => [])
   await fs.rm(directory, { recursive: true, force: true })
 
   assert.equal(result.error, undefined, result.error)
@@ -142,7 +167,14 @@ test('the whole loop explores, pools, dreams, redeploys and names a winner', asy
   for (const name of ['round-001', 'round-002']) {
     assert.ok(roundFiles[name].includes('rollout.json'), `${name} kept no rollout record`)
     assert.ok(roundFiles[name].includes('dreaming.json'), `${name} kept no dreaming record`)
+    assert.ok(attemptRecords[name].length > 0, `${name} kept no per-attempt record`)
+    assert.ok(attemptRecords[name].every(record => record.patchFile), `${name} lost an attempt's patch path`)
+    // The phase's versions are archived under the phase label, not overwritten
+    // by the next round's.
+    assert.ok(roundFiles[name].some(file => file === 'grid.json'))
   }
+  assert.ok(versionFiles.includes('r001-v001.mjs') && versionFiles.includes('r002-v001.mjs'), `each phase kept no archived versions: ${versionFiles.join(', ')}`)
+  assert.ok(replayFiles.includes('r001-v001.json') && replayFiles.includes('r002-v001.json'), `each phase kept no replay record: ${replayFiles.join(', ')}`)
 })
 
 test('a pinned plan bounds what a first run may spend, whatever the history says', () => {

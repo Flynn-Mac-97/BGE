@@ -14,19 +14,24 @@
  * A policy that asked for an unrevealed cell would have to reach past the
  * question to do it, and the question does not offer the record.
  *
- * A legal cell the run never reached reveals `evaluated: false`. That is not a
- * failure of the policy but it is not free either: the probe is spent and the
- * attainment does not move, which is what the paper means by a route outside the
- * recorded support earning no reward.
+ * A probe reveals a child the recorded tree already holds. A recorded leaf has
+ * no continuation, so it is not a legal move: replay makes no phantom attempt,
+ * invents no observation, and cannot earn reward from a route the run did not
+ * take.
  */
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { gridCeiling, legalActions, observationOf } from './grid.mjs'
+import { gridCeiling, observationOf, recordedActions } from './grid.mjs'
 import { readPool } from './pool.mjs'
 import { loadPolicy } from './policy.mjs'
 
-/** The objective the paper's evaluator ranks by. `legacy` keeps the body-of-paper equation. */
-export const DEFAULT_OBJECTIVE = 'pareto'
+/**
+ * The objective a sweep ranks by: the paper's page-6 equation (1), named
+ * `legacy` here for compatibility with earlier records.
+ *
+ * `pareto` is a separate, local objective and not the paper's method equation.
+ */
+export const DEFAULT_OBJECTIVE = 'legacy'
 
 /** Every objective a sweep may use. Their numbers are not comparable with each other. */
 export const OBJECTIVES = ['pareto', 'legacy']
@@ -68,7 +73,7 @@ export function makeQuestion({ grid, maxParallelism = 3, onReveal = null }) {
   let sequentialRounds = 0
   let bestSoFar = grid.baseline?.value ?? 0
 
-  const legalNow = () => legalActions({ ...grid, cells: Object.fromEntries(revealed) })
+  const legalNow = () => recordedActions(grid, Object.fromEntries(revealed))
 
   const cellAt = id => {
     const [branch, attempt] = String(id).split(':').map(Number)
@@ -231,13 +236,12 @@ function attainmentAuc({ curve, baseline, ceiling }) {
 /**
  * Score one policy over one recorded grid.
  *
- * Two objectives are computed side by side and kept apart. The paper's ranks a
- * route by `pareto.auc - lambda * parallel_penalty`: the mean attainment over the
- * probes spent, less the price of not filling the workers. The other is the
- * equation the body of the paper states, kept because earlier sweeps were
- * recorded with it and its numbers are not comparable with the paper's.
- *
- * Only one of them is called `reward`, and `objective` names which, so a sweep
+ * Two objectives are computed side by side and kept apart. The default is the
+ * paper's page-6 equation (1): best quality, less the execution cost of every
+ * revealed non-root node, plus the parallelism bonus. The other,
+ * `pareto.auc - lambda * parallel_penalty`, is a local experimental variant
+ * inspired by the Appendix B.2 prompt; the paper publishes no exact formula for
+ * it. Only one is called `reward`, and `objective` names which, so a sweep
  * recorded under one is never compared with a sweep made under the other.
  */
 export async function replayGrid({
@@ -283,7 +287,10 @@ export async function replayGrid({
   // probes has still not lost the target it started from.
   const attainments = [baseline, ...trace.map(round => round.attainment)]
   const best = Math.max(...attainments)
-  const attempts = trace.reduce((total, round) => total + round.batch.filter(id => Number(String(id).split(':')[1]) > 0).length, 0)
+  // N in the paper's equation (1) is |T| - 1: every revealed non-root node,
+  // branch openings included. Because replay reveals only recorded children,
+  // that is every probe it spent.
+  const attempts = trace.reduce((total, round) => total + round.batch.length, 0)
   const parallelBonus = attempts ? Number((attempts / Math.max(1, trace.length)).toFixed(6)) : 0
   const legacyReward = Number((best - beta1 * attempts + beta2 * parallelBonus).toFixed(6))
 
@@ -390,9 +397,9 @@ export async function replaySweep({
   const spread = rewards.length ? Number((Math.max(...rewards) - Math.min(...rewards)).toFixed(6)) : 0
   const best = points.reduce((winner, point) => (!winner || point.reward > winner.reward ? point : winner), null)
 
-  // The paper's reward for the sweep: the mean attainment over the probes spent,
-  // less lambda times the mean parallel penalty over the sweep. Both are means of
-  // the same per-beta quantities, so the two objectives stay separable.
+  // The experimental objective's number: the mean attainment over the probes
+  // spent, less lambda times the mean parallel penalty over the sweep. Both are
+  // means of the same per-beta quantities, so the two objectives stay separable.
   const paretoAuc = mean('auc')
   const parallelPenalty = mean('parallelPenalty')
   const paretoReward = Number((paretoAuc - lambda * parallelPenalty).toFixed(6))

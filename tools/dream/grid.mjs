@@ -9,8 +9,8 @@
  *
  * A cell holds an outcome, which is what a run recorded when that attempt was
  * really made: a score, the measures behind it, and whether it was refused.
- * A cell the run never reached holds no outcome at all, which is not the same as
- * a cell that scored badly, and replay treats it as work that buys nothing.
+ * A cell the run never reached is absent from `cells`, so replay does not offer
+ * it as a move: there is no recorded continuation to reveal.
  *
  * Nothing here runs anything. A grid is read from a run's records, or written by
  * a test, and replay reads it. That is the whole point: once attempts are
@@ -25,8 +25,8 @@ import path from 'node:path'
  * The field names are the paper's `Observation`. `n_valid` and `n_total` are the
  * checks that passed against the checks that ran, so a policy can see partial
  * progress; they are null on a cell with no recorded outcome. `evaluated` is
- * false both for a cell the run never reached and for a harness failure that
- * produced no score, and `fail_class` names which.
+ * false for a harness failure that produced no score, and `fail_class` names
+ * what happened.
  */
 export const observationOf = (cell, grid) => {
   const parent = cell.attempt > 0 ? grid.cells[`${cell.branch}:${cell.attempt - 1}`] : null
@@ -110,6 +110,29 @@ export function legalCells(grid) {
 /** The legal moves, as cell ids: what a policy names in a batch. */
 export function legalActions(grid) {
   return legalCells(grid).map(cell => `${cell.branch}:${cell.attempt}`)
+}
+
+/**
+ * The moves a replay may make: the next attempt of each branch, but only when
+ * the recorded tree holds that cell.
+ *
+ * The paper replays a fixed recorded tree, so a probe reveals a child that was
+ * already recorded and a recorded leaf offers no continuation. Offering a cell
+ * the run never reached would invent a probe that buys nothing and a score the
+ * route never earned.
+ */
+export function recordedActions(grid, revealed = {}) {
+  const deepest = {}
+  for (const cell of Object.values(revealed)) {
+    if (deepest[cell.branch] === undefined || cell.attempt > deepest[cell.branch]) deepest[cell.branch] = cell.attempt
+  }
+  const actions = []
+  for (let branch = 0; branch < grid.branchCount; branch++) {
+    const next = deepest[branch] === undefined ? 0 : deepest[branch] + 1
+    const id = `${branch}:${next}`
+    if (grid.cells?.[id]) actions.push(id)
+  }
+  return actions
 }
 
 /** The cells revealed so far, oldest first, as observations. */

@@ -204,7 +204,7 @@ const run = (command, args, libraries) => new Promise((resolve, reject) => {
   const environment = libraries
     ? { ...process.env, PATH: `${libraries}${path.delimiter}${process.env.PATH}` }
     : process.env
-  const child = spawn(command, args, { stdio: 'inherit', env: environment })
+  const child = spawn(command, args, { stdio: 'inherit', env: environment, windowsHide: true })
   child.on('error', reject)
   child.on('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited ${code}`)))
 })

@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { findChrome } from '../engine/chrome-path.mjs'
+import { recordLaneBrowser, forgetLaneBrowser } from '../engine/lane-browsers.mjs'
 
 const CHROME = findChrome(process.cwd())
 const BASE = process.argv[2] || 'http://localhost:5180/'
@@ -32,7 +33,18 @@ const chrome = spawn(CHROME, [
   '--no-first-run', '--no-default-browser-check',
   `--window-size=${WIDTH},${HEIGHT}`,
   URL
-], { stdio: ['ignore', 'pipe', 'pipe'] })
+], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+
+// Written before the wait, so a browser that never comes up is still findable
+// and stoppable by `lanes` or the supervisor, the same as a lane browser.
+try {
+  recordLaneBrowser(process.cwd(), {
+    client: NAME, port: PORT, url: URL, pid: chrome.pid, profile,
+    serves: process.cwd(), chrome: CHROME, headless: true, startedAt: new Date().toISOString()
+  })
+} catch (error) {
+  process.stderr.write(`could not record the browser: ${error.message}\n`)
+}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -65,7 +77,13 @@ async function removeProfile() {
   }
 }
 
-chrome.on('exit', async () => { await removeProfile(); process.exit(0) })
+chrome.on('exit', async () => {
+  // The record is removed before the profile, so a listing that races this
+  // exit sees the browser gone rather than a record pointing at a dead port.
+  try { forgetLaneBrowser(process.cwd(), NAME) } catch { /* the registry is already unreadable */ }
+  await removeProfile()
+  process.exit(0)
+})
 const stop = () => chrome.kill()
 process.on('SIGTERM', stop)
 process.on('SIGINT', stop)

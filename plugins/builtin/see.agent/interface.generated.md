@@ -1,8 +1,9 @@
-<!--e526784b-->
+<!--d03958e8-->
 parsed from source
   plugin See
   category agents
-  commands see.describe
+  commands see.editor
+  see.describe
   see.view
   see.occlusion
   see.isolate
@@ -14,6 +15,7 @@ parsed from source
   see.sketch
   see.moment
   see.capture
-  arguments see.describe: options;see.view: options;see.occlusion: options;see.isolate: options;see.find: options;see.diff: options;see.camera:;see.ray: options;see.identify: options;see.sketch: options = {};see.moment: options = {};see.capture: options = {}
+  arguments see.editor: options = {};see.describe: options;see.view: options;see.occlusion: options;see.isolate: options;see.find: options;see.diff: options;see.camera:;see.ray: options;see.identify: options;see.sketch: options = {};see.moment: options = {};see.capture: options = {}
+  input see.editor: { type: 'object', properties: { scope: { type: 'string', enum: ['editor', 'window'] }, name: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' } }, additionalProperties: false }
   context see
-  source 309 lines
+  source 316 lines

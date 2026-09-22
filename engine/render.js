@@ -56,7 +56,7 @@
 import * as THREE from 'three/webgpu'
 import {
   attribute, cameraProjectionMatrix, float, max, modelNormalMatrix, modelViewMatrix,
-  mrt, normalGeometry, normalize, normalView, oneMinus, output, pass, positionGeometry,
+  mrt, normalGeometry, normalize, oneMinus, output, pass, positionGeometry,
   positionLocal, screenSize, smoothstep, step, uv as uvAttribute, vec4
 } from 'three/tsl'
 import * as TSL from 'three/tsl'
@@ -69,6 +69,30 @@ import {
 // Re-exported because the turn test reaches the reader here, where it used to
 // live. The one reader is frame-plan's now.
 export { turnRadians }
+
+/**
+ * Make the bone matrices upload once per skeleton, not once per skinned mesh.
+ *
+ * A skinned mesh reads its skeleton's bone matrices from a uniform buffer, and
+ * three binds and uploads that buffer for every draw, so each of the thirteen
+ * meshes over a rig uploads the same 455 matrices again — almost all of a
+ * frame's buffer traffic. Past the uniform-buffer limit three uploads the
+ * matrices once as a texture the skeleton shares, and the shader does the same
+ * arithmetic either way.
+ *
+ * The limit is a device constant with no per-node override, so a skinned mesh's
+ * own builder answers zero. Only that builder's skinning node changes path;
+ * morph weights, instance matrices and every other buffer keep the real limit.
+ * The marker stops a second module load from wrapping this twice.
+ */
+const uniformBufferLimit = THREE.NodeBuilder.prototype.getUniformBufferLimit
+if (!uniformBufferLimit.forcedBoneTexture) {
+  const boneTextureSkinned = function () {
+    return this.object?.isSkinnedMesh ? 0 : uniformBufferLimit.call(this)
+  }
+  boneTextureSkinned.forcedBoneTexture = true
+  THREE.NodeBuilder.prototype.getUniformBufferLimit = boneTextureSkinned
+}
 
 /** Everything this file has already complained about, so each distinct message is said once. */
 const alreadySaid = new Set()
@@ -807,8 +831,93 @@ const attachedModels = new WeakMap()
 /** Every named node of a freshly cloned model, so pose and attachments can find one. */
 function indexNodes(holder, instance) {
   const nodes = {}
-  instance.traverse(node => { if (node.name && !nodes[node.name]) nodes[node.name] = node })
+  // A bone or an empty helper draws nothing, but three projects every node in
+  // the graph on every scene pass. Marking the helpers invisible makes
+  // `_projectObject` return before their subtrees, so the hundreds of joints in
+  // a rig cost nothing to describe. Visibility does not gate `updateMatrixWorld`,
+  // so bones still update for the skinning.
+  const draws = new Set([holder, instance])
+  // One rig per set of bone objects the clone brought. SkeletonUtils.clone
+  // gives every skinned mesh its own skeleton over the same bones, so three
+  // rebuilds and uploads the same bone matrices once per mesh. These meshes are
+  // pointed at one skeleton between them; each keeps its own bind matrix, so it
+  // draws exactly as before.
+  const rigs = []
+  instance.traverse(node => {
+    if (node.name && !nodes[node.name]) nodes[node.name] = node
+    if (node.isSkinnedMesh && node.skeleton) {
+      let rig = rigs.find(candidate => sameRig(candidate, node.skeleton))
+      if (rig === undefined) rigs.push(node.skeleton)
+      else if (rig !== node.skeleton) node.skeleton = rig
+    }
+    // A scene node's local matrix only changes when something poses it. Three
+    // otherwise recomposes and re-multiplies every node's matrix on every draw,
+    // which for a rigged model is most of what describing a frame costs. Pose
+    // and attachments call `updateMatrix` after they write a transform.
+    node.matrixAutoUpdate = false
+    node.updateMatrix()
+    if (node.isMesh || node.isSprite || node.isPoints || node.isLine || node.isLight || node.isCamera) {
+      draws.add(node)
+      for (let parent = node.parent; parent; parent = parent.parent) draws.add(parent)
+    }
+  })
+  instance.traverse(node => { if (!draws.has(node)) node.visible = false })
+  // A node that draws nothing and leads to nothing drawn or skinned is dead
+  // weight: three still walks it on every `updateMatrixWorld`, and a rig brings
+  // hundreds of them. Remove the top of each such subtree; anything an
+  // attachment asks for is put back by `reattach`.
+  const keeps = new Set([holder, instance])
+  for (const rig of rigs) for (const bone of rig.bones) if (bone) for (let at = bone; at; at = at.parent) keeps.add(at)
+  instance.traverse(node => {
+    if (node.isMesh || node.isSprite || node.isPoints || node.isLine || node.isLight || node.isCamera) {
+      for (let at = node; at; at = at.parent) keeps.add(at)
+    }
+  })
+  const pruned = []
+  instance.traverse(node => {
+    if (!keeps.has(node) && node.parent && keeps.has(node.parent)) pruned.push(node)
+  })
+  for (const node of pruned) {
+    prunedParents.set(node, node.parent)
+    node.removeFromParent()
+  }
   namedNodes.set(holder, nodes)
+}
+
+/** The parent a pruned subtree was removed from, so an attachment can put it back. */
+const prunedParents = new WeakMap()
+
+/**
+ * Put back every pruned ancestor of a node, top down.
+ *
+ * A node with nothing drawn or skinned under it is removed from its model when
+ * the model loads, so three stops walking it every frame. An attachment may
+ * still name that node, and a node outside the scene graph draws nothing, so
+ * the chain is re-added before the attachment hangs off it.
+ */
+function reattach(node, holder) {
+  const chain = []
+  for (let at = node; at && at !== holder; at = at.parent) {
+    if (prunedParents.has(at)) chain.push(at)
+  }
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const at = chain[i]
+    const parent = prunedParents.get(at)
+    prunedParents.delete(at)
+    parent.add(at)
+  }
+}
+
+/**
+ * Whether two skeletons are the same rig: the same bone objects over the same
+ * inverse bind matrices. Meshes over one rig may share a skeleton; two rigs may
+ * not, even when they name the same bones, because their bind poses differ.
+ */
+function sameRig(first, second) {
+  if (first.bones.length !== second.bones.length) return false
+  if (first.boneInverses !== second.boneInverses) return false
+  for (let i = 0; i < first.bones.length; i++) if (first.bones[i] !== second.bones[i]) return false
+  return true
 }
 
 /**
@@ -891,6 +1000,13 @@ function applyAttachments(holder, declared) {
         report(`[render] ${where}: no node named "${name}" to attach "${spec.model}" to`)
         continue
       }
+      // A pruned node is not in the graph, and an attachment under one draws
+      // nothing. The chain is put back before the group is hung on it.
+      reattach(node, holder)
+      // A joint with no mesh of its own was hidden when the model loaded, and a
+      // hidden node hides everything added under it. The attachment draws, so
+      // the node and its ancestors have to show again.
+      for (let at = node; at && at !== holder; at = at.parent) at.visible = true
       // A group of its own rather than the loaded scene directly: the offset
       // that fits a grip into a fist has to survive the file arriving late, and
       // a node that exists from the first frame is the simplest way to hold it.
@@ -907,6 +1023,7 @@ function applyAttachments(holder, declared) {
     entry.group.position.set(position.x, position.y, position.z)
     entry.group.rotation.set(rotation.x, rotation.y, rotation.z)
     entry.group.scale.setScalar(number(spec.scale, 1, `${where}.attachments.${name}.scale`))
+    entry.group.updateMatrix()
   }
 }
 
@@ -1035,6 +1152,15 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   const scene = new THREE.Scene()
+  // Three refreshes every world matrix on each `renderer.render` call, and a
+  // post chain can render the scene more than once. This file refreshes them
+  // once in `draw` instead, so every pass reads the matrices the frame already
+  // produced rather than rebuilding all of them. Explicit callers (`drawInto`,
+  // `rayHits`) already refresh their own matrices.
+  scene.matrixWorldAutoUpdate = false
+  // The scene's own matrix never changes, so recomposing it would flag the whole
+  // tree dirty and force every still object to re-multiply its world matrix.
+  scene.matrixAutoUpdate = false
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000)
   orthographic.position.z = 10
 
@@ -1103,6 +1229,16 @@ export async function makeRenderer(canvas, view, viewport) {
   let frameCounter = 0
 
   /**
+   * Whether a shadow map this frame needs redrawing.
+   *
+   * A shadow map changes only when a caster, a light or the scene changes.
+   * Three redraws every map every frame, so this raises the flag on the frames
+   * that changed something; `updateShadows` lowers it. A frame that changed
+   * nothing draws the map it already has.
+   */
+  let shadowDirty = true
+
+  /**
    * The keyline colour the drawn outlines were built with.
    *
    * An idling entity keeps the outline it already has, so a colour changed on
@@ -1158,7 +1294,16 @@ export async function makeRenderer(canvas, view, viewport) {
       steady: false,
       // The entity this record answered for last, so the position-indexed array
       // can tell a stable list from a reordered one.
-      entity: null
+      entity: null,
+      // The last local transform this record wrote, and the object it wrote it
+      // to. A pose or a look change makes an entity dirty without moving it, so
+      // composing the same matrix again would flag the whole model subtree for
+      // re-multiplication on every draw. These nine compares keep a still
+      // transform from claiming it changed.
+      placedObject: null,
+      placedX: NaN, placedY: NaN, placedZ: NaN,
+      placedRotX: NaN, placedRotY: NaN, placedRotZ: NaN,
+      placedScaleX: NaN, placedScaleY: NaN, placedScaleZ: NaN
     }
     records.set(entity, record)
     return record
@@ -1223,6 +1368,84 @@ export async function makeRenderer(canvas, view, viewport) {
     record.turnRotation = entity.rotation
     record.turnYaw = entity.yaw
     return turn
+  }
+
+  /**
+   * Recompose an object's local matrix only when its transform really changed.
+   *
+   * `Object3D.updateMatrix` flags the object so the next scene traversal
+   * multiplies its world matrix and forces every descendant to do the same. An
+   * entity that is dirty because its pose or look changed must not pay that for
+   * the whole subtree, so the last written position, rotation and scale are
+   * compared first.
+   */
+  function placeMatrix(object, record) {
+    const px = object.position.x, py = object.position.y, pz = object.position.z
+    const rx = object.rotation.x, ry = object.rotation.y, rz = object.rotation.z
+    const sx = object.scale.x, sy = object.scale.y, sz = object.scale.z
+    if (record.placedObject === object
+        && record.placedX === px && record.placedY === py && record.placedZ === pz
+        && record.placedRotX === rx && record.placedRotY === ry && record.placedRotZ === rz
+        && record.placedScaleX === sx && record.placedScaleY === sy && record.placedScaleZ === sz) return
+    record.placedObject = object
+    record.placedX = px; record.placedY = py; record.placedZ = pz
+    record.placedRotX = rx; record.placedRotY = ry; record.placedRotZ = rz
+    record.placedScaleX = sx; record.placedScaleY = sy; record.placedScaleZ = sz
+    object.updateMatrix()
+    shadowDirty = true
+  }
+
+  /**
+   * Redraw a shadow map only when the things in it moved.
+   *
+   * Three draws every shadow map every frame. On a level that is almost all
+   * static geometry under a fixed sun, the map changes only when a caster, a
+   * light or its shadow camera moves, or when an object joins or leaves. Three
+   * draws a map when `shadow.needsUpdate` is set and clears that itself, so
+   * `autoUpdate` is turned off once and the flag is raised only on a changed
+   * frame; a frame that changed nothing draws the map it already has.
+   */
+  function updateShadows() {
+    for (const child of scene.children) {
+      if (!child.isLight || !child.castShadow || !child.shadow) continue
+      const shadow = child.shadow
+      const remembered = child.userData
+      const target = child.target
+      const view = shadow.camera
+      const moved = remembered.shadowAtX !== child.position.x
+        || remembered.shadowAtY !== child.position.y
+        || remembered.shadowAtZ !== child.position.z
+        || (target && (remembered.shadowTargetX !== target.position.x
+          || remembered.shadowTargetY !== target.position.y
+          || remembered.shadowTargetZ !== target.position.z))
+        || (view && (remembered.shadowLeft !== view.left
+          || remembered.shadowRight !== view.right
+          || remembered.shadowTop !== view.top
+          || remembered.shadowBottom !== view.bottom
+          || remembered.shadowNear !== view.near
+          || remembered.shadowFar !== view.far))
+        || remembered.shadowWidth !== shadow.mapSize.width
+      shadow.autoUpdate = false
+      if (shadowDirty || moved) shadow.needsUpdate = true
+      remembered.shadowAtX = child.position.x
+      remembered.shadowAtY = child.position.y
+      remembered.shadowAtZ = child.position.z
+      remembered.shadowWidth = shadow.mapSize.width
+      if (target) {
+        remembered.shadowTargetX = target.position.x
+        remembered.shadowTargetY = target.position.y
+        remembered.shadowTargetZ = target.position.z
+      }
+      if (view) {
+        remembered.shadowLeft = view.left
+        remembered.shadowRight = view.right
+        remembered.shadowTop = view.top
+        remembered.shadowBottom = view.bottom
+        remembered.shadowNear = view.near
+        remembered.shadowFar = view.far
+      }
+    }
+    shadowDirty = false
   }
 
   // ------------------------------------------- the per-entity quiet snapshot
@@ -1427,6 +1650,10 @@ export async function makeRenderer(canvas, view, viewport) {
         const place = drawInto(drawnPlaceScratch, entity, blend)
         const object = snapshot[at + SLOT_OBJECT]
         object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
+        // The record keeps the last transform written so a later full pass can
+        // tell a real move from a pose change; this fast path moves the object,
+        // so it writes through the same bookkeeping rather than around it.
+        placeMatrix(object, object.userData.record)
         // The keyline hangs off the object and moves with it, so only the
         // ground mark has to be written again.
         if (!entity.hidden) {
@@ -1515,6 +1742,7 @@ export async function makeRenderer(canvas, view, viewport) {
       // pose is a mark or a transform this scan does not write.
       record.steady = record.simple && record.batchKey === null && record.keylineReady
         && declared.ring === undefined && entity.pose === undefined
+      placeMatrix(object, record)
       saveSlot(i, entity, object, record)
       return record.keyline ? 1 : 0
     }
@@ -1549,6 +1777,7 @@ export async function makeRenderer(canvas, view, viewport) {
     // Facing is a mirror, not a rotation: negative X scale flips the art
     // without touching the collider or the transform gizmo.
     if (entity.flip) object.scale.x = -object.scale.x
+    placeMatrix(object, record)
     saveSlot(i, entity, object, record)
     return 0
   }
@@ -1834,6 +2063,7 @@ export async function makeRenderer(canvas, view, viewport) {
       // entity that declared its attachment once, before the body existed,
       // would hold air until something happened to declare it again.
       applyAttachments(holder, holder.userData.attachmentsWanted)
+      shadowDirty = true
     }, () => {
       // The box stays, and `model()` has already named the file on the console.
     })
@@ -1888,6 +2118,7 @@ export async function makeRenderer(canvas, view, viewport) {
   /** Remove an object from the scene and revoke anything private it still holds. */
   function discard(object) {
     scene.remove(object)
+    shadowDirty = true
     release(object)
     namedNodes.delete(object)
     attachedModels.delete(object)
@@ -1931,7 +2162,13 @@ export async function makeRenderer(canvas, view, viewport) {
     }
     const known = meshes.has(entity.id)
     object = buildObject(entity, described)
+    // Three recomputes every object's local and world matrix on every scene
+    // traversal, and the scene is traversed once per pass and per render. A
+    // still object's matrix is already right, so this file writes it once and
+    // keeps three away from it; `sync` updates it when the entity moves.
+    object.matrixAutoUpdate = false
     scene.add(object)
+    shadowDirty = true
     meshes.set(entity.id, object)
     record.object = object
     record.drawnLook = described.look
@@ -2013,12 +2250,14 @@ export async function makeRenderer(canvas, view, viewport) {
         // quaternion scales the node it is set on.
         node.quaternion.set(turn[0], turn[1], turn[2], turn[3]).normalize()
         if (turn.length === 7) node.position.set(turn[4], turn[5], turn[6])
+        node.updateMatrix()
         continue
       }
       // The fast path: this runs for every limb of every character every frame,
       // and naming the failure costs a string whether or not there is one.
       const wanted = Number.isFinite(turn) ? turn : number(turn, 0, `pose.${name}`)
       node.rotation.x = (node.userData.restRotationX || 0) + wanted
+      node.updateMatrix()
     }
   }
 
@@ -2755,18 +2994,25 @@ export async function makeRenderer(canvas, view, viewport) {
    * they run in and about what the scene pass can offer them.
    *
    * `parts` carries what an effect cannot make for itself: the scene pass, the
-   * camera, and — when anything asked for one — a normal and depth pre-pass.
-   * The pre-pass is a second full render of the scene, so it is only made when
-   * an effect says `needsNormals`.
+   * camera, and — when anything asked for one — depth and view-space normals
+   * read from that same pass. Normals are reconstructed from depth rather than
+   * drawn in a second pass, so `needsNormals` costs no extra geometry pass.
    *
    * `parts.sceneOutput(name)` is one more buffer the scene pass writes, named as
    * three's TSL names it (`diffuseColor`, `velocity`). Every effect's requests
    * go into one set of outputs, so two effects never replace each other's.
    * An effect with `singleSample` turns multisampling off on the scene pass,
-   * because its outputs are read per sample, as temporal antialiasing does.
+   * because its outputs are read per sample, as temporal antialiasing does. A
+   * depth read also needs multisampling off, so `needsNormals` turns it off too.
    */
   function buildPost(list, camera) {
-    const scenePass = list.some(effect => effect.singleSample)
+    const needsNormals = list.some(effect => effect.needsNormals)
+    // Ambient occlusion samples normals at low resolution, so a second full
+    // geometry pass only to produce them is wasted. Reconstruct view-space
+    // normals from the colour pass's own depth instead. The colour pass then
+    // must not be multisampled, because a multisampled depth texture cannot be
+    // read back; the level's own antialiasing pass still runs.
+    const scenePass = list.some(effect => effect.singleSample) || needsNormals
       ? pass(scene, camera, { samples: 0 })
       : pass(scene, camera)
 
@@ -2780,15 +3026,13 @@ export async function makeRenderer(canvas, view, viewport) {
       }
     }
     const passes = [scenePass]
-    if (list.some(effect => effect.needsNormals)) {
-      // No multisampling: the pass is read as data, and on WebGPU a
-      // multisampled depth texture cannot be sampled by textureGather, which
-      // ambient occlusion needs.
-      const prePass = pass(scene, camera, { samples: 0 })
-      prePass.setMRT(mrt({ output: normalView }))
-      parts.normal = prePass.getTextureNode()
-      parts.depth = prePass.getTextureNode('depth')
-      passes.push(prePass)
+    if (needsNormals) {
+      const depth = scenePass.getTextureNode('depth')
+      // Rendered once to a texture because ambient occlusion and denoise sample
+      // normals at neighbouring pixels rather than only at their own.
+      const normals = TSL.getNormalFromDepth(TSL.screenUV, depth, TSL.cameraProjectionMatrixInverse)
+      parts.depth = depth
+      parts.normal = TSL.convertToTexture(vec4(normals, 1))
     }
 
     let colour = scenePass
@@ -2988,6 +3232,19 @@ export async function makeRenderer(canvas, view, viewport) {
   }
 
   return {
+    /**
+     * Give the graphics card back everything this renderer holds.
+     *
+     * For a page that can no longer be driven: its dev server is gone, so it
+     * cannot reload, be edited, or be read, and a heavy scene it keeps drawing
+     * holds hundreds of megabytes for nothing. Nothing draws afterwards; the
+     * page is finished.
+     */
+    release() {
+      forgetDrawRecords()
+      renderer.dispose()
+    },
+
     // Both are the session's objects, re-exposed so existing plugins that reach
     // for renderer.view keep working.
     view,
@@ -3201,6 +3458,10 @@ export async function makeRenderer(canvas, view, viewport) {
       if (headless) return
       const startedAt = performance.now()
       const camera = readyCamera()
+      // One world-matrix update for every pass this frame. The renderer would
+      // otherwise repeat it for each scene pass.
+      scene.updateMatrixWorld()
+      updateShadows()
       renderer.info.reset()
 
       // The editor draws through an orthographic camera and play through a

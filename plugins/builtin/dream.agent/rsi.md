@@ -10,20 +10,23 @@ node bin/engine.mjs dream.rsi "make working inside this engine's own source chea
 
 Options: `{ rounds, versions, parallelism, timeout, model, harness }`. One round is:
 
-1. **Plan a grid.** How many branches and how deep, from what earlier rounds did —
-   a win at a branch root widens, a late win deepens, early gains narrow it. Never
-   from this round's outcomes: how wide to work is a decision about the next
-   rollout. Capped at 4 branches and 4 refinements.
+1. **Plan a grid.** The current policy's `plan_grid(context)` states how many
+   branches and how deep, from completed earlier rounds only — never from this
+   round's outcomes: how wide to work is a decision about the next rollout. The
+   runner's own widening/deepening rule answers only when the policy has no
+   `plan_grid`. Capped at 4 branches and 4 refinements.
 2. **Explore online.** The current policy names batches of cells. Every cell is a
    real attempt: a worktree branched from its parent's patch, an agent working in
-   it, a score from the frozen setup. This is the only stage that costs anything.
+   it, a score from the frozen setup. This is the only stage that makes real
+   attempts, and the run's largest spend.
 3. **Pool it.** The grid joins `pool/`, and the pool is frozen for the dreaming
    that follows.
 4. **Dream.** The policy is revised `versions` times, and **every version is
-   replayed over every grid in the pool** with a beta sweep. No agent is called:
-   a replay reveals outcomes that are already recorded.
-5. **Redeploy.** The version with the best average reward becomes
-   `policy/current.mjs`, and the next round explores with it.
+   replayed over every grid in the pool** with a beta sweep. A replay calls no
+   agent; it reveals outcomes that are already recorded. Each revision, however,
+   does call a development agent, so the phase spends token calls too.
+5. **Redeploy.** The valid version with the highest reward, the incumbent
+   included, becomes `policy/current.mjs`, and the next round explores with it.
 
 ## The policy
 
@@ -41,24 +44,33 @@ question.meta(id)            // { branch, attempt, parent_id, seq, tags }
 `best_so_far` and `budget_spent` exist and must not decide anything: reading them
 is deciding from the evaluator's numbers rather than from what was revealed.
 
-The reward is the paper's: `best_quality − beta1 × attempts + beta2 × attempts /
-decision_rounds`. `best_quality` is the best revealed score. `attempts` counts
-revealed non-root nodes. `decision_rounds` counts non-empty batches. `beta1` and
-`beta2` are fixed evaluator coefficients. The policy's `beta` is a separate
-exploration knob.
+The default reward is the paper's page-6 equation (1):
+`best_quality − beta1 × N + beta2 × N / max(1, decision_rounds)`. `best_quality`
+is the best revealed score. `N = |T| − 1` counts every revealed non-root node,
+branch openings included. `decision_rounds` counts non-empty batches. `beta1`
+and `beta2` are fixed evaluator coefficients. The selected policy is the highest
+valid score including the incumbent, so it is never worse than the policy the
+phase started from. The policy's `beta` is a separate exploration knob.
+
+The records name this default `legacy` for compatibility. `pareto`
+(`pareto.auc − lambda × parallel_penalty`) is a local experimental alternative
+inspired by the Appendix B.2 prompt; the paper publishes no exact formula for it.
 
 ## What a run records
 
 ```
-pool/            one JSON grid per round: cells, outcomes, which patch each cell is
-policy/v000.mjs  the policy a round started from, and every revision
-policy/current.mjs  the version the next round plays
-replay/v000.json the sweep scores: mean reward, best beta, spread, failures
-rsi/round-001/{rollout.json, dreaming.json}
-dreaming.json    the versions of the last dreaming phase, and what it deployed
-rsi-summary.json the whole run: rounds, pool, best cell, improvement, cost
-rsi.json         live phase, round, pool and policy — what the panel reads
-winner.patch     the best attempted version, ready to land
+pool/                    one JSON grid per round: cells, outcomes, which patch each cell is
+policy/r001-v000.mjs     a phase's policy versions; the phase label keeps each round's apart
+policy/current.mjs       the version the next round plays
+replay/r001-v000.json    that version's sweep: mean reward, best beta, spread, failures
+rsi/round-001/rollout.json   what exploring cost, and the plan it used
+rsi/round-001/dreaming.json  every version replayed, which won, what was deployed
+rsi/round-001/rsi-b0-r001c1.json  one attempt's full record, written as it ended
+rsi/r001-b0a0.patch      that attempt's diff, named by its round, branch and depth
+dreaming.json            the versions of the last dreaming phase, and what it deployed
+rsi-summary.json         the whole run: rounds, pool, best cell, improvement, cost
+rsi.json                 live phase, round, pool and policy — what the panel reads
+winner.patch             the best attempted version, ready to land
 ```
 
 ## Picking a run back up
@@ -92,8 +104,8 @@ node tools/dream/inspect.mjs --port 4317
 
 The page reads the run directory, the pool, the policy versions and the agent's
 own transcript, so a working attempt is visible while it works. It draws the grid
-cell by cell with the order each attempt was probed in, and reward against beta
-beside attainment against probes.
+cell by cell with the order each attempt was probed in, and the ranked reward
+against beta beside attainment against probes.
 
 Started as a managed background job, the shell that launched it can be reaped
 while the server it spawned keeps running, and the job then reports a failure that

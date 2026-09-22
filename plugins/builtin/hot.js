@@ -27,12 +27,14 @@
  * a full reload before anything here runs. Editing, adding and breaking a file
  * are all handled in place, which is the loop that actually matters.
  */
+import { engineTransport } from '../../engine/transport.js'
+
 export default {
   name: 'Live File Updates',
 
   category: 'engine',
   onLoad(context) {
-    const hot = import.meta.hot
+    const hot = engineTransport(import.meta.hot)
     if (!hot) return
 
     hot.on('engine:changed', async change => {

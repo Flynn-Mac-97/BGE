@@ -10,7 +10,7 @@ better than the one that was just replayed.
 
 Change that file and nothing else. It is the whole policy: a class extending
 `LLMDesignedMethod`, one `beta` read in the constructor, `solve(question,
-budget)` and `plan_grid(context)`.
+budget)`, and optionally `plan_grid(context)`.
 
 ## What the policy may read
 
@@ -31,10 +31,9 @@ question.max_parallelism
 An `Observation` carries `branch attempt score evaluated valid fail_class error
 delta_vs_baseline delta_vs_parent n_valid n_total`.
 
-A cell the recorded run never reached reveals `evaluated: false`, `valid: false`,
-`fail_class: "not_recorded"` and `error: "this attempt was never made"`. That
-probe is spent and buys nothing, so spending the whole budget on unreached cells
-scores badly.
+Replay reveals only a child the recorded tree already holds. A recorded leaf has
+no legal continuation, so a cell the run never reached is not a legal action and
+is never probed.
 
 The four signals beside the API answer the judgements the rules below ask for.
 `branchPromising(observations, branch)` returns `{ promising, anchored, climbing
@@ -129,25 +128,26 @@ class Policy extends LLMDesignedMethod {
 ## What is rewarded
 
 The evaluator sweeps your single `beta` knob and ranks the resulting curve by
-the paper's objective:
+the paper's page-6 equation (1):
 
 ```
-pareto.reward = pareto.auc - lambda * parallel_penalty
+V = best_quality − beta1 × N + beta2 × N / max(1, decision_rounds)
 ```
 
-`pareto.auc` rewards reaching high per-trace attainment with few total probes.
-`parallel_penalty` is the mean of `effective_sequential_rounds / total_probes`
-over the sweep. A batch of `k` cells on `W = question.max_parallelism` workers
-costs one decision round and `ceil(k / W)` effective sequential rounds, so a
-serial policy has a penalty near 1 and a useful full batch approaches `1/W`.
-`lambda` is a fixed evaluator coefficient.
+`best_quality` is the best revealed score. `N = |T| − 1` counts every revealed
+non-root node, branch openings included, which in replay is every probe. The
+second term is the cost of the attempts the trajectory represents; the third
+rewards batching useful continuations into few decision rounds. `beta1` and
+`beta2` are fixed evaluator coefficients.
 
-`legacy` is the older equation `best_quality − beta1 × attempts + beta2 ×
-attempts / decision_rounds`. It is not the ranked number. Its values are not
-comparable with `pareto.reward`, so never compare the two and never tune the
-policy towards a legacy figure. In the route lines below, `reward` is the
-pareto reward; `bonus` belongs to the legacy equation and is not the ranked
-number.
+This equation is named `legacy` in the records for compatibility. It is the
+ranked number. In the route lines below, `reward` is this value and `bonus` is
+its batching term.
+
+`pareto` (`pareto.auc − lambda × parallel_penalty`) is a local experimental
+alternative inspired by the Appendix B.2 prompt. The paper publishes no exact
+formula for it, and its numbers are not comparable with the default. Do not
+tune towards it unless the run is explicitly scored with it.
 
 So find high-quality recorded outcomes with few probes, and batch independent
 promising probes whenever the evidence supports them.
@@ -194,14 +194,21 @@ The sweep is non-degenerate only when beta changes the attainment/work
 trade-off, and it also shows whether the policy batches. Do not pick the
 smallest beta that reaches a frozen trace's known ceiling.
 
-## plan_grid is required
+## plan_grid (optional in this engine)
 
-Every version must implement `plan_grid(context)`. It runs before a new grid
-exists, reads no outcome of the current episode, and is synchronous: returning a
-promise fails the round. It must return a plan on every path and must not fall
-through to the runner's rule. When history is empty or insufficient, return an
-explicit conservative bootstrap derived from the context and say the evidence is
-insufficient.
+This is the Appendix B.2 planning idea, not part of the page-6 equation. A
+version may define `plan_grid(context)`. The live round calls it when present and
+otherwise uses the runner's own history rule, so a version without one is still
+valid; `loadPolicy` does not require it. Replay never calls `plan_grid`, so the
+sweep scores the route a policy takes through a recorded grid, not its plan:
+width and depth affect only the next live round. That is a known limitation, not
+a reward channel.
+
+`plan_grid` runs before a new grid exists, reads no outcome of the current
+episode, and is synchronous: returning a promise stops the round. Return a plan
+on every path, or fall through to the runner's rule. When history is empty or
+insufficient, return an explicit conservative bootstrap derived from the context
+and say the evidence is insufficient.
 
 `context` carries:
 
@@ -220,9 +227,9 @@ hardMaxRefineCount })` is the conservative answer from those facts when you have
 nothing better. The runner validates `1 <= branchCount <= hardMaxBranchCount`
 and `0 <= refineCount <= hardMaxRefineCount`; outside that it stops the round
 rather than clamping. The plan makes branches `0..branchCount-1` and attempts
-`0..refineCount`, so `refineCount` is the refinements allowed after each root. A
-plan beyond `traceBranchCount` or `traceRefineCount` is outside a frozen trace's
-support and earns no replay reward.
+`0..refineCount`, so `refineCount` is the refinements allowed after each root.
+`traceBranchCount` and `traceRefineCount` name the frozen trace's support when
+the runner supplies them; the current RSI loop does not, so they are `null`.
 
 Choose width against depth from evidence, not from a preference:
 
@@ -279,12 +286,12 @@ and make one concrete change when the reward stalls.
 
 ## Rules the run enforces
 
-- The version must load and export a policy with a `NAME`, a `solve` and a
-  `plan_grid`.
-- It must probe at least once, and it must stop. A policy that loops forever is
-  a failed version, not a patient one.
-- Replay calls `solve(question, null)`. Terminate when no batch is selected;
-  never assume a budget cap exists.
+- The version must load and export a policy with a `NAME` and a `solve`.
+- It must stop. A policy that loops forever is a failed version, not a patient
+  one. The paper permits an immediate stop, so there is no minimum number of
+  probes.
+- Replay calls `solve(question, null)`. Terminate when no batch is selected or
+  no recorded continuation remains; never assume a budget cap exists.
 - It may only make the reward higher. A version that changes nothing scores what
   the last one scored, and the run keeps the earlier file.
 

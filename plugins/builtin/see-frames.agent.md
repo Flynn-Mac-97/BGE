@@ -17,6 +17,11 @@ Reach for a frame when the question is genuinely about appearance — does this
 read as a wall, is the silhouette right, does the lighting sell it — or when a
 person asked to see something.
 
+Use `see.editor` for the desktop editor panels. Add `{"scope":"window"}`
+to include the desktop tabs and console. This captures Electron surfaces,
+requires the desktop host, and does not need Chrome or native computer tools.
+Use `see.capture` for the game canvas.
+
 ## Detail
 
 Read only the file your task needs.

@@ -5,8 +5,9 @@
  * docks around it, a toolbar above and a test list below. The game was about a
  * third of the window, and a panel was one stray click away mid-round.
  *
- * So: when play starts the frame collapses to the viewport and the browser's own
- * chrome goes with it; when play stops the editor comes back exactly as it was.
+ * So: when play starts the frame collapses to the viewport; when play stops the
+ * editor comes back exactly as it was. Play never asks for full screen — that is
+ * the FOCUS button's job, and only a real click can ask.
  *
  * The split. `shell.focus(on)` is the kernel's — the frame lives in
  * `engine/shell.js`, so knowing *how* to get out of the way lives there, and a
@@ -41,6 +42,7 @@
 export const playFocus = {
   context: null,    // the live context, filled in at load
   wanted: false,    // what the policy last asked for
+  wantsFullscreen: true, // whether this ask also wanted the whole screen
   fullscreen: false // whether the browser actually granted the whole screen
 }
 
@@ -74,9 +76,10 @@ function say(kind, message) {
  * Exported so a test can drive the policy directly against whatever `context.shell`
  * is at the time, with no screen and no click involved.
  */
-export function applyFocus(context, on) {
+export function applyFocus(context, on, { fullscreen = true } = {}) {
   const wanted = !!on
   playFocus.wanted = wanted
+  playFocus.wantsFullscreen = wanted && fullscreen
   // Cleared first, so whatever the report says afterwards is about this attempt
   // and not about one three rounds ago.
   why = null
@@ -91,8 +94,8 @@ export function applyFocus(context, on) {
   }
 
   shell.focus(wanted)
-  if (wanted) askForFullScreen(context)
-  else leaveFullScreen()
+  if (wanted && fullscreen) askForFullScreen(context)
+  else if (!wanted) leaveFullScreen()
   return describeFocus(context)
 }
 
@@ -100,10 +103,9 @@ export function applyFocus(context, on) {
  * Ask for the whole screen.
  *
  * The browser only grants this from inside a user gesture. The gesture is the
- * click on PLAY: `editor.togglePlay` emits `play:started` synchronously from the
- * button's own handler, so the listener below is still inside it. Starting play
- * from a terminal is not a gesture and the request is refused — which is why the
- * refusal says what to press instead, and why the FOCUS toolbar button exists.
+ * click on FOCUS. Play never asks, so a game does not seize the screen when it
+ * starts and a terminal run does not trip a refusal it cannot satisfy; the
+ * FOCUS toolbar button is the way in, and F11 does the same by hand.
  */
 function askForFullScreen(context) {
   if (typeof document === 'undefined') {
@@ -158,9 +160,10 @@ export function describeFocus(context) {
   // A request that was neither granted nor rejected still has to read as
   // something. The request is made and answered a moment later, so this is what
   // the report says in between — and what it keeps saying if the answer never
-  // comes, which is the case that would otherwise be silent.
-  const pending = playFocus.wanted && focused && !fullscreen && !why
-    ? 'the browser has not granted full screen. It is only granted from a real click, so press PLAY or FOCUS in the toolbar; F11 does the same by hand.'
+  // comes, which is the case that would otherwise be silent. Only a call that
+  // asked for the whole screen can be waiting on one.
+  const pending = playFocus.wanted && playFocus.wantsFullscreen && focused && !fullscreen && !why
+    ? 'the browser has not granted full screen. It is only granted from a real click, so press FOCUS in the toolbar; F11 does the same by hand.'
     : why
 
   return {
@@ -172,7 +175,7 @@ export function describeFocus(context) {
     // Only ever a reason something is *not* on. Nothing is wrong when nothing
     // was asked for, and a report that always carries a complaint teaches you to
     // stop reading it.
-    why: playFocus.wanted && !(focused && fullscreen) ? pending : null,
+    why: playFocus.wanted && playFocus.wantsFullscreen && !(focused && fullscreen) ? pending : null,
     escape: ESCAPE_MEANS
   }
 }
@@ -184,8 +187,9 @@ export default {
   onLoad(context) {
     playFocus.context = context
 
-    // The policy, and the whole of it: play decides, the shell obeys.
-    context.bus.on('play:started', () => applyFocus(context, true))
+    // The policy, and the whole of it: play collapses the frame, the shell obeys.
+    // Full screen is left to the FOCUS button, which is a real gesture.
+    context.bus.on('play:started', () => applyFocus(context, true, { fullscreen: false }))
     context.bus.on('play:stopped', () => applyFocus(context, false))
 
     if (typeof document === 'undefined') return
@@ -215,16 +219,20 @@ export default {
     on: context => context.shell?.focused === true,
     // A toolbar click is a real user gesture, so this is also the way back into
     // full screen after play was started from a terminal, or after Escape.
-    run: context => { applyFocus(context, !(context.shell?.focused === true)) }
+    run: context => { applyFocus(context, !(context.shell?.focused === true), { fullscreen: true }) }
   }],
 
   commands: [{
     id: 'play.focus',
     label: 'Screen fill state',
-    // args: nothing to read it, true or false to set it by hand
+    // args: nothing to read it, true or false to collapse or restore,
+    // or {"on":true,"fullscreen":true} to also ask for the whole screen
     run(context, wanted) {
       if (wanted === undefined || wanted === null) return describeFocus(context)
-      return applyFocus(context, wanted === true || wanted === 'true')
+      if (typeof wanted === 'object') {
+        return applyFocus(context, wanted.on === true, { fullscreen: wanted.fullscreen === true })
+      }
+      return applyFocus(context, wanted === true || wanted === 'true', { fullscreen: false })
     }
   }]
 }

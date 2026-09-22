@@ -44,6 +44,21 @@ function resolvePiBundle() {
   return null
 }
 
+/**
+ * The environment pi runs in, with any proxy removed.
+ *
+ * DeepSeek is reached directly from this machine, so a proxy only adds a hop.
+ * Set PI_USE_PROXY=1 to keep the caller's proxy variables.
+ */
+function childEnvironment() {
+  const environment = { ...process.env }
+  if (process.env.PI_USE_PROXY === '1') return environment
+  for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) {
+    delete environment[name]
+  }
+  return environment
+}
+
 /** What pi is allowed to touch, per permission mode. dsh's modes, pi's tools. */
 function toolArguments(permissionMode) {
   if (permissionMode === 'read-only') return ['--tools', 'read']
@@ -116,7 +131,7 @@ async function main() {
   // longer than that.
   const child = spawn(process.execPath, [bundle, ...args], {
     cwd: options.cwd,
-    env: process.env,
+    env: childEnvironment(),
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true
   })

@@ -16,6 +16,8 @@ import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { findChrome } from '../../engine/chrome-path.mjs'
+import { recordServer, forgetServer } from '../../engine/project-servers.mjs'
+import { recordLaneBrowser, forgetLaneBrowser } from '../../engine/lane-browsers.mjs'
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -44,7 +46,7 @@ function stopTree(child) {
     // The tree is killed even when the process this holds has already exited:
     // Chrome's launcher exits as soon as the browser it started is up, and the
     // browser itself is what holds a whole scene on the graphics card.
-    if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+    if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
     else if (child.exitCode === null) child.kill('SIGKILL')
   } catch { /* already gone */ }
 }
@@ -178,6 +180,7 @@ const COMPARE = `async (first, second) => {
  * - `warmSeconds` — seconds of play before sampling, so loading is not measured.
  * - `frames` — frames sampled while playing.
  * - `cycles` — play-and-stop rounds for the memory check; 0 skips it.
+ * - `profileOut` — write a Chrome CPU profile of the sampled playing frames here.
  *
  * Answers `{ measures, difference, picture, problem }`. `measures` holds
  * `cpuMs` and `gpuMs` (medians over the sampled frames: the thread's time and the
@@ -189,19 +192,30 @@ const COMPARE = `async (first, second) => {
 export async function browserFrames(checkout, project, options = {}) {
   const {
     level = null, size = [1280, 720], camera = null, picture = null, compareTo = null,
-    warmSeconds = 15, frames = 120, cycles = 0
+    warmSeconds = 15, frames = 120, cycles = 0, profileOut = null
   } = options
   const started = Date.now()
   const serverPort = await freePort()
   const cdpPort = await freePort()
   const profile = fs.mkdtempSync(path.join(tmpdir(), 'dream-browser-'))
+  // The page carries this name, so `lanes` proves the browser is the one this
+  // record describes rather than any browser holding the debugging port.
+  const client = `dream-${serverPort}`
   let server = null
   let chrome = null
   let page = null
   try {
     server = spawn(process.execPath, [viteScript(checkout), '--port', String(serverPort), '--strictPort'], {
-      cwd: checkout, env: { ...process.env, ENGINE_PROJECT: project }, stdio: 'ignore'
+      cwd: checkout, env: { ...process.env, ENGINE_PROJECT: project }, stdio: 'ignore', windowsHide: true
     })
+    // The dev server records itself once it listens; this is written first so a
+    // server killed before it ever listened is still findable and stoppable.
+    try {
+      recordServer(checkout, {
+        port: serverPort, pid: server.pid, serves: checkout, project,
+        url: `http://localhost:${serverPort}`, startedAt: new Date().toISOString()
+      })
+    } catch { /* a measurement must not stop because the registry is busy */ }
     await waitFor('the dev server', async () => (await fetch(`http://localhost:${serverPort}/api/project`)).ok, 180000)
 
     // Named here so the record says which browser measured, and so a run that
@@ -211,8 +225,17 @@ export async function browserFrames(checkout, project, options = {}) {
       '--headless=new', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', '--disk-cache-size=1',
       `--remote-debugging-port=${cdpPort}`, `--user-data-dir=${profile}`, '--no-first-run',
       '--no-default-browser-check', `--window-size=${size[0]},${size[1]}`,
-      `http://localhost:${serverPort}/?client=dream-${serverPort}`
-    ], { stdio: 'ignore' })
+      `http://localhost:${serverPort}/?client=${encodeURIComponent(client)}`
+    ], { stdio: 'ignore', windowsHide: true })
+    // Written before the wait, so a scoring run killed outright leaves the
+    // browser findable by `lanes` or the supervisor instead of leaking it.
+    try {
+      recordLaneBrowser(checkout, {
+        client, port: cdpPort, url: `http://localhost:${serverPort}/?client=${encodeURIComponent(client)}`,
+        pid: chrome.pid, profile, serves: checkout, chrome: browser,
+        headless: true, startedAt: new Date().toISOString()
+      })
+    } catch { /* the browser is still measured even when it cannot be recorded */ }
     page = await connect(cdpPort)
 
     if (level) {
@@ -227,7 +250,7 @@ export async function browserFrames(checkout, project, options = {}) {
     const answer = { measures, difference: null, picture: null, problem: null }
     if (picture || compareTo) Object.assign(answer, await stillPicture(page, camera, picture, compareTo))
 
-    Object.assign(measures, await playingFrames(page, warmSeconds, frames))
+    Object.assign(measures, await playingFrames(page, warmSeconds, frames, profileOut))
     if (cycles > 0) Object.assign(measures, await memoryOverCycles(page, cycles))
     return answer
   } catch (error) {
@@ -238,6 +261,8 @@ export async function browserFrames(checkout, project, options = {}) {
     stopTree(chrome)
     stopTree(server)
     await sleep(1000)
+    try { forgetLaneBrowser(checkout, client) } catch { /* the registry is already unreadable */ }
+    try { forgetServer(checkout, serverPort, server?.pid) } catch { /* already gone */ }
     try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* Windows may still hold it */ }
   }
 }
@@ -269,12 +294,19 @@ async function stillPicture(page, camera, file, compareTo) {
 }
 
 /** Frame costs while the game plays, after `warmSeconds` of play. */
-async function playingFrames(page, warmSeconds, frames) {
+async function playingFrames(page, warmSeconds, frames, profileOut = null) {
   await page.evaluate('window.engine.play()')
   // Play draws through another camera, and nothing draws while its chain compiles.
   await sleep(1000)
   await waitForDrawing(page, 'a drawn playing frame')
   await sleep(warmSeconds * 1000)
+  // Sampling starts with the same frames the costs come from, so a hotspot in
+  // the profile is a hotspot in the priced frame rather than in loading.
+  if (profileOut) {
+    await page.call('Profiler.enable')
+    await page.call('Profiler.setSamplingInterval', { interval: 100 })
+    await page.call('Profiler.start')
+  }
   const samples = await page.evaluate(`new Promise(resolve => {
     const cpu = [], gpu = [], gaps = []
     let last = performance.now()
@@ -289,6 +321,10 @@ async function playingFrames(page, warmSeconds, frames) {
     }
     requestAnimationFrame(tick)
   })`)
+  if (profileOut) {
+    const stopped = await page.call('Profiler.stop')
+    fs.writeFileSync(profileOut, JSON.stringify(stopped.profile))
+  }
   await page.evaluate('window.engine.stop()')
   return {
     cpuMs: round(median(samples.cpu)),
@@ -296,7 +332,8 @@ async function playingFrames(page, warmSeconds, frames) {
     gpuMs: round(median(samples.gpu)),
     frameMs: round(median(samples.gaps)),
     drawCalls: samples.drawCalls,
-    triangles: samples.triangles
+    triangles: samples.triangles,
+    ...(profileOut ? { profile: profileOut } : {})
   }
 }
 

@@ -107,7 +107,8 @@ const children = roster.map(agent => {
   const child = spawn(process.execPath, [AGENT, JSON.stringify({ ...agent, report, scratch })], {
     cwd: CHECKOUT,
     stdio: 'ignore',
-    env: { ...process.env }
+    env: { ...process.env },
+    windowsHide: true
   })
   return { agent, child, report }
 })
@@ -147,7 +148,7 @@ for (const project of [STRESS, crowd]) {
 // One more process, alone, after all of it: the checkout still works.
 const afterAll = await new Promise(resolve => {
   const at = Date.now()
-  const child = spawn(process.execPath, [CLI, '--headless', '--project', crowd, 'snapshot'], { cwd: CHECKOUT, stdio: 'ignore' })
+  const child = spawn(process.execPath, [CLI, '--headless', '--project', crowd, 'snapshot'], { cwd: CHECKOUT, stdio: 'ignore', windowsHide: true })
   child.on('exit', code => resolve({ code, ms: Date.now() - at }))
 })
 

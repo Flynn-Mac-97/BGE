@@ -218,7 +218,7 @@ export const pluginProblems = failures => failures.map(failure => ({
  */
 function syntaxErrorLine(file) {
   try {
-    execFileSync(process.execPath, ['--check', file], { stdio: ['ignore', 'pipe', 'pipe'] })
+    execFileSync(process.execPath, ['--check', file], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
     return null
   } catch (error) {
     return Number(String(error.stderr || '').split('\n')[0]?.match(/:(\d+)\s*$/)?.[1]) || null

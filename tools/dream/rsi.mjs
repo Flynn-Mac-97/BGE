@@ -13,12 +13,14 @@
  *   3. construct a simulator — the grid joins the pool, and the pool is frozen
  *      for the dreaming phase that follows;
  *   4. dream — the policy is revised M times, every version replayed over every
- *      grid in the pool, and the best average reward is selected;
+ *      grid in the pool, and the highest valid reward is selected, the incumbent
+ *      included, so the deployed policy is never worse than the one before it;
  *   5. redeploy — the selected policy drives the next round, and the pool grows.
  *
- * Only step 2 costs anything. That is the whole argument of the paper: the
- * expensive work happens once, and every policy tried afterwards is scored by
- * reading what that work recorded.
+ * Step 2 is the only one that makes real attempts, which is the paper's point:
+ * the expensive discovery work happens once. Step 4's replay is arithmetic, but
+ * its policy revisions do call a development agent, so the offline half is not
+ * free either.
  *
  * The loop never lands a change. It proposes a patch; applying it is a separate
  * decision.
@@ -385,7 +387,6 @@ export async function rsiRun({
   const priorRounds = await recordedRsiRounds(directory)
   const firstRound = priorRounds.reduce((highest, round) => Math.max(highest, round.number), 0) + 1
   const history = priorRounds.filter(round => round.plannedBranchCount !== null)
-  const spent = []
   const record = {
     target: targetText,
     baseline,
@@ -451,22 +452,37 @@ export async function rsiRun({
     // The grid is written after every attempt, not only when the round ends. A
     // rollout is the expensive part of the loop, and one that can only be watched
     // after it finishes is one nobody can stop in time.
-    await fs.mkdir(roundDirectory(directory, round), { recursive: true })
-    const liveGrid = path.join(roundDirectory(directory, round), 'grid.json')
+    const roundDir = roundDirectory(directory, round)
+    await fs.mkdir(roundDir, { recursive: true })
+    const liveGrid = path.join(roundDir, 'grid.json')
     const writeGrid = () => fs.writeFile(liveGrid, `${JSON.stringify(grid, null, 2)}\n`, 'utf8')
     await writeGrid()
+
+    // One record per attempt, written as it ends. The next attempt in this same
+    // round reads these through the candidate prompt, so it sees what its
+    // siblings already tried rather than only what earlier rounds did.
+    const writeAttemptRecord = async made => {
+      if (!made?.record) return
+      const attemptRecord = {
+        ...made.record,
+        patchFile: made.patchPath ? path.relative(directory, made.patchPath).split(path.sep).join('/') : null,
+        // The diff is the .patch file beside this record; copying it here would
+        // double the size of the run directory for no reader.
+        patch: null
+      }
+      await fs.writeFile(path.join(roundDir, `${made.record.id}.json`), `${JSON.stringify(attemptRecord, null, 2)}\n`, 'utf8')
+    }
 
     const rollout = await rolloutOnce({
       grid,
       policy,
       maxParallelism,
       attempt: makeAttemptFactory(round),
-      onAttempt: writeGrid
+      onAttempt: async (answer, made) => {
+        await writeAttemptRecord(made)
+        await writeGrid()
+      }
     })
-    for (const made of rollout.records) {
-      if (made.record?.cost) spent.push(made.record.cost)
-      else if (made.record?.tokens) spent.push(costBands(made.record.tokens))
-    }
 
     const added = await addGrid(directory, grid)
     if (added.error) {
@@ -495,6 +511,9 @@ export async function rsiRun({
     // priced without the grid having to carry the money as well as the outcome.
     const attempts = rollout.records.map(made => ({
       cell: made.id,
+      id: made.record?.id ?? null,
+      depth: made.record?.depth ?? null,
+      parent: made.record?.parent ?? null,
       verdict: made.record?.verdict ?? null,
       value: made.record?.value ?? null,
       reason: made.record?.reason ?? null,
@@ -519,6 +538,7 @@ export async function rsiRun({
       beta1,
       beta2,
       startPolicyFile: hasPolicy ? currentPolicyFile : null,
+      phase: `r${String(round).padStart(3, '0')}`,
       ...(revise ? { revise } : { timeoutSeconds, model, harness })
     })
     if (dreamed.error) {
@@ -528,11 +548,12 @@ export async function rsiRun({
 
     roundRecord.dreaming = {
       pool: dreamed.pool,
-      versions: dreamed.versions.map(version => ({ version: version.version, policy: version.policy, score: version.score, failure: version.failure ?? null, degenerate: version.degenerate })),
+      versions: dreamed.versions.map(version => ({ version: version.version, policy: version.policy, score: version.score, valid: version.valid ?? false, failure: version.failure ?? null, degenerate: version.degenerate })),
       winner: dreamed.winner,
       improved: dreamed.improved,
       gain: dreamed.gain,
-      deployed: dreamed.deployed
+      deployed: dreamed.deployed,
+      revisionCosts: dreamed.revisionCosts ?? []
     }
     await fs.writeFile(path.join(roundDirectory(directory, round), 'dreaming.json'), `${JSON.stringify(roundRecord.dreaming, null, 2)}\n`, 'utf8')
     record.rounds.push(roundRecord)
@@ -577,7 +598,23 @@ export async function rsiRun({
   record.best = best
   record.baseline = baseline
   record.improvement = best ? Number((best.score - baseline.value).toFixed(6)) : 0
-  record.cost = sumCosts(spent)
+  // The cost of every round the run has recorded, not only the rounds this
+  // invocation made: a resumed run read its earlier rounds back, and a cost that
+  // ignored them would understate the run by half its work. Each attempt's
+  // record carries its own token breakdown, and each dreaming phase its revising
+  // agents', so the sum is recomputed from the records rather than carried in
+  // memory across invocations.
+  const costItems = []
+  for (const round of everyRound) {
+    const attempts = JSON.parse(await fs.readFile(path.join(roundDirectory(directory, round.number), 'attempts.json'), 'utf8').catch(() => 'null')) ?? []
+    for (const attempt of attempts) {
+      if (attempt.cost) costItems.push(attempt.cost)
+      else if (attempt.tokens) costItems.push(costBands(attempt.tokens))
+    }
+    const dreaming = JSON.parse(await fs.readFile(path.join(roundDirectory(directory, round.number), 'dreaming.json'), 'utf8').catch(() => 'null'))
+    for (const cost of dreaming?.revisionCosts ?? []) if (cost?.priced) costItems.push(cost)
+  }
+  record.cost = sumCosts(costItems)
   record.policies = history
 
   if (best?.patchPath) {

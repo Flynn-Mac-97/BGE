@@ -57,58 +57,67 @@ test('a replay is deterministic and spends no agent and no process', async () =>
   assert.equal(first.attainment, 0.9, 'the replay did not reach the recorded best')
 })
 
-test('a policy sees only what it revealed, and an unreached cell is not a failure', () => {
+test('replay reveals only recorded continuations, so a phantom cell is never a probe', () => {
   const grid = emptyGrid({ id: 'g', baseline: { value: 0.1 }, branchCount: 2, refineCount: 2 })
   record(grid, { branch: 0, attempt: 0, outcome: { score: 0.4, verdict: 'scored' } })
+  record(grid, { branch: 0, attempt: 1, outcome: { score: 0.5, verdict: 'scored' } })
   const question = makeQuestion({ grid, maxParallelism: 2 })
 
+  // Only the recorded root is legal: branch 1 was never opened and 0:2 was
+  // never reached, so neither is a continuation the recorded tree holds.
+  assert.deepEqual(question.legal_actions(), ['0:0'], 'an unrecorded cell was offered as a legal action')
   assert.deepEqual(question.observed(), {}, 'a fresh question revealed something')
-  assert.equal(question.meta('1:1').revealed, false, 'an unrevealed cell reported itself revealed')
-  assert.equal(question.meta('1:1').outcome, null)
+  assert.equal(question.meta('0:1').revealed, false, 'an unrevealed cell reported itself revealed')
+  assert.equal(question.meta('0:1').outcome, null)
+  assert.throws(() => question.probe_batch(['1:0']), /not a legal action/, 'a cell the run never reached was probeable')
 
-  question.probe_batch(['0:0', '1:0'])
+  question.probe_batch(['0:0'])
   const observed = question.observed()
-  assert.deepEqual(Object.keys(observed).sort(), ['0:0', '1:0'])
+  assert.deepEqual(Object.keys(observed), ['0:0'], 'a phantom cell was revealed')
   assert.equal(observed['0:0'].score, 0.4)
-  assert.equal(observed['1:0'].evaluated, false, 'a cell the run never reached read as evaluated')
-  assert.equal(observed['1:0'].fail_class, 'not_recorded')
   assert.equal(observed['0:0'].delta_vs_baseline, 0.3, 'the delta against the baseline is wrong')
+  assert.deepEqual(question.legal_actions(), ['0:1'], 'the recorded child was not the only legal continuation')
+  assert.throws(() => question.probe_batch(['0:2']), /not a legal action/)
 })
 
 test('the question refuses an illegal batch rather than repairing it', () => {
   const grid = emptyGrid({ id: 'g', baseline: { value: 0.1 }, branchCount: 2, refineCount: 2 })
+  record(grid, { branch: 0, attempt: 0, outcome: { score: 0.4, verdict: 'scored' } })
+  record(grid, { branch: 1, attempt: 0, outcome: { score: 0.3, verdict: 'scored' } })
   const question = makeQuestion({ grid, maxParallelism: 3 })
 
   assert.throws(() => question.probe_batch(['0:1']), /not a legal action/, 'attempt 1 was allowed before attempt 0')
   assert.throws(() => question.probe_batch(['0:0', '1:0', '1:0']), /twice/, 'a repeated cell was allowed')
-  assert.throws(() => question.probe_batch(['0:0', '1:0', '0:0']), /twice|not a legal/, 'a repeated cell was allowed')
+  assert.throws(() => question.probe_batch(['0:0', '1:0', '9:9']), /not a legal action/, 'an unrecorded cell was allowed')
 })
 
 test('max_parallelism is a limit, not a suggestion', () => {
   const grid = emptyGrid({ id: 'g', baseline: { value: 0.1 }, branchCount: 4, refineCount: 0 })
+  for (let branch = 0; branch < 4; branch++) record(grid, { branch, attempt: 0, outcome: { score: 0.2, verdict: 'scored' } })
   const question = makeQuestion({ grid, maxParallelism: 2 })
   assert.throws(() => question.probe_batch(['0:0', '1:0', '2:0']), /exceeds max_parallelism/)
   assert.equal(question.probe_batch(['0:0', '1:0']).length, 2)
 })
 
-test('the legacy reward counts non-root attempts and rewards batching', async () => {
+test('the page-6 reward counts every revealed node and rewards batching', async () => {
   const grid = gridWithOneGoodBranch()
   const serial = await replayGrid({ grid, policy: makePolicy('serial-refine'), maxParallelism: 3 })
-  const roots = serial.trace.reduce((total, round) => total + round.batch.filter(id => Number(String(id).split(':')[1]) === 0).length, 0)
-  assert.equal(serial.attempts, serial.probes - roots, 'root probes were charged as refinements')
+  // N = |T| - 1 counts every revealed non-root node, branch openings included.
+  // Replay reveals only recorded continuations, so N is exactly the probes spent.
+  assert.equal(serial.attempts, serial.probes, 'N did not count every revealed node')
   assert.ok(serial.parallelBonus > 0, 'serial refinement did not earn a batching term')
+  assert.equal(serial.reward, Number((serial.quality - 0.01 * serial.attempts + 0.5 * serial.parallelBonus).toFixed(6)))
+  assert.equal(serial.objective, 'legacy')
+  assert.equal(serial.reward, serial.legacyReward, 'the default is not the page-6 equation')
 
-  // A policy that always fills the batch: the paper's other stated check.
+  // A policy that always fills its batch earns a bigger parallelism bonus.
   const greedy = { NAME: 'full-batches', solve(question) { question.reset(); while (question.legal_actions().length) question.probe_batch(question.legal_actions().slice(0, question.max_parallelism)) } }
-  const filled = await replayGrid({ grid, policy: greedy, maxParallelism: 3, objective: 'legacy' })
-  assert.ok(filled.parallelBonus >= 0, 'the batching term was not recorded')
-  assert.equal(filled.objective, 'legacy', 'the legacy sweep did not name its objective')
-  assert.equal(filled.reward, Number((filled.quality - 0.01 * filled.attempts + 0.5 * filled.parallelBonus).toFixed(6)))
-  assert.equal(filled.legacyReward, filled.reward, 'the legacy objective did not return the body-of-paper equation')
+  const filled = await replayGrid({ grid, policy: greedy, maxParallelism: 3 })
+  assert.ok(filled.parallelBonus >= serial.parallelBonus, 'batching did not raise the parallelism bonus')
 
-  const paper = await replayGrid({ grid, policy: greedy, maxParallelism: 3 })
-  assert.equal(paper.objective, 'pareto')
-  assert.equal(paper.reward, paper.paretoReward, 'the default objective is not the paper reward')
+  const experiment = await replayGrid({ grid, policy: greedy, maxParallelism: 3, objective: 'pareto' })
+  assert.equal(experiment.objective, 'pareto')
+  assert.equal(experiment.reward, experiment.paretoReward, 'the experimental objective did not return its own number')
 })
 
 test('a policy that opens branches and fills batches beats one that only refines', async () => {

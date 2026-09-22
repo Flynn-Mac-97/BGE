@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.mjs",
   "bin": {
     "engine": "bin/engine.mjs"
   },
@@ -11,6 +12,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "engine": "node bin/engine.mjs",
+    "electron": "node tools/build-desktop.mjs && electron electron/main.mjs",
+    "desktop:build": "npm run build && node tools/build-desktop.mjs",
+    "desktop:package": "npm run desktop:build && node tools/package-desktop.mjs",
+    "test:desktop": "node tools/test-desktop.mjs",
     "test": "npm run test:offline && node test/cli.bridge.mjs",
     "test:offline": "node --test \"test/*.test.mjs\"",
     "test:agent": "node --test test/agent-workspace.test.mjs"
@@ -19,14 +24,22 @@
     "@dimforge/rapier2d-deterministic-compat": "^0.20.0",
     "@dimforge/rapier3d-deterministic-compat": "^0.20.0",
     "@joint/core": "^4.3.3",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
+    "@xterm/xterm": "^6.0.0",
     "acorn": "^8.18.0",
+    "chokidar": "^5.0.0",
     "elkjs": "^0.12.0",
     "monaco-editor": "^0.56.0",
+    "node-pty": "^1.1.0",
     "three": "^0.186.0",
     "tree-sitter-javascript": "^0.25.0",
-    "web-tree-sitter": "^0.27.0"
+    "web-tree-sitter": "^0.27.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.4.3",
     "vite": "^5.4.0"
   }
 }

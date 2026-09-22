@@ -475,3 +475,24 @@ test('merging a reused id records the run that was merged', async t => {
   assert.notEqual(records[0].mergedAt, records[1].mergedAt, 'each merge stamped its own record')
   assert.match(execFileSync('git', ['-C', root, 'log', '--oneline'], { encoding: 'utf8' }), /work from second/)
 })
+
+test('agent context leaves Jev off by default and falls back to the plain packet without a key', async () => {
+  const beforeKey = process.env.OPENROUTER_API_KEY
+  const beforeProxy = process.env.OPENROUTER_PROXY_URL
+  delete process.env.OPENROUTER_API_KEY
+  delete process.env.OPENROUTER_PROXY_URL
+  try {
+    const off = await contextFromDisk(ROOT, { task: 'finish the See plugin', jev: false })
+    assert.equal(off.jev, undefined, 'off means no Jev field and no call')
+    const plain = await contextFromDisk(ROOT, { task: 'finish the See plugin' })
+    assert.equal(plain.jev, undefined, 'the switch is off by default')
+
+    const on = await contextFromDisk(ROOT, { task: 'finish the See plugin', jev: true })
+    assert.equal(on.jev.ok, false)
+    assert.match(on.jev.why, /no OpenRouter key/)
+    assert.equal(on.text, plain.text, 'a Jev fault leaves the packet exactly as it was')
+  } finally {
+    if (beforeKey !== undefined) process.env.OPENROUTER_API_KEY = beforeKey
+    if (beforeProxy !== undefined) process.env.OPENROUTER_PROXY_URL = beforeProxy
+  }
+})

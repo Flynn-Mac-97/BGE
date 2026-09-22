@@ -23,6 +23,10 @@ file, and nothing is saved anywhere else.
 - Working with other agents at once: `docs/agent-workspace.md`, the "Several
   agents at once" section. Claim a file with `agent.prepare` and set
   `ENGINE_AGENT_ID`, or another run's claim will refuse your writes.
+- Every engine process goes through the supervisor: the dev server, the editor
+  browser, a lane browser and a headless session. Start it with
+  `node bin/engine.mjs supervisor.start`, or `engine.cmd` at the checkout root.
+  Rule: `agents/supervisor.md`.
 
 ## Style links
 

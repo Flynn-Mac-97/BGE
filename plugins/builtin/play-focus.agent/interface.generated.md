@@ -1,4 +1,4 @@
-<!--204e88ca-->
+<!--2d5912b6-->
 parsed from source
   plugin Play Focus
   category editor
@@ -7,4 +7,4 @@ parsed from source
   play.focus.toggle
   arguments play.focus: wanted;play.focus.toggle:
   listens play:started, play:stopped
-  source 231 lines
+  source 239 lines

@@ -267,10 +267,15 @@ export async function renderRsiPictures(runDirectory) {
   const attemptCosts = []
   for (const name of (await fs.readdir(rsiDirectory).catch(() => [])).sort()) {
     const file = path.join(rsiDirectory, name, 'attempts.json')
-    if (!(await exists(file))) continue
-    for (const attempt of JSON.parse(await fs.readFile(file, 'utf8'))) {
-      if (attempt.cost) attemptCosts.push(attempt.cost)
+    if (await exists(file)) {
+      for (const attempt of JSON.parse(await fs.readFile(file, 'utf8'))) {
+        if (attempt.cost) attemptCosts.push(attempt.cost)
+      }
     }
+    // The offline half: what the phase's revising agents spent, recorded with
+    // the phase's dreaming result.
+    const dreaming = JSON.parse(await fs.readFile(path.join(rsiDirectory, name, 'dreaming.json'), 'utf8').catch(() => 'null'))
+    for (const cost of dreaming?.revisionCosts ?? []) if (cost?.priced) attemptCosts.push(cost)
   }
 
   const target = await read('target.json')

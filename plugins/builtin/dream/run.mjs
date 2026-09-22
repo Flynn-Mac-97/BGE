@@ -133,7 +133,7 @@ export function readReport({ checkout, directory }) {
  * setting of one: the evolutionary loop improves the artifact and keeps a fixed
  * measure, and this one improves the exploration policy over recorded attempts.
  */
-export async function startRsi({ checkout, target, rounds = 2, versions = 3, parallelism = 3, branches, refinements, seed, timeout, model }) {
+export async function startRsi({ checkout, target, rounds = 2, versions = 3, parallelism = 3, branches, refinements, seed, timeout, model, harness }) {
   if (!target || !String(target).trim()) return { refused: 'dream.rsi needs a target to improve' }
 
   const { startRun: makeRun } = await import(/* @vite-ignore */ '../../../tools/dream/setup.mjs')
@@ -147,7 +147,7 @@ export async function startRsi({ checkout, target, rounds = 2, versions = 3, par
   // first dreaming phase averages over more than one history.
   if (branches !== undefined && refinements !== undefined) args.push('--branches', String(branches), '--refinements', String(refinements))
   if (seed !== undefined) args.push('--seed', String(seed))
-  for (const [flag, value] of [['timeout', timeout], ['model', model]]) {
+  for (const [flag, value] of [['timeout', timeout], ['model', model], ['harness', harness]]) {
     if (value !== undefined && value !== null && value !== '') args.push(`--${flag}`, String(value))
   }
 
@@ -176,7 +176,7 @@ export async function startRsi({ checkout, target, rounds = 2, versions = 3, par
  * with the path, the log and the process id immediately — a person watching a
  * run needs somewhere to look before the first round finishes.
  */
-export async function startRun({ checkout, target, files = [], rounds, candidates, timeout, model }) {
+export async function startRun({ checkout, target, files = [], rounds, candidates, timeout, model, harness }) {
   if (!target || !String(target).trim()) return { refused: 'dream.improve needs a target to improve' }
 
   const { startRun: makeRun } = await import(/* @vite-ignore */ '../../../tools/dream/setup.mjs')
@@ -186,7 +186,7 @@ export async function startRun({ checkout, target, files = [], rounds, candidate
 
   const args = ['tools/dream/loop.mjs', '--run', directory, '--target', String(target)]
   if (files.length) args.push('--files', files.join(','))
-  for (const [flag, value] of [['rounds', rounds], ['candidates', candidates], ['timeout', timeout], ['model', model]]) {
+  for (const [flag, value] of [['rounds', rounds], ['candidates', candidates], ['timeout', timeout], ['model', model], ['harness', harness]]) {
     if (value !== undefined && value !== null && value !== '') args.push(`--${flag}`, String(value))
   }
 

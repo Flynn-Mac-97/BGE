@@ -38,7 +38,7 @@ function alwaysOnRules() {
   const reply = execFileSync(
     process.execPath,
     ['bin/engine.mjs', 'agent.context', JSON.stringify({ task: packetTask })],
-    { cwd: repositoryRoot, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] }
+    { cwd: repositoryRoot, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }
   );
   const text = JSON.parse(reply).text;
   if (typeof text !== 'string') return '';

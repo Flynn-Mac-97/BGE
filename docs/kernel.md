@@ -300,6 +300,9 @@ plugin filter uses the exact display name. Commands with no schema say
 
 `inputSchema` is checked at the engine.run boundary before calling the handler.
 The supported subset is type, properties, required, additionalProperties,
-items, enum, minimum, maximum and description. Unsupported keywords fail
-explicitly. Direct JavaScript calls to a handler bypass that boundary. Return
-values and data-access declarations are not validated by this feature.
+items, enum, minimum, maximum, pattern and description. `pattern` must be a
+string and is tested with JavaScript RegExp semantics, unanchored unless the
+schema anchors it; a non-string or malformed pattern is reported as a schema
+defect, never coerced. Unsupported keywords fail explicitly. Direct JavaScript
+calls to a handler bypass that boundary. Return values and data-access
+declarations are not validated by this feature.

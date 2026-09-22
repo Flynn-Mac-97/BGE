@@ -1,11 +1,13 @@
 /**
  * The online rollout: a policy choosing attempts that are really made.
  *
- * This is the paper's first stage, and the only stage that spends anything. The
+ * This is the paper's first stage: the only one that makes real attempts. The
  * policy reads what it has revealed, names a batch, and each cell in that batch
  * becomes a real attempt: a worktree branched from its parent's patch, an agent
  * working in it, and a score from the frozen setup. The outcomes are recorded
- * into the grid, which is what makes the rollout replayable afterwards.
+ * into the grid, which is what makes the rollout replayable afterwards. The
+ * dreaming phase's policy revisions also spend agent calls; they are the other
+ * paid part of a run.
  *
  * The question here has the same API as the replay question, so one policy runs
  * both. The difference is what a probe costs: replay reads an outcome that is
@@ -241,7 +243,10 @@ export function realAttempt({ checkout, runDirectory, setup, target, files, setu
       id: `rsi-b${cell.branch}`,
       target,
       files,
-      parent: parent ? { id: `${cell.branch}:${cell.attempt - 1}`, patch: parent.patchPath ?? null, depth: cell.attempt } : null,
+      // The parent's own candidate id, not its cell id: the lineage a reader
+      // follows is record ids, and `runCandidate` names this child
+      // `rsi-b<b>-r<round>c<attempt+1>`, so the parent one attempt up is `c<attempt>`.
+      parent: parent ? { id: `rsi-b${cell.branch}-r${round}c${cell.attempt}`, patch: parent.patchPath ?? null, depth: cell.attempt } : null,
       depth: cell.attempt,
       timeoutSeconds,
       model,

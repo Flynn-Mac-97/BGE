@@ -1,4 +1,8 @@
 node_modules/
+dist/
+release/
+electron/console.bundle.js
+electron/console.bundle.css
 .agent-worktrees/
 .tmp-agent-tests/
 

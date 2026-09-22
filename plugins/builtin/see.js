@@ -25,6 +25,7 @@ import { occlusion, isolate, find, diff, camera, identify } from './see/queries.
 import { ray } from './see/ray.js'
 
 import { capture } from './see/capture.js'
+import { captureEditor } from './see/editor.js'
 import { framesTaken, freeFrameName, describeAtDeclaredShape, concealOverlays, revealOverlays, needsRenderer, keepView, bindMarks, withSubject } from './see/frame-context.js'
 
 /**
@@ -119,6 +120,12 @@ export default {
   },
 
   commands: [
+    {
+      id: 'see.editor',
+      label: 'Capture editor panels',
+      inputSchema: { type: 'object', properties: { scope: { type: 'string', enum: ['editor', 'window'] }, name: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' } }, additionalProperties: false },
+      run: (_context, options = {}) => captureEditor(options)
+    },
     {
       id: 'see.describe',
       label: 'What is on screen',

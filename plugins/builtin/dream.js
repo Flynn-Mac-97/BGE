@@ -160,7 +160,7 @@ export default {
       // ctrl+alt+d: the dream key. Chrome binds no such combination, and no
       // other engine command claims it.
       key: 'ctrl+alt+d',
-      // args: the target in words, then { files, rounds, candidates, timeout, model }
+      // args: the target in words, then { files, rounds, candidates, timeout, model, harness }
       run: async (context, target, options = {}) => {
         if (!context.host) return needsNode('dream.improve')
         if (!target) return { refused: 'name a target to improve, in words' }
@@ -172,7 +172,8 @@ export default {
           rounds: options.rounds,
           candidates: options.candidates,
           timeout: options.timeout,
-          model: options.model
+          model: options.model,
+          harness: options.harness
         })
         await refresh(context)
         return started
@@ -181,7 +182,7 @@ export default {
     {
       id: 'dream.rsi',
       label: 'Dream: run the RSI loop',
-      // args: the target in words, then { rounds, versions, parallelism, branches, refinements, seed, timeout, model }
+      // args: the target in words, then { rounds, versions, parallelism, branches, refinements, seed, timeout, model, harness }
       run: async (context, target, options = {}) => {
         if (!context.host) return needsNode('dream.rsi')
         if (!target) return { refused: 'name a target to improve, in words' }
@@ -195,7 +196,8 @@ export default {
           refinements: options.refinements,
           seed: options.seed,
           timeout: options.timeout,
-          model: options.model
+          model: options.model,
+          harness: options.harness
         })
         await refresh(context)
         return started

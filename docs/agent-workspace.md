@@ -155,6 +155,21 @@ at a `mkdtempSync` directory instead.
 A worktree isolates **tracked** files only, so commit untracked work first or
 lanes fight over exactly the files that are not in it.
 
+**A lane's own server and browser.** A lane in `.agent-worktrees/<id>` starts
+its own dev server through the supervisor, so one id stops both:
+
+```sh
+node bin/engine.mjs supervisor.open dev-server '{"checkout":".agent-worktrees/<id>"}'
+node bin/engine.mjs supervisor.open lane-browser '{"url":"http://localhost:<port>/"}'
+```
+
+The checkout must be this checkout's main worktree or a directory inside it.
+The lane drives its own server with `--port <port>`; the reply names the
+directory it serves, and the CLI refuses a server serving a different checkout.
+A lane browser is headless with its own debugging port, so no two lanes share a
+renderer. `supervisor.stop <id>` ends each, and stopping the dev server closes
+the pages that were serving it.
+
 **What still bites:**
 
 - Two editor tabs on the SAME server both answer the bridge and the first

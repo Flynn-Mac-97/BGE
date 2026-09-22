@@ -52,17 +52,20 @@ function policyImport() {
   return pathToFileURL(path.join(here, '..', 'tools', 'dream', 'policy-api.mjs')).href
 }
 
-test('the pool refuses a grid with nothing revealed', async () => {
+test('a root-only world with a valid baseline is a simulator; one without a baseline is refused', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-pool-'))
-  const empty = emptyGrid({ id: 'nothing', baseline: { value: 0.1 }, branchCount: 2, refineCount: 1 })
-  const refused = await addGrid(directory, empty)
+  // Immediate stop is permitted, so a rollout that made no attempt still leaves
+  // a legitimate world: the tree is just its root, and its baseline is the score.
+  const noBaseline = await addGrid(directory, emptyGrid({ id: 'no-baseline', branchCount: 2, refineCount: 1 }))
+  const rootOnly = await addGrid(directory, emptyGrid({ id: 'root-only', baseline: { value: 0.1 }, branchCount: 2, refineCount: 1 }))
   const added = await seededPool(directory)
   const grids = await readPool(directory)
   await fs.rm(directory, { recursive: true, force: true })
 
-  assert.match(refused.error, /nothing revealed/)
+  assert.match(noBaseline.error, /baseline/)
+  assert.equal(rootOnly.revealed, 0, 'a root-only world must be accepted')
   assert.equal(added.revealed, 7)
-  assert.equal(grids.length, 1, 'the refused grid was written anyway')
+  assert.equal(grids.length, 2, 'the root-only world and the seeded grid should both be in the pool')
   assert.equal(poolSummary(grids).best, 0.9)
 })
 
@@ -89,7 +92,7 @@ test('a dreaming phase scores every version on the same frozen pool and deploys 
   assert.equal(record.improved, false, 'the run claimed an improvement it did not make')
   assert.equal(deployed.error, undefined)
   assert.equal(deployed.policy.NAME, 'parallel-refine', 'the deployed policy is not the winner')
-  assert.deepEqual(files.sort(), ['v000.json', 'v001.json', 'v002.json'])
+  assert.deepEqual(files.sort(), ['phase-v000.json', 'phase-v001.json', 'phase-v002.json'])
   assert.equal(record.versions[1].degenerate, true, 'a policy that ignores beta was reported as exposing a trade-off')
 })
 
@@ -110,28 +113,25 @@ test('a version that cannot probe legally is recorded as failed and never wins',
   assert.equal(record.winner.version, 0, 'a version that cannot probe won the phase')
 })
 
-test('a version that ignores beta wins only by a margin, and loses a close call to one that responds', () => {
-  const flat = { version: 1, score: 0.5, degenerate: true }
-  const responsive = { version: 2, score: 0.495, degenerate: false }
-  const behind = { version: 3, score: 0.4, degenerate: false }
+test('selection keeps the highest valid score and never lowers the incumbent', () => {
+  const incumbent = { version: 0, score: 0.5, valid: true, degenerate: true }
+  const responsive = { version: 1, score: 0.495, valid: true, degenerate: false }
+  const broken = { version: 2, score: 0.9, valid: false, failure: 'will not load' }
+  const partial = { version: 3, score: 0.8, valid: false, failures: 1 }
 
-  // The knob matters more than a hair of reward: the rollout plays one beta.
-  const close = selectVersion({ versions: [flat, responsive, behind], epsilon: 0.01 })
-  assert.equal(close.winner.version, 2)
-  assert.match(close.rule, /beta changes nothing in the best version/)
-  assert.deepEqual(close.displaced, { version: 1, score: 0.5 })
+  // Strict: the highest valid score wins even when it ignores beta. A lower
+  // responsive version never displaces it, because the reward is the measurement.
+  const strict = selectVersion({ versions: [incumbent, responsive] })
+  assert.equal(strict.winner.version, 0)
+  assert.match(strict.rule, /highest valid replay score/)
 
-  // A flat policy that wins by a real margin keeps its win: the reward is the measurement.
-  const clear = selectVersion({ versions: [{ version: 1, score: 0.9, degenerate: true }, { version: 2, score: 0.5, degenerate: false }], epsilon: 0.01 })
-  assert.equal(clear.winner.version, 1)
-  assert.match(clear.rule, /larger than epsilon/)
+  // A tie keeps the incumbent, so the deployed policy is never worse.
+  assert.equal(selectVersion({ versions: [incumbent, { version: 1, score: 0.5, valid: true }] }).winner.version, 0)
 
-  // A version that responds to beta and leads is simply the best.
-  const leads = selectVersion({ versions: [{ version: 1, score: 0.4, degenerate: true }, { version: 2, score: 0.6, degenerate: false }] })
-  assert.equal(leads.winner.version, 2)
-  assert.match(leads.rule, /highest average replay reward/)
-
-  assert.equal(selectVersion({ versions: [{ version: 0, failure: 'will not load' }] }).winner, null)
+  // A higher valid score wins; an invalid version never wins, whatever its score.
+  assert.equal(selectVersion({ versions: [incumbent, { version: 4, score: 0.6, valid: true }] }).winner.version, 4)
+  assert.equal(selectVersion({ versions: [incumbent, broken, partial] }).winner.version, 0)
+  assert.equal(selectVersion({ versions: [broken] }).winner, null)
 })
 
 test('a dreaming phase with an empty pool refuses instead of reporting a winner', async () => {
@@ -226,6 +226,90 @@ test('the earlier-revision budget cuts the oldest revisions and long reports', a
   assert.doesNotMatch(prompt, /x{401}/, 'the report ran past the budget')
 })
 
+test('each phase reads the policy deployed at its start, not a cached module', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-recache-'))
+  await seededPool(directory)
+  const deployed = path.join(directory, 'policy', 'current.mjs')
+  await fs.mkdir(path.dirname(deployed), { recursive: true })
+  const writePolicy = name => fs.writeFile(deployed, `export default { NAME: '${name}', solve(question) { question.reset(); while (question.legal_actions().length) question.probe_batch([question.legal_actions()[0]]) } }\n`, 'utf8')
+  const noChange = async () => ({ ok: true, status: 'completed', tokens: null, durationMs: 1, text: '' })
+
+  // Three phases in one process, each handed the same path with new code. Node
+  // caches a module by URL, so without a fresh query the second and third
+  // phases would replay the first phase's file.
+  const played = []
+  for (const name of ['first', 'second', 'third']) {
+    await writePolicy(name)
+    const record = await dreamPolicies({ checkout: process.cwd(), runDirectory: directory, phase: 'deployed', versions: 1, startPolicyFile: deployed, revise: noChange })
+    played.push(record.versions[0].policy)
+  }
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.deepEqual(played, ['first', 'second', 'third'], 'a phase replayed a cached module instead of the file it was handed')
+})
+
+test('a revision that cannot load is recorded, retained, and never displaces the incumbent', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-badimport-'))
+  await seededPool(directory)
+  const brokeImport = async ({ policyFile }) => {
+    await fs.writeFile(policyFile, "import './missing-module.mjs'\nexport default { NAME: 'broken', solve() {} }\n", 'utf8')
+    return { ok: true, status: 'completed', text: 'broke the import', durationMs: 1, tokens: null }
+  }
+
+  const record = await dreamPolicies({ checkout: process.cwd(), runDirectory: directory, versions: 2, revise: brokeImport })
+  const deployed = await loadPolicy(path.join(directory, 'policy/current.mjs'))
+  const kept = await fs.readFile(path.join(directory, 'policy/phase-v001.mjs'), 'utf8')
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(record.versions[1].valid, false, 'a version that will not load was treated as valid')
+  assert.match(record.versions[1].failure, /missing-module/)
+  assert.equal(record.winner.version, 0, 'a version that will not load won the phase')
+  assert.equal(deployed.policy.NAME, 'parallel-refine', 'a broken revision displaced the incumbent')
+  assert.match(kept, /missing-module/, 'the broken revision was not retained for the next revision to read')
+})
+
+test('a revision whose constructor throws is recorded and never displaces the incumbent', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-ctor-'))
+  await seededPool(directory)
+  const ctorThrows = async ({ policyFile }) => {
+    await fs.writeFile(policyFile, "export default class Explodes { constructor() { throw new Error('constructor boom') } solve() {} }\n", 'utf8')
+    return { ok: true, status: 'completed', text: 'wrote a throwing constructor', durationMs: 1, tokens: null }
+  }
+
+  const record = await dreamPolicies({ checkout: process.cwd(), runDirectory: directory, versions: 2, revise: ctorThrows })
+  const deployed = await loadPolicy(path.join(directory, 'policy/current.mjs'))
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.equal(record.versions[1].valid, false, 'a throwing constructor was treated as valid')
+  assert.match(record.versions[1].failure, /constructor boom/)
+  assert.equal(record.winner.version, 0, 'a throwing constructor won the phase')
+  assert.equal(deployed.policy.NAME, 'parallel-refine')
+})
+
+test('a reviser that throws is recorded and the incumbent is still deployed', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-revise-throw-'))
+  await seededPool(directory)
+
+  const record = await dreamPolicies({
+    checkout: process.cwd(),
+    runDirectory: directory,
+    versions: 2,
+    revise: async () => { throw new Error('reviser down') }
+  })
+  const deployed = await loadPolicy(path.join(directory, 'policy/current.mjs'))
+  await fs.rm(directory, { recursive: true, force: true })
+
+  // The next file was copied from the incumbent first, so a reviser that throws
+  // leaves a version that ties it. Selection keeps the incumbent; the failure is
+  // recorded rather than losing the phase.
+  assert.equal(record.versions[1].valid, true)
+  assert.equal(record.versions[1].score, record.versions[0].score)
+  assert.equal(record.versions[1].revision.ok, false)
+  assert.match(record.versions[1].revision.said, /reviser down/)
+  assert.equal(record.winner.version, 0)
+  assert.equal(deployed.policy.NAME, 'parallel-refine')
+})
+
 test('a recorded replay carries the objective and the terms that made its reward', async () => {
   const directory = path.join(os.tmpdir(), `dream-objective-${process.pid}`)
   await fs.rm(directory, { recursive: true, force: true })
@@ -241,13 +325,15 @@ test('a recorded replay carries the objective and the terms that made its reward
   // A reward scored under one objective is not comparable with one scored under
   // the other, so every record that carries a number carries its objective too.
   const version = record.versions[0]
-  assert.equal(version.objective, 'pareto', 'the version does not name the objective it was scored under')
+  // The default is the paper's page-6 equation (1), recorded as `legacy` for
+  // compatibility; the experimental pareto number is kept beside it.
+  assert.equal(version.objective, 'legacy', 'the version does not name the objective it was scored under')
   for (const replay of version.replays) {
-    assert.equal(replay.objective, 'pareto', 'a replay does not name its objective')
+    assert.equal(replay.objective, 'legacy', 'a replay does not name its objective')
     assert.equal(typeof replay.auc, 'number', 'the replay dropped the area under the attainment curve')
     assert.equal(typeof replay.parallelPenalty, 'number', 'the replay dropped the parallel penalty')
-    assert.equal(replay.reward, replay.paretoReward, 'the reward is not the objective the record names')
-    assert.notEqual(replay.legacyReward, undefined, 'the replay dropped the legacy number')
+    assert.equal(replay.reward, replay.legacyReward, 'the reward is not the objective the record names')
+    assert.notEqual(replay.paretoReward, undefined, 'the replay dropped the experimental pareto number')
   }
 
   await fs.rm(directory, { recursive: true, force: true })

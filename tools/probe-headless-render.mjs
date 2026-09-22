@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { findChrome } from '../engine/chrome-path.mjs'
+import { recordLaneBrowser, forgetLaneBrowser } from '../engine/lane-browsers.mjs'
 
 const CHROME = findChrome(process.cwd())
 const URL = process.argv[2] || 'http://localhost:5180/'
@@ -16,6 +17,10 @@ const OUT = process.argv[3] || 'agent-runs/u1-headless.png'
 const PORT = Number(process.argv[4] || 9333)
 const MODE = process.argv[5] || 'headless'
 const [WIDTH, HEIGHT] = [540, 960]
+// The page carries its registry name, so `lanes` can prove this browser is the
+// one the record describes rather than any browser holding the port.
+const CLIENT = `probe-${PORT}`
+const PAGE = URL + (URL.includes('?') ? '&' : '?') + `client=${encodeURIComponent(CLIENT)}`
 
 const profile = fs.mkdtempSync(path.join(process.env.TEMP || '/tmp', 'u1-chrome-'))
 const flags = [
@@ -28,7 +33,18 @@ const flags = [
 // so nothing here asks for software rendering.
 if (MODE === 'headless') flags.push('--headless=new')
 
-const chrome = spawn(CHROME, [...flags, 'about:blank'], { stdio: ['ignore', 'pipe', 'pipe'] })
+const chrome = spawn(CHROME, [...flags, 'about:blank'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+
+// Written before the wait, so a probe killed outright is still findable and
+// stoppable by `lanes` or the supervisor rather than leaking its port.
+try {
+  recordLaneBrowser(process.cwd(), {
+    client: CLIENT, port: PORT, url: PAGE, pid: chrome.pid, profile,
+    serves: process.cwd(), chrome: CHROME, headless: true, startedAt: new Date().toISOString()
+  })
+} catch (error) {
+  process.stderr.write(`could not record the browser: ${error.message}\n`)
+}
 const chromeErrors = []
 chrome.stderr.on('data', d => chromeErrors.push(String(d)))
 
@@ -88,7 +104,7 @@ try {
   })
 
   // Ask the page itself, before the engine loads, whether WebGL exists at all.
-  await call('Page.navigate', { url: URL })
+  await call('Page.navigate', { url: PAGE })
   for (let attempt = 0; attempt < 120; attempt++) {
     const { result } = await call('Runtime.evaluate', {
       expression: 'document.readyState === "complete" && !!window.engine',
@@ -138,6 +154,7 @@ try {
 } finally {
   chrome.kill()
   await sleep(400)
+  try { forgetLaneBrowser(process.cwd(), CLIENT) } catch { /* the registry is already unreadable */ }
   try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* Windows holds it briefly */ }
 }
 

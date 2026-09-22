@@ -19,6 +19,10 @@ const REPLACES = 'Physics 2D'
 const NAME = 'Rapier 2D'
 const HOLD = `${NAME} loading`
 
+// Per world: a process-level Map would show one world's hash in another world's
+// panel.
+const panelHashes = new WeakMap()
+
 /** Three numbers in the collider box says 3D, and Rapier 3D claims those. */
 const is2D = entity =>
   !!entity?.collider && (Number(entity.collider.circle) > 0 || entity.collider.box?.length !== 3)

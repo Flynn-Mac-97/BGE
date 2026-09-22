@@ -6,8 +6,8 @@
  * a terminal (any agent — this file names no vendor) can read and drive a live
  * editor without a screenshot and without being embedded in our UI.
  *
- * Transport is Vite's existing dev-server websocket. No extra port, no extra
- * dependency, and it dies with the dev server rather than outliving it.
+ * Transport uses Vite's socket during development and the engine socket in
+ * the packaged desktop. Both carry the same messages.
  *
  *   terminal  ->  bin/engine.mjs  ->  POST /api/engine  ->  ws  ->  here
  *
@@ -15,16 +15,15 @@
  * editing when a verb is added — the surface and the bridge stay in step by
  * construction.
  */
+import { engineTransport } from '../../engine/transport.js'
+
 export default {
   name: 'Terminal Bridge',
 
   category: 'agents',
   onLoad(context) {
-    const hot = import.meta.hot
-    if (!hot) {
-      // production build: no dev socket, so no bridge. Not an error.
-      return
-    }
+    const hot = engineTransport(import.meta.hot)
+    if (!hot) return
 
     hot.on('engine:call', async ({ id, op, args = [] }) => {
       let out
@@ -43,7 +42,7 @@ export default {
   commands: [{
     id: 'bridge.status',
     label: 'Bridge: status',
-    run: () => ({ open: !!import.meta.hot, transport: 'vite ws' })
+    run: () => ({ open: !!engineTransport(import.meta.hot), transport: import.meta.hot ? 'vite ws' : 'engine ws' })
   }]
 }
 

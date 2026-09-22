@@ -184,6 +184,16 @@ export function makePolicy(name, beta = 0.6) {
 }
 
 /**
+ * A counter that makes every policy import a distinct module URL.
+ *
+ * Node caches an ES module by URL, so rewriting `current.mjs` or a version file
+ * at the same path and importing it again would return the first copy. Every
+ * other round would then score one file and play another. A fresh query string
+ * forces the file to be read again.
+ */
+let importCount = 0
+
+/**
  * Load a policy from a file.
  *
  * Refused rather than repaired: a policy that will not load, or that has no
@@ -192,19 +202,32 @@ export function makePolicy(name, beta = 0.6) {
  * one need not be a class.
  */
 export async function loadPolicy(file) {
-  const module = await import(pathToFileURL(file).href)
-  const exported = module.default
-  if (!exported) return { error: `${file} exports nothing` }
+  let module
+  try {
+    module = await import(`${pathToFileURL(file).href}?dream=${++importCount}`)
+  } catch (error) {
+    // A file with a syntax error or a missing import is an invalid version, not
+    // a crash: the phase records it and keeps whatever policy it already had.
+    return { error: `${file}: ${String(error?.message || error).split('\n')[0].slice(0, 200)}` }
+  }
+  // Reading the export and building the instance is inside the same guard: a
+  // constructor that throws is an invalid version, not a crashed phase.
+  try {
+    const exported = module.default
+    if (!exported) return { error: `${file} exports nothing` }
 
-  // The constructor is kept beside the instance so an evaluator can build the
-  // same policy at every beta of a sweep without the file being re-imported.
-  const Class = typeof exported === 'function' ? exported : null
-  const policy = Class ? new Class({ beta: module.BETA ?? 0.6 }) : exported
-  if (typeof policy.solve !== 'function') return { error: `${file} exports no policy with a solve method` }
-  const NAME = policy.NAME ?? module.NAME ?? policy.constructor?.name
-  if (typeof NAME !== 'string' || !NAME) return { error: `${file} names no policy: a NAME is required to report a winner` }
-  policy.NAME = NAME
-  return { policy, Class, file }
+    // The constructor is kept beside the instance so an evaluator can build the
+    // same policy at every beta of a sweep without the file being re-imported.
+    const Class = typeof exported === 'function' ? exported : null
+    const policy = Class ? new Class({ beta: module.BETA ?? 0.6 }) : exported
+    if (typeof policy.solve !== 'function') return { error: `${file} exports no policy with a solve method` }
+    const NAME = policy.NAME ?? module.NAME ?? policy.constructor?.name
+    if (typeof NAME !== 'string' || !NAME) return { error: `${file} names no policy: a NAME is required to report a winner` }
+    policy.NAME = NAME
+    return { policy, Class, file }
+  } catch (error) {
+    return { error: `${file}: ${String(error?.message || error).split('\n')[0].slice(0, 200)}` }
+  }
 }
 
 /**

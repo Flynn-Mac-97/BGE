@@ -1,4 +1,4 @@
-<!--ae5200aa-->
+<!--ed5859c2-->
 parsed from source
   plugin Dream
   category agents
@@ -10,4 +10,4 @@ parsed from source
   dream.report (Dream: run report, refuses without a host)
   dream.forget (Dream: discard run, refuses without a host)
   arguments dream.improve: target, options = {};dream.rsi: target, options = {};dream.status: directory;dream.stop: directory;dream.report: directory;dream.forget: directory
-  source 252 lines
+  source 254 lines

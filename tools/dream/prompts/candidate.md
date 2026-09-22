@@ -62,18 +62,26 @@ improving anything, so it is refused rather than rewarded.
 
 Objective: {{OBJECTIVE}}
 
+{{PROBE}}
+
 ## The record so far
 
 {{HISTORY}}
 
 This block is capped so the prompt stays affordable, so it may leave attempts
 out. Every earlier attempt kept its patch and its record beside `{{SETUP}}`,
-under `rounds/r<round>/`. A `.patch` file is the diff that attempt produced; the
-`.json` beside it holds its measures and the four lines its agent wrote about
-what worked and what did not. Read them before you design: they are outside your
+under the run directory's round folders: `rounds/r<round>/` for an
+improve-a-target run, `rsi/round-<round>/` for an RSI run. A `.patch` file is the
+diff that attempt produced; the `.json` beside it holds its measures and the
+four lines its agent wrote about what worked and what did not. Read them before you design: they are outside your
 worktree, so reading them changes nothing, and repeating an idea that already
 failed spends your whole budget for nothing. Take what measured well, leave what
 broke the checks.
+
+A line marked `status <name>` other than `completed` was cut off before it
+finished. Its `measures` are still the evaluator's, but its `report` is an
+unfinished claim, not a validated result. Only the evaluator's `measures` are
+evidence that a change worked.
 
 ## Read the complete history first
 

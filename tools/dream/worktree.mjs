@@ -30,7 +30,7 @@ const WORKTREES = '.agent-worktrees'
  */
 export function git(checkout, args) {
   return execFileSync('git', ['-C', checkout, ...args], {
-    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, windowsHide: true
   })
 }
 

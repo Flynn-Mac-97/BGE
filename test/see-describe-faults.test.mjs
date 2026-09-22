@@ -3,8 +3,6 @@
  * describe()'s size-outlier and stacked-entity fault detection, offline and
  * pure. verticalSpan and heightGaps are covered elsewhere and untouched here.
  *
- * Not wired into `npm run test:offline` — that script names its two files
- * explicitly in package.json, and this lane's claim is describe.js alone.
  * Run directly: node --test test/see-describe-faults.test.mjs
  */
 import test from 'node:test'
@@ -85,10 +83,17 @@ test('a hidden duplicate is not reported unless includeHidden is asked for', () 
  */
 // One copy per run, because spawning and setting save the level: two runs
 // sharing a project means the second reads what the first wrote.
-const script = async steps => JSON.parse(execFileSync(process.execPath, [
-  CLI, 'script', JSON.stringify(steps),
-  '--headless', '--project', await temporaryFixture('engine-see-faults-'), '--level', FIXTURE_LEVEL
-], { encoding: 'utf8' }))
+async function script(steps) {
+  const directory = await temporaryFixture('engine-see-faults-')
+  return JSON.parse(execFileSync(process.execPath, [
+    CLI, 'script', JSON.stringify(steps),
+    '--headless', '--project', directory, '--level', FIXTURE_LEVEL
+  ], {
+    encoding: 'utf8',
+    // Fixture writes must not share the real workspace's agent claims.
+    env: { ...process.env, ENGINE_STATE_ROOT: path.join(directory, '.engine') }
+  }))
+}
 
 test('two entities spawned on one point are caught as stacked', async () => {
   const steps = await script([

@@ -41,11 +41,13 @@ step.
 
 | Doc | What it owns |
 |---|---|
+| `docs/desktop.md` | Electron startup, the persistent console, terminal sessions, packaging |
 | `docs/kernel.md` | the kernel modules, boot, the frame, and `context` — the one object |
 | `docs/entity-model.md` | the flat entity, types and placements, behaviours, the runtime vocabulary |
 | `docs/determinism.md` | the clock, the random stream, and why a run repeats |
 | `docs/surfaces.md` | the ways in: editor gestures, the CLI, the bridge, headless |
 | `docs/agent-workspace.md` | the instruction tree, packets, project overrides, live reload |
+| `docs/evolution.md` | one evidence-first maintenance task from the existing pain and insight ledgers |
 | `docs/design.md` | design rules the code follows, what is deliberately absent, known gaps |
 
 
@@ -58,6 +60,10 @@ Use `node bin/engine.mjs --headless run agent.commands '{"query":"profile"}'`
 to discover command arguments, and `run agent.contracts` for service owners,
 dependencies, lifecycle coverage and schedules. Reports are paginated.
 Contracts and migration limits are documented in `docs/kernel.md`.
+
+Agent registration generates matching Codex and Claude skill files in
+`.agents/skills` and `.claude/skills`. Both use the same category settings and
+freshness checks.
 
 Plugin interfaces are generated files beside their guides. The server refreshes
 them on source edits; packet readers check freshness and include the stored text

@@ -1,4 +1,4 @@
-<!--f4f0f4ee-->
+<!--71fb0086-->
 parsed from source
   plugin Live File Updates
   category engine
@@ -7,4 +7,4 @@ parsed from source
   emits hot:applied
   hot:failed {error}
   reload:before {file, why}
-  source 122 lines
+  source 124 lines

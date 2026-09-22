@@ -9,6 +9,7 @@
  * contribution.
  */
 const KERNEL = [
+  { op: 'desktop <action> [json]', purpose: 'desktop snapshot or action: capture (scope editor/window, name, client), terminal.start/read/write/resize/interrupt/stop, engine.open/activate/reload, instance.stop, dev.start, project.open' },
   { op: 'snapshot', purpose: 'the world in one view: mode, level, time, seed, camera, counts' },
   { op: 'snapshot --entities', purpose: 'every entity, every field this list carries, as rows' },
   { op: 'snapshot \'{"entities":["id","at"]}\'', purpose: 'the same entities as two columns — a fifth of the reading' },
@@ -41,13 +42,19 @@ const OFFLINE = [
   { op: 'serve', purpose: 'one private world held open: one JSON request per line on stdin, one JSON reply per line, so many questions cost one boot' },
   { op: 'servers', purpose: 'every dev server this checkout started, each proved by asking its port' },
   { op: 'servers.stop [<port>|all]', purpose: 'stop that one; several running means one must be named' },
+  { op: 'supervisor [--watch]', purpose: 'what the supervisor is running, with `showing` per browser instance: visible, hidden, or nothing when no page is attached; --watch is the same table live, with keys to open a dev server, open a visible or headless engine on one, stop one, stop all and quit; exit 2 when none is up' },
+  { op: 'engine.cmd', purpose: 'open the desktop console and engine at the checkout root' },
+  { op: 'supervisor.start', purpose: 'start it detached if it is not up; idempotent, and prints the port' },
+  { op: 'supervisor.open <kind> [json]', purpose: 'start one instance: dev-server, editor-browser, lane-browser or headless-session; every editor-browser is its own tab in the one visible window and drives as --client <its id>' },
+  { op: 'supervisor.stop [<id>|all] [--down]', purpose: 'stop one instance, every owned one, or with --down the supervisor itself; exit 1 while any asked-for instance runs' },
   { op: 'lanes', purpose: 'every headless browser started for a lane, each proved against its debugging port' },
   { op: 'lanes.start <client> [--profile WxH] [--debugPort N]', purpose: 'start one and wait for its page; refused while a browser of that name is running' },
-  { op: 'lanes.stop [<client>]', purpose: 'stop one lane browser, or all of them; a port still answering is named, not called clear' },
+  { op: 'lanes.stop [<client>|all]', purpose: 'stop one lane browser, or all of them; "all" sweeps the visible window too, and a port still answering is named, not called clear' },
   { op: 'clients', purpose: 'who is attached to the dev server, and which one an untargeted call would reach' },
   { op: 'lock', purpose: 'whether lanes are working, who holds the checkout, and which records are stale' },
   { op: 'pain "<what>" [--cost N]', purpose: 'record friction — the cost matters as much as the words' },
   { op: 'pain.list', purpose: 'open painpoints, ranked by cost, grouped by kind' },
+  { op: 'evolve [<id>|<words>]', purpose: 'one read-only review brief from open pain or insight records; reproduce first, make small compatible improvements directly, ask for risky changes' },
   { op: 'pain.resolve <id> "<done>"', purpose: 'mark a painpoint resolved' },
   { op: 'insight "<what worked>" [--problem "<when>"] [--saves N]', purpose: 'record a solution worth reusing — the saving is what decides which becomes a tool' },
   { op: 'insight.list [<words>]', purpose: 'with words, search every insight; without, the un-adopted ones ranked by saving' },
@@ -58,10 +65,15 @@ const OFFLINE = [
   { op: 'agent.release <id> [--blocked]', purpose: 'run the packet checks and finish a run; failing checks leave it active' },
   { op: 'agent.merge <id>', purpose: 'merge the lane, run its deferred checks, remove its worktree and branch' },
   { op: 'agent.sweep [--dry-run]', purpose: 'delete worktrees and directories left by lanes whose work is in HEAD' },
-  { op: 'agent.skills', purpose: 'rewrite AGENTS.md, CLAUDE.md and the generated skill copies' }
+  { op: 'agent.skills', purpose: 'rewrite AGENTS.md, CLAUDE.md and the generated skill copies' },
+  { op: 'jev.status', purpose: 'the opt-in switch, the pinned model, and whether a key and a proxy are present' },
+  { op: 'jev.mode \'{"on":true}\'', purpose: 'turn Jev on or off for this project; no argument reads it, and off makes no network call' },
+  { op: 'jev.guides \'{"task":"…"}\'', purpose: 'rank the optional plugin guides a task looks like it needs' },
+  { op: 'jev.records \'{"text":"…"}\'', purpose: 'rank open ledger records related to a new finding; advisory, never decides work is fixed' }
 ]
 
 const FLAGS = [
+  { op: '--repro / --expected / --actual <text>', purpose: 'pain and insight only: reproduction steps and observed results, stored as evidence and never executed' },
   { op: '--headless', purpose: 'run the op in a private world in this process' },
   { op: '--level <name>', purpose: 'open this level first (headless only)' },
   { op: '--project <name>', purpose: 'open this project directory instead of `project` — a directory inside the checkout. index, tree, check and headless read it' },
@@ -71,6 +83,8 @@ const FLAGS = [
   { op: '--verbose', purpose: 'name the answering client on stderr, and print error detail' },
   { op: '--profile <WxH>', purpose: 'lanes.start only: the window size Chrome is told to open' },
   { op: '--debugPort <n>', purpose: 'lanes.start only: the debugging port the lane browser answers on' },
+  { op: '--down', purpose: 'supervisor.stop only: stop the supervisor itself, not just its instances' },
+  { op: '--watch', purpose: 'supervisor only: the instance table live, with keys to open a dev server, open a visible or headless engine on one, stop one, stop all and quit' },
   { op: '--raw / --pretty', purpose: 'force one-line or indented JSON' }
 ]
 

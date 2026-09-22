@@ -140,6 +140,18 @@ test('role comes from the registry, not from the caller', t => {
   assert.equal(roleOfClient(root, 'LANE-A'), 'person', 'the name must match the record exactly')
 })
 
+test('a visible editor window holds nothing and may write', t => {
+  const root = checkout(t, {
+    browsers: [{ client: 'editor', port: 9400, pid: LIVE_PID, headless: false }]
+  })
+  const lock = workLock(root)
+  assert.equal(lock.locked, false, 'the person\'s own window is not a lane')
+  assert.deepEqual(lock.holders, [])
+  assert.deepEqual(lock.stale, [], 'and its live record is not stale litter')
+  assert.equal(roleOfClient(root, 'editor'), 'person')
+  assert.equal(permits(lock, 'set').allowed, true)
+})
+
 test('role is unaffected by what the page reports about itself', t => {
   // The page's headless flag and user agent reach the server as ordinary
   // strings. Neither is a client name, so neither can reach this function.

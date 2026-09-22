@@ -10,8 +10,9 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,12 +48,100 @@ test('help exits 0 and names the verb groups', () => {
   }
 })
 
+test('offline commands use the desktop terminal project', () => {
+  const reply = run(['tree'], { env: { ...process.env, ENGINE_PROJECT: FIXTURE } })
+  assert.equal(reply.code, 0)
+  assert.ok(JSON.parse(reply.stdout).some(file => file.path === 'game.json'))
+  assert.equal(reply.stdout, run(['tree', '--project', FIXTURE]).stdout)
+})
+
 test('exit codes: 0 ok, 1 bad argument, 2 nothing to talk to', () => {
   assert.equal(run(['check', '--project', FIXTURE]).code, 0, 'an offline op succeeds')
   const badKind = run(['pain', 'x', '--kind', 'nonsense'])
   assert.equal(badKind.code, 1, 'a bad argument is 1')
   assert.ok(badKind.stderr.includes('--kind must be one of'), 'and says which rule')
   assert.equal(run(['snapshot', '--port', '5999']).code, 2, 'no editor on that port is 2')
+})
+
+test('servers keeps the record of a live process that has not bound its port', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-servers-live-'))
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+  try {
+    const port = await freePort()
+    fs.mkdirSync(path.join(root, '.engine'), { recursive: true })
+    fs.writeFileSync(path.join(root, '.engine/servers.json'), JSON.stringify({
+      version: 1,
+      servers: [{ port, pid: child.pid, serves: root, project: null, startedAt: new Date().toISOString() }]
+    }, null, 2))
+
+    const result = run(['servers', '--root', root])
+    assert.equal(result.code, 0, result.stderr)
+
+    const listed = JSON.parse(result.stdout)
+    const seen = listed.servers.find(server => server.port === port)
+    assert.equal(seen?.state, 'unresponsive', 'a live process that answers nothing is still starting, not litter')
+
+    const registry = JSON.parse(fs.readFileSync(path.join(root, '.engine/servers.json'), 'utf8'))
+    assert.equal(registry.servers.some(server => server.pid === child.pid), true,
+      'the record of a live process survives a listing')
+  } finally {
+    try { process.kill(child.pid, 'SIGKILL') } catch { /* already gone */ }
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+/** A port nothing holds right now, for a record whose server has not bound. */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address()
+      server.close(() => resolve(port))
+    })
+  })
+}
+
+/**
+ * The supervisor verbs answer with nothing running.
+ *
+ * A temp root, so a real supervisor on this checkout cannot make the down path
+ * look up. Nothing is started here: the offline suite spawns no supervisor,
+ * and the up paths are the browser suite's job.
+ */
+test('supervisor verbs say how to start it when nothing is running', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-supervisor-offline-'))
+  try {
+    const status = run(['supervisor', '--root', root])
+    assert.equal(status.code, 2, 'no supervisor is exit 2')
+    assert.match(status.stderr, /supervisor\.start/, 'and says how to start one')
+
+    const stopped = run(['supervisor.stop', 'all', '--root', root])
+    assert.equal(stopped.code, 2, 'stopping with nothing running is exit 2')
+    assert.match(stopped.stderr, /supervisor\.start/)
+
+    const opened = run(['supervisor.open', 'dev-server', '--root', root])
+    assert.equal(opened.code, 2, 'opening with nothing running is exit 2')
+
+    const badKind = run(['supervisor.open', 'nonsense', '--root', root])
+    assert.equal(badKind.code, 1, 'a kind that is not one of the four is a usage error')
+    assert.match(badKind.stderr, /not an instance kind/)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('lanes.stop all sweeps every browser instead of naming a client', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-lanes-stop-'))
+  try {
+    const result = run(['lanes.stop', 'all', '--root', root])
+    assert.equal(result.code, 0, 'an empty sweep is a clean exit')
+    const answer = JSON.parse(result.stdout)
+    assert.deepEqual(answer.stopped, [], 'nothing was recorded, so nothing was stopped')
+    assert.equal(answer.remaining, 0)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('a JSON argument is sent as JSON, not a string', () => {

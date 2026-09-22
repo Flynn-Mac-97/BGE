@@ -34,14 +34,15 @@ export async function readPool(runDirectory) {
 /**
  * Add one grid to the pool.
  *
- * Refused rather than repaired when it names no cell outcomes at all: a grid with
- * nothing revealed is not a simulator, and scoring policies against it would
- * report rewards for arithmetic on an empty record.
+ * A grid with no revealed cell is accepted when it carries the target's own
+ * score: the paper permits a rollout to stop immediately, so a root-only world
+ * is a legitimate recorded history, and replaying it makes every policy stop at
+ * the baseline. A grid without a baseline is refused: there is no floor to
+ * score against.
  */
 export async function addGrid(runDirectory, grid) {
   const revealed = Object.keys(grid.cells ?? {}).length
-  if (revealed === 0) return { error: 'a grid with nothing revealed is not a simulator to dream in' }
-  if (typeof grid.baseline?.value !== 'number') return { error: 'a grid needs the score of the target as it stood' }
+  if (typeof grid.baseline?.value !== 'number') return { error: 'a grid needs its baseline: the score of the target as it stood' }
 
   const directory = path.join(runDirectory, POOL)
   await fs.mkdir(directory, { recursive: true })

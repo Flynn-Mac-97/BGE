@@ -45,7 +45,8 @@ export function packetCharacters(checkout, request, { timeout = 120000 } = {}) {
       cwd: checkout,
       encoding: 'utf8',
       timeout,
-      maxBuffer: 64 * 1024 * 1024
+      maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true
     })
   } catch (error) {
     return { error: String(error?.message || error), milliseconds: Date.now() - started }
@@ -71,7 +72,7 @@ export function engineProcess(checkout, project, args, { timeout = DEFAULT_PROCE
   const run = spawnSync(
     process.execPath,
     ['bin/engine.mjs', '--headless', '--project', project, ...(level ? ['--level', level] : []), ...args],
-    { cwd: checkout, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 }
+    { cwd: checkout, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024, windowsHide: true }
   )
   const milliseconds = Date.now() - started
   if (run.error) return { reply: null, milliseconds, problem: `failed to start: ${run.error.message}` }

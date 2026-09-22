@@ -64,11 +64,20 @@ function processAlive(pid) {
   }
 }
 
+/**
+ * Whether a browser record is a lane.
+ *
+ * A visible editor window is recorded in the same registry with
+ * `headless: false`. It is the person's own window, so it holds nothing and
+ * may write; only a headless lane holds the checkout.
+ */
+const isLaneRecord = entry => entry.headless !== false
+
 /** Lane browser records split by whether their process still exists. */
 function proveLaneBrowsers(browsers) {
   const live = []
   const stale = []
-  for (const entry of browsers) {
+  for (const entry of browsers.filter(isLaneRecord)) {
     if (processAlive(entry.pid)) live.push(entry)
     else stale.push(entry)
   }
@@ -80,7 +89,8 @@ const staleSentence = stale => {
   if (!stale.length) return ''
   const one = stale.length === 1
   return `Stale lane browser record${one ? '' : 's'}, process gone: ` +
-    `${stale.map(entry => entry.id).join(', ')}. Run lanes.stop to clear ${one ? 'it' : 'them'}.`
+    `${stale.map(entry => entry.id).join(', ')}. Run lanes.stop to clear ${one ? 'it' : 'them'}. ` +
+    `Every instance has a supervisor id: list them with node bin/engine.mjs supervisor and stop one with supervisor.stop <id>.`
 }
 
 /**
@@ -92,7 +102,7 @@ const staleSentence = stale => {
  * is alive.
  */
 export function workLock(root) {
-  const engineDirectory = path.join(root, COORDINATION)
+  const engineDirectory = process.env.ENGINE_STATE_ROOT || path.join(root, COORDINATION)
   const runs = readJson(path.join(engineDirectory, 'agents.json'))?.runs || []
   const browsers = readJson(path.join(engineDirectory, 'lane-browsers.json'))?.browsers || []
   const { live, stale } = proveLaneBrowsers(browsers)
@@ -121,7 +131,8 @@ export function workLock(root) {
     stale: staleRecords,
     why: `${names.length === 1 ? 'a lane is' : `${names.length} lanes are`} working: ${names.join(', ')}. ` +
       `Editing here would change files they are building against. ` +
-      `They release with agent.release, and lanes.stop ends a lane browser.` +
+      `They release with agent.release, and lanes.stop ends a lane browser. ` +
+      `A browser is also a supervisor instance: list ids with node bin/engine.mjs supervisor and stop one with supervisor.stop <id>.` +
       (note ? ` ${note}` : '')
   }
 }
@@ -134,15 +145,15 @@ export function workLock(root) {
  * about itself — `navigator.webdriver`, the user agent — is set by whoever
  * launched it and decides nothing.
  *
- * A name with no live record is the person, so an unrecognised caller obeys the
- * work lock. Every real lane has a live record, and a live record holds the
- * lock, so this fallback exempts nobody by mistake.
+ * A visible editor window carries `headless: false` and is the person, so it is
+ * never a lane. A name with no live lane record is the person too, so an
+ * unrecognised caller obeys the work lock.
  */
 export function roleOfClient(root, clientId) {
   if (!clientId) return 'person'
-  const browsers = readJson(path.join(root, COORDINATION, 'lane-browsers.json'))?.browsers || []
+  const browsers = readJson(path.join(process.env.ENGINE_STATE_ROOT || path.join(root, COORDINATION), 'lane-browsers.json'))?.browsers || []
   const record = browsers.find(entry => entry.client === clientId)
-  return record && processAlive(record.pid) ? 'lane' : 'person'
+  return record && isLaneRecord(record) && processAlive(record.pid) ? 'lane' : 'person'
 }
 
 /**

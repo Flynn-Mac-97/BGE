@@ -38,8 +38,8 @@ const PROMPT_BUDGET_CHARACTERS = 48000
 /** The largest history block, however much of the prompt budget is free. */
 const HISTORY_BLOCK_CHARACTERS = 12000
 
-/** One attempt's entry is cut here, so one long report cannot fill the block. */
-const HISTORY_ENTRY_CHARACTERS = 1200
+/** One attempt's entry is cut here, so its report cannot fill the whole block. */
+const HISTORY_ENTRY_CHARACTERS = 1600
 
 /** The block keeps a place for at least one attempt even when the packet has taken the rest. */
 const HISTORY_FLOOR_CHARACTERS = 1200
@@ -51,8 +51,8 @@ const HISTORY_ENTRY_MINIMUM_CHARACTERS = 240
  * What earlier attempts did, as text the prompt carries.
  *
  * The paper gives a rollout the completed history rather than a summary of it,
- * so each entry keeps the attempt's own report and the files its patch changed,
- * not only its number. The block is capped: the records stay on disk, and a
+ * so each entry keeps the attempt's own report, the files its patch changed and
+ * the evaluator's measures. The block is capped: the records stay on disk, and a
  * block that will not hold every attempt names how many it left out.
  */
 export async function historyLines({ runDirectory = null, history = [], budget = HISTORY_BLOCK_CHARACTERS } = {}) {
@@ -74,7 +74,7 @@ export async function historyLines({ runDirectory = null, history = [], budget =
   }
 
   if (omitted) {
-    const note = `- ${omitted} earlier attempt${omitted === 1 ? '' : 's'} left out to keep this prompt small; their records are under \`rounds/r*/\` in the run directory.`
+    const note = `- ${omitted} earlier attempt${omitted === 1 ? '' : 's'} left out to keep this prompt small; their records are under the run's round directories.`
     if (used + note.length <= budget) lines.push(note)
   }
   return lines.join('\n')
@@ -88,10 +88,21 @@ function summarize(history = []) {
     .join('\n')
 }
 
-/** Every candidate record a run has written, with the round it was made in. */
+/**
+ * Every candidate record a run has written, with the round it was made in.
+ *
+ * Three layouts: the evolutionary loop writes one JSON per candidate under
+ * `rounds/r####/`; the Dream-RSI loop writes one per attempt under
+ * `rsi/round-###/`; and an older RSI run has only the round's `attempts.json`
+ * beside separate patches. Reading all three is what connects an RSI attempt to
+ * the next candidate's history, including the attempts already made this round,
+ * and keeps a resumed run's earlier history visible after the per-attempt
+ * record became the norm.
+ */
 async function readAttempts(runDirectory) {
-  const rounds = path.join(runDirectory, 'rounds')
   const attempts = []
+  const seen = new Set()
+  const rounds = path.join(runDirectory, 'rounds')
   for (const directory of (await fs.readdir(rounds).catch(() => [])).sort()) {
     const round = Number(directory.replace(/^r/, ''))
     const files = (await fs.readdir(path.join(rounds, directory)).catch(() => [])).sort()
@@ -108,8 +119,55 @@ async function readAttempts(runDirectory) {
       })
     }
   }
+
+  const rsi = path.join(runDirectory, 'rsi')
+  const rsiRounds = (await fs.readdir(rsi).catch(() => [])).filter(name => /^round-\d+$/.test(name)).sort()
+  for (const directory of rsiRounds) {
+    const round = Number(directory.replace(/^round-/, ''))
+    for (const file of (await fs.readdir(path.join(rsi, directory)).catch(() => [])).sort()) {
+      // Only an attempt record; the round's grid, rollout, dreaming and attempts
+      // summary sit beside it and are not attempts themselves.
+      if (!/^rsi-b\d+-r\d+c\d+\.json$/.test(file)) continue
+      const record = JSON.parse(await fs.readFile(path.join(rsi, directory, file), 'utf8').catch(() => 'null'))
+      if (!record) continue
+      if (record.id) seen.add(record.id)
+      attempts.push({ ...record, round, patchFile: record.patchFile ? path.join(runDirectory, record.patchFile) : null })
+    }
+  }
+
+  // A run that predates the per-attempt record has only the round's summary and
+  // separate patches. Read those entries too, skipping any the loop above
+  // already has, so an old run's history is not invisible.
+  for (const directory of rsiRounds) {
+    const round = Number(directory.replace(/^round-/, ''))
+    const summary = JSON.parse(await fs.readFile(path.join(rsi, directory, 'attempts.json'), 'utf8').catch(() => 'null'))
+    if (!Array.isArray(summary)) continue
+    for (const entry of summary) {
+      const parsed = /^(\d+):(\d+)$/.exec(String(entry.cell ?? ''))
+      if (!parsed) continue
+      const branch = Number(parsed[1])
+      const attempt = Number(parsed[2])
+      const id = entry.id ?? rsiAttemptId(round, branch, attempt)
+      if (seen.has(id)) continue
+      seen.add(id)
+      attempts.push({
+        ...entry,
+        id,
+        round,
+        depth: entry.depth ?? attempt + 1,
+        parent: entry.parent ?? (attempt === 0 ? 'target' : rsiAttemptId(round, branch, attempt - 1)),
+        patchFile: entry.patch ? path.join(runDirectory, rsiPatchFile(round, branch, attempt)) : null
+      })
+    }
+  }
   return attempts
 }
+
+/** The candidate id an RSI attempt's record uses, from its round and cell. */
+const rsiAttemptId = (round, branch, attempt) => `rsi-b${branch}-r${round}c${attempt + 1}`
+
+/** Where an RSI attempt's patch is kept, run-relative. */
+const rsiPatchFile = (round, branch, attempt) => path.join('rsi', `r${String(round).padStart(3, '0')}-b${branch}a${attempt}.patch`)
 
 /**
  * The order the block reads attempts in: most relevant first.
@@ -124,9 +182,13 @@ function byRelevance(attempts) {
   const byId = new Map(attempts.map(attempt => [attempt.id, attempt]))
   const ordered = []
   const seen = new Set()
-  const best = attempts
-    .filter(attempt => attempt.best === true)
+  // The evolutionary loop marks the kept candidate. An RSI record carries no
+  // such mark, so the highest-scoring attempt stands in for it and the line
+  // leading to that attempt is read first either way.
+  const scored = attempts.filter(attempt => attempt.verdict === 'scored' && typeof attempt.value === 'number')
+  const best = attempts.filter(attempt => attempt.best === true)
     .sort((left, right) => (right.value ?? 0) - (left.value ?? 0) || (right.depth ?? 0) - (left.depth ?? 0))[0]
+    ?? scored.sort((left, right) => right.value - left.value || (right.depth ?? 0) - (left.depth ?? 0))[0]
   for (let walk = best; walk && !seen.has(walk.id); walk = byId.get(walk.parent)) {
     seen.add(walk.id)
     ordered.push(walk)
@@ -140,9 +202,9 @@ function byRelevance(attempts) {
 }
 
 /**
- * One attempt as text: what it changed, what its agent reported, what the
- * evaluator measured. The report and the measures are cut last, so an
- * oversized report never hides the change or the score.
+ * One attempt as text: what it changed, what the evaluator measured, and what
+ * its agent reported. The measures come before the report, so a long report
+ * cannot hide the evaluator's own numbers.
  */
 async function attemptText(attempt, room) {
   const verdict = attempt.verdict === 'scored'
@@ -150,16 +212,20 @@ async function attemptText(attempt, room) {
     : attempt.verdict === 'failed'
       ? `a check failed — ${oneLine(attempt.reason)}`
       : `refused — ${oneLine(attempt.error ?? attempt.reason ?? 'no score was read')}`
-  const lines = [`- ${attempt.id} (round ${attempt.round}, depth ${attempt.depth ?? 0}${attempt.best ? ', best' : ''}): value ${attempt.value}, ${verdict}`]
+  // A cut-off attempt keeps its patch and its measures. Naming the status stops a
+  // later candidate from reading its unfinished report as a measured result.
+  const cut = attempt.status && attempt.status !== 'completed' ? `, status ${attempt.status}` : ''
+  const lines = [`- ${attempt.id} (round ${attempt.round}, depth ${attempt.depth ?? 0}${attempt.best ? ', best' : ''}${cut}): value ${attempt.value}, ${verdict}`]
   const changed = await changedText(attempt)
   if (changed) lines.push(`  changed ${changed}`)
-  if (attempt.report) lines.push(`  report: ${oneLine(attempt.report)}`)
   if (attempt.measures && Object.keys(attempt.measures).length) lines.push(`  measures ${JSON.stringify(attempt.measures)}`)
+  if (attempt.report) lines.push(`  report: ${oneLine(attempt.report)}`)
   return trim(lines.join('\n'), room)
 }
 
 /** The files an attempt's patch touched and the lines it added and removed, as one line. */
 async function changedText(attempt) {
+  if (!attempt.patchFile) return null
   const patch = await fs.readFile(attempt.patchFile, 'utf8').catch(() => null)
   if (!patch) return null
   const summary = patchSummary(patch)
@@ -191,12 +257,16 @@ export function patchSummary(patch) {
   return { files: [...files], added, removed }
 }
 
-/** Text cut to fit, on a line boundary, marked as cut. */
+/**
+ * Text cut to fit, marked as cut.
+ *
+ * The cut is at a character, not a line: `oneLine` writes a report as one line,
+ * and a line-boundary cut dropped a report whole when it overflowed the entry by
+ * a few characters, which is how the measured finding was lost from a live run.
+ */
 function trim(text, room) {
   if (text.length <= room) return text
-  const cut = text.slice(0, Math.max(0, room - 2))
-  const at = cut.lastIndexOf('\n')
-  return `${(at > 0 ? cut.slice(0, at) : cut).trimEnd()} …`
+  return `${text.slice(0, Math.max(0, room - 2)).trimEnd()} …`
 }
 
 /** One line of text, with the report's own lines kept apart. */
@@ -217,7 +287,7 @@ function packetText(checkout, target, files) {
     const output = execFileSync(
       process.execPath,
       ['bin/engine.mjs', 'agent.context', JSON.stringify({ task: String(target), files })],
-      { cwd: checkout, encoding: 'utf8', timeout: 120000, maxBuffer: 64 * 1024 * 1024 }
+      { cwd: checkout, encoding: 'utf8', timeout: 120000, maxBuffer: 64 * 1024 * 1024, windowsHide: true }
     )
     const envelope = JSON.parse(output)
     return envelope.text ?? output
@@ -253,9 +323,40 @@ async function candidatePrompt({ checkout, runDirectory, setup, workspace, targe
   // The packet is inside `filled`, so it is counted before the history is sized:
   // what the fixed part does not use is all the history may have, up to its own
   // cap and never below one attempt's entry.
-  const fixed = filled.length - '{{HISTORY}}'.length
+  const fixed = filled.length - '{{HISTORY}}'.length - '{{PROBE}}'.length
   const budget = Math.max(HISTORY_FLOOR_CHARACTERS, Math.min(HISTORY_BLOCK_CHARACTERS, PROMPT_BUDGET_CHARACTERS - fixed))
-  return filled.replaceAll('{{HISTORY}}', await historyLines({ runDirectory, history, budget }))
+  return filled
+    .replaceAll('{{HISTORY}}', await historyLines({ runDirectory, history, budget }))
+    .replaceAll('{{PROBE}}', await probeText(runDirectory, setup.project))
+}
+
+/**
+ * The quick-probe instruction, or nothing when the setup does not price frames.
+ *
+ * Read from the frozen setup's own text: a setup that calls `browserFrames`
+ * measures what a frame costs, so its candidates get the probe. Every other
+ * target gets an empty section rather than guidance its task cannot use.
+ */
+export async function probeText(runDirectory, project) {
+  const setup = await fs.readFile(path.join(runDirectory, 'setup.mjs'), 'utf8').catch(() => '')
+  if (!setup.includes('browserFrames')) return ''
+  return `## Measuring a frame cost quickly
+
+If your target is what a frame costs to draw, do not write a browser probe; this
+checkout already carries one:
+
+\`\`\`
+node tools/dream/quick-probe.mjs --project "${project}" --level <level the task names> [--profile <file>]
+\`\`\`
+
+It starts the same hidden browser the evaluator uses, samples a short warm run,
+and prints \`cpuMs\`, \`frameMs\`, \`gpuMs\`, draw calls and triangles, the paths it
+measured, and any problem — about a minute, where the full setup takes several.
+\`--profile\` also writes a Chrome CPU profile of the sampled frames, so a hotspot
+can be named rather than guessed. The probe is exploratory: the frozen setup
+decides the score, and a playing-picture check decides the picture. Carry the
+numbers you measured and the ideas you rejected into your report; they are what
+the next attempt reads instead of repeating your probe.`
 }
 
 /**
@@ -344,7 +445,7 @@ export async function runCandidate({
     await fs.writeFile(promptPath, prompt, 'utf8')
     args.push('--task-file', promptPath)
 
-    const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true })
     let envelope = null
     try {
       envelope = JSON.parse(String(run.stdout))

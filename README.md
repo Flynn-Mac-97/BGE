@@ -1,15 +1,42 @@
 # browser game engine — v1
 
-An AI-native game engine that runs in the browser. Everything except a small
-kernel is a plugin, including the editor's own panels.
+A game engine with an Electron desktop and a browser editor. The desktop has
+a persistent console for terminals, coding agents, activity, and instances.
 
 **[ARCHITECTURE.md](ARCHITECTURE.md)** explains how it works and why it is
 shaped this way. This file is how to use it.
 
 ```
 npm install
-npm run dev          # http://localhost:5180
+npm run desktop:build
+npm run electron
 ```
+
+`npm run desktop:package` writes `release/Engine-win32-x64/Engine.exe`.
+Double-click it to open the engine. No Node installation or running dev server
+is needed for the packaged editor. Coding agents must be installed separately;
+their normal login and permission prompts appear in the terminal.
+
+Choose a project, then select Shell, Codex, Claude, or Pi and press **New session**.
+The session starts in the directory shown. Type `engine ping` or
+`engine snapshot` to drive the selected engine view. Each session keeps the
+target it started with; `--client <id>` selects another one.
+
+Terminal sessions survive game reloads. Activity shows lifecycle events and
+renderer output. Instances shows the shared supervisor list and stop controls.
+Quit stops application-owned sessions and services; previously running servers
+that were adopted are left running. Terminal output is held in bounded memory,
+not saved as a transcript. Exited sessions remain visible until the app closes.
+
+For browser development use `npm run dev`. Set `ENGINE_DESKTOP_DEV=1` before
+`npm run electron` to use source reloads inside the desktop. Desktop design and
+test commands are in [docs/desktop.md](docs/desktop.md).
+
+Every engine process this checkout starts — the dev server, the editor window, a
+lane browser, a headless session — belongs to the supervisor. Start it with
+`node bin/engine.mjs supervisor.start` for CLI-only work. The desktop starts it
+itself. Double-click `engine.cmd` at the checkout root to open the desktop.
+Use `node bin/engine.mjs supervisor --watch` for the terminal table.
 
 ## The shape of a project
 
@@ -46,6 +73,13 @@ measured browser window overrides it. A game that declares no device gets
 
 ## Agent workspace
 
+At a completed game milestone, run `node bin/engine.mjs evolve <id or words>`
+to review one relevant pain point or insight. It returns a read-only task brief.
+Agents may make small compatible engine improvements while building games,
+with a reproduction, regression check, and guide update. Risky changes need approval.
+Use the existing workspace and checks, not a separate maintenance system.
+See [the evolution workflow](docs/evolution.md).
+
 The root `AGENTS.md` is a short bootstrap that points at `ENGINE-BASE.md` —
 the base instructions: speech, code and comment style, and where everything
 is, with links out. Engine rules are in `agents/`. Game rules are in
@@ -54,6 +88,12 @@ is, with links out. Engine rules are in `agents/`. Game rules are in
 Open **AGENTS** to inspect the tree, add a branch, edit its file, or switch an
 optional skill on or off. A disabled skill adds no text to an agent packet.
 Skills use the portable `SKILL.md` format.
+
+`engine agent.skills` generates the enabled skill listings in `.agents/skills`
+for Codex and `.claude/skills` for Claude. `skillCategories` in
+`agents/manifest.json` controls both listings. Restart the agent session if its
+skill list does not refresh. Instruction packets remain available through
+`engine agent.context` for guides outside those categories.
 
 Every plugin may carry a short sidecar guide beside its code:
 
@@ -477,6 +517,32 @@ Output is compact when captured and indented at a terminal, because an agent
 pays for whitespace on every call and a person does not. `--raw` and
 `--pretty` force either.
 
+### Running a dev server
+
+Every engine process goes through the supervisor. It starts the process, writes
+it down, proves it by asking its own port, and kills what it owns when it exits,
+so nothing is left running that nothing remembers.
+
+```
+node bin/engine.mjs supervisor.start          # idempotent; prints the port
+node bin/engine.mjs supervisor                # the instance list as JSON
+node bin/engine.mjs supervisor --watch        # the same list live
+node bin/engine.mjs supervisor.open dev-server
+node bin/engine.mjs supervisor.open editor-browser              # the one running dev server
+node bin/engine.mjs supervisor.open editor-browser '{"url":"http://localhost:5180/"}'
+node bin/engine.mjs supervisor.stop <id>
+node bin/engine.mjs supervisor.stop all
+node bin/engine.mjs supervisor.stop all --down
+```
+
+A person double-clicks `engine.cmd` at the checkout root. It starts the
+supervisor if it is down, then shows the same table live — kind, id, port, pid,
+project, age and proved state — with `d` to open a dev server, `e` to open the
+editor on one, `s` to stop one, `a` to stop all and `q` to quit.
+
+`npm run dev` still starts Vite and opens the editor directly. Use the
+supervisor so the process is recorded and stoppable.
+
 ### Headless — and running many at once
 
 `--headless` starts a world inside the CLI process. No dev server, no port, no
@@ -689,12 +755,13 @@ There are no tool modes. The handle you grab is the choice.
   tab open; use `--headless` when you want more than one world.
 - Headless worlds are isolated in memory but share `project/` on disk, so two
   runs that both save a level will collide.
-- No terminal panel in the editor yet — the bridge works, but you run your CLI
-  in your own terminal. Embedding one needs a PTY (`node-pty`) so a CLI's TUI
-  renders properly.
+- The browser editor has no terminal panel — run your CLI in your own terminal.
+  The Electron desktop console has one, backed by `node-pty` and xterm.js, with
+  Shell, Codex, Claude and Pi providers.
 - Plugins cannot hot-swap; editing one reloads the page. Deleting any project
   file also reloads, because Vite does not consult plugins on unlink.
-- `Terminal Bridge` is dev-server only. A production build has no relay.
+- `Terminal Bridge` relays over a server. The dev server and the packaged
+  desktop backend both provide it; a static browser-only build has no relay.
 - The bridge does not authenticate and `eval` runs arbitrary code in the page.
   Fine for localhost; do not expose the dev server on a network.
 

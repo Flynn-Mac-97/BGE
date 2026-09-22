@@ -55,7 +55,7 @@ const NEEDED = [
  * answers `--version`.
  */
 const found = command => ['--version', '--help'].some(flag =>
-  spawnSync(`${command} ${flag}`, { stdio: 'ignore', shell: true }).status === 0)
+  spawnSync(`${command} ${flag}`, { stdio: 'ignore', shell: true, windowsHide: true }).status === 0)
 
 const GENERATOR = WINDOWS ? 'kmd-generate.exe' : 'kmd-generate'
 
@@ -74,7 +74,7 @@ function visualStudio() {
     '-latest', '-products', '*',
     '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
     '-property', 'installationPath'
-  ], { encoding: 'utf8' })
+  ], { encoding: 'utf8', windowsHide: true })
   const root = answer.stdout?.trim()
   if (!root) return null
   const script = path.join(root, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat')
@@ -101,7 +101,7 @@ const run = (command, args, cwd) => new Promise((resolve, reject) => {
   console.log(`\n$ ${command} ${args.join(' ')}`)
   // No shell: every command here is a real executable, and a shell would need
   // each argument escaped.
-  const child = spawn(command, args, { cwd, stdio: 'inherit' })
+  const child = spawn(command, args, { cwd, stdio: 'inherit', windowsHide: true })
   child.on('error', reject)
   child.on('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited ${code}`)))
 })
@@ -123,7 +123,7 @@ function cmake(args, cwd) {
  */
 async function patch() {
   if (!WINDOWS || !fs.existsSync(PATCH)) return
-  const clean = spawnSync('git', ['apply', '--check', PATCH], { cwd: HOME })
+  const clean = spawnSync('git', ['apply', '--check', PATCH], { cwd: HOME, windowsHide: true })
   if (clean.status !== 0) { console.log('\nwindows patch: already applied, or refused — skipping'); return }
   await run('git', ['apply', PATCH], HOME)
 }

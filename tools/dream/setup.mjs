@@ -103,7 +103,7 @@ export async function designSetup({ checkout = CHECKOUT, runDirectory, target, t
   if (model) args.push('--model', model)
   args.push(prompt)
 
-  const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const run = spawnSync(process.execPath, args, { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true })
   let envelope
   try {
     envelope = JSON.parse(String(run.stdout))

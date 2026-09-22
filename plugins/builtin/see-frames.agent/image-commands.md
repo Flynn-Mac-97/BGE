@@ -1,5 +1,15 @@
 # Image commands
 
+- `see.editor` captures the active desktop editor, including its panels.
+  `{"scope":"window"}` also includes desktop tabs and the console; the OS
+  title bar is excluded. `name` selects `agent-runs/see/<name>.png` and its
+  JSON sidecar (default `editor`, replaces the same name). Names accept only
+  letters, numbers, underscores and hyphens. Pixels use one pixel per DIP.
+  The desktop must be restored and the targeted engine view active. Chrome
+  and headless worlds return an explicit refusal. After host changes, rebuild
+  and restart the desktop. `desktop capture` uses the same capture without
+  needing an editor bridge connection. Captures do not change the game camera.
+
 - `see.sketch '{...}'` — flat-colour frame from computed facts: marked
   entities fill their screen hull in their type's colour, the rest are
   rectangles. Headless it writes `agent-runs/see/<name>.png` + `.json`; in

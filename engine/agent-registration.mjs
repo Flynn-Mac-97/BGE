@@ -3,7 +3,7 @@
  *
  * Registration is the difference between a guide an agent must go looking for
  * and one the harness puts in front of it. A plugin guide with `skill:` and
- * `description:` frontmatter becomes `.claude/skills/<name>/SKILL.md`, and the
+ * `description:` frontmatter becomes a skill in each agent's discovery directory. The
  * harness lists that file's name and description at session start. It is the
  * only surface in this project measured to change an agent's first move.
  *
@@ -24,6 +24,7 @@ import { BUILTIN_REGISTERED_TYPES, loadedModuleSource, registeredTypeNames } fro
 
 /** Where the harness looks. Fixed by the harness, not by this project. */
 const SKILL_DIRECTORY = '.claude/skills'
+const CODEX_SKILL_DIRECTORY = '.agents/skills'
 
 /**
  * The engine's name, and the prefix on every skill it registers.
@@ -404,6 +405,9 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     text: registeredTypesText(known)
   })
   files.push(...await manifestSkillFiles(root, new Set(files.map(file => file.path)), enabled))
+  files.push(...files.filter(file => file.path.startsWith(`${SKILL_DIRECTORY}/`)).map(file => ({
+    ...file, path: file.path.replace(SKILL_DIRECTORY, CODEX_SKILL_DIRECTORY)
+  })))
   return files
 }
 
@@ -463,12 +467,18 @@ ${bodyOf(source)}`
 
 /** Generated skill files on disk, whatever guide they came from. */
 async function generatedSkillsOnDisk(root) {
-  const directory = path.join(root, SKILL_DIRECTORY)
+  const lists = await Promise.all([SKILL_DIRECTORY, CODEX_SKILL_DIRECTORY]
+    .map(directory => generatedSkillsInDirectory(root, directory)))
+  return lists.flat()
+}
+
+async function generatedSkillsInDirectory(root, skillDirectory) {
+  const directory = path.join(root, skillDirectory)
   let names = []
   try { names = await fs.readdir(directory) } catch { return [] }
   const found = []
   for (const name of names) {
-    const file = `${SKILL_DIRECTORY}/${name}/SKILL.md`
+    const file = `${skillDirectory}/${name}/SKILL.md`
     const text = await fs.readFile(path.join(root, file), 'utf8').catch(() => '')
     // An empty file is a write that did not finish. It carries no marker, so
     // treating "no marker" as hand-written would leave it on disk for good —
@@ -498,7 +508,10 @@ export async function writeGeneratedAgentFiles(root, projectPath) {
   const wanted = new Set(files.map(file => file.path))
   for (const skill of await generatedSkillsOnDisk(root)) {
     if (wanted.has(skill.path)) continue
-    await fs.rm(path.join(root, SKILL_DIRECTORY, skill.name), { recursive: true, force: true })
+    const directory = path.resolve(root, path.dirname(skill.path))
+    const relative = path.relative(path.resolve(root), directory)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Skill directory is outside the checkout')
+    await fs.rm(directory, { recursive: true, force: true })
   }
   return files.map(file => file.path)
 }

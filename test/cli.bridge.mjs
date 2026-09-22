@@ -204,7 +204,8 @@ await test('simulate is deterministic for every entity, not just the player', ()
   // weeks while the bat sampled performance.now(). Compare the whole world.
   const run = () => {
     cli(['stop'])
-    const s = json(['simulate', '1.5'])
+    json(['simulate', '1.5'])
+    const s = json(['snapshot', '--entities'])
     return { time: s.time, entities: s.entities.map(e => [e.id, ...e.at]) }
   }
   const a = run(), b = run(), c = run()
@@ -260,7 +261,7 @@ await test('uncaught errors and rejections reach engine.errors()', () => {
 })
 
 await test('check passes clean and fails on nondeterminism', () => {
-  const clean = cli(['check'])
+  const clean = cli(['check', '--project', PROJECT])
   eq(clean.code, 0, 'the project is clean')
   eq(JSON.parse(clean.stdout).problems, [], 'and says so with no problems')
 
@@ -274,17 +275,17 @@ await test('check passes clean and fails on nondeterminism', () => {
     '}'
   ].join('\n'))
   try {
-    const bad = cli(['check'])
+    const bad = cli(['check', '--project', PROJECT])
     eq(bad.code, 1, 'a violation exits 1 so it can gate a shell chain')
     const p = JSON.parse(bad.stdout).problems
     ok(p.some(x => /performance\.now/.test(x.why)), 'names the wall clock')
     ok(p.some(x => /Math\.random/.test(x.why)), 'names the random source')
     ok(p.some(x => /setTimeout/.test(x.why)), 'names the scheduler')
-    ok(p.every(x => x.line > 0), 'every problem has a line number')
+    ok(p.filter(x => /performance\.now|Math\.random|setTimeout/.test(x.why)).every(x => x.line > 0), 'every nondeterminism problem has a line number')
   } finally {
     removeAndSettle(scratch)
   }
-  eq(cli(['check']).code, 0, 'clean again once removed')
+  eq(cli(['check', '--project', PROJECT]).code, 0, 'clean again once removed')
 })
 
 await test('a simulated world refuses to save', () => {

@@ -1,5 +1,6 @@
 /**
- * Headless browsers started to render for a lane.
+ * Browsers started by this engine: a headless lane, or the visible window a
+ * person works in.
  *
  * A lane needs real pixels, and taking them from the person's browser is what
  * made five parallel lanes fight over one tab. Each lane gets its own headless
@@ -9,8 +10,9 @@
  * forgotten one is only findable by reading process command lines. So every one
  * is written down here, and the reader proves an entry by asking its debugging
  * port rather than trusting the file — the same rule the server registry
- * follows, for the same reason. The answer must name the lane, because any
- * browser can answer a port.
+ * follows, for the same reason. A lane's reply must name the lane, because any
+ * browser can answer a port; a visible window has no `?client=` page, so its
+ * port answering is proof enough.
  *
  * Records belong to the main checkout, not to whichever worktree started the
  * browser, so a lane's browser can be listed and stopped from outside its
@@ -51,13 +53,20 @@ function mainCheckout(root) {
 }
 
 /** The lane browser registry's path in the main checkout. */
-const registryFile = root => path.join(mainCheckout(root), '.engine/lane-browsers.json')
+const registryFile = root => path.join(process.env.ENGINE_STATE_ROOT || path.join(mainCheckout(root), '.engine'), 'lane-browsers.json')
 
-/** The recorded lane browsers for this checkout, or an empty list when the file is missing or broken. */
+/**
+ * The recorded browsers for this checkout, or an empty list when the file is
+ * missing or broken.
+ *
+ * A record written before the `headless` field existed was a lane, so a record
+ * without the field reads as one. New records carry it either way.
+ */
 export function readLaneBrowsers(root) {
   try {
     const value = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'))
-    return Array.isArray(value.browsers) ? value.browsers : []
+    const browsers = Array.isArray(value.browsers) ? value.browsers : []
+    return browsers.map(entry => ({ ...entry, headless: entry.headless !== false }))
   } catch { return [] }
 }
 
@@ -68,11 +77,17 @@ function writeLaneBrowsers(root, browsers) {
   fs.writeFileSync(file, JSON.stringify({ version: 1, browsers }, null, 2) + '\n', 'utf8')
 }
 
-/** Add or replace the entry for a client name. */
+/**
+ * Add or replace the entry for a client name.
+ *
+ * `headless` defaults to true because a browser started without saying which
+ * kind it is was a lane; a visible window passes false explicitly.
+ */
 export function recordLaneBrowser(root, entry) {
-  const kept = readLaneBrowsers(root).filter(other => other.client !== entry.client)
-  writeLaneBrowsers(root, [...kept, entry])
-  return entry
+  const record = { headless: true, ...entry }
+  const kept = readLaneBrowsers(root).filter(other => other.client !== record.client)
+  writeLaneBrowsers(root, [...kept, record])
+  return record
 }
 
 /** Remove one client's record from the registry. */
@@ -113,13 +128,14 @@ export function browserVersion(port) {
 }
 
 /**
- * Ask a debugging port who it is, or null if it does not answer.
+ * Read one DevTools HTTP resource, or null when the port does not answer.
  *
- * The body is read even though only the status matters: an unread body holds
- * its socket open, and a socket still closing when the process exits trips a
- * libuv assertion on Windows that is printed after the command's own output.
+ * The body is read even though some callers only need the status: an unread
+ * body holds its socket open, and a socket still closing when the process exits
+ * trips a libuv assertion on Windows that is printed after the command's own
+ * output. node:http with `agent: false`, not fetch, for the same reason.
  */
-function ask(port, resource = '/json/version') {
+function debuggingPortGet(port, resource) {
   return new Promise(resolve => {
     const request = http.get({
       host: '127.0.0.1', port, path: resource, agent: false, timeout: 1500
@@ -129,8 +145,7 @@ function ask(port, resource = '/json/version') {
       response.on('data', chunk => { body += chunk })
       response.once('end', () => {
         request.destroy()
-        if (response.statusCode !== 200) return resolve(null)
-        try { resolve(JSON.parse(body)) } catch { resolve(null) }
+        resolve({ status: response.statusCode, text: body })
       })
     })
     const fail = () => { request.destroy(); resolve(null) }
@@ -139,10 +154,13 @@ function ask(port, resource = '/json/version') {
   })
 }
 
-// node:http with `agent: false`, not fetch: fetch keeps its connection in a
-// pool this code cannot close, and a socket still closing when the CLI exits
-// aborts the process on Windows with a libuv assertion. Here the socket is this
-// function's to destroy.
+/** Ask a debugging port who it is, or null when it does not answer with JSON. */
+async function ask(port, resource = '/json/version') {
+  const answer = await debuggingPortGet(port, resource)
+  if (!answer || answer.status !== 200) return null
+  try { return JSON.parse(answer.text) } catch { return null }
+}
+
 /** Whether anything answers a debugging port at all. */
 const answers = port => ask(port).then(said => said !== null)
 
@@ -169,13 +187,189 @@ export async function clientsOnPort(port) {
   return targets.map(target => clientOf(target.url)).filter(Boolean)
 }
 
-/** Whether a port can be bound on the loopback address now. */
-function portIsFree(port) {
+/**
+ * The pages a debugging port has open, or null when it does not answer.
+ *
+ * Only `type: "page"` targets are windows a person sees. A service worker or a
+ * browser-internal target is not a tab to reuse or close.
+ */
+export async function pagesOnPort(port) {
+  const targets = await ask(port, '/json/list')
+  if (!Array.isArray(targets)) return null
+  return targets.filter(target => target.type === 'page')
+}
+
+/** Bring one page to the front. Reports whether the port took it. */
+export async function activatePage(port, id) {
+  const answer = await debuggingPortGet(port, `/json/activate/${encodeURIComponent(id)}`)
+  return Boolean(answer && answer.status === 200)
+}
+
+/**
+ * One command on the browser's own debugging socket, and its result.
+ *
+ * `/json` answers about pages only. Window position, size and state are
+ * browser-level commands, which are reachable over the socket alone.
+ */
+export async function browserCommand(port, method, parameters = {}, { timeoutMilliseconds = 4000, open } = {}) {
+  const version = await ask(port, '/json/version')
+  const address = version?.webSocketDebuggerUrl
+  if (!address) return null
+  const socket = (open ?? (url => new WebSocket(url)))(address)
+  try {
+    return await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${method} did not answer`)), timeoutMilliseconds)
+      const done = value => { clearTimeout(timer); resolve(value) }
+      socket.onopen = () => socket.send(JSON.stringify({ id: 1, method, params: parameters }))
+      socket.onerror = () => { clearTimeout(timer); reject(new Error(`cannot reach the browser on port ${port}`)) }
+      socket.onmessage = event => {
+        const message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
+        if (message.id === 1) done(message.error ? null : message.result)
+      }
+    })
+  } finally {
+    try { socket.close() } catch { /* already closed */ }
+  }
+}
+
+/**
+ * Open a url as a tab in a browser that is already running.
+ *
+ * Every engine belongs in one window, as tabs a person switches between: a
+ * window each buries the rest and fills the desktop.
+ *
+ * `Target.createTarget` makes a window of its own even with `newWindow: false`,
+ * so the tab is opened from a page already in the window instead — that is what
+ * puts it in the same tab strip. A browser holding no page has no window to add
+ * to, so the first page is made the other way. Returns the new page id, or null.
+ */
+export async function openTabOnPort(port, url, { milliseconds = 8000 } = {}) {
+  const before = await pagesOnPort(port)
+  const host = before?.find(page => page.webSocketDebuggerUrl)
+  if (!host) {
+    const made = await browserCommand(port, 'Target.createTarget', { url, newWindow: false })
+    return made?.targetId ?? null
+  }
+  const known = new Set(before.map(page => page.id))
+  // A script opens a tab only for a user action, so the evaluation says it is one.
+  const opened = await evaluateOnPage(host, `String(!!window.open(${JSON.stringify(url)}, '_blank'))`, { userGesture: true })
+  if (opened !== 'true') return null
+  return waitForNewPage(port, known, { milliseconds })
+}
+
+/** The id of the first page the port gains, or null at the deadline. */
+async function waitForNewPage(port, known, { milliseconds }) {
+  const deadline = Date.now() + milliseconds
+  for (;;) {
+    const pages = await pagesOnPort(port)
+    const made = pages?.find(page => !known.has(page.id))
+    if (made) return made.id
+    if (Date.now() >= deadline) return null
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+}
+
+/** Evaluate one expression in one page, over that page's own socket. */
+function evaluateOnPage(page, expression, { userGesture = false, timeoutMilliseconds = 5000, open } = {}) {
+  const socket = (open ?? (url => new WebSocket(url)))(page.webSocketDebuggerUrl)
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { try { socket.close() } catch { /* already closed */ } resolve(null) }, timeoutMilliseconds)
+    const done = value => { clearTimeout(timer); try { socket.close() } catch { /* already closed */ } resolve(value) }
+    socket.onopen = () => socket.send(JSON.stringify({
+      id: 1, method: 'Runtime.evaluate', params: { expression, userGesture, returnByValue: true }
+    }))
+    socket.onerror = () => done(null)
+    socket.onmessage = event => {
+      const message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
+      if (message.id === 1) done(message.result?.result?.value ?? null)
+    }
+  })
+}
+
+/** Where one page's window is, and how big. Null when the browser will not say. */
+export async function windowOfPage(port, pageId) {
+  const found = await browserCommand(port, 'Browser.getWindowForTarget', { targetId: pageId })
+  return found ? { windowId: found.windowId, bounds: found.bounds } : null
+}
+
+/** What one page says about itself, evaluated in the page. Null when it will not answer. */
+export async function pageReports(port, pageId, expression, { timeoutMilliseconds = 4000, open } = {}) {
+  const pages = await pagesOnPort(port)
+  const page = pages?.find(target => target.id === pageId) ?? pages?.[0]
+  if (!page?.webSocketDebuggerUrl) return null
+  const socket = (open ?? (url => new WebSocket(url)))(page.webSocketDebuggerUrl)
+  try {
+    return await new Promise(resolve => {
+      const timer = setTimeout(() => resolve(null), timeoutMilliseconds)
+      socket.onopen = () => socket.send(JSON.stringify({
+        id: 1, method: 'Runtime.evaluate', params: { expression, returnByValue: true }
+      }))
+      socket.onerror = () => { clearTimeout(timer); resolve(null) }
+      socket.onmessage = event => {
+        const message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
+        if (message.id !== 1) return
+        clearTimeout(timer)
+        resolve(message.result?.result?.value ?? null)
+      }
+    })
+  } finally {
+    try { socket.close() } catch { /* already closed */ }
+  }
+}
+
+/**
+ * Put one page's window on screen, and report whether it is really there.
+ *
+ * Chrome stores a window's last state in its profile, so a window killed while
+ * minimised opens minimised again — with `windowState: "normal"` reported all
+ * the same. The bounds are therefore always set, and the page itself is asked
+ * whether it is visible, because only the page knows.
+ */
+export async function showWindow(port, pageId, { width, height } = {}) {
+  await activatePage(port, pageId)
+  const found = await windowOfPage(port, pageId)
+  if (!found) return null
+  const asked = found.bounds ?? {}
+  await browserCommand(port, 'Browser.setWindowBounds', {
+    windowId: found.windowId,
+    bounds: {
+      windowState: 'normal',
+      left: asked.left ?? 20, top: asked.top ?? 20,
+      width: width ?? asked.width ?? 1400, height: height ?? asked.height ?? 900
+    }
+  })
+  const settled = await windowOfPage(port, pageId)
+  const visibility = await pageReports(port, pageId, 'document.visibilityState')
+  return { ...(settled?.bounds ?? asked), visible: visibility === 'visible' }
+}
+
+/** Close one page. Reports whether the port took it. */
+export async function closePage(port, id) {
+  const answer = await debuggingPortGet(port, `/json/close/${encodeURIComponent(id)}`)
+  return Boolean(answer && answer.status === 200)
+}
+
+/** Whether one loopback address can be bound now. An address this host lacks cannot be held. */
+function hostIsFree(port, host) {
   return new Promise(resolve => {
     const probe = net.createServer()
-    probe.once('error', () => resolve(false))
-    probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)))
+    probe.once('error', error => resolve(error.code === 'EADDRNOTAVAIL' || error.code === 'EAFNOSUPPORT'))
+    probe.listen(port, host, () => probe.close(() => resolve(true)))
   })
+}
+
+/**
+ * Whether a port can be bound now.
+ *
+ * Both loopback addresses are tested: a dev server binds `localhost`, which is
+ * the IPv6 address first on Windows, while a browser binds `127.0.0.1`. A port
+ * held on either one is not free, and the second binder loses silently.
+ */
+async function portIsFree(port) {
+  for (const host of ['127.0.0.1', '::1']) {
+    if (!await hostIsFree(port, host)) return false
+  }
+  return true
 }
 
 /**
@@ -192,7 +386,8 @@ export async function findFreeDebuggingPort(root, { from = 9400, tries = 200 } =
     if (taken.has(port)) continue
     if (await portIsFree(port)) return port
   }
-  throw new Error(`no free debugging port between ${from} and ${from + tries - 1}`)
+  throw new Error(`no free debugging port between ${from} and ${from + tries - 1}; `
+    + 'see what holds them with: node bin/engine.mjs supervisor, then stop browsers with: supervisor.stop all')
 }
 
 /** Why an entry is not proved alive, in the reader's terms. */
@@ -205,20 +400,20 @@ function whyNotAlive(entry, running, clients) {
 }
 
 /**
- * Every recorded lane browser, each proved against its own port.
+ * Every recorded browser, each proved against its own port.
  *
  * A record says what was true when it was written. A browser killed outright
  * gets no chance to remove its entry, so the port is asked before an entry is
- * reported alive — and the answer must name this lane. Any browser can answer a
- * port, so an entry pointed at a port another browser holds would otherwise
- * read as running on someone else's reply.
+ * reported alive. A headless lane's reply must name this lane, because any
+ * browser can answer a port; a visible window has no lane page, so a port that
+ * answers at all is the proof.
  */
 export async function listLaneBrowsers(root) {
   const browsers = readLaneBrowsers(root)
   return Promise.all(browsers.map(async entry => {
     const running = alive(entry.pid)
     const clients = running ? await clientsOnPort(entry.port) : null
-    const mine = Boolean(clients?.includes(entry.client))
+    const mine = entry.headless ? Boolean(clients?.includes(entry.client)) : clients !== null
     return {
       ...entry,
       alive: mine,
@@ -246,12 +441,14 @@ export async function freeLaneName(root, client) {
       ? `answering on port ${found.port}`
       : `not answering on port ${found.port}`
     throw new Error(
-      `a lane browser is already called "${client}": process ${found.pid}, ${port}`
+      `a browser is already called "${client}": process ${found.pid}, ${port}`
       + (found.startedAt ? `, started ${found.startedAt}` : '')
-      + `.\nStop it first:  node bin/engine.mjs lanes.stop ${client}`)
+      + `; stop it with: node bin/engine.mjs supervisor.stop <id> (list ids with: node bin/engine.mjs supervisor) or: node bin/engine.mjs lanes.stop ${client}, or open with another client name`)
   }
   forgetLaneBrowser(root, client)
-  if (found.profile) {
+  // A lane's profile is temporary. A visible window keeps its profile so window
+  // size, zoom and open tabs return; a dead record does not discard it.
+  if (found.headless !== false && found.profile) {
     try { fs.rmSync(found.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
   }
   return found
@@ -274,7 +471,8 @@ async function pickDebuggingPort(root, asked) {
   if (!await portIsFree(wanted)) {
     throw new Error(
       `port ${wanted} is already bound, so a browser started on it would have no debugging port. `
-      + `Leave the port unset to take a free one.`)
+      + `Stop the holder with: node bin/engine.mjs supervisor.stop <id> `
+      + `(node bin/engine.mjs supervisor lists ids), or leave the port unset to take a free one.`)
   }
   return wanted
 }
@@ -319,11 +517,13 @@ export async function startLaneBrowser(root, {
   // it, the way a dev server does. Inheriting stdio would end it when the
   // starting process exits and close the pipes.
   const browser = spawn(chrome, laneBrowserArguments({ port: debuggingPort, profile, width, height, page }),
-    { stdio: 'ignore', detached: true })
+    { stdio: 'ignore', detached: true, windowsHide: true })
   browser.unref()
 
   const entry = {
     client, port: debuggingPort, url: page, pid: browser.pid, profile, serves: root,
+    // A lane has no window; only the visible editor is not headless.
+    headless: true,
     // Which binary rendered. A lane that fell back to an installed Chrome is
     // then visible in the registry rather than silent.
     chrome,
@@ -363,13 +563,18 @@ export async function startLaneBrowser(root, {
 }
 
 /**
- * Stop lane browsers and remove their records.
+ * Stop recorded browsers and remove their records.
  *
- * With no name, stops every recorded one. A profile directory is removed only
- * after its browser is gone, because Windows holds the files while it runs.
+ * With no name, stops only headless lanes: the person's visible editor window
+ * must survive a lane sweep. A named client is stopped whatever kind it is, and
+ * `all` stops every recorded browser.
+ *
+ * A profile directory is removed only after its browser is gone, because
+ * Windows holds the files while it runs.
  */
-export async function stopLaneBrowsers(root, client = null) {
-  const wanted = readLaneBrowsers(root).filter(entry => !client || entry.client === client)
+export async function stopLaneBrowsers(root, client = null, { all = false } = {}) {
+  const wanted = readLaneBrowsers(root).filter(entry =>
+    all || (client === null ? entry.headless !== false : entry.client === client))
   const stopped = []
   for (const entry of wanted) {
     const was = alive(entry.pid) ? 'running' : 'gone'
@@ -395,7 +600,8 @@ export async function stopLaneBrowsers(root, client = null) {
     remaining: readLaneBrowsers(root).length,
     ...(missed.length ? {
       warning: `port ${missed.map(entry => entry.port).join(', ')} still answers after the stop. `
-        + `A browser is attached that this registry does not describe.`
+        + `A browser is attached that this registry does not describe. `
+        + 'See every instance with: node bin/engine.mjs supervisor, then stop one with: supervisor.stop <id>.'
     } : {})
   }
 }

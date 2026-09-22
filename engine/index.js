@@ -22,6 +22,7 @@ import { PROJECT_PREFIX } from './asset-path.js'
  * server has no project to save to, so it reads as named and nothing changes.
  */
 async function openProject() {
+  await globalThis.__engineRoleReady
   try {
     const body = await (await fetch('/api/project')).json()
     if (typeof body.project === 'string') return { name: body.project, untitled: body.untitled === true }
@@ -175,10 +176,33 @@ async function boot() {
     context.renderer.draw()
     context.bus.emit('frame:painted')
   }
+  /**
+   * Whether this page still draws.
+   *
+   * A page whose dev server is gone cannot reload, be edited or be read, so it
+   * stops drawing and gives the graphics card back what it holds. A heavy scene
+   * left drawing in a forgotten tab costs hundreds of megabytes for nothing.
+   */
+  let alive = true
+
   /** Keep asking for the next frame while the world is stopped. */
-  const idle = () => { paint(); requestAnimationFrame(idle) }
+  const idle = () => { if (!alive) return; paint(); requestAnimationFrame(idle) }
   idle()
-  setInterval(() => { if (document.hidden) paint() }, 100)
+  const hiddenPaint = setInterval(() => { if (alive && document.hidden) paint() }, 100)
+
+  if (import.meta.hot) {
+    import.meta.hot.on('vite:ws:disconnect', () => {
+      if (!alive) return
+      alive = false
+      clearInterval(hiddenPaint)
+      loop.stop()
+      context.renderer.release()
+      document.getElementById('app').innerHTML =
+        '<pre style="padding:24px;font:12px ui-monospace">the dev server is gone. '
+        + 'this page stopped drawing and gave back what it held. '
+        + 'start the server and reload to carry on.</pre>'
+    })
+  }
 
   console.log('%cengine ready', 'font-weight:600', '— try engine.snapshot() or engine.commands()')
 }

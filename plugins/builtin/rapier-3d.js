@@ -145,6 +145,10 @@ function standingDown(context) {
  */
 const verbOwners = new WeakMap()
 
+// Per world, like verbOwners: a process-level Map would show one world's hash
+// in another world's panel.
+const panelHashes = new WeakMap()
+
 function takeVerbs(context) {
   if (verbOwners.has(context)) return
   verbOwners.set(context, { raycast: context.raycast, canStand: context.canStand })

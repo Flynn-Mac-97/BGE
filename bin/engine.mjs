@@ -13,8 +13,8 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { execFileSync, spawn } from 'node:child_process'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolveProject } from '../engine/project-path.mjs'
 
 const PORT = process.env.ENGINE_PORT || 5180
@@ -46,7 +46,7 @@ const ledgerHome = () => {
   if (ledgerRoot !== null) return ledgerRoot
   ledgerRoot = HERE
   try {
-    const line = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: HERE, encoding: 'utf8' })
+    const line = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: HERE, encoding: 'utf8', windowsHide: true })
       .split(/\r?\n/).find(value => value.startsWith('worktree '))
     if (line) ledgerRoot = path.resolve(line.slice('worktree '.length))
   } catch { /* not a git checkout — this repo is still the right answer */ }
@@ -91,11 +91,36 @@ lanes     lanes                every headless browser started for a lane, each
                                start one and wait for its page. Refused when a
                                browser of that name is already running, so a
                                second start can never orphan the first
-          lanes.stop [<client>]     stop one, or all of them
+          lanes.stop [<client>|all]  stop one, or all of them when no client
+                               is given. "all" includes the visible window
           clients              who is attached to this server, and which one an
                                untargeted call would reach
           lock                 whether lanes are working, and so whether anybody
                                else may write
+desktop   desktop [<action>] [json]   console state or a desktop action
+                               terminal.start/read/write/resize/interrupt/stop,
+                               engine.open/activate/reload, instance.stop,
+                               dev.start, project.open
+
+supervisor
+          supervisor [--watch]
+                               what the supervisor is running, or the sentence
+                               that starts one. --watch prints a live table and
+                               takes keys: d dev server, e editor tab, h
+                               headless, s stop, a stop all, q.
+                               Exit 2 when none is up
+          supervisor.start     start it detached if it is not up; idempotent,
+                               and prints the port
+          supervisor.open <kind> [json]
+                               start one instance: dev-server, editor-browser,
+                               lane-browser or headless-session. Every
+                               editor-browser is a tab of its own in the one
+                               visible window, and drives from the terminal as
+                               --client <its id>
+          supervisor.stop [<id>|all]
+                               stop one instance, or every owned one. --down
+                               stops the supervisor itself. Exit 1 while any
+                               asked-for instance is still running
 session   serve                one headless world, many ops, read from stdin:
                                one JSON request per line, one JSON reply per
                                line. What --headless pays per command, a session
@@ -110,6 +135,12 @@ insight   insight "<what worked>" [--kind method|engine|cli|docs|editor]
                [--tool "<what would make this one step>"]
           insight.list [<words to search>] [--all]
           insight.adopt <id> "<the tool that now does it>"
+evolve    evolve [<id>|<words>] one read-only maintenance brief; newest matching
+                               open pain or insight, not a priority score.
+                               Reproduce first; small compatible fixes may
+                               proceed directly. Ask for risky changes.
+          pain / insight accept --repro "<steps>" --expected "<result>"
+                               --actual "<result>" as evidence, never executed.
 agents    agent.context [file...]
           agent.prepare <id> [file...] [--parallel]
           agent.status [--all] live runs, lanes to merge, leftovers on disk
@@ -121,6 +152,19 @@ agents    agent.context [file...]
                                whose work is already in HEAD, and rounds of
                                agent output older than N days (default 7). The
                                two ledgers and the README are never swept
+jev       jev.status           the opt-in switch, the pinned model, and whether
+                               a key and a proxy are present (never the key)
+          jev.mode '{"on":true}'  turn Jev on or off for this project; no
+                               argument reads it. Off means no network call
+          jev.guides '{"task":"..."}'  rank the optional plugin guides a
+                               task looks like it needs
+          jev.records '{"text":"..."}'  rank open ledger records related to
+                               a new finding; advisory, never decides work is
+                               fixed
+
+Jev runs from node and reaches OpenRouter alone: OPENROUTER_PROXY_URL is
+attached to that one request as a dispatcher. The pi process, a global
+dispatcher and the Windows proxy are never touched.
 
 Args that parse as JSON are sent as JSON, everything else as a string.
 Flags (--foo) collect into a trailing options object.
@@ -156,6 +200,10 @@ servers and servers.stop need no editor either. They read what each dev server
 wrote down and then prove every line by asking the port, because a server killed
 outright leaves its record behind and a record alone is not evidence. A port
 answering for somebody else's checkout is named and never stopped for you.
+
+supervisor and its verbs need no editor either. The supervisor owns every
+instance this checkout starts and proves each against its own port; a record
+alone is not evidence, so a stale one is dropped rather than reported running.
 
 lanes proves every entry against its debugging port the same way. A lane browser
 has no window, so the registry is the only handle on one: one name is one
@@ -218,10 +266,10 @@ closes one, meaning the engine now has a tool that reaches the same answer.
  * following argument and the failure would look like the flag doing nothing.
  */
 const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project', 'client',
-                             'profile', 'debugPort', 'problem', 'saves', 'tool'])
+                             'profile', 'debugPort', 'problem', 'saves', 'tool', 'repro', 'expected', 'actual'])
 
 const argv = process.argv.slice(2)
-const flags = {}
+const flags = process.env.ENGINE_CLIENT ? { client: process.env.ENGINE_CLIENT } : {}
 const words = []
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
@@ -333,9 +381,9 @@ function rejoinSplitRequest(list) {
 // Flags the CLI itself consumes never reach the browser.
 const options = { ...flags }
 for (const k of ['port', 'timeout', 'raw', 'pretty', 'verbose', 'help',
-                 'kind', 'where', 'fix', 'cost', 'reads', 'all', 'problem', 'saves', 'tool',
+                 'kind', 'where', 'fix', 'cost', 'reads', 'all', 'problem', 'saves', 'tool', 'repro', 'expected', 'actual',
                  'headless', 'level', 'root', 'project', 'parallel', 'checked', 'blocked',
-                 'client', 'dry-run', 'dryRun', 'profile', 'debugPort']) delete options[k]
+                 'client', 'dry-run', 'dryRun', 'profile', 'debugPort', 'down', 'watch']) delete options[k]
 
 let args = rejoinSplitRequest(words).map(coerce)
 // `select` takes a list, so two ids mean one array argument, not two arguments.
@@ -359,14 +407,16 @@ async function call(op, args, ms = timeout) {
       body: payload
     })
   } catch (e) {
-    die(2, `cannot reach the dev server at ${host}. Is \`npm run dev\` running?`, String(e))
+    die(2, `cannot reach the dev server at ${host}. Start one through the supervisor: `
+      + 'node bin/engine.mjs supervisor.start, then supervisor.open dev-server', String(e))
   }
   const body = await res.json().catch(() => ({ error: `bad response ${res.status}` }))
   // The server names the checkout it serves; refuse to drive somebody else's.
   // This is what makes it safe for a lane to drive its own dev server — the
   // reply proves whose workspace is on the other end before any op lands.
   if (body.serves && path.resolve(body.serves) !== path.resolve(REPO)) {
-    die(2, `the server at ${host} serves\n  ${path.resolve(body.serves)}\nbut this command runs from\n  ${path.resolve(REPO)}\nDrive this workspace's own server with --port, or run --headless.`)
+    die(2, `the server at ${host} serves\n  ${path.resolve(body.serves)}\nbut this command runs from\n  ${path.resolve(REPO)}\nDrive this workspace's own server with --port, or run --headless. `
+      + `See every instance with: node bin/engine.mjs supervisor, then stop one with: supervisor.stop <id>`) 
   }
   // Nothing to talk to is exit 2; the wrong number of things to talk to is a
   // usage error the caller fixes with --client, so it is exit 1.
@@ -417,7 +467,8 @@ async function get(pathname) {
     const res = await fetch(host + pathname)
     return await res.json()
   } catch {
-    die(2, `cannot reach the dev server at ${host}. Is \`npm run dev\` running?`)
+    die(2, `cannot reach the dev server at ${host}. Start one through the supervisor: `
+      + 'node bin/engine.mjs supervisor.start, then supervisor.open dev-server')
   }
 }
 
@@ -599,6 +650,16 @@ const readPain = () => readLedger(PAIN_FILE())
 const appendPain = record => appendLedger(PAIN_FILE(), record)
 const foldPain = () => foldLedger(PAIN_FILE(), 'resolved')
 
+function ledgerEvidence() {
+  const evidence = {}
+  for (const name of ['repro', 'expected', 'actual']) {
+    if (flags[name] === undefined) continue
+    if (typeof flags[name] !== 'string' || !flags[name].trim()) die(1, `--${name} needs non-empty text`)
+    evidence[name] = flags[name].trim()
+  }
+  return evidence
+}
+
 if (op === 'pain') {
   const what = words.join(' ').trim()
   if (!what) die(1, 'say what was hard:  pain "had to read four files to find where collisions resolve"')
@@ -614,6 +675,7 @@ if (op === 'pain') {
     at: new Date().toISOString(),
     kind,
     what,
+    ...ledgerEvidence(),
     // What it cost, not just how it felt. A rough order of magnitude is worth
     // far more than nothing — this is what pain.list ranks by.
     ...(cost !== null ? { cost } : {}),
@@ -705,9 +767,17 @@ const INSIGHT_KINDS = ['method', 'engine', 'cli', 'docs', 'editor']
 const readInsights = () => readLedger(INSIGHT_FILE())
 const foldInsights = () => foldLedger(INSIGHT_FILE(), 'adopted')
 
+if (op === 'evolve') {
+  try {
+    const { evolutionBrief } = await import('../engine/evolve.mjs')
+    out(evolutionBrief(foldPain(), foldInsights(), words.join(' ')))
+    process.exit(0)
+  } catch (error) { die(1, error.message) }
+}
+
 /** Every word must appear somewhere in the record. Case is ignored. */
 const insightMatches = (record, words) => {
-  const haystack = [record.what, record.problem, record.where, record.tool, record.note]
+  const haystack = [record.what, record.problem, record.where, record.tool, record.note, record.repro, record.expected, record.actual]
     .filter(Boolean).join(' ').toLowerCase()
   return words.every(word => haystack.includes(word))
 }
@@ -729,6 +799,7 @@ if (op === 'insight') {
     at: new Date().toISOString(),
     kind,
     what,
+    ...ledgerEvidence(),
     // The problem is the search key. Without it the solution is unreachable
     // by anyone who has not already had the idea.
     ...(typeof flags.problem === 'string' ? { problem: flags.problem } : {}),
@@ -803,7 +874,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url))
  * project, the same blank game the editor opens with.
  */
 const CHECKOUT = path.resolve(typeof flags.root === 'string' ? flags.root : REPO)
-const PROJECT = resolveProject(CHECKOUT, typeof flags.project === 'string' ? flags.project : '')
+const PROJECT = resolveProject(CHECKOUT, typeof flags.project === 'string' ? flags.project : process.env.ENGINE_PROJECT)
 const readProject = async () => import('../engine/project-index.mjs')
 
 // Agent context and worktree setup are file/git operations, not world
@@ -948,6 +1019,83 @@ if (op.startsWith('agent.')) {
   }
 }
 
+// ---------------------------------------------------------------- jev (opt-in)
+/**
+ * Jev ranks supplied candidates; it never edits the ledger and never decides
+ * that work is fixed. Off unless a project switched it on or a call asked for
+ * it, and every fault returns the ordinary answer with a short reason.
+ */
+if (op.startsWith('jev.')) {
+  await (async () => {
+    const jev = await import('../plugins/builtin/jev/context.mjs')
+    const { DECISIONS_MODEL } = await import('../plugins/builtin/openrouter/decisions.mjs')
+    const { pluginGuides } = await import('../engine/plugin-guides.mjs')
+    const request = args[0] && typeof args[0] === 'object' ? args[0] : {}
+    const spoken = typeof args[0] === 'string' ? args[0] : ''
+    const { key, where } = await jev.readProjectKey(PROJECT)
+    const state = {
+      enabled: await jev.storedMode(PROJECT), model: DECISIONS_MODEL,
+      proxy: Boolean(process.env.OPENROUTER_PROXY_URL),
+      key: { found: key !== null, where, last4: key ? key.slice(-4) : null }
+    }
+
+    if (op === 'jev.mode') {
+      if (typeof request.on === 'boolean') {
+        const file = path.join(PROJECT, jev.MODE_FILE)
+        await fs.promises.mkdir(path.dirname(file), { recursive: true })
+        await fs.promises.writeFile(file, jev.modeText(request.on), 'utf8')
+        state.enabled = request.on
+      }
+      out(state)
+      stop(0)
+      return
+    }
+
+    if (op === 'jev.status') {
+      out(state)
+      stop(0)
+      return
+    }
+
+    if (op !== 'jev.guides' && op !== 'jev.records') {
+      die(1, `no jev op "${op}". Try jev.status, jev.mode, jev.guides, or jev.records`)
+    }
+    if (!key) die(1, 'no OpenRouter key is set; export OPENROUTER_API_KEY or store one with openrouter.key')
+
+    if (op === 'jev.guides') {
+      const task = String(request.task || spoken).trim()
+      if (!task) die(1, 'say what the task is:  jev.guides \'{"task":"make the level look better"}\'')
+      const guides = await pluginGuides(CHECKOUT, PROJECT)
+      const readGuide = (scope, file) => fs.promises.readFile(path.join(scope === 'engine' ? CHECKOUT : PROJECT, file), 'utf8')
+      const candidates = await jev.allGuideCandidates(guides, readGuide, request.candidateLimit)
+      if (!candidates.length) {
+        out({ task, asked: 0, suggestions: [], why: 'no enabled plugin guide declares a description' })
+        stop(0)
+        return
+      }
+      const result = await jev.rankGuides({ task, files: request.files || [], candidates, key, minimum: request.minimum, limit: request.limit })
+        .catch(error => die(1, `Jev could not rank guides: ${String(error?.message || error)}`))
+      out({ task, where, model: result.model, asked: result.asked, suggestions: result.ranked, dropped: result.dropped, usage: result.usage })
+      stop(0)
+      return
+    }
+
+    const text = String(request.text || spoken).trim()
+    if (!text) die(1, 'say what the finding is:  jev.records \'{"text":"..."}\'')
+    const records = [...foldPain(), ...foldInsights()]
+    const candidates = jev.recordShortlist(text, records, request.candidateLimit)
+    if (!candidates.length) {
+      out({ text, asked: 0, suggestions: [], why: 'no open record shares a word with the finding' })
+      stop(0)
+      return
+    }
+    const result = await jev.rankRecords({ finding: text, candidates, key, minimum: request.minimum, limit: request.limit })
+      .catch(error => die(1, `Jev could not rank records: ${String(error?.message || error)}`))
+    out({ text, where, model: result.model, asked: result.asked, suggestions: result.ranked, dropped: result.dropped, usage: result.usage })
+    stop(0)
+  })()
+}
+
 if (op === 'index') {
   const { buildIndex } = await readProject()
   out(await buildIndex(PROJECT))
@@ -1074,7 +1222,8 @@ if (op === 'lanes' || op === 'lanes.start' || op === 'lanes.stop') {
     }
 
     if (op === 'lanes.stop') {
-      finish(await browsers.stopLaneBrowsers(CHECKOUT, typeof args[0] === 'string' ? args[0] : null))
+      const client = typeof args[0] === 'string' ? args[0] : null
+      finish(await browsers.stopLaneBrowsers(CHECKOUT, client === 'all' ? null : client, { all: client === 'all' }))
     }
   } catch (error) {
     die(1, String(error?.message || error))
@@ -1092,7 +1241,8 @@ if (op === 'clients') {
   try {
     answer = await (await fetch(`${host}/api/server`)).json()
   } catch (error) {
-    die(2, `cannot reach the dev server at ${host}. Is \`npm run dev\` running?`, String(error))
+    die(2, `cannot reach the dev server at ${host}. Start one through the supervisor: `
+      + 'node bin/engine.mjs supervisor.start, then supervisor.open dev-server', String(error))
   }
   const attached = answer.tabs || []
   finish({
@@ -1112,10 +1262,13 @@ if (op === 'servers' || op === 'servers.stop') {
     // server nobody wrote down, sitting where every command looks by default,
     // is the one an agent cannot otherwise see.
     const listed = await listServers(CHECKOUT, [Number(flags.port || PORT)])
-    // A record for a server that no longer answers is litter. Keeping it makes
+    // A record for a server whose process is gone is litter. Keeping it makes
     // a person read four dead ports to find the one live one, so it is dropped
-    // once the port has been asked and did not answer. `--all` keeps them.
-    const gone = (listed.servers || []).filter(entry => !entry.alive && entry.pid)
+    // once the port has been asked and the process proved absent. A process that
+    // is alive is kept whatever its port says: a server still binding answers
+    // nothing, and dropping its record made a live start read as litter.
+    // `--all` keeps them.
+    const gone = (listed.servers || []).filter(entry => entry.pid && !entry.processAlive)
     if (gone.length && !flags.all) {
       const { forgetServer } = await import('../engine/project-servers.mjs')
       for (const entry of gone) {
@@ -1136,7 +1289,8 @@ if (op === 'servers' || op === 'servers.stop') {
     const running = (await listServers(CHECKOUT, [])).servers.filter(server => server.state === 'running')
     if (running.length > 1) {
       die(1, `${running.length} servers are running, on ports ${running.map(server => server.port).join(', ')}. `
-        + `Name the one to stop, or say "servers.stop all" to take them all down.`)
+        + `Name the one to stop, say "servers.stop all" to take them all down, `
+        + `or use the supervisor: node bin/engine.mjs supervisor.stop all.`)
     }
   }
   const result = await stopServers(CHECKOUT, named)
@@ -1144,6 +1298,154 @@ if (op === 'servers' || op === 'servers.stop') {
   // Non-zero only when something was asked for and is still running, so a
   // cleanup step in a shell chain fails exactly when cleanup did not happen.
   process.exit(result.ok ? 0 : 1)
+}
+
+/**
+ * Start the supervisor as a detached background process.
+ *
+ * `engine/supervisor.mjs` exports `startSupervisor` but has no entry of its
+ * own, and this checkout keeps no launcher file for it. The entry is `-e`:
+ * one line that imports the module and calls it. Output is ignored because a
+ * detached process outlives this one, and this one waits on `/health` anyway.
+ */
+function startSupervisorProcess(checkout) {
+  const moduleUrl = pathToFileURL(path.join(REPO, 'engine/supervisor.mjs')).href
+  const entry = `import { startSupervisor } from ${JSON.stringify(moduleUrl)}; `
+    + 'startSupervisor(process.argv[1]).catch(error => { console.error(error); process.exit(1) })'
+  const child = spawn(process.execPath, ['--input-type=module', '-e', entry, checkout], {
+    detached: true, stdio: 'ignore', windowsHide: true
+  })
+  child.unref()
+  return child
+}
+
+/**
+ * The supervisor: one process that owns every engine instance here.
+ *
+ * It answers over HTTP on a loopback port, and its record names that port. The
+ * record is a note; `GET /health` is the evidence, so a stale file naming a
+ * dead port is not reported up. These verbs need no editor and no dev server:
+ * the question "what is running" is worst to answer when nothing is.
+ */
+if (op === 'desktop') {
+  try {
+    const { askSupervisor } = await import('../engine/supervisor.mjs')
+    const action = args[0] || 'snapshot'
+    const details = typeof args[1] === 'object' ? args[1] : args[1] ? JSON.parse(args[1]) : {}
+    finish(await askSupervisor(CHECKOUT, 'POST', '/desktop', { ...details, action }, 30000))
+  } catch (error) { die(1, error.message) }
+}
+
+if (op === 'supervisor' || op === 'supervisor.start' || op === 'supervisor.open' || op === 'supervisor.stop') {
+  const supervisor = await import('../engine/supervisor.mjs')
+  const START = 'node bin/engine.mjs supervisor.start'
+  const down = () => die(2, `no supervisor is running for ${CHECKOUT}; start one with \`${START}\``)
+  const pause = () => new Promise(resolve => setTimeout(resolve, 250))
+  // A dev server binds only after Vite has read the checkout and optimised its
+  // dependencies, which can be minutes on a cold start. The open waits for the
+  // instance to answer; a listing and a stop are quick.
+  const OPEN_TIMEOUT = 180_000
+  const LIST_TIMEOUT = 15_000
+  const STOP_TIMEOUT = 30_000
+
+  if (op === 'supervisor') {
+    const live = await supervisor.supervisorAddress(CHECKOUT)
+    if (!live) down()
+    if (flags.watch) {
+      // The same table the front door shows. A person gets keys; a stream gets
+      // the table once, so an agent can read it from a pipe.
+      const { watchSupervisor } = await import('../engine/supervisor-watch.mjs')
+      try {
+        await watchSupervisor(CHECKOUT)
+        process.exit(0)
+      } catch (error) {
+        die(2, `the supervisor on port ${live.port} stopped answering: ${error.message}`)
+      }
+    }
+    try {
+      const health = await supervisor.askSupervisor(CHECKOUT, 'GET', '/health', null, LIST_TIMEOUT)
+      const listed = await supervisor.askSupervisor(CHECKOUT, 'GET', '/instances', null, LIST_TIMEOUT)
+      out({ up: true, port: live.port, pid: live.pid, startedAt: health.startedAt, instances: listed.instances })
+      process.exit(0)
+    } catch (error) {
+      die(2, `the supervisor on port ${live.port} stopped answering: ${error.message}`)
+    }
+  }
+
+  if (op === 'supervisor.start') {
+    const already = await supervisor.supervisorAddress(CHECKOUT)
+    if (already) {
+      out({ up: true, port: already.port, pid: already.pid, started: false })
+      process.exit(0)
+    }
+    startSupervisorProcess(CHECKOUT)
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const live = await supervisor.supervisorAddress(CHECKOUT)
+      if (live) {
+        out({ up: true, port: live.port, pid: live.pid, started: true })
+        process.exit(0)
+      }
+      await pause()
+    }
+    die(1, `the supervisor did not answer within 20 seconds; its output went nowhere. `
+      + `Run \`${START}\` in a terminal to see why`)
+  }
+
+  if (op === 'supervisor.open') {
+    const kinds = ['dev-server', 'editor-browser', 'lane-browser', 'headless-session']
+    const kind = typeof args[0] === 'string' ? args[0] : null
+    if (!kind) die(1, `usage: supervisor.open <${kinds.join('|')}> [json request]`)
+    if (!kinds.includes(kind)) die(1, `"${kind}" is not an instance kind; expected ${kinds.join(', ')}`)
+    // The optional argument is merged into the request, the same as every
+    // other JSON argument here: `{ kind, ...request }`.
+    const request = args[1] && typeof args[1] === 'object' ? args[1] : {}
+    if (!await supervisor.supervisorAddress(CHECKOUT)) down()
+    try {
+      out(await supervisor.askSupervisor(CHECKOUT, 'POST', '/instances', { kind, ...request }, OPEN_TIMEOUT))
+      process.exit(0)
+    } catch (error) {
+      die(1, String(error?.message || error))
+    }
+  }
+
+  if (op === 'supervisor.stop') {
+    const target = typeof args[0] === 'string' ? args[0] : 'all'
+    const live = await supervisor.supervisorAddress(CHECKOUT)
+    if (!live) down()
+    try {
+      if (flags.down) {
+        // The supervisor writes its reply before it closes the door, so wait
+        // for the record to go before calling it down.
+        const answer = await supervisor.askSupervisor(CHECKOUT, 'POST', '/shutdown', null, STOP_TIMEOUT)
+        let up = true
+        for (let attempt = 0; attempt < 40; attempt++) {
+          if (!await supervisor.supervisorAddress(CHECKOUT)) { up = false; break }
+          await pause()
+        }
+        out({ stopped: answer.stopped, up })
+        process.exit(up ? 1 : 0)
+      }
+      const answer = target === 'all'
+        ? await supervisor.askSupervisor(CHECKOUT, 'DELETE', '/instances', null, STOP_TIMEOUT)
+        : await supervisor.askSupervisor(CHECKOUT, 'DELETE', `/instances/${encodeURIComponent(target)}`, null, STOP_TIMEOUT)
+      // Ask again: only what the listing no longer names is stopped. A leftover
+      // instance leaves exit 1, so a cleanup step fails exactly when it should.
+      const listed = await supervisor.askSupervisor(CHECKOUT, 'GET', '/instances', null, LIST_TIMEOUT)
+      const running = listed.instances
+        .filter(entry => target === 'all' ? entry.owned : entry.id === target)
+        .map(entry => entry.id)
+      out({
+        stopped: answer.stopped,
+        // A repeat stop is a success that says so, rather than a 404 that reads
+        // as a wrong id.
+        ...(answer.alreadyStopped?.length ? { alreadyStopped: answer.alreadyStopped } : {}),
+        running
+      })
+      process.exit(running.length === 0 ? 0 : 1)
+    } catch (error) {
+      die(1, String(error?.message || error))
+    }
+  }
 }
 
 /**

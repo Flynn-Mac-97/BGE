@@ -27,11 +27,11 @@ function checkout(t) {
 }
 
 /** Bind a port, as a running browser does. Returns a release. */
-async function holdPort(t, port) {
+async function holdPort(t, port, host = '127.0.0.1') {
   const server = net.createServer()
   await new Promise((resolve, reject) => {
     server.once('error', reject)
-    server.listen(port, '127.0.0.1', resolve)
+    server.listen(port, host, resolve)
   })
   let open = true
   const release = () => new Promise(resolve => {
@@ -108,6 +108,17 @@ test('freeLaneName refuses a live name and clears a dead one', async t => {
   assert.equal(removed.client, 'alpha')
   assert.deepEqual(readLaneBrowsers(root), [], 'a dead record is litter')
   assert.equal(fs.existsSync(profile), false, 'its profile directory goes with it')
+})
+
+test('a dead visible record frees the name but keeps its profile', async t => {
+  const root = checkout(t)
+  const profile = profileDirectory(t)
+  recordLaneBrowser(root, { client: 'editor', port: 39400, pid: deadPid(), profile, headless: false })
+
+  const removed = await freeLaneName(root, 'editor')
+  assert.equal(removed.client, 'editor')
+  assert.deepEqual(readLaneBrowsers(root), [], 'the dead record is gone')
+  assert.equal(fs.existsSync(profile), true, 'a visible window keeps its profile for the next open')
 })
 
 test('an unused name is free and removes nothing', async t => {
@@ -205,6 +216,16 @@ test('a port a record already names is skipped, even before its browser binds', 
     'two starts at once must not pick the same free port')
 })
 
+test('a port held on the other loopback address is not free', async t => {
+  const root = checkout(t)
+  const from = 39550
+  // A dev server binds `localhost`, which is ::1 first on Windows. A port held
+  // there cannot be handed to a browser, however free it looks on 127.0.0.1.
+  try { await holdPort(t, from, '::1') } catch { return t.skip('this host has no IPv6 loopback') }
+  await assert.rejects(() => findFreeDebuggingPort(root, { from, tries: 1 }),
+    /no free debugging port/, 'the IPv6 bind is seen, so no port is offered')
+})
+
 test('an entry is proved by its port naming the lane, not by any browser answering', async t => {
   const root = checkout(t)
   const port = await findFreeDebuggingPort(root, { from: 39560 })
@@ -221,6 +242,62 @@ test('an entry is proved by its port naming the lane, not by any browser answeri
   assert.equal(gamma.alive, false, 'beta must not answer the probe for gamma')
   assert.equal(gamma.state, 'wrong browser')
   assert.match(gamma.why, /beta/, 'it says whose browser holds the port')
+})
+
+test('a visible window is proved by its port answering, with no lane page', async t => {
+  const root = checkout(t)
+  const port = await findFreeDebuggingPort(root, { from: 39600 })
+  // A visible window lists no page named for a client, the way an editor does not.
+  await fakeBrowser(t, port, [])
+  recordLaneBrowser(root, { client: 'editor', port, pid: process.pid, headless: false })
+
+  const listed = await listLaneBrowsers(root)
+  const editor = listed.find(entry => entry.client === 'editor')
+  assert.equal(editor.alive, true, 'a window with no lane page is still alive')
+  assert.equal(editor.state, 'running')
+  assert.equal(editor.why, undefined)
+})
+
+test('a sweep with no name leaves the visible window alone', async t => {
+  const root = checkout(t)
+  const editorPort = await findFreeDebuggingPort(root, { from: 39620 })
+  await fakeBrowser(t, editorPort, [])
+  recordLaneBrowser(root, { client: 'editor', port: editorPort, pid: process.pid, headless: false })
+  recordLaneBrowser(root, { client: 'alpha', port: 39621, pid: deadPid(), headless: true })
+
+  const result = await stopLaneBrowsers(root)
+
+  assert.deepEqual(result.stopped.map(entry => entry.client), ['alpha'], 'only the lane is stopped')
+  const left = readLaneBrowsers(root)
+  assert.equal(left.length, 1, 'the editor record stays')
+  assert.equal(left[0].client, 'editor')
+  assert.equal(left[0].headless, false)
+})
+
+test('an all sweep stops the visible window too', async t => {
+  const root = checkout(t)
+  const editorPort = await findFreeDebuggingPort(root, { from: 39660 })
+  await fakeBrowser(t, editorPort, [])
+  recordLaneBrowser(root, { client: 'editor', port: editorPort, pid: deadPid(), headless: false })
+  recordLaneBrowser(root, { client: 'alpha', port: 39661, pid: deadPid(), headless: true })
+
+  const result = await stopLaneBrowsers(root, null, { all: true })
+
+  assert.deepEqual(result.stopped.map(entry => entry.client).sort(), ['alpha', 'editor'], 'both kinds are stopped')
+  assert.deepEqual(readLaneBrowsers(root), [], 'the registry is left empty')
+})
+
+test('a record with no headless field is read as a lane', async t => {
+  const root = checkout(t)
+  // An old file, written before the field existed.
+  fs.writeFileSync(path.join(root, '.engine/lane-browsers.json'), JSON.stringify({
+    version: 1,
+    browsers: [{ client: 'alpha', port: 39640, pid: deadPid() }]
+  }))
+
+  assert.equal((await listLaneBrowsers(root))[0].headless, true, 'missing means lane')
+  const result = await stopLaneBrowsers(root)
+  assert.deepEqual(result.stopped.map(entry => entry.client), ['alpha'], 'a lane is swept')
 })
 
 test('a start on a port another browser holds is refused', async t => {

@@ -10,7 +10,7 @@ const normal = value => String(value || '').replaceAll('\\', '/').replace(/^\.\/
 
 /** Run git in a checkout and return its trimmed output; a failure throws with git's own message. */
 const git = (root, args) => execFileSync('git', ['-C', root, ...args], {
-  encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
+  encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
 }).trim()
 
 /** The main worktree's absolute path, so lane records survive a worktree being deleted. */
@@ -22,7 +22,7 @@ export function mainWorktree(root) {
 }
 
 /** The run registry's path in the main worktree. */
-const registryFile = root => path.join(mainWorktree(root), '.engine/agents.json')
+const registryFile = root => path.join(process.env.ENGINE_STATE_ROOT || path.join(mainWorktree(root), '.engine'), 'agents.json')
 
 /** A registry edit is one read and one rename; a lock older than this is a corpse. */
 const STALE_LOCK_MILLISECONDS = 60_000
@@ -177,17 +177,31 @@ export async function contextFromDisk(root, request, projectPath = 'project', in
     return fs.promises.readFile(target, 'utf8')
   }
   const transport = onDisk(project, root)
+  const pluginNodes = await transport.agentPlugins()
   // A packet's checks run from the checkout, so the project they name is the
   // path from there. The absolute path is longer and moves with the worktree.
   const projectLabel = normal(path.relative(root, project)) || '.'
   const packet = await resolveAgentContext(
-    read, request, await transport.agentPlugins(), projectLabel, interfaceText || transport.agentInterface)
+    read, request, pluginNodes, projectLabel, interfaceText || transport.agentInterface)
   // A request that names no files has given the agent nothing to point at. The
   // file tree in the packet answers that, so finding a path costs no second
   // engine process (`tree`). A request that names files needs no tree.
   if (!packet.files.length) {
     const { walk } = await import('./project-index.mjs')
     packet.tree = await walk(project)
+  }
+  // Jev is off unless the project switched it on or the request asked for it.
+  // It only appends an advisory block: a fault leaves the packet as it was.
+  const { addGuideSuggestions } = await import('../plugins/builtin/jev/context.mjs')
+  const suggested = await addGuideSuggestions({ project, request, packet, pluginNodes, read })
+  if (suggested) {
+    packet.jev = suggested.jev
+    if (suggested.suggestions) packet.suggestions = suggested.suggestions
+    if (suggested.dropped) packet.jevDropped = suggested.dropped
+    if (suggested.section) {
+      packet.text = packet.text.trimEnd() + '\n' + suggested.section
+      packet.characters = packet.text.length
+    }
   }
   return packet
 }
@@ -299,7 +313,7 @@ const isSerial = check => SERIAL.some(needle => check.includes(needle))
  */
 function runCheck(cwd, command) {
   try {
-    const output = execSync(command, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const output = execSync(command, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
     return { command, ok: true, exitCode: 0, output: output.trim().slice(-400) }
   } catch (error) {
     return {

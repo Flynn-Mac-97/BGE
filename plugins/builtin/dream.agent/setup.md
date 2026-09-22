@@ -52,6 +52,12 @@ still picture, taken before play so engine time has not moved; `compareTo`
 compares it with a reference PNG and guards against a candidate that draws less.
 `cycles` plays and stops that many times and reports `heapGrowthMB`.
 
+When a setup calls `browserFrames`, the candidate prompt already carries
+`tools/dream/quick-probe.mjs`: a short exploratory run (a few seconds of warm
+play, thirty frames, no heap cycles) that prints the same measures and can write
+a Chrome CPU profile with `--profile`. A setup does not need to describe it, and
+should not ask a candidate to build a probe script of its own.
+
 Task code runs in the dream process, not in an agent, so it may do anything node
 may do. Keep it deterministic: a score that moves between two identical runs is
 not a score.

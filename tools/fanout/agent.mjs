@@ -140,7 +140,7 @@ async function processes({ project, level, atOnce, inARow, steps, scratch }) {
     const fd = fsSync.openSync(out, 'w')
     const errFd = fsSync.openSync(err, 'w')
     const child = spawn(process.execPath, [CLI, '--headless', '--project', project, ...(level ? ['--level', level] : []), 'script', script],
-      { cwd: CHECKOUT, stdio: ['ignore', fd, errFd] })
+      { cwd: CHECKOUT, stdio: ['ignore', fd, errFd], windowsHide: true })
     child.on('exit', (code, signal) => {
       fsSync.closeSync(fd)
       fsSync.closeSync(errFd)
@@ -172,7 +172,7 @@ async function processes({ project, level, atOnce, inARow, steps, scratch }) {
   // One killed in flight. The others must not notice, the project must still read, and
   // a fresh process afterwards must start.
   const doomed = spawn(process.execPath, [CLI, '--headless', '--project', project, 'script', JSON.stringify([['simulate', 600], ['snapshot', {}]])],
-    { cwd: CHECKOUT, stdio: 'ignore' })
+    { cwd: CHECKOUT, stdio: 'ignore', windowsHide: true })
   setTimeout(() => doomed.kill(), 120)
   const killed = await new Promise(resolve => doomed.on('exit', (code, signal) => resolve(code ?? signal)))
 

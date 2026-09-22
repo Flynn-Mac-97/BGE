@@ -1,8 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { probeText } from '../tools/dream/candidate.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const TEMPLATE = path.join(CHECKOUT, 'tools/dream/prompts/candidate.md')
@@ -50,10 +53,36 @@ test('a built prompt keeps the packet, the history and the exploration rules', a
 
   assert.match(prompt, /sample PACKET/, 'the engine packet section is missing')
   assert.match(prompt, /sample HISTORY/, 'the history block is missing')
+  assert.match(prompt, /sample PROBE/, 'the frame-probe section is missing')
   assert.match(prompt, /## Read the complete history first/, 'the complete-history rule is missing')
   assert.match(prompt, /Trust the measured result over what the/, 'the measured result is not preferred over the claim')
   assert.match(prompt, /## Do not converge into a local optimum/, 'the local-optimum rule is missing')
   assert.match(prompt, /untried combination of pieces that already worked/, 'a structurally different mechanism is not preferred')
   assert.match(prompt, /## What counts as a new proposal/, 'the new-proposal rule is missing')
   assert.doesNotMatch(prompt, /\{\{\w+\}\}/, 'a placeholder was left unfilled')
+})
+
+test('a built prompt says a cut-off attempt is not a validated result', async () => {
+  const prompt = await buildPrompt()
+
+  assert.match(prompt, /status <name>/, 'the cut-off mark is not explained')
+  assert.match(prompt, /unfinished claim, not a validated result/, 'an unfinished report is not marked as a claim')
+  assert.match(prompt, /Only the evaluator's `measures` are\s+evidence that a change worked/, 'the measures are not named as the evidence')
+})
+
+test('the frame probe is advertised only when the setup prices frames', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dream-probe-text-'))
+  await fs.writeFile(path.join(directory, 'setup.mjs'), 'await helpers.browserFrames(checkout, project, {})', 'utf8')
+  const priced = await probeText(directory, 'the-game')
+  await fs.writeFile(path.join(directory, 'setup.mjs'), 'await helpers.engineProcess(checkout, project, [])', 'utf8')
+  const unpriced = await probeText(directory, 'the-game')
+  await fs.writeFile(path.join(directory, 'setup.mjs'), 'nothing here', 'utf8')
+  const missing = await probeText(path.join(directory, 'absent'), 'the-game')
+  await fs.rm(directory, { recursive: true, force: true })
+
+  assert.match(priced, /## Measuring a frame cost quickly/, 'the priced setup got no probe section')
+  assert.match(priced, /node tools\/dream\/quick-probe\.mjs --project "the-game"/, 'the exact probe command is missing')
+  assert.match(priced, /exploratory/, 'the probe is not marked exploratory')
+  assert.equal(unpriced, '', 'a setup that does not price frames got the probe')
+  assert.equal(missing, '', 'a missing setup got the probe')
 })
