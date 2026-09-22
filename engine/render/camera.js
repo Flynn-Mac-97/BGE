@@ -2,9 +2,13 @@
  * Kernel: the two world cameras, the second one for the viewmodel, and the
  * viewport they are built from.
  *
- * `view` and `viewport` belong to the session; this module only reads them.
+ * The world camera's numbers come from `cameraProjection` in
+ * `camera-project.js`, the same reading the headless projector uses, so the two
+ * cannot drift. `view` and `viewport` belong to the session; this module only
+ * reads them.
  */
 import * as THREE from 'three/webgpu'
+import { cameraProjection } from '../camera-project.js'
 
 export function makeCamera(state) {
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000)
@@ -47,25 +51,26 @@ export function makeCamera(state) {
 
   /** Rebuild the active camera from the view and viewport: ortho, or perspective. */
   function updateCamera() {
-    if (flat()) {
-      const hw = state.viewport.width / 2 / state.view.zoom
-      const hh = state.viewport.height / 2 / state.view.zoom
-      orthographic.left = -hw; orthographic.right = hw
-      orthographic.top = hh;   orthographic.bottom = -hh
-      orthographic.position.x = state.view.x
-      orthographic.position.y = state.view.y
+    const projection = cameraProjection(state.view, state.viewport)
+    if (projection.mode === 'ortho') {
+      const halfWidth = projection.width / 2 / projection.zoom
+      const halfHeight = projection.height / 2 / projection.zoom
+      orthographic.left = -halfWidth; orthographic.right = halfWidth
+      orthographic.top = halfHeight;   orthographic.bottom = -halfHeight
+      orthographic.position.x = projection.x
+      orthographic.position.y = projection.y
       orthographic.updateProjectionMatrix()
       return
     }
-    perspective.position.set(state.view.x, state.view.y, state.view.z || 0)
+    perspective.position.set(projection.x, projection.y, projection.z)
     // The order was set once at construction, so this is yaw about +Y and pitch
     // about +X in the order the view object promises.
-    perspective.rotation.set(state.view.pitch || 0, state.view.yaw || 0, 0)
-    perspective.fov = state.view.fov || 90
-    perspective.aspect = state.viewport.width / Math.max(1, state.viewport.height)
+    perspective.rotation.set(projection.pitch, projection.yaw, 0)
+    perspective.fov = projection.fov
+    perspective.aspect = projection.aspect
     perspective.updateProjectionMatrix()
 
-    state.viewmodelCamera.aspect = perspective.aspect
+    state.viewmodelCamera.aspect = projection.aspect
     state.viewmodelCamera.updateProjectionMatrix()
   }
 

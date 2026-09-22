@@ -18,7 +18,7 @@
     "test:desktop": "node tools/test-desktop.mjs",
     "test": "npm run test:offline && node test/cli.bridge.mjs",
     "test:offline": "node --test \"test/*.test.mjs\"",
-    "test:core": "node --test test/state-hash.test.mjs test/checkpoint.test.mjs test/rewind.test.mjs test/world-capture.test.mjs test/input-record.test.mjs test/startup-gate.test.mjs test/plugin-contracts.test.mjs test/command-schema.test.mjs test/asset-path.test.mjs test/ui.test.mjs test/device-profile.test.mjs test/log-wiring.test.mjs test/refusal-surfaces.test.mjs test/write-guard.test.mjs test/node-write-guard.test.mjs test/work-lock.test.mjs test/quiet-answers.test.mjs test/reload-notice.test.mjs test/shell-shortcuts.test.mjs test/live-camera.test.mjs test/headless-frame.test.mjs test/frame-plan.test.mjs test/turn.test.mjs test/agent-index.test.mjs test/cli.offline.test.mjs test/context-save.test.mjs",
+    "test:core": "node --test test/state-hash.test.mjs test/checkpoint.test.mjs test/rewind.test.mjs test/world-capture.test.mjs test/input-record.test.mjs test/startup-gate.test.mjs test/plugin-contracts.test.mjs test/command-schema.test.mjs test/asset-path.test.mjs test/ui.test.mjs test/device-profile.test.mjs test/log-wiring.test.mjs test/refusal-surfaces.test.mjs test/write-guard.test.mjs test/node-write-guard.test.mjs test/work-lock.test.mjs test/quiet-answers.test.mjs test/reload-notice.test.mjs test/shell-shortcuts.test.mjs test/live-camera.test.mjs test/camera-project.test.mjs test/headless-frame.test.mjs test/frame-plan.test.mjs test/turn.test.mjs test/agent-index.test.mjs test/cli.offline.test.mjs test/context-save.test.mjs",
     "test:agent": "node --test test/agent-workspace.test.mjs"
   },
   "dependencies": {
