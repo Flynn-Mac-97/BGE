@@ -65,6 +65,7 @@ import {
   number, meshOf, totalScale, turnRadians, spinRadians, partsOf, meshShape, drawSize,
   source, tilingOf, materialNameFor, materialLook, entityPlan
 } from './frame-plan.js'
+import { makeOnceReporter } from './report-once.js'
 
 // Re-exported because the turn test reaches the reader here, where it used to
 // live. The one reader is frame-plan's now.
@@ -94,22 +95,9 @@ if (!uniformBufferLimit.forcedBoneTexture) {
   THREE.NodeBuilder.prototype.getUniformBufferLimit = boneTextureSkinned
 }
 
-/** Everything this file has already complained about, so each distinct message is said once. */
-const alreadySaid = new Set()
-
-/**
- * Complain once per distinct message.
- *
- * Geometry and materials are read every frame, so a message about a bad
- * declaration would otherwise arrive sixty times a second — and a console that
- * scrolls is a console nobody reads, which is how the next real error goes
- * unseen. Say each distinct thing once and mean it.
- */
-function report(message) {
-  if (alreadySaid.has(message)) return
-  alreadySaid.add(message)
-  console.error(message)
-}
+// One history for the whole file. `forget` clears it, so a message about a
+// file that has been edited and fixed can be said again.
+const { report, clearSaid } = makeOnceReporter()
 
 // ---------------------------------------------------------------- textures
 
@@ -3826,7 +3814,7 @@ export async function makeRenderer(canvas, view, viewport) {
       // The keyline is traced from the file, so an edited model needs a new one.
       hullCache.delete(`model:${file}`)
       hullCache.delete(`model:${name}`)
-      alreadySaid.clear()
+      clearSaid()
       invalidateEverything()
     }
   }

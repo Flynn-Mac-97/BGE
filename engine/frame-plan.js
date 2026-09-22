@@ -11,21 +11,9 @@
  * `meshMaterial` and `geometryFor` stay in render.js. Those build real GPU
  * objects, they are cached, and they are not the per-frame cost.
  */
+import { makeOnceReporter } from './report-once.js'
 
-/** Everything already complained about, so each distinct message is said once. */
-const alreadySaid = new Set()
-
-/**
- * Complain once per distinct message.
- *
- * The shape and the numbers are read for every entity every frame, so a
- * message about a bad declaration would otherwise arrive sixty times a second.
- */
-function report(message) {
-  if (alreadySaid.has(message)) return
-  alreadySaid.add(message)
-  console.error(message)
-}
+const { report } = makeOnceReporter()
 
 /**
  * A number a declaration promised, or the fallback — and never silently.

@@ -10,6 +10,7 @@
  * cannot find another behaviour, and has no lifecycle beyond the same four
  * hooks everything else has. All it can do is read and write the entity.
  */
+import { round3 } from './round3.js'
 
 let nextId = 1
 
@@ -879,4 +880,4 @@ function behaviourPlacement(e) {
  * one is NaN, and JSON writes NaN as null, so a save would drop it.
  */
 const round = value =>
-  Array.isArray(value) ? value.map(round) : Math.round(value * 1000) / 1000
+  Array.isArray(value) ? value.map(round) : round3(value)

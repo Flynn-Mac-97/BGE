@@ -16,6 +16,8 @@
  * playing a run again means feeding the same events back at the same step counts,
  * not pressing keys again by hand.
  */
+import { round3 } from './round3.js'
+
 const STEP = 1 / 60
 const MAX_CATCHUP = 5
 const DEFAULT_SEED = 1
@@ -317,15 +319,15 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
       : measured
     if (!sample || sample.seconds <= 0) return null
     return {
-      ticksPerSecond: round(sample.ticks / sample.seconds),
-      gameSpeed: round(sample.advanced / sample.seconds)
+      ticksPerSecond: round3(sample.ticks / sample.seconds),
+      gameSpeed: round3(sample.advanced / sample.seconds)
     }
   }
 
   /** One sentence naming the driver, the rate, and what it costs the reader. */
   const slowSentence = rate =>
     `[loop] the game is running at ${rate.gameSpeed}x real time — driver ${driver} is delivering ` +
-    `${rate.ticksPerSecond} ticks a second, and the clock is ${round(behindBy())}s behind the wall ` +
+    `${rate.ticksPerSecond} ticks a second, and the clock is ${round3(behindBy())}s behind the wall ` +
     `clock. Every reading taken while this holds is of a game that has barely moved.`
 
   /**
@@ -589,7 +591,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     get state() {
       if (!running) return { driver: 'stopped' }
       const rate = measure()
-      const out = { driver, ...(rate || {}), behindSeconds: round(behindBy()) }
+      const out = { driver, ...(rate || {}), behindSeconds: round3(behindBy()) }
       if (rate && rate.gameSpeed < SLOW) out.warning = slowSentence(rate)
       return out
     },
@@ -784,7 +786,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
 
     get timers() {
       return timers.filter(t => !t.cancelled)
-        .map(t => ({ id: t.id, in: round(t.at - fixed), every: t.every || undefined }))
+        .map(t => ({ id: t.id, in: round3(t.at - fixed), every: t.every || undefined }))
     },
 
     /**
@@ -805,8 +807,6 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   }
 }
 
-/** Three decimal places, so a time or a place round-trips through JSON. */
-const round = n => Math.round(n * 1000) / 1000
 
 /** One fixed step, in engine seconds. */
 export const FIXED_STEP = STEP

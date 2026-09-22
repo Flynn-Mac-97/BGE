@@ -25,6 +25,7 @@ import { PROJECT_PREFIX } from './asset-path.js'
 import { makeProjector } from './camera-project.js'
 import { captureMoment, makeCheckpoints, restoreMoment } from './checkpoint.js'
 import { makeRewind, watchWorldChanges } from './rewind.js'
+import { round3 } from './round3.js'
 
 /**
  * The screen a game is drawn for, when the game declares none.
@@ -45,14 +46,6 @@ const DEFAULT_DEVICE = { width: 1280, height: 720, pixelRatio: 1, orientation: '
  */
 const positive = value => (Number.isFinite(value) && value > 0 ? value : null)
 
-/**
- * @desc Three decimal places, so a saved place matches what a reader saw.
- * @domain level — a camera position written back to a level file.
- * @pure Reads its argument and returns a value.
- * @param {number} n The number to round.
- * @returns {number} The number at three decimal places.
- */
-const round = n => Math.round(n * 1000) / 1000
 
 /**
  * @desc The target device a game declares under `device` in game.json, filled in
@@ -825,8 +818,8 @@ async function saveLevel({ world, loop, editor, view, files, levelFile }, { nami
   // play start to wherever the author happened to be flying. The flat view's
   // position is the only editor position that is also a level position.
   if (view.mode === 'ortho') {
-    camera.at = [round(view.x), round(view.y)]
-    camera.zoom = round(view.zoom)
+    camera.at = [round3(view.x), round3(view.y)]
+    camera.zoom = round3(view.zoom)
   }
   const level = { ...levelFile.raw, ...world.toLevel(camera) }
   await files.writeJSON(`levels/${editor.levelName}.json`, level)

@@ -51,6 +51,7 @@
  * production build, and every use of both is guarded — the headless world runs
  * many at a time and must not pay a penny for a browser's problem.
  */
+import { round3 } from './round3.js'
 
 /** The shape written to storage. A capture from an older engine is discarded rather than guessed at. */
 const CAPTURE_VERSION = 1
@@ -98,8 +99,6 @@ const MODELLED = new Set([
   '_definition', '_detached', '_setByPlacement', '_extraKeys'
 ])
 
-/** Three decimal places, so a captured time or place round-trips through storage. */
-const round = n => Math.round(n * 1000) / 1000
 
 /** Whether a value is data: a plain or null-prototype object, not an array or an instance. */
 const isPlainObject = value =>
@@ -203,7 +202,7 @@ export function captureWorld({ world, loop, editor, view }, cause = {}) {
     level: editor.levelName,
     playing: !!loop.running,
     simulated: !!world.simulated,
-    time: round(loop.time),
+    time: round3(loop.time),
     // The clock in the form the loop actually keeps it, and the stream in the
     // form that can be rejoined. A time in seconds is a rounding and a seed
     // alone is only where a run began, so neither on its own would put the
@@ -441,7 +440,7 @@ function restoreLosses(capture, { world, loop, missing, fromLevel }) {
   // Claimed only when true. The clock and the stream are restored now, and a
   // notice that went on saying they were not would be the same silence in a
   // different voice.
-  if (loop.steps !== (capture.steps ?? 0)) losses.push(`the clock, which was ${capture.time}s and is now ${round(loop.time)}s`)
+  if (loop.steps !== (capture.steps ?? 0)) losses.push(`the clock, which was ${capture.time}s and is now ${round3(loop.time)}s`)
   if (loop.random.seed !== capture.seed || loop.random.draws !== (capture.draws ?? 0)) {
     losses.push(`the random stream, which was ${capture.draws ?? 0} draws into seed ${capture.seed} and is now ${loop.random.draws} into seed ${loop.random.seed}`)
   }
@@ -694,7 +693,7 @@ function armCapture(parts, store) {
           version: CAPTURE_VERSION, cause, project: parts.editor.projectName,
           level: parts.editor.levelName, entityCount: parts.world.entities.length,
           simulated: !!parts.world.simulated,
-          time: round(parts.loop.time), seed: parts.loop.random.seed,
+          time: round3(parts.loop.time), seed: parts.loop.random.seed,
           entities: null, failed: String(error?.message || error)
         }))
       } catch { /* a tab that cannot write cannot be helped */ }

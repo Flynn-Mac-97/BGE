@@ -11,6 +11,7 @@
  */
 import { validateCommandInput } from './command-schema.js'
 import { stateHash } from './world.js'
+import { round3 } from './round3.js'
 const RING = 200
 
 /** Half a fixed step. Below this, a simulation ran the time it was asked for. */
@@ -206,8 +207,8 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
   const entityView = (e, bulk = false) => {
     const out = {
       id: e.id, type: e.type,
-      at: [r(e.x), r(e.y), r(e.z)],
-      ...(e.rotation ? { rotation: r(e.rotation) } : {}),
+      at: [round3(e.x), round3(e.y), round3(e.z)],
+      ...(e.rotation ? { rotation: round3(e.rotation) } : {}),
       // Why this one is placed here. In a bulk list it is the only description
       // that appears, and only on the placements that wrote one — what the type
       // IS is said once per type, not once per entity.
@@ -264,7 +265,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         level: editor.levelName,
         // Engine time and seed, because "what happened" is only reproducible
         // if you know where the clock and the random stream were.
-        time: r(loop.time),
+        time: round3(loop.time),
         // Only when something is holding time still. "Nothing is moving" is the
         // hardest thing to diagnose without being told who asked for that.
         ...(loop.paused ? { paused: loop.holds } : {}),
@@ -274,7 +275,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         // whether a change altered the simulation at all, and it is what makes a
         // rewind or a restored world checkable. See `stateHash` in world.js.
         hash: stateHash(world),
-        camera: { x: r(view.x), y: r(view.y), zoom: r(view.zoom), mode: view.mode },
+        camera: { x: round3(view.x), y: round3(view.y), zoom: round3(view.zoom), mode: view.mode },
         counts: {
           entities: world.entities.length,
           types: types.length,
@@ -397,7 +398,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       const advanced = loop.time - before
       if (advanced < seconds - STEP_TOLERANCE) {
         snapshot.asked = seconds
-        snapshot.advanced = Math.round(advanced * 1000) / 1000
+        snapshot.advanced = round3(advanced)
         snapshot.heldBy = loop.holds
       }
       return snapshot
@@ -510,8 +511,6 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
 
   return api
 }
-
-const r = n => Math.round(n * 1000) / 1000
 
 /** One plugin failure in a sentence, for a log line or a snapshot. */
 const reasonFor = failure => failure.file
