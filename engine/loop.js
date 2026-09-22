@@ -1,22 +1,20 @@
 /**
- * Kernel: the clock, the schedule, and the random stream.
+ * Kernel: the clock and the run's holds.
  *
  * Physics runs on a fixed step so behaviour is deterministic; rendering runs per
  * frame. Game code never sees the difference — that is why there is an `update`
  * hook and no `fixedUpdate`.
  *
- * These live together because they are the ways a run can fail to repeat. If game
- * code can reach the wall clock, `Math.random`, or `setTimeout`, then running the
- * same level twice gives two answers, and the whole point of `simulate()` —
- * change something, run it, compare — is gone. So the engine owns those three,
- * and `engine check` fails a file that reaches around them.
- *
- * Input is the fourth, and the only one that arrives from outside. A key is
- * pressed between two steps, so the step it counts for is written down with it:
- * playing a run again means feeding the same events back at the same step counts,
- * not pressing keys again by hand.
+ * The clock reads the wall clock only to measure how fast frames arrive, so the
+ * same level replays to the same numbers. The three other ways a run can fail to
+ * repeat — `Math.random`, `setTimeout` and input from outside — are owned by
+ * `loop-random.js`, `loop-timers.js` and `loop-input.js`, and `engine check`
+ * fails a file that reaches around them.
  */
 import { round3 } from './round3.js'
+import { makeInputRecord } from './loop-input.js'
+import { makeRandom } from './loop-random.js'
+import { makeTimers } from './loop-timers.js'
 
 const STEP = 1 / 60
 const MAX_CATCHUP = 5
@@ -43,74 +41,8 @@ const REPORT_EVERY = 10_000
 const DRAWING_OFFSET = 0x9e3779b9
 
 /**
- * How far mulberry32 moves its state on every draw.
- *
- * Named because it is more than an implementation detail: the state advances by
- * this one addition and by nothing else, which is what makes a stream rejoinable
- * at a point without replaying every draw that led there.
- */
-const STREAM_STEP = 0x6d2b79f5
-
-/**
- * mulberry32: small, fast, and identical everywhere. The exact algorithm
- * matters less than the fact that it is ours — `Math.random` is seeded by the
- * browser and cannot be replayed.
- */
-function mulberry32(seed) {
-  let a = seed >>> 0
-  return () => {
-    a = (a + STREAM_STEP) >>> 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-/**
- * The deterministic stream, and the count of draws taken from it.
- *
- * The count is what `random.resume` needs: the state after n draws is the seed
- * plus n stream steps, so a rebuilt world can rejoin the stream where the
- * captured one had reached instead of starting it again.
- */
-function makeRandom(seed) {
-  let current = seed
-  let drawn = 0
-  let generator = mulberry32(current)
-  // Counted in one place, so `range`, `int`, `pick` and `chance` are all counted
-  // by being written in terms of it. A helper that reached past this would make
-  // the count a lie exactly where the stream was used most.
-  const next = () => { drawn++; return generator() }
-
-  const random = () => next()
-  random.range = (lo, hi) => lo + next() * (hi - lo)
-  random.int = (lo, hi) => Math.floor(lo + next() * (hi - lo + 1))
-  random.pick = list => list[Math.floor(next() * list.length)]
-  random.chance = p => next() < p
-  random.reset = s => { current = s ?? current; drawn = 0; generator = mulberry32(current) }
-
-  /**
-   * Rejoin a stream where it had got to, rather than starting it again.
-   *
-   * The state after n draws from a seed is the seed plus n stream steps, in
-   * 32-bit arithmetic and nothing else, so a generator started there gives the
-   * same next number the original would have given and every number after it.
-   * That is what lets a world be put back mid-run and still be the same run.
-   */
-  random.resume = (s, n = 0) => {
-    current = s ?? current
-    drawn = Math.max(0, Math.round(n))
-    generator = mulberry32((current + Math.imul(drawn, STREAM_STEP)) >>> 0)
-  }
-
-  Object.defineProperty(random, 'seed', { get: () => current })
-  /** How many numbers have been taken since the stream was seeded. Half of where it is. */
-  Object.defineProperty(random, 'draws', { get: () => drawn })
-  return random
-}
-
-/**
- * The one clock, the fixed step and the random streams.
+ * The one clock, the fixed step, the random streams, the input record, the
+ * timers and the run's holds.
  *
  * `onFixed(seconds, time)` runs the simulation at exactly 1/60 s a step and
  * `onFrame(seconds, time)` draws. `onStepStart` baselines places before a step
@@ -122,7 +54,8 @@ function makeRandom(seed) {
  * @param {Function} onFrame Draws one frame `(seconds, time)`.
  * @param {Function} [onError] Called when a timer throws `(error, timer)`.
  * @param {Function} [onStepStart] Baselines entity places before each step.
- * @returns {object} The loop: clock, `random`, `drawing`, holds and `step`.
+ * @returns {object} The loop: clock, `random`, `drawing`, `input`, timers, holds
+ *   and `step`.
  */
 export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   let running = false
@@ -168,85 +101,9 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
    * because a resumed run has to play the same, not look the same.
    */
   const drawing = makeRandom(DEFAULT_SEED ^ DRAWING_OFFSET)
-  let timers = []
-  let nextTimer = 1
 
-  /**
-   * Every input event, oldest first, and the keys it leaves down.
-   *
-   * Stamped with the step count it arrived at rather than a time, so replaying is
-   * arithmetic on the step count and survives a rewind. Everything else about
-   * input — which keys are down, which were pressed on the step about to run — is
-   * derived from this list, so there is one record to carry and no second copy to
-   * fall out of step with it.
-   */
-  let inputEvents = []
-  let keysDown = new Set()
-  let pressedNow = new Set()
-
-  /**
-   * How many of the recorded events have reached the keys.
-   *
-   * A live press is applied where it arrives, so it counts as applied the moment it
-   * is written down. A record put back by `resume` is applied up to the step being
-   * resumed to, and everything after that step is left for the steps that reach it
-   * — which is what makes a run rewound and replayed press the same keys at the
-   * same counts instead of running on with a keyboard nobody is touching.
-   */
-  let applied = 0
-
-  /**
-   * Put a recorded input timeline back.
-   *
-   * @param {Array} records Events as `{ at, code, down }`, oldest first.
-   * @param {number} at The step count being resumed to.
-   */
-  function restoreInput(records, at) {
-    inputEvents = records.map(record => ({ at: record.at, code: record.code, down: record.down }))
-    keysDown = new Set()
-    pressedNow = new Set()
-    applied = 0
-    for (const record of inputEvents) {
-      if (record.at > at) break
-      if (record.down) keysDown.add(record.code)
-      else keysDown.delete(record.code)
-      applied++
-    }
-    // Whatever was pressed on the step being resumed to is about to run.
-    for (const record of inputEvents) if (record.down && record.at === at) pressedNow.add(record.code)
-  }
-
-  /**
-   * Apply every recorded event stamped for the step about to run.
-   *
-   * The record is the run's input as it was played, so replaying it is what makes a
-   * rewind a rewind of the same run rather than of a world nobody touched. A live
-   * press has already been applied by `press`, which is why the cursor is moved
-   * there too: setting a key twice is setting it once, and applying it twice at two
-   * different steps is not.
-   */
-  function applyRecorded() {
-    while (applied < inputEvents.length && inputEvents[applied].at <= steps) {
-      const record = inputEvents[applied++]
-      if (!record.down) { keysDown.delete(record.code); continue }
-      keysDown.add(record.code)
-      // Pressed means the step it was stamped for, which is this one.
-      if (record.at === steps) pressedNow.add(record.code)
-    }
-  }
-
-  /**
-   * Drop recorded events stamped after the step the clock is on.
-   *
-   * After a rewind the record still holds the old future, and a key pressed now
-   * means that future never happened: leaving those events in place would apply
-   * them out of order, or apply a run that was abandoned.
-   */
-  function forgetAfter() {
-    if (!inputEvents.length || inputEvents[inputEvents.length - 1].at <= steps) return
-    inputEvents = inputEvents.filter(record => record.at <= steps)
-    applied = Math.min(applied, inputEvents.length)
-  }
+  const input = makeInputRecord({ step: () => steps })
+  const timers = makeTimers({ onError })
 
   /**
    * Who is holding time still, by name.
@@ -345,32 +202,6 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   }
 
   /**
-   * Run every timer that has come due, on the fixed clock.
-   *
-   * The list is copied before walking it, because a callback may add or cancel
-   * a timer. An interval counts from its start rather than adding to its last
-   * due time, so it cannot drift over a long run.
-   */
-  function runTimers() {
-    if (!timers.length) return
-    // Snapshot first: a callback may add or cancel timers, and mutating the
-    // list mid-walk is how a scheduler quietly drops one.
-    for (const t of [...timers]) {
-      if (t.cancelled || fixed < t.at) continue
-      try {
-        t.fn()
-      } catch (e) {
-        onError?.(e, t)
-      }
-      // Count intervals from the start rather than adding to `at`, so a
-      // repeating timer cannot accumulate error over a long run.
-      if (t.every && !t.cancelled) t.at = t.start + ++t.n * t.every
-      else t.cancelled = true
-    }
-    if (timers.some(t => t.cancelled)) timers = timers.filter(t => !t.cancelled)
-  }
-
-  /**
    * One fixed step: baseline places, advance the clock, run due timers, and run
    * the simulation unless something is holding it.
    *
@@ -383,21 +214,21 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     onStepStart?.()
     // Before the step runs, and on every path: a held step is exactly where a
     // choice screen reads a key.
-    applyRecorded()
+    input.applyAt()
     // Held: the clock does not move, so no timer comes due and `context.time`
     // reads the same on the far side of a pause. The step still runs, because a
     // paused game is still a game being looked at.
     try {
       if (holds.size) { onFixed(0, fixed); return }
       fixed = ++steps * STEP
-      runTimers()
+      timers.run(fixed)
       if (held > 0) { held--; return }
       onFixed(STEP, fixed)
     } finally {
       // A key that went down since the last step reads as pressed for this step
       // and not for the next. Cleared on every path out, because a held step is
       // exactly where a choice screen reads the key that picks.
-      pressedNow.clear()
+      input.clearPressed()
     }
   }
 
@@ -513,62 +344,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
      * has a `release` — the one that lets go of a hold on time — and a second
      * `release` would have silently replaced it.
      */
-    input: {
-      /**
-       * Record a key — or a mouse button, or anything else naming an input —
-       * going down. Returns whether anything changed, so a caller can tell a
-       * fresh press from a repeat.
-       */
-      press(code) {
-        if (keysDown.has(code)) return false
-        forgetAfter()
-        keysDown.add(code)
-        pressedNow.add(code)
-        inputEvents.push({ at: steps, code, down: true })
-        applied = inputEvents.length
-        return true
-      },
-
-      /** Record it coming up, and whether it was down. */
-      release(code) {
-        if (!keysDown.delete(code)) return false
-        forgetAfter()
-        inputEvents.push({ at: steps, code, down: false })
-        applied = inputEvents.length
-        return true
-      },
-
-      /**
-       * Let go of everything.
-       *
-       * A page that loses the window never gets the keyup, and a key stuck down is
-       * worse than one dropped — it is the difference between a game that stops
-       * and one that walks into a wall for ever.
-       */
-      releaseAll() {
-        const held = [...keysDown]
-        if (held.length) forgetAfter()
-        for (const code of held) { keysDown.delete(code); inputEvents.push({ at: steps, code, down: false }) }
-        applied = inputEvents.length
-        pressedNow.clear()
-        return held.length
-      },
-
-      /** Whether `code` is down now. */
-      isDown: code => keysDown.has(code),
-
-      /**
-       * Whether `code` went down since the last step — true for exactly one step.
-       *
-       * A frame is not a step. Clearing this on the frame phase left it true for
-       * every one of the six hundred steps a headless `step(600)` runs, while the
-       * browser cleared it sixty times a second: one run, two answers.
-       */
-      pressed: code => pressedNow.has(code),
-
-      /** Every input event, oldest first, stamped with the step it arrived at. */
-      get events() { return inputEvents.map(record => ({ at: record.at, code: record.code, down: record.down })) }
-    },
+    input,
 
     /** Stop time under this name. Naming it is what lets two holders overlap. */
     hold(reason = 'paused') { holds.add(reason); return reason },
@@ -627,7 +403,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     },
 
     /**
-     * Back to zero: clock, schedule and random stream together.
+     * Back to zero: clock, schedule, input and random stream together.
      *
      * Called when a level loads. Resetting only some of them is the subtle
      * version of the bug this module exists to prevent.
@@ -637,16 +413,14 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
       fixed = 0
       acc = 0
       held = 0
-      timers = []
+      timers.clear()
       // A hold left over from the last run would open the next level frozen,
       // with nothing on screen saying why.
       holds.clear()
       // Input goes back to nothing with the clock. A level that opened with a key
       // already down would not start the same way twice, and reset exists so that
       // two runs of one level begin alike.
-      inputEvents = []
-      keysDown = new Set()
-      pressedNow = new Set()
+      input.clear()
       random.reset(seed)
       drawing.reset((seed ?? random.seed) ^ DRAWING_OFFSET)
       restartMeasuring()
@@ -684,7 +458,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
      * @param {number} [where.hitStop] Fixed steps of hit stop left.
      * @param {number} [where.scheduled] Captured callback count; clears the schedule when present.
      */
-    resume({ steps: to = 0, seed, draws = 0, input, holds: holdNames, hitStop, scheduled } = {}) {
+    resume({ steps: to = 0, seed, draws = 0, input: inputRecords, holds: holdNames, hitStop, scheduled } = {}) {
       const target = Math.max(0, Math.round(to))
       const shift = (target - steps) * STEP
       steps = target
@@ -692,15 +466,15 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
       acc = 0
       // Full checkpoints cannot carry closures. A clock-only reload retains
       // its rebuilt schedule; a checkpoint discards the abandoned schedule.
-      if (scheduled !== undefined) timers = []
-      else for (const t of timers) { t.start += shift; t.at += shift }
+      if (scheduled !== undefined) timers.clear()
+      else timers.shiftBy(shift)
       random.resume(seed ?? random.seed, draws)
       if (holdNames) { holds.clear(); for (const reason of holdNames) holds.add(reason) }
       if (hitStop !== undefined) held = Math.max(0, Math.round(hitStop))
       // A world picked up mid-run was played with a key held, and the step about
       // to run sees whatever was pressed on it. Carried rather than re-pressed,
       // because the person who pressed it is not here to do it again.
-      if (input) restoreInput(input, target)
+      if (inputRecords) input.restore(inputRecords, target)
       restartMeasuring()
       return { time: fixed, steps, seed: random.seed, draws: random.draws }
     },
@@ -731,8 +505,8 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
         // In fixed steps, because that is what the loop counts it in, and hit
         // stop is a whole number of steps by construction.
         hitStop: held,
-        scheduled: timers.filter(t => !t.cancelled).length,
-        input: inputEvents.map(record => ({ at: record.at, code: record.code, down: record.down }))
+        scheduled: timers.count(),
+        input: input.events
       }
     },
 
@@ -764,30 +538,15 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     // ---- scheduling, on the fixed clock ----
 
     /** Run `fn` once, `seconds` of engine time from now. */
-    after(seconds, fn) {
-      const t = { id: nextTimer++, start: fixed, n: 1, at: fixed + seconds, every: 0, fn, cancelled: false }
-      timers.push(t)
-      return t.id
-    },
+    after(seconds, fn) { return timers.after(seconds, fixed, fn) },
 
     /** Run `fn` every `seconds` of engine time, starting one interval from now. */
-    every(seconds, fn) {
-      const t = { id: nextTimer++, start: fixed, n: 1, at: fixed + seconds, every: seconds, fn, cancelled: false }
-      timers.push(t)
-      return t.id
-    },
+    every(seconds, fn) { return timers.every(seconds, fixed, fn) },
 
     /** Cancel one scheduled timer. Returns whether it was still pending. */
-    cancel(id) {
-      const t = timers.find(x => x.id === id)
-      if (t) t.cancelled = true
-      return !!t
-    },
+    cancel(id) { return timers.cancel(id) },
 
-    get timers() {
-      return timers.filter(t => !t.cancelled)
-        .map(t => ({ id: t.id, in: round3(t.at - fixed), every: t.every || undefined }))
-    },
+    get timers() { return timers.list(fixed) },
 
     /**
      * Advance by N fixed steps, ignoring wall clock and requestAnimationFrame
