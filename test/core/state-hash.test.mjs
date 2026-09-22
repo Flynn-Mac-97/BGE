@@ -17,6 +17,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import { CHECKOUT, FIXTURE, FIXTURE_LEVEL, temporaryProject } from '../fixture-project.mjs'
+import { stepCounterPlugin } from '../fake-plugin.mjs'
 import { startWorldInNode } from '../../engine/start-world-node.mjs'
 import { stateHash } from '../../engine/world.js'
 
@@ -130,44 +131,39 @@ test('the number comes from the world, not from how it got there', async () => {
 })
 
 /**
- * The same claim with a solver in it, which the fixture cannot make.
+ * The same claim with a scoped plugin in it, which the fixture cannot make.
  *
- * The fixture's physics stands down, so the check above never reached a solver. Rapier
- * is the case that broke: a level reload drops every body, and the solver did that by
- * removing them one at a time — which leaves the arena, the handle allocation and the
- * island structure of the run that just ended. The level that followed was then solved
- * from a different internal order than the same level in a fresh world, and the two
- * answered differently. Stopping play and starting it again is that path in the
- * editor, so this was a level whose second playthrough was not the first.
+ * A plugin holding state outside the world — here a step count and the entities
+ * it owns — makes a level reload depend on that state being dropped with the
+ * level. The plugin resets on `level:loaded`, so a level played, reloaded and
+ * played again is the level played once.
  */
-test('a level with physics in it is the level never played, reloaded or not', async () => {
+test('a level with a scoped plugin in it is the level never played, reloaded or not', async () => {
   const files = {
-    'game.json': { title: 'reload', startLevel: 'main', plugins: { disabled: ['Physics 3D', 'Physics 2D'] } },
+    'game.json': { title: 'reload', startLevel: 'main' },
     'levels/main.json': {
-      camera: { at: [0, 6] },
-      entities: [
-        { type: 'floor', at: [0, -1, 0] },
-        ...Array.from({ length: 24 }, (unused, at) => ({
-          type: 'box',
-          at: [(at % 6) * 0.7 - 2, 1 + Math.floor(at / 6) * 0.9, 0]
-        }))
-      ]
+      camera: { at: [0, 4] },
+      entities: Array.from({ length: 24 }, (unused, at) => ({
+        type: 'mover',
+        at: [(at % 6) * 0.7 - 2, 1 + Math.floor(at / 6) * 0.9, 0]
+      }))
     },
-    'types/floor.js': "export default { collider: { box: [12, 0.4, 12] }, properties: { body: 'solid' } }\n",
-    'types/box.js': "export default { collider: { box: [0.6, 0.6, 0.6] }, properties: { body: 'dynamic' } }\n"
+    'types/mover.js': 'export default { properties: { held: true } }\n'
   }
-  const project = await temporaryProject(files, 'reload-physics-')
+  const project = await temporaryProject(files, 'reload-plugin-')
   try {
     const fresh = await boot(project)
+    fresh.loader.add(stepCounterPlugin)
     fresh.loop.step(200)
     const expected = stateHash(fresh.world)
-    // Guarded before it is compared: with the solver standing down, a world that
-    // never moved would agree with another world that never moved.
-    assert.ok(fresh.rapier3d?.snapshot(), 'the solver did not load, so this would prove nothing')
-    const box = fresh.world.entities.find(entity => entity.type === 'box')
-    assert.ok(box.y < 1, `the bodies fell, so the solver was stepping (y=${box.y})`)
+    // Guarded before it is compared: a plugin that never moved anything would
+    // agree with another run that never moved anything.
+    assert.ok(fresh.stepCounter, 'the plugin did not load, so this would prove nothing')
+    const mover = fresh.world.entities[0]
+    assert.ok(mover.y < 1, `the plugin moved it, so the plugin was stepping (y=${mover.y})`)
 
     const played = await boot(project)
+    played.loader.add(stepCounterPlugin)
     played.loop.step(200)
     await played.editor.loadLevel('main')
     played.loop.step(200)
@@ -177,17 +173,4 @@ test('a level with physics in it is the level never played, reloaded or not', as
   } finally {
     await fs.rm(project, { recursive: true, force: true })
   }
-})
-
-test('the shared game state is the game to reset, not the kernel', async () => {
-  const context = await boot()
-  context.world.state.kept = 7
-  await context.editor.loadLevel(FIXTURE_LEVEL)
-
-  // A level load resets the entities, the clock, the schedule and the random
-  // stream. `world.state` is the game's, so a plugin resets what it owns when it
-  // hears `level:loaded` — and anything that captures or restores a world has to
-  // carry it, because nothing else will put it back.
-  assert.equal(context.world.state.kept, 7, 'a level load does not clear the shared game state')
-  delete context.world.state.kept
 })

@@ -3,7 +3,7 @@
  *
  * `world.capture()` puts the entities back and nothing else. A moment is more than
  * the entities: it is the clock, the random stream, the keys that were down, and
- * whatever a solver holds outside the world. Miss any one of them and the restore
+ * whatever a plugin holds outside the world. Miss any one of them and the restore
  * looks right and runs wrong — so every test here steps PAST the moment and then
  * steps the same distance again, and asks whether it landed where the run landed.
  *
@@ -12,14 +12,16 @@
  * first run. A step that touched none of them would pass without the loop's share
  * being carried at all.
  *
- * The Rapier pair at the end is the case the whole feature exists for, and it
- * checks that the solver put bytes in the moment before it claims anything: a
- * solver that stood down leaves two identical entity dumps to compare.
+ * The scoped plugin at the end is the case the whole feature exists for: it holds a
+ * step count and the entities it owns, outside the world, and every test there asks
+ * whether the moment carried that state and gave it back. The plugin is added to the
+ * loader by the test itself, so no plugin file has to exist for it.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { stepCounterPlugin } from '../fake-plugin.mjs'
 import { startWorldInNode } from '../../engine/start-world-node.mjs'
 import { stateHash } from '../../engine/world.js'
 
@@ -33,86 +35,25 @@ const PROJECT = {
     e.properties.ticks = (e.properties.ticks || 0) + 1
     e.properties.at = context.time
     e.x += 0.1 + context.random() * 0.01
-    if (context.input.held('right')) e.y += 0.01
+    if (context.loop.input.isDown('KeyD')) e.y += 0.01
   }
 }
 `
 }
 
-/** Rapier is offered the entities; the built-in solvers would own them instead. */
-const CHOOSE_RAPIER = { disabled: ['Physics 3D', 'Physics 2D'] }
-
-const SOLVERS = [
-  {
-    plugin: 'Rapier 3D',
-    name: '3D',
-    files: {
-      'game.json': { title: 'checkpoint-3d', startLevel: 'main', plugins: CHOOSE_RAPIER },
-      'levels/main.json': {
-        camera: { at: [0, 6] },
-        entities: [
-          { type: 'floor', at: [0, -1, 0] },
-          { type: 'box', at: [0, 6, 0] },
-          { type: 'box', at: [0.4, 9, 0.2] }
-        ]
-      },
-      'types/floor.js': "export default { collider: { box: [12, 0.4, 12] }, properties: { body: 'solid' } }\n",
-      'types/box.js': "export default { collider: { box: [0.6, 0.6, 0.6] }, properties: { body: 'dynamic' } }\n"
-    }
-  },
-  {
-    plugin: 'Rapier 2D',
-    name: '2D',
-    files: {
-      'game.json': { title: 'checkpoint-2d', startLevel: 'main', plugins: CHOOSE_RAPIER },
-      'levels/main.json': {
-        camera: { at: [0, 4] },
-        entities: [
-          { type: 'floor', at: [0, -1, 0] },
-          { type: 'ball', at: [0, 5, 0] }
-        ]
-      },
-      // Two numbers in a box, or a circle, is Rapier 2D's claim. Three is 3D's.
-      'types/floor.js': "export default { collider: { box: [12, 0.4] }, properties: { body: 'solid' } }\n",
-      'types/ball.js': "export default { collider: { circle: 0.4 }, properties: { body: 'dynamic' } }\n"
-    }
-  }
-]
+/** A project whose type is held by the scoped plugin added in the test. */
+const PLUGIN_PROJECT = {
+  'game.json': { title: 'checkpoint-plugin', startLevel: 'main' },
+  'levels/main.json': { entities: [{ type: 'drone', at: [0, 3, 0] }, { type: 'drone', at: [1, 3, 0] }] },
+  'types/drone.js': 'export default { properties: { held: true } }\n'
+}
 
 /** The boot every test in this file uses, so one change reaches all of them. */
 const boot = async project => (await startWorldInNode({ root: CHECKOUT, project })).context
 
-/**
- * Open the project, take a moment fifty steps in, run on, and put it back.
- *
- * Shared by the two solvers so the two differ only in what they declare.
- */
-async function rewindThrough(files) {
-  const project = await temporaryProject(files, 'checkpoint-')
-  try {
-    const context = await boot(project)
-    const { loop, world } = context
-    const steps = 50
-
-    loop.step(steps)
-    const mark = context.capture()
-    const atMark = stateHash(world)
-    loop.step(steps)
-    const carriedOn = stateHash(world)
-
-    const back = context.restore(mark)
-    const afterRewind = stateHash(world)
-    loop.step(steps)
-
-    return { atMark, carriedOn, back, afterRewind, replayed: stateHash(world) }
-  } finally {
-    await fs.rm(project, { recursive: true, force: true })
-  }
-}
-
-/** A project of one drifting entity, made and removed by the test that uses it. */
-async function withProject(body) {
-  const project = await temporaryProject(PROJECT)
+/** A project made and removed by the test that uses it. */
+async function withFiles(files, body) {
+  const project = await temporaryProject(files)
   try {
     return await body(await boot(project))
   } finally {
@@ -120,10 +61,13 @@ async function withProject(body) {
   }
 }
 
+/** The one-entity project above, which most tests in this file use. */
+const withProject = body => withFiles(PROJECT, body)
+
 test('the clock, the stream and the keys come back with the entities', async () => {
   await withProject(context => {
     const { loop, world } = context
-    context.input.press('KeyD')
+    context.loop.input.press('KeyD')
 
     loop.step(45)
     const mark = context.capture()
@@ -144,7 +88,7 @@ test('the clock, the stream and the keys come back with the entities', async () 
     assert.equal(loop.steps, atMark.steps, 'the clock went back with the entities')
     assert.equal(loop.random.draws, atMark.draws, 'and so did the stream')
     assert.equal(loop.random.seed, atMark.seed)
-    assert.equal(context.input.held('right'), true, 'and the key that was down is down again')
+    assert.equal(context.loop.input.isDown('KeyD'), true, 'and the key that was down is down again')
 
     loop.step(30)
 
@@ -177,30 +121,29 @@ test('a world that was held is held again', async () => {
   })
 })
 
-test('a plugin hands over what it holds, and is asked for it on the way back', async () => {
-  await withProject(context => {
-    const mine = { frames: 0 }
-    let puts = 0
-    context.checkpoints.add('Counter', {
-      capture: () => ({ frames: mine.frames }),
-      restore: state => { mine.frames = state.frames; puts++; return true }
-    })
-
+test('a scoped plugin hands over what it holds, and is asked for it on the way back', async () => {
+  await withFiles(PLUGIN_PROJECT, context => {
+    context.loader.add(stepCounterPlugin)
     context.loop.step(10)
-    mine.frames = 12
+
     const mark = context.capture()
-    assert.deepEqual(mark.plugins, { Counter: { frames: 12 } }, 'a plugin is asked by name')
+    const held = mark.plugins['Step Counter']
+    assert.equal(held.steps, 10, 'a plugin is asked by name')
+    assert.deepEqual(held.held, context.stepCounter.held, 'and its own membership is in the moment')
+    assert.equal(held.held.length, 2)
 
-    mine.frames = 99
     context.loop.step(10)
+    assert.equal(context.stepCounter.steps, 20, 'the plugin went on with the run')
+
     const back = context.restore(mark)
 
-    // Contained, not equal: every registered plugin is asked on the way back — one
-    // the moment holds nothing for is asked to hold nothing again — and this project
-    // leaves both Rapier solvers registered and standing down.
-    assert.equal(back.plugins.includes('Counter'), true)
-    assert.equal(mine.frames, 12, 'the plugin is standing where it stood')
-    assert.equal(puts, 1, 'asked once, not once per step after it')
+    // Contained, not equal: every registered plugin is asked on the way back,
+    // including the engine plugins this world still has. The name can only be in
+    // the list if its state was in the moment and was taken back.
+    assert.equal(back.plugins.includes('Step Counter'), true)
+    assert.equal(context.stepCounter.steps, 10, 'the plugin is standing where it stood')
+    assert.deepEqual(context.stepCounter.held, held.held)
+    assert.equal(context.stepCounter.restores, 1, 'asked once, not once per step after it')
   })
 })
 
@@ -265,50 +208,61 @@ test('restoring a checkpoint reports captured timers as lost and removes them', 
   })
 })
 
-for (const { plugin, name, files } of SOLVERS) {
-  test(`${name} restores body membership after removal and spawning`, async () => {
-    const project = await temporaryProject(files, 'checkpoint-membership-')
-    try {
-      const context = await boot(project)
-      context.loop.step(30)
-      const mark = context.capture()
-      context.loop.step(50)
-      const expected = stateHash(context.world)
-      context.restore(mark)
-      const victim = context.world.entities.find(entity => entity.properties.body === 'dynamic')
-      const type = victim.type
-      context.world.destroy(victim)
-      context.loop.step(1)
-      context.spawn(type, { at: [4, 10, 0] })
-      context.loop.step(10)
-      assert.deepEqual(context.restore(mark).refused, [])
-      context.loop.step(50)
-      assert.equal(stateHash(context.world), expected)
-      const service = name === '3D' ? context.rapier3d : context.rapier2d
-      const RAPIER = await import(name === '3D' ? '@dimforge/rapier3d-deterministic-compat' : '@dimforge/rapier2d-deterministic-compat')
-      const solver = RAPIER.World.restoreSnapshot(service.snapshot())
-      let count = 0
-      solver.forEachRigidBody(() => count++)
-      solver.free()
-      assert.equal(count, mark.plugins[plugin].bodies.length)
-      // A second restore checks that replay did not mutate the captured mapping.
-      context.restore(mark)
-      context.loop.step(50)
-      assert.equal(stateHash(context.world), expected)
-    } finally { await fs.rm(project, { recursive: true, force: true }) }
-  })
-  test(`a checkpoint of a simulated world carries ${name} too`, async () => {
-    const { atMark, carriedOn, back, afterRewind, replayed } = await rewindThrough(files)
+test('a scoped plugin gets its membership back after entities left and returned', async () => {
+  await withFiles(PLUGIN_PROJECT, context => {
+    context.loader.add(stepCounterPlugin)
+    context.loop.step(20)
 
-    // Checked before it is claimed: a solver that stood down leaves two identical
+    const mark = context.capture()
+    const held = mark.plugins['Step Counter'].held
+    assert.equal(held.length, 2, 'the plugin held the two entities the level placed')
+
+    // Remove one entity and place another, so the membership the moment holds is a
+    // world that no longer exists when the moment is put back.
+    const victim = context.world.entities[0]
+    const type = victim.type
+    context.destroy(victim)
+    context.loop.step(1)
+    context.spawn(type, { at: [4, 6, 0] })
+    context.loop.step(10)
+
+    const back = context.restore(mark)
+
+    assert.deepEqual(back.refused, [], 'the plugin took its moment back')
+    assert.deepEqual(context.stepCounter.held, held, 'the membership the moment holds came back')
+  })
+})
+
+test('a checkpoint of a simulated world carries a scoped plugin too', async () => {
+  await withFiles(PLUGIN_PROJECT, context => {
+    context.loader.add(stepCounterPlugin)
+    const { loop, world } = context
+    const steps = 50
+
+    loop.step(steps)
+    const mark = context.capture()
+    const atMark = stateHash(world)
+    const countAtMark = context.stepCounter.steps
+
+    loop.step(steps)
+    const carriedOn = stateHash(world)
+
+    // Checked before it is claimed: a plugin that stood down leaves two identical
     // entity dumps to compare, and the comparison below would pass on nothing.
     assert.notEqual(carriedOn, atMark, 'the fifty steps moved the world')
-    // Contained, not equal: the other dimension's solver is loaded too, claims no
-    // entity here, and hands over the bytes of the world it built and left empty.
-    // The name can only be in the list if its state was in the moment and was taken
-    // back, which is what makes this the check and not a formality.
-    assert.equal(back.plugins.includes(plugin), true, `${plugin} put its state in the moment, and took it back`)
-    assert.equal(afterRewind, atMark, 'the world at the rewind is the world at the mark, solver included')
-    assert.equal(replayed, carriedOn, 'and the fifty steps after it are the fifty steps that happened')
+
+    const back = context.restore(mark)
+
+    // Contained, not equal: the engine plugins this world still has are asked too.
+    assert.equal(back.plugins.includes('Step Counter'), true, 'the plugin put its state in the moment, and took it back')
+
+    const afterRewind = stateHash(world)
+    const countAfterRewind = context.stepCounter.steps
+
+    assert.equal(afterRewind, atMark, 'the world at the rewind is the world at the mark, plugin included')
+    assert.equal(countAfterRewind, countAtMark, 'and the plugin count came back with it')
+
+    loop.step(steps)
+    assert.equal(stateHash(world), carriedOn, 'and the fifty steps after it are the fifty steps that happened')
   })
-}
+})

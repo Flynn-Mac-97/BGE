@@ -2,7 +2,7 @@
  * The way back through a run: marks, and the walk from one to a step count.
  *
  * What makes this worth a test rather than a probe is the failure it prevents. A
- * rewind that puts the entities back and leaves the clock, the stream or the solver
+ * rewind that puts the entities back and leaves the clock, the stream or the plugin
  * where they were reads as a rewind and runs as a different game, and the only
  * symptom is a number that stopped matching.
  *
@@ -20,6 +20,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import { CHECKOUT, temporaryProject } from '../fixture-project.mjs'
+import { stepCounterPlugin } from '../fake-plugin.mjs'
 import { startWorldInNode } from '../../engine/start-world-node.mjs'
 import { makeRewind } from '../../engine/rewind.js'
 import { stateHash } from '../../engine/world.js'
@@ -38,17 +39,11 @@ const PROJECT = {
 `
 }
 
-const PHYSICS = {
-  'game.json': { title: 'rewind-3d', startLevel: 'main', plugins: { disabled: ['Physics 3D', 'Physics 2D'] } },
-  'levels/main.json': {
-    camera: { at: [0, 6] },
-    entities: [
-      { type: 'floor', at: [0, -1, 0] },
-      { type: 'box', at: [0, 6, 0] }
-    ]
-  },
-  'types/floor.js': "export default { collider: { box: [12, 0.4, 12] }, properties: { body: 'solid' } }\n",
-  'types/box.js': "export default { collider: { box: [0.6, 0.6, 0.6] }, properties: { body: 'dynamic' } }\n"
+/** A project whose entity is held by the scoped plugin the test adds. */
+const PLUGIN_PROJECT = {
+  'game.json': { title: 'rewind-plugin', startLevel: 'main' },
+  'levels/main.json': { entities: [{ type: 'drone', at: [0, 4, 0] }] },
+  'types/drone.js': 'export default { properties: { held: true } }\n'
 }
 
 const boot = async project => (await startWorldInNode({ root: CHECKOUT, project })).context
@@ -226,20 +221,23 @@ test('a mark is a moment of the whole world, an edit included', async () => {
   })
 })
 
-test('a step back is exact in a world with a solver in it', async () => {
-  await withProject(PHYSICS, async context => {
+test('a step back is exact in a world with a scoped plugin in it', async () => {
+  await withProject(PLUGIN_PROJECT, async context => {
+    context.loader.add(stepCounterPlugin)
     const { engine, loop, world } = context
-    assert.ok(context.rapier3d?.snapshot(), 'the solver did not load, so this would prove nothing')
+    assert.ok(context.stepCounter, 'the plugin did not load, so this would prove nothing')
 
     loop.step(150)
     const atOneFifty = stateHash(world)
+    const countAtMark = context.stepCounter.steps
     loop.step(150)
-    assert.notEqual(stateHash(world), atOneFifty, 'the bodies moved, or the comparison is vacuous')
+    assert.notEqual(stateHash(world), atOneFifty, 'the plugin moved the world, or the comparison is vacuous')
 
     const back = engine.stepBack(150)
 
     assert.equal(back.reached, true, `the walk landed: ${JSON.stringify(back)}`)
-    assert.equal(back.refused, undefined, 'the solver went back with everything else')
-    assert.equal(stateHash(world), atOneFifty, 'the bodies are where they were, not just the entities')
+    assert.equal(back.refused, undefined, 'the plugin went back with everything else')
+    assert.equal(stateHash(world), atOneFifty, 'the world is where it was, not just the entities')
+    assert.equal(context.stepCounter.steps, countAtMark, 'and the plugin count came back with it')
   })
 })

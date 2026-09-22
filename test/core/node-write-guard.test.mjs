@@ -13,10 +13,28 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 const REPO = fileURLToPath(new URL('../..', import.meta.url))
 const CLI = path.join(REPO, 'bin/engine.mjs')
+
+/** The `new.file` command the guard is tested through, written here so no shipped plugin is read. */
+const NEW_FILE = `export default {
+  name: 'New File',
+
+  commands: [{
+    id: 'new.file',
+    label: 'Create a file',
+    run: async (context, args) => {
+      const [kind, name] = [].concat(args)
+      const path = kind + 's/' + name + '.js'
+      const written = await context.files.write(path, 'export default {}')
+      context.editor.index = written?.types ?? written?.index ?? await context.files.index()
+      return { created: path }
+    }
+  }]
+}
+`
 
 /**
  * A checkout of its own, holding a lock registry the test controls.
@@ -24,8 +42,9 @@ const CLI = path.join(REPO, 'bin/engine.mjs')
  * The repository's own registry records live lanes, so a test that wrote it
  * would change what other runs are told.
  *
- * One builtin plugin, re-exported from the shipped file so the write under test
- * is the real one. Nothing else is needed; the world starts with no other.
+ * One builtin plugin, written here so the guard is reached through a real
+ * plugin command without reading one off the shipped tree. Nothing else is
+ * needed; the world starts with no other.
  */
 function checkout(t, runs = []) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-node-write-guard-'))
@@ -40,8 +59,7 @@ function checkout(t, runs = []) {
   fs.writeFileSync(path.join(root, 'game/game.json'), JSON.stringify({ title: 'write guard' }))
 
   fs.mkdirSync(path.join(root, 'plugins/builtin'), { recursive: true })
-  const real = pathToFileURL(path.join(REPO, 'plugins/builtin/new-file.js')).href
-  fs.writeFileSync(path.join(root, 'plugins/builtin/new-file.js'), `export { default } from ${JSON.stringify(real)}\n`)
+  fs.writeFileSync(path.join(root, 'plugins/builtin/new-file.js'), NEW_FILE)
 
   fs.mkdirSync(path.join(root, 'game/plugins'), { recursive: true })
   fs.writeFileSync(path.join(root, 'game/plugins/ignores-refusal.js'), IGNORES_REFUSAL)
