@@ -213,7 +213,7 @@ export async function startWorld({
   editor.reloadBehaviour = name => reloadBehaviour(parts, name)
   editor.togglePlay = () => togglePlay(parts)
 
-  attachWorldSurface(context, { world, bus, editor, loop, importProjectFile, saveLevel })
+  attachWorldSurface(context, { world, bus, editor, loop, importProjectFile, saveLevel: editor.saveLevel })
 
   // ---------------------------------------------------------------- run
   await bootPlugins({ loader, loadPlugins, game, context })
