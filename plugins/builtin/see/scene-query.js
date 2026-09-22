@@ -1,5 +1,5 @@
 /**
- * Kernel: geometry queries over world and describe data — ray against box,
+ * See: geometry queries over world and describe data — ray against box,
  * box-shadow occlusion, point-in-box membership, predicate filters over
  * describe entries, and the change between two describe results.
  *

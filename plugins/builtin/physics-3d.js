@@ -18,7 +18,7 @@
 
 import { CELL, MAX_CELLS, cellKey, fillCells } from './physics/cells.js'
 
-import { asFiniteVector, normalise } from '../../engine/vector.js'
+import { asFiniteVector, normalise } from './shared/vector.js'
 const GRAVITY = -20.32
 const STEP_HEIGHT = 0.46
 

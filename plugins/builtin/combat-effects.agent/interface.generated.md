@@ -1,4 +1,4 @@
-<!--324be5be-->
+<!--08bd570d-->
 parsed from source
   plugin Combat Effects
   category game

@@ -15,7 +15,7 @@
  * rather than hoped for.
  */
 
-import { asFiniteVector } from '../../engine/vector.js'
+import { asFiniteVector } from './shared/vector.js'
 import { makeBridge, GRAVITY_3D } from './rapier/bridge.js'
 import { makeLoader } from './rapier/loading.js'
 import { installSolver } from './rapier/solver-context.js'

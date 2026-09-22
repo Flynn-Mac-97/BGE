@@ -1,4 +1,4 @@
-import { screenHull, typeHue, hueHex } from '../../../engine/frame-facts.js'
+import { screenHull, typeHue, hueHex } from './frame-facts.js'
 // Bound both drawing clutter and the size of brief replies.
 const MOST_MARKS = 40
 const round = value => Math.round(value * 100) / 100

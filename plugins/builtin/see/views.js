@@ -7,7 +7,7 @@
  * holds them; saving without a camera keeps the view being looked through
  * right now.
  */
-import { boundsOf, frameSubject } from '../../../engine/frame-facts.js'
+import { boundsOf, frameSubject } from './frame-facts.js'
 
 const FILE = 'views.json'
 

@@ -1,8 +1,8 @@
 /**
- * engine/scene-query.js `occlusionGrid`: the blocked fraction is shadow area,
+ * plugins/builtin/see/scene-query.js `occlusionGrid`: the blocked fraction is shadow area,
  * not where sample rays happen to land.
  *
- * The kernel used to sample a fixed rows x columns grid, so a blocker narrower
+ * The query used to sample a fixed rows x columns grid, so a blocker narrower
  * than a cell fell between samples and was missed. It now projects every
  * blocker box to a convex shadow on the eye-facing face and takes the union of
  * those areas. These cases pin that: thin blockers counted, overlapping shadows
@@ -14,8 +14,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { rayBox, occlusionGrid } from '../engine/scene-query.js'
-import { boundsOf } from '../engine/frame-facts.js'
+import { rayBox, occlusionGrid } from '../plugins/builtin/see/scene-query.js'
+import { boundsOf } from '../plugins/builtin/see/frame-facts.js'
 
 /** A 2x2x2 subject at the origin; the eye on +Z sees its z = +1 face, x,y in [-1,1]. */
 const HERO = () => ({ id: 'hero', x: 0, y: 0, z: 0, mesh: { box: [2, 2, 2] } })

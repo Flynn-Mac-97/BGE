@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { boundsOf } from '../engine/frame-facts.js'
+import { boundsOf } from '../plugins/builtin/see/frame-facts.js'
 
 test('a model box is multiplied by the mesh scale and the entity scale', () => {
   const entity = { scale: 2, mesh: { model: 'models/hero.glb', scale: 0.5, box: [1, 3, 0.5] } }

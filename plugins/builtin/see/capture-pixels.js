@@ -1,4 +1,4 @@
-import { convexHull } from '../../../engine/frame-facts.js'
+import { convexHull } from './frame-facts.js'
 
 export function studioBounds(raw, canvas) {
   // GPU rows start at the bottom; bounds and spans use image coordinates.

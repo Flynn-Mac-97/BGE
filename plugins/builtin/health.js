@@ -26,7 +26,7 @@
  * deleting its corpses.
  */
 
-import { asVector } from '../../engine/vector.js'
+import { asVector } from './shared/vector.js'
 
 /** Everything this plugin set up. Nothing else is its business. See the header. */
 const managed = new Set()

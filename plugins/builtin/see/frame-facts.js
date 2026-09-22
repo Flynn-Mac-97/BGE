@@ -1,9 +1,10 @@
 /**
- * Kernel: computable facts about what a camera would show.
+ * See: computable facts about what a camera would show.
  *
- * The See plugin asks these; they are kernel because every one is pure —
- * entity in, numbers out — and pure geometry is what an agent reasons about
- * best. Nothing here reads a renderer, a clock, or a file.
+ * The See plugin asks these. Every one is pure — entity in, numbers out —
+ * because pure geometry is what an agent reasons about best, and the same
+ * entity answers the same in the browser and headless. Nothing here reads a
+ * renderer, a clock or a file.
  */
 
 /**

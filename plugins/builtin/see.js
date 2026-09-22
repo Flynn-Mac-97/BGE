@@ -18,7 +18,7 @@
  * the CLI. Frames are named by level name and a frame number, never by a
  * clock.
  */
-import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from '../../engine/frame-sketch.js'
+import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from './see/frame-sketch.js'
 import { describe } from './see/describe.js'
 import { resolveView, view } from './see/views.js'
 import { occlusion, isolate, find, diff, camera, identify } from './see/queries.js'

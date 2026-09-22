@@ -18,7 +18,7 @@
  * and the visible canvas is never drawn to.
  */
 import { describe } from './describe.js'
-import { convexHull } from '../../../engine/frame-facts.js'
+import { convexHull } from './frame-facts.js'
 
 /** render.js keeps merged members on layer 1 for the raycaster. Change both together. */
 const MERGED_LAYER = 1

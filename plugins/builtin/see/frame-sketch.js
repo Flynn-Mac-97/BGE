@@ -1,5 +1,5 @@
 /**
- * Kernel: draw a frame from frame facts, and land it somewhere useful.
+ * See: draw a frame from frame facts, and land it somewhere useful.
  *
  * Two drawings of the same description: `sketchPixels` fills a raw RGBA
  * buffer for node to encode as a PNG, `sketchOnCanvas` uses a 2D canvas,
@@ -125,7 +125,7 @@ export async function writeFrameFiles(name, png, description) {
   const { mkdir, writeFile } = await import('node:fs/promises')
   const { join, dirname } = await import('node:path')
   const { fileURLToPath } = await import('node:url')
-  const folder = join(dirname(fileURLToPath(import.meta.url)), '../agent-runs/see')
+  const folder = join(dirname(fileURLToPath(import.meta.url)), '../../../agent-runs/see')
   await mkdir(folder, { recursive: true })
   await writeFile(join(folder, `${name}.png`), png)
   await writeFile(join(folder, `${name}.json`), JSON.stringify(description))

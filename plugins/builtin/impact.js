@@ -19,7 +19,7 @@
  * table in one place rather than three numbers at every call site.
  */
 
-import { asVector } from '../../engine/vector.js'
+import { asVector } from './shared/vector.js'
 
 /** Weight one: the heaviest hit a game should ever ask for. */
 const MOST_HOLD = 0.11      // seconds the world stops

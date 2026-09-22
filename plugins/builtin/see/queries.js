@@ -3,12 +3,12 @@
  * is read. Every verb takes (context, options) and returns plain JSON with a
  * `method` field naming how the answer was computed. Occlusion and identify
  * prefer the renderer's ID buffer when one can answer; everything else is
- * geometry from engine/scene-query.js over the same describe index every See
+ * geometry from scene-query.js over the same describe index every See
  * command uses.
  */
 import { makeProjector } from '../../../engine/camera-project.js'
-import { boundsOf, facingOffset } from '../../../engine/frame-facts.js'
-import { occlusionGrid, insideOf, matches, diffMoments } from '../../../engine/scene-query.js'
+import { boundsOf, facingOffset } from './frame-facts.js'
+import { occlusionGrid, insideOf, matches, diffMoments } from './scene-query.js'
 import { FIXED_STEP } from '../../../engine/loop.js'
 import { describe, aboutTypes } from './describe.js'
 import { clippedShare } from './describe-marks.js'

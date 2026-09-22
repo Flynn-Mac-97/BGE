@@ -6,14 +6,14 @@
  * grid of screen points, or from an entity in a named direction, and name
  * every entity's box the line passes through, nearest first.
  *
- * Every ray is a box test (engine/scene-query.js `rayBox`), so it answers
+ * Every ray is a box test (scene-query.js `rayBox`), so it answers
  * headless with no renderer. In the browser the ID buffer's pixel at that
  * screen point seeds the nearest hit with drawn truth — see `limits` below
  * for where a box and a drawn pixel can disagree.
  */
 import { makeProjector } from '../../../engine/camera-project.js'
-import { boundsOf } from '../../../engine/frame-facts.js'
-import { rayBox } from '../../../engine/scene-query.js'
+import { boundsOf } from './frame-facts.js'
+import { rayBox } from './scene-query.js'
 
 /**
  * The ID buffer is another lane's module and may still be under construction;
@@ -33,7 +33,7 @@ const RAY_LIMITS = 'rays test collider and mesh BOXES, not the drawn silhouette 
   + 'missed, and a box can answer a hit where nothing is actually drawn. Particles, decals and HUD '
   + 'overlays are not entities; no ray can name them.'
 
-/** Yaw 0 faces -Z (engine/frame-facts.js facingOffset) — north keeps that bearing. */
+/** Yaw 0 faces -Z (frame-facts.js facingOffset) — north keeps that bearing. */
 const DIRECTIONS = {
   down: { x: 0, y: -1, z: 0 },
   up: { x: 0, y: 1, z: 0 },

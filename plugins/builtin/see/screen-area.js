@@ -1,4 +1,4 @@
-import { convexHull } from '../../../engine/frame-facts.js'
+import { convexHull } from './frame-facts.js'
 
 /**
  * The part of a convex polygon inside the frame [0, 100] by [0, 100].

@@ -20,7 +20,7 @@
  * real answer to "did that hit land, and for how much" with no screen at all.
  */
 
-import { asVector } from '../../engine/vector.js'
+import { asVector } from './shared/vector.js'
 
 /** Live numbers, oldest first. Cleared on a level load with everything else. */
 const rising = []

@@ -1,5 +1,5 @@
 import { makeProjector } from '../../../engine/camera-project.js'
-import { boundsOf, frameSubject } from '../../../engine/frame-facts.js'
+import { boundsOf, frameSubject } from './frame-facts.js'
 import { selectMarks, addHulls, markPalette, addClipping } from './describe-marks.js'
 import { projectEntities, screenCoverage, markedRelations, screenRegions, describeBetween, worldSpans, emptyBands, findSizeOutliers, findStackedEntities } from './describe-facts.js'
 export { simplifyHull } from './describe-marks.js'

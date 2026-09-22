@@ -15,7 +15,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { makeProjector } from '../engine/camera-project.js'
-import { boundsOf, convexHull } from '../engine/frame-facts.js'
+import { boundsOf, convexHull } from '../plugins/builtin/see/frame-facts.js'
 import { projectedShape, clipToFrame, polygonArea } from '../plugins/builtin/see/screen-area.js'
 import { projectEntities, screenCoverage } from '../plugins/builtin/see/describe-facts.js'
 import { addClipping } from '../plugins/builtin/see/describe-marks.js'

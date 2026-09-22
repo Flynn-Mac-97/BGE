@@ -17,7 +17,7 @@
  * `context.particles.art`, which a game names in its own plugin.
  */
 
-import { normalise, asWrittenVector } from '../../engine/vector.js'
+import { normalise, asWrittenVector } from './shared/vector.js'
 
 export default {
   name: 'Combat Effects',

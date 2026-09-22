@@ -11,7 +11,7 @@
  * with `particles.define`.
  */
 
-import { normalise, asWrittenVector } from '../../engine/vector.js'
+import { normalise, asWrittenVector } from './shared/vector.js'
 
 /**
  * The ceiling for live particles. Two overlapping smoke screens are normal

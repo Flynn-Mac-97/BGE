@@ -33,7 +33,7 @@
  * answers "did that make a noise".
  */
 
-import { asVector, normalise } from '../../engine/vector.js'
+import { asVector, normalise } from './shared/vector.js'
 import { assetURL } from '../../engine/asset-path.js'
 import { grownQuads, quadIndices } from './vfx/quad-group.js'
 

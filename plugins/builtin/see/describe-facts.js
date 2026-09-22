@@ -1,4 +1,4 @@
-import { boundsOf, facingOffset, boxesTouch } from '../../../engine/frame-facts.js'
+import { boundsOf, facingOffset, boxesTouch } from './frame-facts.js'
 import { projectedShape } from './screen-area.js'
 import { screenMap } from './projection-map.js'
 const round = value => Math.round(value * 100) / 100

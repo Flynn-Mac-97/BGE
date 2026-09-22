@@ -66,11 +66,13 @@ out: the modules the two entries pull in. Six are node only —
 `plugin-guides.mjs` `host-node.mjs`. `index.js` and `start-world-node.mjs` are
 the entries, and `start-world.js` is the runtime they both call.
 
-Four files claim `Kernel:` in their header without being in the boot closure:
-`vector.js`, `frame-facts.js`, `frame-sketch.js` and `scene-query.js` — plugins
-import them and nothing in `engine/` does. The dependency edge decides, not the
-header comment. `project-index.mjs` is the reverse: no header claim, but node
-boot imports it, so it is in the closure.
+Four files once claimed `Kernel:` in their header without being in the boot
+closure: `vector.js`, `frame-facts.js`, `frame-sketch.js` and `scene-query.js`.
+Plugins imported them and nothing in `engine/` did, so they now live with their
+consumers — the three See internals in `plugins/builtin/see/`, and `vector.js`
+in `plugins/builtin/shared/`. The dependency edge decides, not the header
+comment. `project-index.mjs` is the reverse: no header claim, but node boot
+imports it, so it is in the closure.
 
 The shell also owns four dock resize handles because they change the frame, not
 panel content. Sizes are browser-local layout state and survive reloads; they

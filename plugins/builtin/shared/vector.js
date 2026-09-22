@@ -1,5 +1,9 @@
 /**
- * Kernel: a point or a direction out of an event payload, read the one way.
+ * Plugin helper: a point or a direction out of an event payload, read the one way.
+ *
+ * Shared by the gameplay plugins — combat, physics, particles, projectiles —
+ * and owned by none of them, so it sits in `plugins/builtin/shared/` rather
+ * than behind one plugin's name. No kernel module imports it.
  *
  * Events, commands and hand-typed arguments write a point two ways — `{x, y, z}`
  * from code, `[x, y, z]` from a terminal — and nine plugins each wrote their own

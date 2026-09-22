@@ -18,7 +18,7 @@
  * the wall is the thing knockback is most fun against.
  */
 
-import { asVector } from '../../engine/vector.js'
+import { asVector } from './shared/vector.js'
 
 /** Seconds a hit stays white. Long enough to see at sixty frames, short enough to strobe. */
 const FLASH = 0.09

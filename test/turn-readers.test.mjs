@@ -9,12 +9,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { yawOf, facingOffset } from '../engine/frame-facts.js'
+import { yawOf, facingOffset } from '../plugins/builtin/see/frame-facts.js'
 import { makeWorld } from '../engine/world.js'
 
 const DEGREE = Math.PI / 180
 
-// ---- engine/frame-facts.js ----
+// ---- see/frame-facts.js ----
 
 test('a bare rotation is yaw in degrees, exactly as before', () => {
   assert.equal(yawOf({ rotation: 90 }), 90 * DEGREE)

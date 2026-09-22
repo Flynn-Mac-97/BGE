@@ -21,7 +21,7 @@
  * so raising the speed never starts passing through people.
  */
 
-import { asVector, normalise } from '../../engine/vector.js'
+import { asVector, normalise } from './shared/vector.js'
 import { radiusOf } from './health.js'
 
 /** The type name a shot is spawned under, unless the caller names another. */
