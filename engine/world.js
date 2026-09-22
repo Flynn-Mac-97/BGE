@@ -1,5 +1,6 @@
 /**
- * Kernel: the entity store and the shared vocabulary every plugin reads and writes.
+ * Kernel: the entity store, the type and behaviour registries, and the hooks
+ * that run them.
  *
  * An entity is flat. Position lives on the entity, not on a Transform that lives
  * on the entity: e.x, not e.transform.position.x.
@@ -9,86 +10,15 @@
  * It is deliberately not a component system — a behaviour cannot be queried,
  * cannot find another behaviour, and has no lifecycle beyond the same four
  * hooks everything else has. All it can do is read and write the entity.
+ *
+ * `stateHash` reads the store. The look and merge vocabulary is in
+ * `world-look.js`; the checkpoint projection and the level shape are in
+ * `world-state.js`.
  */
-import { round3 } from './round3.js'
+import { HANDLED, RESERVED, asAttached, expand, mergeLook, lookDiff } from './world-look.js'
+import { captureWorld, restoreWorld, levelFromWorld } from './world-state.js'
 
 let nextId = 1
-
-/** Placement keys the entity models directly; everything else is preserved verbatim. */
-const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprite', 'mesh', 'collider', 'behaviours', 'note'])
-
-/**
- * Names a behaviour may not take.
- *
- * Each behaviour gets `e[name]` as its own bag, so a behaviour called `scale`
- * would quietly replace the entity's scale with an object and the symptom would
- * be a thing that stops drawing. Refused by name instead, at attach time.
- */
-const RESERVED = new Set([
-  'id', 'type', 'x', 'y', 'z', 'rotation', 'scale', 'sprite', 'mesh', 'collider',
-  'properties', 'overrides', 'behaviours', 'hidden', 'play', 'note',
-  'velocityX', 'velocityY', 'velocityZ', 'grounded', 'animation', 'frame', 'flip', 'animationDone'
-])
-
-/**
- * Both ways of writing an attachment list, reduced to one shape.
- *
- *   behaviours: ['float']                  nothing to configure
- *   behaviours: { float: { speed: 3 } }    defaults changed here
- *   behaviours: { float: false }           this placement takes it back off
- */
-const asAttached = v => {
-  if (!v) return {}
-  if (Array.isArray(v)) return Object.fromEntries(v.map(n => [n, {}]))
-  return v
-}
-
-/** Expand the shorthand form of a value: 'coin.png' -> { image: 'coin.png' } */
-const expand = (v, key) => (typeof v === 'string' ? { [key]: v } : v)
-
-/**
- * The entity always holds the expanded object form, but the type may have
- * declared the string shorthand — compare what they mean, not how they were
- * written, or every save writes an override that is not one.
- */
-const sameLook = (a, b, key) => {
-  const norm = v => JSON.stringify(expand(v, key) ?? null)
-  return norm(a) === norm(b)
-}
-
-/**
- * A placement's `mesh` MERGES over the type's, key by key — it does not replace it.
- *
- * Replacing was the obvious reading and it was wrong. A map is hundreds of walls
- * that share one texture and differ only in size, and under replacement every one
- * of them had to repeat the texture, the tiling and the tint in order to change
- * the box. de_dust2 came out at 3,300 lines where 1,300 would do, and every read
- * of that file paid the difference. `properties` has always merged; this is the
- * same rule applied to the other thing a placement customises.
- *
- * `tint` is the key this surprises people on. A tint MULTIPLIES the texture
- * rather than standing in for one, so a tint on the TYPE is not a fallback: it
- * colours every textured placement that did not state its own, and the level
- * file says nothing about it. `check` reports that pair — see `tintProblems` in
- * engine/project-index.mjs.
- */
-const mergeLook = (base, over, key) => {
-  const a = expand(base, key)
-  const b = expand(over, key)
-  if (!a) return b
-  if (!b) return a
-  return { ...a, ...b }
-}
-
-/** What this value says that its type default does not. The decision, not the copy. */
-const lookDiff = (value, base) => {
-  if (!value) return null
-  const out = {}
-  for (const [k, v] of Object.entries(value)) {
-    if (JSON.stringify(base?.[k]) !== JSON.stringify(v)) out[k] = v
-  }
-  return Object.keys(out).length ? out : null
-}
 
 /**
  * The numbers a run is compared by.
@@ -217,67 +147,6 @@ export function stateHash(world) {
   }
   // A world in a test may stand in with nothing but its entities.
   return foldValue(hash, world.state || {})
-}
-
-/**
- * How deep a checkpoint copies before it stops.
- *
- * A behaviour may keep a structure of its own, and a checkpoint that walked one
- * for ever would be worse than one that says how far it went.
- */
-const CHECKPOINT_DEPTH = 6
-
-/** Bumped when the shape of a checkpoint changes, so an old one is refused rather than misread. */
-const CHECKPOINT_VERSION = 1
-
-/** A value a checkpoint could not carry, kept apart from `null`, which is a value. */
-const LOST = Symbol('lost')
-
-/**
- * What a value becomes on the way into a checkpoint.
- *
- * Plain data is COPIED, because a checkpoint that shares a live object changes
- * when the world carries on and is then no longer a checkpoint. A reference to
- * another entity is written down as its id and resolved again on the way back:
- * a state object holding two entities is a graph, and copying it would quietly
- * split it into two. Anything else — a function, a node from outside — is
- * counted and named, because a checkpoint that dropped something in silence is
- * worse than one that says what it could not keep.
- */
-function asCopy(value, live, lost, where, depth = 0) {
-  if (value === null) return null
-  if (typeof value === 'function') { lost.push(`${where} is a function`); return LOST }
-  if (typeof value !== 'object') return value
-  if (live.has(value)) return { $entity: value.id }
-  if (depth >= CHECKPOINT_DEPTH) { lost.push(`${where} is deeper than ${CHECKPOINT_DEPTH}`); return LOST }
-  if (Array.isArray(value)) return value.map((item, at) => asCopy(item, live, lost, `${where}[${at}]`, depth + 1))
-  if (value instanceof Set) return { $set: [...value].map((item, at) => asCopy(item, live, lost, `${where}<${at}>`, depth + 1)) }
-  if (value instanceof Map) return {
-    $map: [...value].map(([key, item]) => [
-      asCopy(key, live, lost, `${where} key`, depth + 1),
-      asCopy(item, live, lost, `${where}[${String(key)}]`, depth + 1)])
-  }
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) {
-    lost.push(`${where} is a ${value.constructor?.name || 'object'}, which a checkpoint cannot copy`)
-    return LOST
-  }
-  const copy = {}
-  for (const key of Object.keys(value)) copy[key] = asCopy(value[key], live, lost, `${where}.${key}`, depth + 1)
-  return copy
-}
-
-/** The other direction. A reference to an entity resolves against the world it goes back into. */
-function asValue(copy, byId) {
-  if (copy === LOST) return undefined
-  if (copy === null || typeof copy !== 'object') return copy
-  if (Array.isArray(copy)) return copy.map(item => asValue(item, byId))
-  if (typeof copy.$entity === 'string') return byId.get(copy.$entity) || null
-  if (Array.isArray(copy.$set)) return new Set(copy.$set.map(item => asValue(item, byId)))
-  if (Array.isArray(copy.$map)) return new Map(copy.$map.map(([key, item]) => [asValue(key, byId), asValue(item, byId)]))
-  const value = {}
-  for (const key of Object.keys(copy)) value[key] = asValue(copy[key], byId)
-  return value
 }
 
 /**
@@ -710,101 +579,17 @@ export function makeWorld(bus) {
     /** One entity by its level id. */
     byId(id) { return entities.find(e => e.id === id) },
 
-    /**
-     * Everything about this world that a checkpoint has to carry.
-     *
-     * Plain values, copied, so the checkpoint is a moment rather than a view of a
-     * world that carries on changing. What could not be copied is named in `lost`,
-     * so a checkpoint that is not exact says so instead of pretending.
-     *
-     * Not here: the clock, the random stream and the input record, which belong to
-     * the loop, and anything a plugin keeps of its own — a solver's world, for one.
-     * Those travel beside this, not inside it.
-     */
+    /** Everything about this world a checkpoint has to carry. Built in `world-state.js`. */
     capture() {
-      const lost = []
-      const live = new Set(entities)
-      const taken = entities.map(entity => {
-        const names = new Set(entity.behaviours.map(record => record.name))
-        const fields = {}
-        for (const key of Object.keys(entity)) {
-          // `_definition` is the type itself, hooks and all, and is looked up
-          // again on the way back. A behaviour's bag is carried with its record
-          // rather than twice, once as `e[name]` and once as the bag.
-          if (key === '_definition' || key === 'behaviours' || names.has(key)) continue
-          fields[key] = asCopy(entity[key], live, lost, `${entity.id}.${key}`)
-        }
-        return {
-          fields,
-          behaviours: entity.behaviours.map(record => ({
-            name: record.name,
-            own: !!record.own,
-            overrides: [...record.overrides],
-            error: record.error,
-            bag: asCopy(record.bag, live, lost, `${entity.id}.${record.name}`)
-          }))
-        }
-      })
-      return {
-        version: CHECKPOINT_VERSION,
-        simulated: world.simulated,
-        state: asCopy(world.state, live, lost, 'world.state'),
-        entities: taken,
-        lost
-      }
+      return captureWorld(world)
     },
 
-    /**
-     * Put this world back to a checkpoint.
-     *
-     * An entity is matched by id and written INTO the object already here rather
-     * than replaced. Identity is what everything else holds: the solver maps an
-     * entity to a body, a behaviour watches one, a chase remembers one. A restore
-     * that handed out new objects would break every one of them, and the symptom
-     * would look like a physics bug.
-     *
-     * @param {object} capture From `capture()`.
-     * @returns {object} How many entities went back, and how much was lost.
-     */
+    /** Put this world back to a checkpoint. Built in `world-state.js`. */
     restore(capture) {
-      if (capture?.version !== CHECKPOINT_VERSION) throw new Error(`checkpoint version ${capture?.version} is not ${CHECKPOINT_VERSION}`)
-      const byId = new Map(entities.map(entity => [entity.id, entity]))
-
-      // Every entity is found or made FIRST, with its keys cleared, so that a value
-      // pointing at one — a field holding an entity, or the shared state holding
-      // one — has something to point at. Resolving references as the fields were
-      // assigned would depend on the order the entities happened to be captured in,
-      // and would lose any entity the world had destroyed since.
-      const rebuilt = capture.entities.map(entry => {
-        const fields = entry.fields
-        const entity = byId.get(fields.id) || makeEntity(fields.type, { id: fields.id })
-        byId.set(fields.id, entity)
-        for (const key of Object.keys(entity)) if (key !== '_definition') delete entity[key]
-        return { entity, entry }
-      })
-
-      for (const { entity, entry } of rebuilt) {
-        for (const key of Object.keys(entry.fields)) entity[key] = asValue(entry.fields[key], byId)
-        entity._definition = types.get(entity.type) || {}
-        entity.behaviours = entry.behaviours.map(record => ({
-          name: record.name,
-          own: record.own,
-          overrides: [...record.overrides],
-          error: record.error,
-          definition: behaviours.get(record.name) || {},
-          bag: asValue(record.bag, byId)
-        }))
-        for (const record of entity.behaviours) entity[record.name] = record.bag
-      }
-
-      entities = rebuilt.map(one => one.entity)
-      // The state object keeps its identity: a plugin that read it once still has
-      // the same object, holding the values from before.
-      for (const key of Object.keys(world.state)) delete world.state[key]
-      Object.assign(world.state, asValue(capture.state, byId))
-      world.simulated = !!capture.simulated
+      const restored = restoreWorld(world, capture, makeEntity)
+      entities = restored.entities
       bus.emit('world:changed')
-      return { entities: entities.length, lost: capture.lost.length }
+      return { entities: entities.length, lost: restored.lost }
     },
 
     /** Empty the world and mark it unsimulated, as loading a level does first. */
@@ -814,70 +599,11 @@ export function makeWorld(bus) {
       bus.emit('world:cleared')
     },
 
-    /**
-     * Serialise back to the level shape.
-     *
-     * A save must never narrow the file: anything the placement carried that the
-     * entity does not model (a per-instance collider, a sprite override) is
-     * written straight back out. Overrides stay plain JSON so a diff is readable.
-     */
+    /** Serialise back to the level shape. Built in `world-state.js`. */
     toLevel(camera) {
-      return {
-        camera,
-        entities: entities.map(e => {
-          const out = { type: e.type, at: [round(e.x), round(e.y), round(e.z)] }
-          if (e.rotation) out.rotation = round(e.rotation)
-          if (e.scale !== 1) out.scale = round(e.scale)
-          if (e.note) out.note = e.note
-          if (e.collider && e.collider !== e._definition.collider) out.collider = e.collider
-          // Same rule for the sprite: if this placement carries its own, it has
-          // to come back out, or changing one crate's art is lost on save.
-          if (e.sprite && !sameLook(e.sprite, e._definition.sprite, 'image')) out.sprite = e.sprite
-          // Only the keys this placement disagrees with its type about. Writing
-          // the whole mesh back turned one decision into a copy of the material.
-          const ownMesh = lookDiff(e.mesh, expand(e._definition.mesh, 'texture'))
-          if (ownMesh) out.mesh = ownMesh
-          const attached = behaviourPlacement(e)
-          if (attached) out.behaviours = attached
-          if (e.overrides.length) {
-            out.properties = {}
-            for (const k of e.overrides) out.properties[k] = e.properties[k]
-          }
-          return { ...e._extraKeys, ...out }
-        })
-      }
+      return levelFromWorld(world, camera)
     }
   }
 
   return world
 }
-
-/**
- * What this PLACEMENT has to say about behaviours — never what its type says.
- *
- * Only what it added, changed, or took off, so a level diff shows the decision
- * somebody made rather than the whole inherited list. Array form when there is
- * nothing to configure, because `["float"]` is what a person would have typed.
- */
-function behaviourPlacement(e) {
-  const out = {}
-  for (const b of e.behaviours) {
-    if (!b.own && !b.overrides.length) continue
-    out[b.name] = Object.fromEntries(b.overrides.map(k => [k, b.bag[k]]))
-  }
-  for (const name of e._detached) out[name] = false
-
-  const names = Object.keys(out)
-  if (!names.length) return null
-  return names.every(n => out[n] && !Object.keys(out[n]).length) ? names : out
-}
-
-/**
- * Three decimal places, over a number or a list of them.
- *
- * `rotation` is written both ways: a bare number is yaw in degrees, `[x, y, z]`
- * is pitch, yaw and roll in degrees. A list must stay a list — `Math.round` of
- * one is NaN, and JSON writes NaN as null, so a save would drop it.
- */
-const round = value =>
-  Array.isArray(value) ? value.map(round) : round3(value)
