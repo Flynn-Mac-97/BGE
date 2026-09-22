@@ -50,6 +50,12 @@ export function ownNonce(storage, { hasOpener, mint }) {
   return fresh
 }
 
+/** A string a page announced, or the empty string. */
+const saidText = (said, key) => String(said?.[key] || '')
+
+/** Whether a page announced this flag as exactly true. */
+const saidFlag = (said, key) => said?.[key] === true
+
 /**
  * The stored entry, built from what the page said. Only the server knows
  * `project` and `serves`, so the caller sets its own — in `said` or on the
@@ -59,17 +65,36 @@ const clientEntry = (client, said, { name, nonce, since }) => ({
   client,
   id: name,
   nonce,
-  url: String(said?.url || ''),
-  title: String(said?.title || ''),
-  project: String(said?.project || ''),
-  serves: String(said?.serves || ''),
-  hidden: said?.hidden === true,
-  viewport: String(said?.viewport || ''),
+  url: saidText(said, 'url'),
+  title: saidText(said, 'title'),
+  project: saidText(said, 'project'),
+  serves: saidText(said, 'serves'),
+  hidden: saidFlag(said, 'hidden'),
+  viewport: saidText(said, 'viewport'),
   pixelRatio: Number(said?.pixelRatio) || 1,
-  headless: said?.headless === true,
+  headless: saidFlag(said, 'headless'),
   since,
   lastSaid: new Date().toISOString()
 })
+
+/** The socket and entry currently holding a name, or an empty pair. */
+function holderOf(clients, socket, name) {
+  return [...clients].find(([key, entry]) => key !== socket && entry.id === name) || []
+}
+
+/**
+ * When this page attached.
+ *
+ * The same page coming back to a name its socket has already given up keeps the
+ * original time. It decides the attach time and nothing else: a nonce can be
+ * copied, so it never takes a name off a page that is still open.
+ */
+function attachTime(clients, socket, held, nonce) {
+  const known = clients.get(socket)?.since
+  if (known) return known
+  if (samePage(held, nonce)) return held.since
+  return new Date().toISOString()
+}
 
 /**
  * Store what a page announced about itself.
@@ -86,15 +111,13 @@ const clientEntry = (client, said, { name, nonce, since }) => ({
 export function mergeClient(clients, socket, client, said) {
   const name = String(said?.id || 'unnamed')
   const nonce = said?.nonce ? String(said.nonce) : ''
-  const [rivalSocket, held] =
-    [...clients].find(([key, entry]) => key !== socket && entry.id === name) || []
+  const [rivalSocket, held] = holderOf(clients, socket, name)
   // Liveness is tested first and alone. Any test that can hand a live page's
   // name to a second announcement is a hijack, whatever else it checks.
   if (isLive(held)) return { error: 'name-taken', existing: held }
   // One page holds one entry, or every call to it is ambiguous.
   if (held) clients.delete(rivalSocket)
-  const since = clients.get(socket)?.since ||
-    (samePage(held, nonce) ? held.since : '') || new Date().toISOString()
+  const since = attachTime(clients, socket, held, nonce)
   clients.set(socket, clientEntry(client, said, { name, nonce, since }))
   return { ok: true }
 }

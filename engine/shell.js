@@ -169,55 +169,79 @@ export function makeShell(root, context) {
     for (const p of list) host.append(drawPanel(p))
   }
 
+  /** The play/stop button. */
+  function drawPlayButton(bar, context) {
+    const running = context.loop.running
+    const play = document.createElement('button')
+    play.className = 'play' + (running ? ' on' : '')
+    play.textContent = running ? 'STOP' : 'PLAY'
+    play.onclick = () => context.editor.togglePlay()
+    bar.append(play)
+  }
+
+  /** The project and level path. */
+  function drawProjectPath(bar, context) {
+    const label = document.createElement('span')
+    label.className = 'path'
+    label.innerHTML = `${context.editor.projectName} / <b>${context.editor.levelName}</b>`
+    bar.append(label)
+  }
+
+  /** One tool button. */
+  function toolButton(tool, context) {
+    const button = document.createElement('button')
+    button.className = 'tool' + (context.editor.tool === tool.id ? ' on' : '')
+    button.textContent = tool.icon || tool.id[0]
+    button.title = `${tool.label}${tool.key ? ` (${tool.key})` : ''} — ${tool.plugin}`
+    button.onclick = () => { context.editor.setTool(tool.id); draw() }
+    return button
+  }
+
+  /** The tool rail, drawn only once something contributes a second tool. */
+  function drawToolRail(bar, context) {
+    const tools = loader.contrib.tools
+    if (tools.length <= 1) return
+    const rail = document.createElement('span')
+    rail.className = 'rail'
+    for (const tool of tools) rail.append(toolButton(tool, context))
+    bar.append(rail)
+  }
+
+  /**
+   * Toolbar entries contributed by plugins.
+   *
+   * This is what `menus` is for: a way to reach something that is not always on
+   * screen, without a plugin needing to touch the toolbar itself.
+   */
+  function drawMenus(bar, context) {
+    for (const menu of loader.contrib.menus) {
+      const button = document.createElement('button')
+      button.className = 'menu' + (menu.on?.(context) ? ' on' : '')
+      button.textContent = menu.label
+      button.title = `${menu.title || menu.label} — ${menu.plugin}`
+      button.onclick = () => { menu.run(context); draw() }
+      bar.append(button)
+    }
+  }
+
+  /** The camera readout at the end of the bar. */
+  function drawViewReadout(bar) {
+    const end = document.createElement('span')
+    end.className = 'end'
+    const renderer = rend()
+    end.textContent = renderer ? `${renderer.view.mode} · ${Math.round(renderer.view.zoom)}px/u` : ''
+    bar.append(end)
+  }
+
   /** Draw the play button, the project path, the tool rail and the toolbar. */
   function drawBar() {
     const bar = element('bar')
     bar.innerHTML = ''
-
-    const play = document.createElement('button')
-    play.className = 'play' + (context.loop.running ? ' on' : '')
-    play.textContent = context.loop.running ? 'STOP' : 'PLAY'
-    play.onclick = () => context.editor.togglePlay()
-    bar.append(play)
-
-    const path = document.createElement('span')
-    path.className = 'path'
-    path.innerHTML = `${context.editor.projectName} / <b>${context.editor.levelName}</b>`
-    bar.append(path)
-
-    // tool rail lives here, and only exists once something contributes a second tool
-    const tools = loader.contrib.tools
-    if (tools.length > 1) {
-      const rail = document.createElement('span')
-      rail.className = 'rail'
-      for (const t of tools) {
-        const b = document.createElement('button')
-        b.className = 'tool' + (editor.tool === t.id ? ' on' : '')
-        b.textContent = t.icon || t.id[0]
-        b.title = `${t.label}${t.key ? ` (${t.key})` : ''} — ${t.plugin}`
-        b.onclick = () => { editor.setTool(t.id); draw() }
-        rail.append(b)
-      }
-      bar.append(rail)
-    }
-
-    // Toolbar entries contributed by plugins. This is what `menus` is for: a
-    // way to reach something that is not always on screen, without a plugin
-    // needing to touch the toolbar itself.
-    for (const m of loader.contrib.menus) {
-      const b = document.createElement('button')
-      b.className = 'menu' + (m.on?.(context) ? ' on' : '')
-      b.textContent = m.label
-      b.title = `${m.title || m.label} — ${m.plugin}`
-      b.onclick = () => { m.run(context); draw() }
-      bar.append(b)
-    }
-
-    const end = document.createElement('span')
-    end.className = 'end'
-    const r = rend()
-    end.textContent = r ? `${r.view.mode} · ${Math.round(r.view.zoom)}px/u` : ''
-    bar.append(end)
+    drawPlayButton(bar, context)
+    drawProjectPath(bar, context)
+    drawToolRail(bar, context)
+    drawMenus(bar, context)
+    drawViewReadout(bar)
   }
 
   /** Draw the status line: selection, the agent hint, and whether the level is saved. */

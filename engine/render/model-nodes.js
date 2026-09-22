@@ -33,6 +33,49 @@ export const namedNodes = new WeakMap()
  */
 export const attachedModels = new WeakMap()
 
+/** Whether three draws this node kind directly. */
+function drawsSomething(node) {
+  return node.isMesh || node.isSprite || node.isPoints
+    || node.isLine || node.isLight || node.isCamera
+}
+
+/** Register a node by name, and give it a rig it can share with its siblings. */
+function collectNode(node, nodes, rigs) {
+  if (node.name && !nodes[node.name]) nodes[node.name] = node
+  if (!node.isSkinnedMesh || !node.skeleton) return
+  const rig = rigs.find(candidate => sameRig(candidate, node.skeleton))
+  if (rig === undefined) rigs.push(node.skeleton)
+  else if (rig !== node.skeleton) node.skeleton = rig
+}
+
+/** Mark one drawing node, and every ancestor of it, as needed. */
+function markDrawn(node, draws) {
+  draws.add(node)
+  for (let parent = node.parent; parent; parent = parent.parent) draws.add(parent)
+}
+
+/** The bones of every rig, and every drawn node's chain, kept in the graph. */
+function collectKeeps(instance, holder, rigs) {
+  const keeps = new Set([holder, instance])
+  for (const rig of rigs) {
+    for (const bone of rig.bones) if (bone) for (let at = bone; at; at = at.parent) keeps.add(at)
+  }
+  instance.traverse(node => { if (drawsSomething(node)) for (let at = node; at; at = at.parent) keeps.add(at) })
+  return keeps
+}
+
+/** Remove the top of every subtree that draws nothing and leads to nothing drawn or skinned. */
+function pruneDeadSubtrees(instance, keeps) {
+  const pruned = []
+  instance.traverse(node => {
+    if (!keeps.has(node) && node.parent && keeps.has(node.parent)) pruned.push(node)
+  })
+  for (const node of pruned) {
+    prunedParents.set(node, node.parent)
+    node.removeFromParent()
+  }
+}
+
 /** Every named node of a freshly cloned model, so pose and attachments can find one. */
 export function indexNodes(holder, instance) {
   const nodes = {}
@@ -49,43 +92,21 @@ export function indexNodes(holder, instance) {
   // draws exactly as before.
   const rigs = []
   instance.traverse(node => {
-    if (node.name && !nodes[node.name]) nodes[node.name] = node
-    if (node.isSkinnedMesh && node.skeleton) {
-      let rig = rigs.find(candidate => sameRig(candidate, node.skeleton))
-      if (rig === undefined) rigs.push(node.skeleton)
-      else if (rig !== node.skeleton) node.skeleton = rig
-    }
+    collectNode(node, nodes, rigs)
     // A scene node's local matrix only changes when something poses it. Three
     // otherwise recomposes and re-multiplies every node's matrix on every draw,
     // which for a rigged model is most of what describing a frame costs. Pose
     // and attachments call `updateMatrix` after they write a transform.
     node.matrixAutoUpdate = false
     node.updateMatrix()
-    if (node.isMesh || node.isSprite || node.isPoints || node.isLine || node.isLight || node.isCamera) {
-      draws.add(node)
-      for (let parent = node.parent; parent; parent = parent.parent) draws.add(parent)
-    }
+    if (drawsSomething(node)) markDrawn(node, draws)
   })
   instance.traverse(node => { if (!draws.has(node)) node.visible = false })
   // A node that draws nothing and leads to nothing drawn or skinned is dead
   // weight: three still walks it on every `updateMatrixWorld`, and a rig brings
   // hundreds of them. Remove the top of each such subtree; anything an
   // attachment asks for is put back by `reattach`.
-  const keeps = new Set([holder, instance])
-  for (const rig of rigs) for (const bone of rig.bones) if (bone) for (let at = bone; at; at = at.parent) keeps.add(at)
-  instance.traverse(node => {
-    if (node.isMesh || node.isSprite || node.isPoints || node.isLine || node.isLight || node.isCamera) {
-      for (let at = node; at; at = at.parent) keeps.add(at)
-    }
-  })
-  const pruned = []
-  instance.traverse(node => {
-    if (!keeps.has(node) && node.parent && keeps.has(node.parent)) pruned.push(node)
-  })
-  for (const node of pruned) {
-    prunedParents.set(node, node.parent)
-    node.removeFromParent()
-  }
+  pruneDeadSubtrees(instance, collectKeeps(instance, holder, rigs))
   namedNodes.set(holder, nodes)
 }
 
@@ -151,6 +172,84 @@ function attachmentOf(value, where) {
 }
 
 /**
+ * Take off every attachment that changed file or is no longer wanted.
+ *
+ * Removed before the replacement is put on, so a swap frees the node before the
+ * thing replacing it wants it.
+ */
+function removeStaleAttachments(record, declared, where, release) {
+  for (const [name, entry] of [...record]) {
+    const wanted = attachmentOf(declared?.[name], `${where}.attachments.${name}`)
+    if (wanted && wanted.model === entry.model) continue
+    entry.group.userData.stale = true
+    entry.group.parent?.remove(entry.group)
+    release(entry.group)
+    record.delete(name)
+  }
+}
+
+/** Put the attachment where the declaration says it sits on the node. */
+function positionAttachment(entry, spec, where, name) {
+  const position = readVector(spec.position, `${where}.attachments.${name}.position`)
+  const rotation = readVector(spec.rotation, `${where}.attachments.${name}.rotation`)
+  entry.group.position.set(position.x, position.y, position.z)
+  entry.group.rotation.set(rotation.x, rotation.y, rotation.z)
+  entry.group.scale.setScalar(declaredNumber(spec.scale, 1, `${where}.attachments.${name}.scale`))
+  entry.group.updateMatrix()
+}
+
+/**
+ * A hidden joint hides everything added under it, so the node and its ancestors
+ * have to show again before the attachment draws.
+ */
+function showChain(node, holder) {
+  for (let at = node; at && at !== holder; at = at.parent) at.visible = true
+}
+
+/**
+ * Create the group one attachment hangs off, or report the node is missing.
+ *
+ * A group of its own rather than the loaded scene directly: the offset that fits
+ * a grip into a fist has to survive the file arriving late, and a node that
+ * exists from the first frame is the simplest way to hold it.
+ */
+function createAttachment(holder, name, spec, record, nodes, where) {
+  const node = nodeNamed(nodes, name)
+  if (!node) {
+    // Once, by name. This is written every frame, and a message that repeats
+    // sixty times a second is a console nobody reads.
+    reportOnce(`[render] ${where}: no node named "${name}" to attach "${spec.model}" to`)
+    return null
+  }
+  // A pruned node is not in the graph, and an attachment under one draws
+  // nothing. The chain is put back before the group is hung on it.
+  reattach(node, holder)
+  showChain(node, holder)
+  const group = new THREE.Group()
+  group.rotation.order = 'YXZ'
+  node.add(group)
+  const entry = { model: spec.model, group }
+  record.set(name, entry)
+  loadAttachment(holder, group, spec.model)
+  return entry
+}
+
+/** Hang one attachment on its node, creating the group on first sight. */
+function placeAttachment(holder, name, spec, record, nodes, where) {
+  const entry = record.get(name) || createAttachment(holder, name, spec, record, nodes, where)
+  if (!entry) return
+  positionAttachment(entry, spec, where, name)
+}
+
+/** Attach every model the declaration names. */
+function applyEachAttachment(holder, declared, record, nodes, where, release) {
+  for (const name of Object.keys(declared)) {
+    const spec = attachmentOf(declared[name], `${where}.attachments.${name}`)
+    if (spec) placeAttachment(holder, name, spec, record, nodes, where)
+  }
+}
+
+/**
  * Hang models off a model's named nodes, and take off what is no longer wanted.
  *
  *   entity.attachments = { weaponMount: 'counter-strike/models/ak47.glb' }
@@ -179,57 +278,10 @@ export function applyAttachments(holder, declared, release) {
   const where = holder.userData.model
   const record = held || new Map()
   if (!held) attachedModels.set(holder, record)
-
-  // Everything that changed file, or is no longer asked for, comes off first —
-  // so a swap frees the node before the thing replacing it wants it.
-  for (const [name, entry] of [...record]) {
-    const wanted = attachmentOf(declared?.[name], `${where}.attachments.${name}`)
-    if (wanted && wanted.model === entry.model) continue
-    entry.group.userData.stale = true
-    entry.group.parent?.remove(entry.group)
-    release(entry.group)
-    record.delete(name)
-  }
+  removeStaleAttachments(record, declared, where, release)
 
   if (!declared) return
-  for (const name of Object.keys(declared)) {
-    const spec = attachmentOf(declared[name], `${where}.attachments.${name}`)
-    if (!spec) continue
-
-    let entry = record.get(name)
-    if (!entry) {
-      const node = nodeNamed(nodes, name)
-      if (!node) {
-        // Once, by name. This is written every frame, and a message that repeats
-        // sixty times a second is a console nobody reads.
-        reportOnce(`[render] ${where}: no node named "${name}" to attach "${spec.model}" to`)
-        continue
-      }
-      // A pruned node is not in the graph, and an attachment under one draws
-      // nothing. The chain is put back before the group is hung on it.
-      reattach(node, holder)
-      // A joint with no mesh of its own was hidden when the model loaded, and a
-      // hidden node hides everything added under it. The attachment draws, so
-      // the node and its ancestors have to show again.
-      for (let at = node; at && at !== holder; at = at.parent) at.visible = true
-      // A group of its own rather than the loaded scene directly: the offset
-      // that fits a grip into a fist has to survive the file arriving late, and
-      // a node that exists from the first frame is the simplest way to hold it.
-      const group = new THREE.Group()
-      group.rotation.order = 'YXZ'
-      node.add(group)
-      entry = { model: spec.model, group }
-      record.set(name, entry)
-      loadAttachment(holder, group, spec.model)
-    }
-
-    const position = readVector(spec.position, `${where}.attachments.${name}.position`)
-    const rotation = readVector(spec.rotation, `${where}.attachments.${name}.rotation`)
-    entry.group.position.set(position.x, position.y, position.z)
-    entry.group.rotation.set(rotation.x, rotation.y, rotation.z)
-    entry.group.scale.setScalar(declaredNumber(spec.scale, 1, `${where}.attachments.${name}.scale`))
-    entry.group.updateMatrix()
-  }
+  applyEachAttachment(holder, declared, record, nodes, where, release)
 }
 
 /** Load one attachment model and add it to its group, unless either has gone stale first. */

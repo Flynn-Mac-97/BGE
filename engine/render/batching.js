@@ -107,60 +107,90 @@ export function makeBatching(state) {
   }
 
   /** Whether this entity is standing still enough, and plainly enough, to merge. */
-  function considerForMerging(entity, object, described, opacity, isModel, turn, record) {
+  function canMergeNow(entity, described, opacity, isModel) {
     // A model is a scene graph rather than one box, so there is nothing here to
     // merge; a dimmed entity has its own material and would take the whole batch
     // with it; a hidden one has to be able to disappear on its own. An outlined
     // one keeps its own mesh because the keyline hangs off it, and a merged
     // entity draws on a layer the camera ignores — the outline would go with it.
-    const canMerge = !isModel && opacity >= 1 && !entity.hidden
-      && !(described.keyline > 0)
+    return !isModel && opacity >= 1 && !entity.hidden && !(described.keyline > 0)
+  }
 
-    // The stillness signature, compared as numbers instead of assembled into a
-    // string and compared back. The look is one shared string while the
-    // declaration holds, so that compare finds the same instance.
-    const moved = record.sigX !== entity.x || record.sigY !== entity.y
+  /**
+   * Whether the entity moved since the last pass.
+   *
+   * The stillness signature, compared as numbers instead of assembled into a
+   * string and compared back. The look is one shared string while the
+   * declaration holds, so that compare finds the same instance.
+   */
+  function hasMoved(entity, described, turn, record) {
+    return record.sigX !== entity.x || record.sigY !== entity.y
       || record.sigZ !== (entity.z || 0)
       || record.sigTurnX !== turn.x || record.sigTurnY !== turn.y || record.sigTurnZ !== turn.z
       || record.sigScale !== (entity.scale ?? 1)
       || record.sigLook !== described.look
+  }
 
-    if (moved) {
-      // It moved. Leave the batch this frame, before anything is drawn, or the
-      // merged copy stays behind at the old place as a ghost. A moving entity is
-      // almost never in a batch, so the record answers without a map lookup.
-      if (record.batchKey !== null) leaveBatch(entity.id, record)
-      // The first signature is where it appeared, not a move. Every one after
-      // it is, and the answer sticks: an enemy that stops to bite must not
-      // drop its keyline and its shadow for as long as it stands still.
-      if (record.haveSignature) record.moved = true
-      record.haveSignature = true
-      record.sigX = entity.x
-      record.sigY = entity.y
-      record.sigZ = entity.z || 0
-      record.sigTurnX = turn.x
-      record.sigTurnY = turn.y
-      record.sigTurnZ = turn.z
-      record.sigScale = entity.scale ?? 1
-      record.sigLook = described.look
-      record.frames = 0
-      record.settled = !canMerge
+  /** Write down the place and look this pass drew, so the next pass compares against it. */
+  function rememberSignature(record, entity, described, turn) {
+    record.sigX = entity.x
+    record.sigY = entity.y
+    record.sigZ = entity.z || 0
+    record.sigTurnX = turn.x
+    record.sigTurnY = turn.y
+    record.sigTurnZ = turn.z
+    record.sigScale = entity.scale ?? 1
+    record.sigLook = described.look
+  }
+
+  /**
+   * Handle a moved entity: leave its batch, remember the new place, and restart
+   * its stillness count.
+   *
+   * The first signature is where it appeared, not a move. Every one after it is,
+   * and the answer sticks: an enemy that stops to bite must not drop its keyline
+   * and its shadow for as long as it stands still.
+   */
+  function recordMove(entity, described, turn, canMerge, record) {
+    // Leave the batch this frame, before anything is drawn, or the merged copy
+    // stays behind at the old place as a ghost.
+    if (record.batchKey !== null) leaveBatch(entity.id, record)
+    if (record.haveSignature) record.moved = true
+    record.haveSignature = true
+    rememberSignature(record, entity, described, turn)
+    record.frames = 0
+    record.settled = !canMerge
+  }
+
+  /** The batch key: material, whether it casts, and the grid cell it stands in. */
+  function batchKeyFor(entity, object, described) {
+    const cellX = Math.floor(entity.x / MERGE_CELL)
+    const cellZ = Math.floor((entity.z || 0) / MERGE_CELL)
+    // Casting is part of the key, not just material and cell. One merged mesh
+    // has one castShadow flag, so a batch holding both a caster and a
+    // non-caster has to pick one and is wrong for half its members.
+    const casts = object.castShadow === false ? 'flat' : 'casts'
+    return `${described.material}|${casts}|${cellX},${cellZ}`
+  }
+
+  /** Join or leave the batch this entity now belongs to. */
+  function applyMergeWish(entity, object, described, record, wanted) {
+    if (wanted && record.batchKey === null) {
+      joinBatch(entity, object, batchKeyFor(entity, object, described), described.material, record)
+      return
+    }
+    if (!wanted && record.batchKey !== null) leaveBatch(entity.id, record)
+  }
+
+  function considerForMerging(entity, object, described, opacity, isModel, turn, record) {
+    const canMerge = canMergeNow(entity, described, opacity, isModel)
+    if (hasMoved(entity, described, turn, record)) {
+      recordMove(entity, described, turn, canMerge, record)
       return
     }
     if (record.frames < SETTLE) record.frames++
-
     const wanted = canMerge && record.frames >= SETTLE
-    if (wanted && record.batchKey === null) {
-      const cellX = Math.floor(entity.x / MERGE_CELL)
-      const cellZ = Math.floor((entity.z || 0) / MERGE_CELL)
-      // Casting is part of the key, not just material and cell. One merged mesh
-      // has one castShadow flag, so a batch holding both a caster and a
-      // non-caster has to pick one and is wrong for half its members.
-      const casts = object.castShadow === false ? 'flat' : 'casts'
-      joinBatch(entity, object, `${described.material}|${casts}|${cellX},${cellZ}`, described.material, record)
-    } else if (!wanted && record.batchKey !== null) {
-      leaveBatch(entity.id, record)
-    }
+    applyMergeWish(entity, object, described, record, wanted)
     if (record.frames >= SETTLE || !canMerge) record.settled = true
   }
 

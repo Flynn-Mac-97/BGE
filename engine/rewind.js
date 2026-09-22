@@ -80,6 +80,71 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
     return null
   }
 
+  /** The requested step count, or the reply saying it is not a count at all. */
+  function targetStep(steps, from) {
+    const wanted = Number(steps)
+    if (!Number.isFinite(wanted)) return { error: { from, to: steps, reached: false, why: `${steps} is not a step count` } }
+    return { target: Math.max(0, Math.round(wanted)) }
+  }
+
+  /** Why the ring cannot reach the requested step. */
+  function noMarkReply(from, target) {
+    return {
+      from, to: target, reached: false,
+      why: marks.length
+        ? `the ring reaches back to step ${marks[0].steps} and no further`
+        : 'this run has no marks — nothing has stepped since the level opened'
+    }
+  }
+
+  /**
+   * Put the mark back and step the rest of the way.
+   *
+   * A replay must not be stepped through by the frame driver at the same time: a
+   * tick landing mid-replay would advance a world being rebuilt. Starting it again
+   * afterwards is the caller's loop, not a second kind of play.
+   */
+  function replayMoment(mark, replayed, parts, loop) {
+    const wasRunning = loop.running
+    if (wasRunning) loop.stop()
+    try {
+      // The timeline, not the mark's copy of it: the keys pressed after the mark
+      // are what the segment being replayed did with its keyboard.
+      const back = restoreMoment(mark.moment, parts, { input: loop.input.events })
+      if (replayed > 0) loop.step(replayed)
+      return back
+    } finally {
+      if (wasRunning) loop.start()
+    }
+  }
+
+  /**
+   * Drop the marks taken after the one just restored, because the timeline the run
+   * is on has been rewritten. The stride counts from the newest mark left, so marks
+   * go on being taken where the clock now is.
+   */
+  function rewindMarks(mark) {
+    marks = marks.filter(one => one.steps <= mark.steps)
+    newest = marks.length ? marks[marks.length - 1].steps : null
+  }
+
+  /** The reply for a rewind, naming what was refused, lost, or holding the clock. */
+  function rewindReply(from, target, mark, replayed, back) {
+    const at = loop.steps
+    const reached = at === target
+    return {
+      from, to: target, reached, mark: mark.steps, replayed, at,
+      // Named, because a solver that would not go back leaves a world that reads
+      // as rewound and runs as the later one.
+      ...(back.refused.length ? { refused: back.refused } : {}),
+      ...(back.lost.length ? { lost: back.lost } : {}),
+      // A held clock is why a replay stops short: the steps run, and the count
+      // does not move. Named, because "it did not get there" is otherwise read as
+      // a broken seek rather than as a paused game.
+      ...(reached ? {} : { heldBy: loop.holds })
+    }
+  }
+
   /**
    * Go back to a step count.
    *
@@ -97,59 +162,20 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
    */
   function to(steps) {
     const from = loop.steps
-    const wanted = Number(steps)
-    if (!Number.isFinite(wanted)) return { from, to: steps, reached: false, why: `${steps} is not a step count` }
-    const target = Math.max(0, Math.round(wanted))
+    const { target, error } = targetStep(steps, from)
+    if (error) return error
     if (target > from) {
       return { from, to: target, reached: false, why: `step ${target} has not happened — the clock is at ${from}. Step forward with simulate instead of seeking to it.` }
     }
     if (target === from) return { from, to: target, reached: true, replayed: 0, at: from }
 
     const mark = newestAtOrBefore(target)
-    if (!mark) {
-      return {
-        from, to: target, reached: false,
-        why: marks.length
-          ? `the ring reaches back to step ${marks[0].steps} and no further`
-          : 'this run has no marks — nothing has stepped since the level opened'
-      }
-    }
+    if (!mark) return noMarkReply(from, target)
 
     const replayed = target - mark.steps
-    // A replay must not be stepped through by the frame driver at the same time: a
-    // tick landing mid-replay would advance a world being rebuilt. Starting it
-    // again afterwards is the caller's loop, not a second kind of play.
-    const wasRunning = loop.running
-    if (wasRunning) loop.stop()
-    let back = null
-    try {
-      // The timeline, not the mark's copy of it: the keys pressed after the mark are
-      // what the segment being replayed did with its keyboard.
-      back = restoreMoment(mark.moment, parts, { input: loop.input.events })
-      if (replayed > 0) loop.step(replayed)
-    } finally {
-      if (wasRunning) loop.start()
-    }
-
-    // The future the run was on is gone: a mark taken in it describes a world that
-    // no longer follows from this one. The stride counts from the newest mark left,
-    // so marks go on being taken where the clock now is.
-    marks = marks.filter(one => one.steps <= mark.steps)
-    newest = marks.length ? marks[marks.length - 1].steps : null
-
-    const at = loop.steps
-    const reached = at === target
-    return {
-      from, to: target, reached, mark: mark.steps, replayed, at,
-      // Named, because a solver that would not go back leaves a world that reads as
-      // rewound and runs as the later one.
-      ...(back.refused.length ? { refused: back.refused } : {}),
-      ...(back.lost.length ? { lost: back.lost } : {}),
-      // A held clock is why a replay stops short: the steps run, and the count does
-      // not move. Named, because "it did not get there" is otherwise read as a
-      // broken seek rather than as a paused game.
-      ...(reached ? {} : { heldBy: loop.holds })
-    }
+    const back = replayMoment(mark, replayed, parts, loop)
+    rewindMarks(mark)
+    return rewindReply(from, target, mark, replayed, back)
   }
 
   return {

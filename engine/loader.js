@@ -12,6 +12,43 @@ const NOTHING = Object.freeze({ name: null, about: '' })
 /** An error as a reader wants it: the kind of failure, then what went wrong. */
 const describe = error => error?.name && error?.message ? `${error.name}: ${error.message}` : String(error?.message || error)
 
+/** Every needs/provides/requires field is a list of names, or absent. */
+function assertNameFields(definition) {
+  for (const field of ['needs', 'provides', 'requires']) {
+    if (definition[field] === undefined) continue
+    const malformed = !Array.isArray(definition[field])
+      || definition[field].some(value => typeof value !== 'string' || !value)
+    if (malformed) throw new Error(`${definition.name}.${field} must be an array of names`)
+  }
+}
+
+/** One provider per service name; two plugins claiming one is refused. */
+function claimServices(definition, providers) {
+  for (const key of definition.provides || []) {
+    if (providers.has(key)) throw new Error(`service ${key} declared by both ${providers.get(key)} and ${definition.name}`)
+    providers.set(key, definition.name)
+  }
+}
+
+/**
+ * Read every definition's name, its field shapes and its service claims.
+ *
+ * Throws on a duplicate name or a malformed field list, because each leaves the
+ * order undefined rather than merely short.
+ */
+function declareDefinitions(definitions) {
+  const byName = new Map()
+  const providers = new Map()
+  for (const definition of definitions) {
+    if (!definition?.name) throw new Error('plugin has no name')
+    if (byName.has(definition.name)) throw new Error(`duplicate plugin: ${definition.name}`)
+    byName.set(definition.name, definition)
+    assertNameFields(definition)
+    claimServices(definition, providers)
+  }
+  return { byName, providers }
+}
+
 /**
  * The plugin loader: registration, activation order and the compiled schedule.
  *
@@ -74,6 +111,46 @@ export function makeLoader(bus) {
     }
     bus.emit('plugins:changed')
   }
+  /** Refuse a plugin whose dependencies are not all enabled and active. */
+  function assertDependenciesReady(name, plugin) {
+    for (const need of dependencies(plugin.definition)) {
+      if (!plugins.get(need)?.enabled || !plugins.get(need)?.active) {
+        throw new Error(`${name}: dependency unavailable: ${need}`)
+      }
+    }
+  }
+
+  /** Refuse a plugin whose required service no plugin provides. */
+  function assertServicesAvailable(name, plugin) {
+    for (const key of plugin.definition.requires || []) {
+      if (!services.has(key)) throw new Error(`${name}: service unavailable: ${key}`)
+    }
+  }
+
+  /** Refuse a plugin that named a service it did not register under its own name. */
+  function assertServicesProvided(name, plugin) {
+    for (const key of plugin.definition.provides || []) {
+      if (services.get(key)?.owner !== name) throw new Error(`${name}: declared service was not provided: ${key}`)
+    }
+  }
+
+  /**
+   * Run a scoped plugin's onLoad and settle the scope it built.
+   *
+   * A scoped onLoad must be synchronous: a promise it returned would let the
+   * plugin go on running after the boot called it loaded, so the promise is
+   * reported and the call is refused.
+   */
+  function runOnLoad(name, plugin, scope) {
+    const result = plugin.definition.onLoad?.(context, scope)
+    if (result && typeof result.then === 'function' && plugin.definition.lifecycle === 'scoped') {
+      Promise.resolve(result).catch(error => report(name, `async initialization: ${describe(error)}`))
+      throw new Error(`${name}: scoped onLoad must be synchronous; register background-job cleanup with scope.defer`)
+    }
+    if (typeof result === 'function') scope.defer(result)
+    assertServicesProvided(name, plugin)
+  }
+
   /**
    * Run one plugin's onLoad inside its scope, once its dependencies and every
    * required service are present. Throws on failure; the caller deactivates and
@@ -82,25 +159,18 @@ export function makeLoader(bus) {
   function activate(name) {
     const plugin = plugins.get(name)
     if (!plugin || plugin.active) return
-    for (const need of dependencies(plugin.definition)) {
-      if (!plugins.get(need)?.enabled || !plugins.get(need)?.active) throw new Error(`${name}: dependency unavailable: ${need}`)
-    }
-    for (const key of plugin.definition.requires || []) if (!services.has(key)) throw new Error(`${name}: service unavailable: ${key}`)
+    assertDependenciesReady(name, plugin)
+    assertServicesAvailable(name, plugin)
     // Legacy registrations keep their original enable behaviour until migrated to scopes.
     if (plugin.loaded && plugin.definition.lifecycle !== 'scoped') { plugin.active = true; return }
     const scope = makePluginScope(name, plugin.definition, bus, services)
     plugin.scope = scope
     try {
-      const result = plugin.definition.onLoad?.(context, scope)
-      if (result && typeof result.then === 'function' && plugin.definition.lifecycle === 'scoped') {
-        Promise.resolve(result).catch(error => report(name, `async initialization: ${describe(error)}`))
-        throw new Error(`${name}: scoped onLoad must be synchronous; register background-job cleanup with scope.defer`)
-      }
-      if (typeof result === 'function') scope.defer(result)
-      for (const key of plugin.definition.provides || []) if (services.get(key)?.owner !== name) throw new Error(`${name}: declared service was not provided: ${key}`)
+      runOnLoad(name, plugin, scope)
       plugin.active = true; plugin.loaded = true; plugin.error = null
     } catch (error) { cleanup(name, plugin); throw error }
   }
+
   const api = {
     plugins, contrib,
     get schedule() { return schedule },
@@ -111,17 +181,7 @@ export function makeLoader(bus) {
      * because each leaves the order undefined rather than merely short.
      */
     order(definitions) {
-      const byName = new Map(), providers = new Map()
-      for (const definition of definitions) {
-        if (!definition?.name) throw new Error('plugin has no name')
-        if (byName.has(definition.name)) throw new Error(`duplicate plugin: ${definition.name}`)
-        byName.set(definition.name, definition)
-        for (const field of ['needs', 'provides', 'requires']) if (definition[field] !== undefined && (!Array.isArray(definition[field]) || definition[field].some(value => typeof value !== 'string' || !value))) throw new Error(`${definition.name}.${field} must be an array of names`)
-        for (const key of definition.provides || []) {
-          if (providers.has(key)) throw new Error(`service ${key} declared by both ${providers.get(key)} and ${definition.name}`)
-          providers.set(key, definition.name)
-        }
-      }
+      const { byName, providers } = declareDefinitions(definitions)
       const seen = new Set(), out = []
       const visit = (definition, stack = []) => {
         if (seen.has(definition.name)) return
@@ -139,6 +199,7 @@ export function makeLoader(bus) {
       definitions.forEach(definition => visit(definition))
       return out
     },
+
     /** Register one definition. With a context already booted, activate it now. */
     add(definition, builtin = false) {
       if (!definition?.name) throw new Error('plugin has no name')

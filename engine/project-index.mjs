@@ -293,6 +293,83 @@ function agentRecords(records, view) {
   return Object.fromEntries(Object.entries(records).map(([name, record]) => [name, agentRecord(record, view)]))
 }
 
+/** Read one project file into the index, through its kind's reader or as an asset. */
+async function readIndexFile(index, file, inside, levelPlacements) {
+  const kind = KIND(file)
+  const reader = READERS[kind]
+  // A file no reader names is data a level may reference, so it is an asset.
+  if (reader) await reader(index, file, inside, levelPlacements)
+  else index.assets[path.basename(file)] = { file, kind, usedBy: [] }
+}
+
+/**
+ * Lint one hand-written JS file against the determinism rules.
+ *
+ * Every such file runs inside the fixed step, so every one is held to them. A
+ * file the reader just imported is linted from the text the loader read; a
+ * project plugin was read for its registrations; anything else is read here.
+ */
+async function lintSourceFile(index, file, inside, pluginSources) {
+  if (!file.endsWith('.js')) return
+  const text = loadedModuleSource(inside(file)) ?? pluginSources.get(file) ?? await fs.readFile(inside(file), 'utf8')
+  index.warnings.push(...lint(file, text))
+}
+
+/** Point every type's asset references back at the type that uses them. */
+function linkTypeAssets(index, name, type, assetFor) {
+  for (const reference of type.uses || []) assetFor(reference)?.usedBy.push(name)
+}
+
+/** Point every type's behaviour references back at the type that uses them. */
+function linkTypeBehaviours(index, name, type) {
+  for (const behaviour of type.behaviours || []) {
+    if (index.behaviours[behaviour]) index.behaviours[behaviour].usedBy.push(name)
+  }
+}
+
+/** Count the levels that place each type. */
+function countLevelTypes(index, level) {
+  for (const type of level.types || []) if (index.types[type]) index.types[type].inLevels++
+}
+
+/** Point every level's behaviour references back at the level that uses them. */
+function linkLevelBehaviours(index, name, level) {
+  for (const behaviour of level.behaviours || []) {
+    if (index.behaviours[behaviour]) index.behaviours[behaviour].usedBy.push(name)
+  }
+}
+
+/** Point every level's asset references back at the level that uses them. */
+function linkLevelAssets(index, name, level, assetFor) {
+  for (const reference of Object.keys(level.assets || {})) assetFor(reference)?.usedBy.push(name)
+}
+
+/** The index again, cut down to what an agent reads. */
+function buildAgentView(index) {
+  return {
+    types: agentRecords(index.types, AGENT_VIEW.types),
+    behaviours: agentRecords(index.behaviours, AGENT_VIEW.behaviours),
+    levels: agentRecords(index.levels, AGENT_VIEW.levels),
+    tests: agentRecords(index.tests, AGENT_VIEW.tests),
+    // Keyed by path, not basename, so "what kind is this file" is an exact
+    // lookup rather than a guess across folders.
+    assets: Object.fromEntries(Object.values(index.assets).map(asset => [asset.file, asset.kind]))
+  }
+}
+
+/**
+ * Write the index and the agent view beside the project.
+ *
+ * Compact, not indented. Every reader parses it — the editor, `check`, and an
+ * agent through the generated agent view — so the indentation is bytes written
+ * on every rebuild that nothing reads. The records are unchanged.
+ */
+async function writeIndexFiles(projectDirectory, index) {
+  await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
+  await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index))
+  await writeAtomic(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(buildAgentView(index)))
+}
+
 /**
  * Build the index — the one artifact both the browser UI and the AI read.
  * Types are imported rather than parsed so `properties` and asset references
@@ -311,7 +388,7 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT, { write 
     pluginTypes: await typesRegisteredByPlugins(files, projectDirectory, checkout, pluginSources)
   }
   /** One project file by its path from the project directory. */
-  const inside = f => path.join(projectDirectory, f)
+  const inside = file => path.join(projectDirectory, file)
 
   // Raw placements, kept only for the invariant pass below and never written
   // to `index`: a level of nine hundred entities copied onto the index would
@@ -323,21 +400,9 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT, { write 
   // and hooks is not read a second time as text for the determinism lint.
   recordModuleSources()
 
-  for (const f of files) {
-    const kind = KIND(f)
-    const reader = READERS[kind]
-    // A file no reader names is data a level may reference, so it is an asset.
-    if (reader) await reader(index, f, inside, levelPlacements)
-    else index.assets[path.basename(f)] = { file: f, kind, usedBy: [] }
-
-    // Every hand-written JS file in the project runs inside the fixed step, so
-    // every one of them is held to the determinism rules. A file the reader
-    // just imported is linted from the text the loader read; a project plugin
-    // was read for its registrations; anything else is read here.
-    if (f.endsWith('.js')) {
-      const text = loadedModuleSource(inside(f)) ?? pluginSources.get(f) ?? await fs.readFile(inside(f), 'utf8')
-      index.warnings.push(...lint(f, text))
-    }
+  for (const file of files) {
+    await readIndexFile(index, file, inside, levelPlacements)
+    await lintSourceFile(index, file, inside, pluginSources)
   }
 
   // relationships: assets -> types that reference them, types -> levels that place them
@@ -345,18 +410,18 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT, { write 
   // subfolder is named `counter-strike/wall.png` and filed under `wall.png`, so
   // looking it up by the reference found nothing and every subfolder asset read
   // as unused — which reads as "safe to delete".
-  const assetByPath = new Map(Object.values(index.assets).map(a => [a.file, a]))
+  const assetByPath = new Map(Object.values(index.assets).map(asset => [asset.file, asset]))
   /** The asset entry a reference resolves to, or undefined when no file is there. */
   const assetFor = reference => assetByPath.get(assetPath(reference))
 
-  for (const [tn, t] of Object.entries(index.types)) {
-    for (const u of t.uses || []) assetFor(u)?.usedBy.push(tn)
-    for (const bn of t.behaviours || []) if (index.behaviours[bn]) index.behaviours[bn].usedBy.push(tn)
+  for (const [name, type] of Object.entries(index.types)) {
+    linkTypeAssets(index, name, type, assetFor)
+    linkTypeBehaviours(index, name, type)
   }
-  for (const [ln, l] of Object.entries(index.levels)) {
-    for (const tn of l.types || []) if (index.types[tn]) index.types[tn].inLevels++
-    for (const bn of l.behaviours || []) if (index.behaviours[bn]) index.behaviours[bn].usedBy.push(ln)
-    for (const reference of Object.keys(l.assets || {})) assetFor(reference)?.usedBy.push(ln)
+  for (const [name, level] of Object.entries(index.levels)) {
+    countLevelTypes(index, level)
+    linkLevelBehaviours(index, name, level)
+    linkLevelAssets(index, name, level, assetFor)
   }
 
   // Every type is loaded by this point; a level can be walked before the type
@@ -371,26 +436,7 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT, { write 
   // for a later reader to mistake for fresh.
   if (!write) return index
 
-  await fs.mkdir(path.join(projectDirectory, '.engine'), { recursive: true })
-  // Compact, not indented. Every reader parses it — the editor, `check`, and an
-  // agent through the generated agent view — so the indentation is bytes written
-  // on every rebuild that nothing reads. The records are unchanged.
-  await writeAtomic(path.join(projectDirectory, '.engine/index.json'), JSON.stringify(index))
-
-  // The agent view: the same map, minus what the editor alone acts on (the
-  // file lists, per-level asset tables, reverse references). This is the file
-  // the instructions tell an agent to read first — the full index is several
-  // times larger for nothing an agent does.
-  const agent = {
-    types: agentRecords(index.types, AGENT_VIEW.types),
-    behaviours: agentRecords(index.behaviours, AGENT_VIEW.behaviours),
-    levels: agentRecords(index.levels, AGENT_VIEW.levels),
-    tests: agentRecords(index.tests, AGENT_VIEW.tests),
-    // Keyed by path, not basename, so "what kind is this file" is an exact
-    // lookup rather than a guess across folders.
-    assets: Object.fromEntries(Object.values(index.assets).map(a => [a.file, a.kind]))
-  }
-  await writeAtomic(path.join(projectDirectory, '.engine/index.agent.json'), JSON.stringify(agent))
+  await writeIndexFiles(projectDirectory, index)
   return index
 }
 
@@ -422,49 +468,77 @@ const READERS = {
   config: async (index, file) => { index.config.push(file) }
 }
 
+/** Every way a type can name a file, and which key named which. */
+function readTypeReferences(entry, loaded) {
+  // See assetReferences, which the level placements go through too. Miss any of
+  // these and "used by" quietly goes empty, which reads as "nothing uses this,
+  // safe to delete", and a missing file goes unreported by `check`.
+  const references = assetReferences(loaded)
+  entry.uses = references.map(reference => reference.reference)
+  // Which key named which file, so a missing one can be reported with the line
+  // the author would have to go and fix.
+  entry.usesBy = Object.fromEntries(references.map(reference => [reference.reference, reference.where]))
+}
+
+/**
+ * What the author says this type is, how a correct one reads on screen, and how
+ * a broken one reads. Carried here so reading the index answers "what is a
+ * brush" with no call and no guess from the name.
+ */
+function readTypeDescription(entry, loaded) {
+  if (loaded.about) entry.about = String(loaded.about)
+  if (loaded.appearance) entry.appearance = String(loaded.appearance)
+  if (loaded.looksWrongWhen) entry.looksWrongWhen = String(loaded.looksWrongWhen)
+}
+
+/**
+ * A rule `check` enforces against every placement of this type. Kept beside
+ * `about`/`appearance` because it is the same kind of fact — written once next
+ * to the type, read by every level that places it. `meshBox`/`colliderBox` are
+ * the type's own defaults, stored only when an invariant is declared, so a type
+ * that never opts in pays nothing: see `placedHeight` for why both are needed.
+ */
+function readTypeInvariant(entry, loaded) {
+  if (!loaded.invariant) return
+  entry.invariant = loaded.invariant
+  if (Array.isArray(loaded.mesh?.box)) entry.meshBox = loaded.mesh.box
+  if (Array.isArray(loaded.collider?.box)) entry.colliderBox = loaded.collider.box
+}
+
+/** A tint on a type multiplies into every textured placement that did not state its own. */
+function readTypeTint(entry, loaded) {
+  if (loaded.mesh?.tint != null) entry.meshTint = loaded.mesh.tint
+}
+
+/** The animation names the type declares. */
+function readTypeAnimation(entry, loaded) {
+  if (loaded.animation) entry.animation = Object.keys(loaded.animation)
+}
+
+/**
+ * What this type composes. Listed here so "what does a crate do" is one index
+ * lookup rather than opening the type and then every behaviour.
+ */
+function readTypeBehaviours(entry, loaded) {
+  const attached = attachedNames(loaded.behaviours)
+  if (attached.length) entry.behaviours = attached
+}
+
 /** One type file: what it declares, what it names, and how it reads on screen. */
 async function readType(file, relative) {
   const entry = { file: relative, properties: [], uses: [], inLevels: 0 }
   try {
     const loaded = await importFresh(file)
     entry.properties = Object.keys(loaded.properties || {})
-    // Every way a type can name a file — see assetReferences, which the
-    // level placements go through too. Miss any of these and "used by"
-    // quietly goes empty, which reads as "nothing uses this, safe to
-    // delete", and a missing file goes unreported by `check`.
-    const references = assetReferences(loaded)
-    entry.uses = references.map(r => r.reference)
-    // Which key named which file, so a missing one can be reported with the
-    // line the author would have to go and fix.
-    entry.usesBy = Object.fromEntries(references.map(r => [r.reference, r.where]))
-    entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
-    // What the author says this type is, how a correct one reads on screen,
-    // and how a broken one reads. Carried here so reading the index answers
-    // "what is a brush" with no call and no guess from the name.
-    if (loaded.about) entry.about = String(loaded.about)
-    if (loaded.appearance) entry.appearance = String(loaded.appearance)
-    if (loaded.looksWrongWhen) entry.looksWrongWhen = String(loaded.looksWrongWhen)
-    // A rule `check` enforces against every placement of this type. Kept
-    // beside `about`/`appearance` because it is the same kind of fact —
-    // written once next to the type, read by every level that places it.
-    // `meshBox`/`colliderBox` are the type's own defaults, stored only
-    // when an invariant is declared, so a type that never opts in pays
-    // nothing: see `placedHeight` for why both are needed.
-    if (loaded.invariant) {
-      entry.invariant = loaded.invariant
-      if (Array.isArray(loaded.mesh?.box)) entry.meshBox = loaded.mesh.box
-      if (Array.isArray(loaded.collider?.box)) entry.colliderBox = loaded.collider.box
-    }
-    // A tint on a type multiplies into every textured placement that did not
-    // state its own — see `tintProblems`, which is the only reader.
-    if (loaded.mesh?.tint != null) entry.meshTint = loaded.mesh.tint
-    if (loaded.animation) entry.animation = Object.keys(loaded.animation)
-    // What this type composes. Listed here so "what does a crate do" is one
-    // index lookup rather than opening the type and then every behaviour.
-    const attached = attachedNames(loaded.behaviours)
-    if (attached.length) entry.behaviours = attached
-  } catch (e) {
-    entry.error = String(e.message || e)
+    readTypeReferences(entry, loaded)
+    entry.hooks = HOOKS.filter(hook => typeof loaded[hook] === 'function')
+    readTypeDescription(entry, loaded)
+    readTypeInvariant(entry, loaded)
+    readTypeTint(entry, loaded)
+    readTypeAnimation(entry, loaded)
+    readTypeBehaviours(entry, loaded)
+  } catch (error) {
+    entry.error = String(error.message || error)
   }
   return entry
 }

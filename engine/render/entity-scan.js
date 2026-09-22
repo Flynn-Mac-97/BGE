@@ -119,6 +119,30 @@ export function makeEntityScans(state, records) {
       | (record.steady ? SLOT_STEADY : 0)
   }
 
+  /** The fields both scans need to match, and the slot each is remembered in. */
+  const SAME_FIELDS = [
+    [SLOT_MESH, 'mesh'],
+    [SLOT_COLLIDER, 'collider'],
+    [SLOT_TYPE, 'type'],
+    [SLOT_SCALE, 'scale'],
+    [SLOT_YAW, 'yaw'],
+    [SLOT_HIDDEN, 'hidden'],
+    [SLOT_OPACITY, 'opacity']
+  ]
+
+  /** Whether the slot still holds the entity's declaration, field for field. */
+  function sameFields(entity, at) {
+    for (const [slot, field] of SAME_FIELDS) {
+      if (snapshot[at + slot] !== entity[field]) return false
+    }
+    return true
+  }
+
+  /** Whether the ring rule names this entity, so it may not be skipped. */
+  function isRinged(entity, ringedId) {
+    return ringedId !== null && (entity.id === ringedId || entity.type === ringedId)
+  }
+
   /**
    * Whether the slot still holds the entity, turned and declared the same, with
    * the place left out.
@@ -129,15 +153,9 @@ export function makeEntityScans(state, records) {
    * is the cheapest way to reject a slot whose entity changed.
    */
   function sameApartFromPlace(entity, at, ringedId) {
-    return typeof entity.rotation !== 'object'
-      && snapshot[at + SLOT_MESH] === entity.mesh
-      && snapshot[at + SLOT_COLLIDER] === entity.collider
-      && snapshot[at + SLOT_TYPE] === entity.type
-      && snapshot[at + SLOT_SCALE] === entity.scale
-      && snapshot[at + SLOT_YAW] === entity.yaw
-      && snapshot[at + SLOT_HIDDEN] === entity.hidden
-      && snapshot[at + SLOT_OPACITY] === entity.opacity
-      && (ringedId === null || (entity.id !== ringedId && entity.type !== ringedId))
+    if (typeof entity.rotation === 'object') return false
+    if (!sameFields(entity, at)) return false
+    return !isRinged(entity, ringedId)
   }
 
   /**
@@ -185,6 +203,34 @@ export function makeEntityScans(state, records) {
   }
 
   /**
+   * Whether the moving scan can place this entity without measuring it again.
+   *
+   * It must be the entity the last pass drew, steady, and moved since — and its
+   * declaration unchanged, which `sameApartFromPlace` answers.
+   */
+  function isPlaceable(entity, at, drawn, flags, ringedId) {
+    if (snapshot[at] !== entity) return false
+    if ((flags & SLOT_STEADY) === 0) return false
+    if (drawnPlaces[drawn] === entity.x && drawnPlaces[drawn + 1] === entity.y && drawnPlaces[drawn + 2] === entity.z) return false
+    return sameApartFromPlace(entity, at, ringedId)
+  }
+
+  /** Move an entity's object to its blended place, and its ground mark with it. */
+  function placeMoving(entity, object, at, blend, drawInto) {
+    const place = drawInto(drawnPlaceScratch, entity, blend)
+    object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
+    // The record keeps the last transform written so a later full pass can tell
+    // a real move from a pose change; this fast path moves the object, so it
+    // writes through the same bookkeeping rather than around it.
+    placeMatrix(object, object.userData.record)
+    // The keyline hangs off the object and moves with it, so only the ground mark
+    // has to be written again.
+    if (!entity.hidden) {
+      state.noteContactShadow(entity, snapshot[at + SLOT_DECLARED], snapshot[at + SLOT_SHAPE], true, place)
+    }
+  }
+
+  /**
    * The per-entity cost of a playing frame, in a function of its own.
    *
    * A playing frame moves every entity and draws it between its last two steps,
@@ -209,24 +255,8 @@ export function makeEntityScans(state, records) {
         if (flags & SLOT_KEYLINE) keylines++
         continue
       }
-      if (snapshot[at] === entity
-          && (flags & SLOT_STEADY) !== 0
-          && (drawnPlaces[drawn] !== entity.x
-            || drawnPlaces[drawn + 1] !== entity.y
-            || drawnPlaces[drawn + 2] !== entity.z)
-          && sameApartFromPlace(entity, at, ringedId)) {
-        const place = drawInto(drawnPlaceScratch, entity, blend)
-        const object = snapshot[at + SLOT_OBJECT]
-        object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
-        // The record keeps the last transform written so a later full pass can
-        // tell a real move from a pose change; this fast path moves the object,
-        // so it writes through the same bookkeeping rather than around it.
-        placeMatrix(object, object.userData.record)
-        // The keyline hangs off the object and moves with it, so only the
-        // ground mark has to be written again.
-        if (!entity.hidden) {
-          state.noteContactShadow(entity, snapshot[at + SLOT_DECLARED], snapshot[at + SLOT_SHAPE], true, place)
-        }
+      if (isPlaceable(entity, at, drawn, flags, ringedId)) {
+        placeMoving(entity, snapshot[at + SLOT_OBJECT], at, blend, drawInto)
         drawnPlaces[drawn] = entity.x
         drawnPlaces[drawn + 1] = entity.y
         drawnPlaces[drawn + 2] = entity.z

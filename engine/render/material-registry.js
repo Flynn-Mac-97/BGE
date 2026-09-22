@@ -91,6 +91,21 @@ export function makeMaterialRegistry(state) {
    * depth and culls its back faces, which is what lets a room be drawn from the
    * inside with nothing sorted.
    */
+  /** The material inputs one mesh declaration asks for, and the texture they tile. */
+  function meshMaterialInputs(entity, declared, where, part) {
+    const declaredColour = readColour(declared.tint, `${where}.tint`)
+    const [u, v] = tilingOf(declared.tiling, part ? part.shape : meshShape(entity), `${where}.tiling`)
+
+    let map = null
+    if (declared.texture && textureStatus(declared.texture, 'world') !== 'failed') {
+      map = tiledTexture(declared.texture, 'world', u, v, invalidateEverything)
+    }
+    // Only a declared tint multiplies into a texture. Falling back to the
+    // per-type colour there would wash every textured wall a different shade.
+    const colour = declaredColour || (map ? new THREE.Color(0xffffff) : entityTint(entity.type))
+    return { map, colour }
+  }
+
   function meshMaterial(entity, key, part = null) {
     const cached = sharedMaterials.get(key)
     if (cached) return cached
@@ -100,17 +115,7 @@ export function makeMaterialRegistry(state) {
     // whole mesh — there is no second way to describe a surface.
     const declared = part ? part.declaration : meshOf(entity)
     const where = part ? `${entity.type}.mesh.parts[${part.index}]` : `${entity.type}.mesh`
-    const declaredColour = readColour(declared.tint, `${where}.tint`)
-    const [u, v] = tilingOf(declared.tiling, part ? part.shape : meshShape(entity), `${where}.tiling`)
-
-    let map = null
-    if (declared.texture && textureStatus(declared.texture, 'world') !== 'failed') {
-      map = tiledTexture(declared.texture, 'world', u, v, invalidateEverything)
-    }
-
-    // Only a declared tint multiplies into a texture. Falling back to the
-    // per-type colour there would wash every textured wall a different shade.
-    const colour = declaredColour || (map ? new THREE.Color(0xffffff) : entityTint(entity.type))
+    const { map, colour } = meshMaterialInputs(entity, declared, where, part)
 
     const name = materialNameFor(declared)
     const build = materialBuilders.get(name)

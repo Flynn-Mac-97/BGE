@@ -81,6 +81,45 @@ export async function reloadBehaviour({ world, editor, files, importProjectFile,
   return { name, entities: moved }
 }
 
+/** One point of the level's camera position, or the view's own value. */
+function cameraPoint(camera, index, fallback) {
+  return camera.at?.[index] ?? fallback
+}
+
+/**
+ * Put the level's camera block into the editor view.
+ *
+ * `mode` is deliberately NOT copied. The level's camera block is the GAME
+ * camera — where the player looks while playing — and the game camera plugin
+ * adopts it on play and hands it back on stop. Copying it at load put the editor
+ * inside a first-person camera standing in a wall the moment you opened a 3D
+ * level, and a black viewport is the worst thing this engine can show.
+ */
+function applyLevelCamera(view, camera) {
+  view.x = cameraPoint(camera, 0, view.x)
+  view.y = cameraPoint(camera, 1, view.y)
+  view.z = cameraPoint(camera, 2, view.z)
+  view.zoom = camera.zoom ?? view.zoom
+  view.mode = 'ortho'
+  view.fov = camera.fov ?? view.fov
+  view.yaw = camera.yaw ?? view.yaw
+  view.pitch = camera.pitch ?? view.pitch
+}
+
+/**
+ * Place every entity the level file lists.
+ *
+ * Ids are position-in-file, not a counter, so `coin-2` means the same coin after
+ * a reload. An agent that noted an id an hour ago can still use it.
+ */
+function spawnLevelEntities(world, placements) {
+  const seen = {}
+  for (const placement of placements) {
+    const entity = world.spawn(placement.type, placement)
+    if (!placement.id) entity.id = `${placement.type}-${seen[placement.type] = (seen[placement.type] ?? -1) + 1}`
+  }
+}
+
 /**
  * Open one level: reset the clock, place every entity, and announce it.
  *
@@ -103,29 +142,8 @@ export async function loadLevel({ world, loop, bus, editor, view, files, levelFi
   editor.levelName = name
   editor.selection.clear()
 
-  if (raw.camera) {
-    view.x = raw.camera.at?.[0] ?? view.x
-    view.y = raw.camera.at?.[1] ?? view.y
-    view.z = raw.camera.at?.[2] ?? view.z
-    view.zoom = raw.camera.zoom ?? view.zoom
-    // `mode` is deliberately NOT copied here. The level's camera block is the
-    // GAME camera — where the player looks while playing — and the game camera
-    // plugin adopts it on play and hands it back on stop. Copying it at load
-    // put the editor inside a first-person camera standing in a wall the
-    // moment you opened a 3D level, and a black viewport is the worst thing
-    // this engine can show.
-    view.mode = 'ortho'
-    view.fov = raw.camera.fov ?? view.fov
-    view.yaw = raw.camera.yaw ?? view.yaw
-    view.pitch = raw.camera.pitch ?? view.pitch
-  }
-  // Ids are position-in-file, not a counter, so `coin-2` means the same coin
-  // after a reload. An agent that noted an id an hour ago can still use it.
-  const seen = {}
-  for (const p of raw.entities || []) {
-    const e = world.spawn(p.type, p)
-    if (!p.id) e.id = `${p.type}-${seen[p.type] = (seen[p.type] ?? -1) + 1}`
-  }
+  if (raw.camera) applyLevelCamera(view, raw.camera)
+  spawnLevelEntities(world, raw.entities || [])
 
   bus.emit('world:changed')
   // The camera rule rides along, because the kernel has already paid to parse

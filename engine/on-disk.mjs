@@ -21,6 +21,30 @@ import { workLock } from './work-lock.mjs'
 import { pluginGuides } from './plugin-guides.mjs'
 import { pluginInterfaceReader } from './plugin-interface.mjs'
 
+/** The engine's own instruction files an agent packet may name. */
+function isEngineAgentFile(clean) {
+  return clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md'
+    || clean.startsWith('agents/') || clean.startsWith('docs/')
+    || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+}
+
+/** A project's own instruction files: its agents folder and its plugin guides. */
+function isProjectAgentFile(clean) {
+  return clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+}
+
+/** The directory a scope's agent files are read from, or null when the scope is unknown. */
+function agentScopeBase(scope, root, projectDirectory) {
+  if (scope === 'engine') return root
+  if (scope === 'project') return projectDirectory
+  return null
+}
+
+/** Whether a scope may name this file at all. */
+function agentFileAllowed(scope, clean) {
+  return scope === 'engine' ? isEngineAgentFile(clean) : isProjectAgentFile(clean)
+}
+
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -62,12 +86,9 @@ export function onDisk(projectDirectory, checkout = ROOT) {
 
   /** Resolve one agent file, from the fixed sets each scope is allowed to read. */
   const insideAgent = (scope, rel) => {
-    const base = scope === 'engine' ? root : scope === 'project' ? projectDirectory : null
+    const base = agentScopeBase(scope, root, projectDirectory)
     const clean = String(rel || '').replaceAll('\\', '/').replace(/^\.\//, '')
-    const allowed = scope === 'engine'
-      ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-      : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-    if (!base || !allowed) throw new Error(`bad agent file path: ${scope}:${rel}`)
+    if (!base || !agentFileAllowed(scope, clean)) throw new Error(`bad agent file path: ${scope}:${rel}`)
     const abs = path.resolve(base, clean)
     if (!abs.startsWith(base + path.sep)) throw new Error(`bad agent file path: ${scope}:${rel}`)
     return abs

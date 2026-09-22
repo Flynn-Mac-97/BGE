@@ -82,23 +82,46 @@ const DEPTH = 5
  * Records are folded by sorted key, so the order a plugin happened to set them
  * does not change the answer.
  */
+/** Fold a list, walking every item so a vector is not one constant. */
+const foldList = (hash, list, depth) => {
+  let out = fold(hash, LIST ^ list.length)
+  for (const item of list) out = foldValue(out, item, depth + 1)
+  return out
+}
+
+/** Fold a record by sorted key, so the order a plugin set them does not change the answer. */
+const foldRecord = (hash, value, depth) => {
+  let out = fold(hash, RECORD)
+  for (const key of Object.keys(value).sort()) out = foldValue(foldText(out, key), value[key], depth + 1)
+  return out
+}
+
+/** A list or a record, whichever this is. */
+const foldComplex = (hash, value, depth) => {
+  if (Array.isArray(value)) return foldList(hash, value, depth)
+  return foldRecord(hash, value, depth)
+}
+
+/**
+ * Fold one value in, whatever shape it is.
+ *
+ * Lists have to be walked rather than converted. `Number([16, 1, 1])` is `NaN`,
+ * so a scale or a rotation written as a vector folded to one constant and the
+ * hash was blind to it — two worlds differing only in a rotated body hashed the
+ * same, which is the worst way for a check to fail.
+ *
+ * Records are folded by sorted key, so the order a plugin happened to set them
+ * does not change the answer.
+ */
 const foldValue = (hash, value, depth = 0) => {
-  if (typeof value === 'number') return foldNumber(hash, value)
-  if (typeof value === 'boolean') return fold(hash, value ? 1 : 2)
-  if (typeof value === 'string') return foldText(hash, value)
+  const kind = typeof value
   if (value === null) return fold(hash, NOTHING)
+  if (kind === 'number') return foldNumber(hash, value)
+  if (kind === 'string') return foldText(hash, value)
+  if (kind === 'boolean') return fold(hash, value ? 1 : 2)
   if (value === undefined) return fold(hash, ABSENT)
   if (depth >= DEPTH) return fold(hash, OTHER)
-  if (Array.isArray(value)) {
-    let out = fold(hash, LIST ^ value.length)
-    for (const item of value) out = foldValue(out, item, depth + 1)
-    return out
-  }
-  if (typeof value === 'object') {
-    let out = fold(hash, RECORD)
-    for (const key of Object.keys(value).sort()) out = foldValue(foldText(out, key), value[key], depth + 1)
-    return out
-  }
+  if (kind === 'object') return foldComplex(hash, value, depth)
   return fold(hash, OTHER)
 }
 
@@ -172,77 +195,121 @@ export function makeWorld(bus) {
    * The type is read once here and kept as `_definition`, so a later edit can
    * find every entity still running the old one — see `retype`.
    */
-  function makeEntity(typeName, placement = {}) {
-    const type = types.get(typeName) || {}
+  /** The id a placement asks for, or the next generated one for its type. */
+  function entityIdFor(typeName, placement) {
+    return placement.id || `${typeName}-${nextId++}`
+  }
+
+  /** Where and how big the entity is, from the placement's own numbers. */
+  function entityPlacementFor(typeName, placement) {
     const at = placement.at || [0, 0, 0]
-
-    const e = {
-      id: placement.id || `${typeName}-${nextId++}`,
+    return {
+      id: entityIdFor(typeName, placement),
       type: typeName,
-
       x: at[0] ?? 0,
       y: at[1] ?? 0,
       z: at[2] ?? 0,
       rotation: placement.rotation ?? 0,
-      scale: placement.scale ?? 1,
+      scale: placement.scale ?? 1
+    }
+  }
 
+  /**
+   * What the entity draws with.
+   *
+   * The 3D counterpart of `sprite`: solid geometry rather than a textured plane.
+   * A thing declares one or the other, never both — `mesh` is what the renderer
+   * draws when it is there. It merges rather than replaces, so a placement can
+   * change the box without restating the material.
+   */
+  function entityLookFor(type, placement) {
+    return {
       sprite: expand(placement.sprite ?? type.sprite, 'image'),
-      // The 3D counterpart of `sprite`: solid geometry rather than a textured
-      // plane. A thing declares one or the other, never both — `mesh` is what
-      // the renderer draws when it is there. It merges rather than replaces, so
-      // a placement can change the box without restating the material.
       mesh: mergeLook(type.mesh, placement.mesh, 'texture'),
-      collider: placement.collider ?? type.collider ?? null,
+      collider: placement.collider ?? type.collider ?? null
+    }
+  }
 
-      // properties: type defaults, overridden per placement. Overrides stay visible.
+  /** Type defaults with the placement's own values over the top; overrides stay visible. */
+  function entityPropertiesFor(type, placement) {
+    return {
       properties: { ...(type.properties || {}), ...(placement.properties || {}) },
-      overrides: Object.keys(placement.properties || {}),
+      overrides: Object.keys(placement.properties || {})
+    }
+  }
 
+  /** Which of the look's fields this placement set for itself, so a type reload leaves them alone. */
+  function entitySetByPlacement(placement) {
+    return {
+      _setByPlacement: {
+        sprite: placement.sprite !== undefined,
+        mesh: placement.mesh !== undefined,
+        collider: placement.collider !== undefined
+      }
+    }
+  }
+
+  /**
+   * Anything the placement carried that the entity does not model directly.
+   *
+   * Kept so a save round-trips the file rather than silently narrowing it.
+   */
+  function entityExtraKeys(placement) {
+    return {
+      _extraKeys: Object.fromEntries(Object.entries(placement).filter(([key]) => !HANDLED.has(key)))
+    }
+  }
+
+  /**
+   * Give the entity the behaviours its type and its placement name.
+   *
+   * The order is the type's first, then the placement's. A name the placement
+   * took off is recorded rather than forgotten, or the next load puts it back.
+   */
+  function attachPlacementBehaviours(entity, type, placement) {
+    const fromType = asAttached(type.behaviours)
+    const fromPlacement = asAttached(placement.behaviours)
+    for (const name of [...Object.keys(fromType), ...Object.keys(fromPlacement)]) {
+      if (entity.behaviours.some(behaviour => behaviour.name === name)) continue
+      if (fromPlacement[name] === false) { entity._detached.add(name); continue }
+      addBehaviour(entity, name, {
+        own: !(name in fromType),
+        typeProps: fromType[name] || {},
+        overrides: fromPlacement[name] || {}
+      })
+    }
+  }
+
+  /**
+   * Build one entity from a placement, filling in the type's defaults.
+   *
+   * The type is read once here and kept as `_definition`, so a later edit can
+   * find every entity still running the old one — see `retype`.
+   */
+  function makeEntity(typeName, placement = {}) {
+    const type = types.get(typeName) || {}
+    const entity = {
+      ...entityPlacementFor(typeName, placement),
+      ...entityLookFor(type, placement),
+      ...entityPropertiesFor(type, placement),
       hidden: false,
-
       // Why THIS one is placed here. It adds to what the type says a thing is;
       // it never restates it, because the type is described once and read from
       // one place. Modelled rather than preserved verbatim so `set` can write
       // it and the inspector can edit it.
       note: placement.note ?? null,
-
       _definition: type,
-
       // What this entity composes, in the order the hooks run. Each record
       // carries its own bag; the bag is also exposed as e[name].
       behaviours: [],
       // Behaviours the TYPE declares that this placement took off. Recorded, or
       // the next load puts them straight back.
       _detached: new Set(),
-
-      // Which of these this placement set for itself. Needed when a type is
-      // reloaded: a placement's own collider must survive, a inherited one
-      // must follow the file.
-      _setByPlacement: {
-        sprite: placement.sprite !== undefined,
-        mesh: placement.mesh !== undefined,
-        collider: placement.collider !== undefined
-      },
-
-      // Anything the placement carried that the entity does not model directly.
-      // Kept so a save round-trips the file rather than silently narrowing it.
-      _extraKeys: Object.fromEntries(
-        Object.entries(placement).filter(([k]) => !HANDLED.has(k))
-      )
+      ...entitySetByPlacement(placement),
+      ...entityExtraKeys(placement)
     }
-
-    const fromType = asAttached(type.behaviours)
-    const fromPlacement = asAttached(placement.behaviours)
-    for (const name of [...Object.keys(fromType), ...Object.keys(fromPlacement)]) {
-      if (e.behaviours.some(b => b.name === name)) continue
-      if (fromPlacement[name] === false) { e._detached.add(name); continue }
-      addBehaviour(e, name, {
-        own: !(name in fromType),
-        typeProps: fromType[name] || {},
-        overrides: fromPlacement[name] || {}
-      })
-    }
-    return e
+    attachPlacementBehaviours(entity, type, placement)
+    return entity
   }
 
   /**

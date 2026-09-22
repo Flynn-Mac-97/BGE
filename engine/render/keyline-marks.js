@@ -72,33 +72,27 @@ export function makeKeylineMarks(state) {
     return Math.max(0, declaredNumber(declared.keyline, 0, 'mesh.keyline'))
   }
 
-  /** Add, resize or remove an entity's keyline so it matches the width it now declares. */
-  function updateKeyline(entity, object, declared, shape, moved, record) {
-    const width = keylineWidth(declared, moved)
-    const colour = declared.keylineColour ?? state.readability.keylineColour
-    // Almost every moving entity keeps the outline it already has, so the answer
-    // is kept on the record. Reading it off `userData` meant a property whose
-    // shape grows with every feature the renderer gains, once per entity per frame.
-    if (record.keylineWidth === width && record.keylineColour === colour
-        && (width <= 0 || record.keylineMesh !== null)) { record.keylineReady = true; return }
+  /** Whether the outline already drawn matches the width and colour this frame wants. */
+  function keylineAlreadyRight(record, width, colour) {
+    if (record.keylineWidth !== width || record.keylineColour !== colour) return false
+    return width <= 0 || record.keylineMesh !== null
+  }
 
-    const drawn = record.keylineMesh ?? object.userData.keylineMesh
-    if (width <= 0) {
-      if (drawn) { object.remove(drawn); state.release(drawn) }
-      record.keylineMesh = null
-      record.keylineWidth = 0
-      record.keylineColour = colour
-      record.keylineReady = true
-      object.userData.keylineMesh = null
-      return
-    }
+  /** Take the outline off the object and forget it. */
+  function clearKeyline(object, record, drawn, colour) {
     if (drawn) { object.remove(drawn); state.release(drawn) }
+    record.keylineMesh = null
+    record.keylineWidth = 0
+    record.keylineColour = colour
+    record.keylineReady = true
+    object.userData.keylineMesh = null
+  }
 
+  /** Build the outline mesh and hang it on the object, or leave it for the next frame. */
+  function addKeyline(entity, object, declared, shape, record, width, colour) {
     const geometry = hullFor(entity, object, declared, shape)
-    // A model still loading. The next frame builds it, and there is no state
-    // to keep.
+    // A model still loading. The next frame builds it, and there is no state to keep.
     if (!geometry) { record.keylineReady = false; return }
-
     const hull = new THREE.Mesh(geometry, keylineMaterial(width, colour, shape?.kind === 'quad'))
     // Read by hullGeometry, and by the batcher deciding what to hide.
     hull.userData.keyline = true
@@ -110,6 +104,21 @@ export function makeKeylineMarks(state) {
     record.keylineWidth = width
     record.keylineColour = colour
     record.keylineReady = true
+  }
+
+  /** Add, resize or remove an entity's keyline so it matches the width it now declares. */
+  function updateKeyline(entity, object, declared, shape, moved, record) {
+    const width = keylineWidth(declared, moved)
+    const colour = declared.keylineColour ?? state.readability.keylineColour
+    // Almost every moving entity keeps the outline it already has, so the answer
+    // is kept on the record. Reading it off `userData` meant a property whose
+    // shape grows with every feature the renderer gains, once per entity per frame.
+    if (keylineAlreadyRight(record, width, colour)) { record.keylineReady = true; return }
+
+    const drawn = record.keylineMesh ?? object.userData.keylineMesh
+    if (width <= 0) { clearKeyline(object, record, drawn, colour); return }
+    if (drawn) { object.remove(drawn); state.release(drawn) }
+    addKeyline(entity, object, declared, shape, record, width, colour)
   }
 
   return { updateKeyline }

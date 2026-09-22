@@ -296,6 +296,70 @@ function sameMoment(capture, fresh) {
 }
 
 /**
+ * Read the stored moment and remove it from storage.
+ *
+ * Removed before it is used, not after: a capture that survived being applied
+ * once would be applied again by the next reload, over a world it does not
+ * describe. `present` says whether there was anything to read at all, and
+ * `capture` is null when the text could not be parsed.
+ */
+function takeCapture(store) {
+  let text = null
+  try { text = store.getItem(STORAGE_KEY) } catch { return { present: false, capture: null } }
+  if (!text) return { present: false, capture: null }
+  try { store.removeItem(STORAGE_KEY) } catch { /* nothing to do about it */ }
+  try { return { present: true, capture: JSON.parse(text) } } catch { return { present: true, capture: null } }
+}
+
+/**
+ * Why a moment could not be read.
+ *
+ * A moment this engine cannot read is still a reload, and a reload nobody
+ * mentions is the whole problem this file exists to end.
+ */
+function unreadableReason(capture) {
+  return capture
+    ? 'the moment was written by a different version of the engine'
+    : 'the moment could not be read back'
+}
+
+/** Why this page will not take a moment written for another project. */
+function wrongProjectReason(capture, parts) {
+  return `the moment belonged to project "${capture.project}" and this page serves "${parts.editor.projectName}"`
+}
+
+/** Why a capture with no entities cannot be put back. */
+function lostReason(capture) {
+  if (capture.tooLarge) return `the moment was ${capture.tooLarge} characters, larger than a session will hold`
+  return capture.failed || 'the moment could not be written down before the page went'
+}
+
+/** Put the entities back, or say why they could not be. */
+async function restoreNotice(capture, parts) {
+  if (!capture.entities) return describeReload(capture, { why: lostReason(capture) })
+  if (sameMoment(capture, captureWorld(parts, capture.cause))) return describeReload(capture, { unchanged: true })
+  try {
+    return describeReload(capture, { restored: await restoreWorld(capture, parts) })
+  } catch (error) {
+    // A half-restored world is worse than a rebuilt one. Go back to the level
+    // and report the reason rather than leaving something in between.
+    try { await parts.editor.loadLevel(parts.editor.levelName) } catch { /* the boot already tried */ }
+    return describeReload(capture, { why: `putting it back failed — ${error?.message || error}` })
+  }
+}
+
+/** The sentence for one capture: unreadable, another project, or restored. */
+async function noticeFor(capture, parts) {
+  if (!capture || capture.version !== CAPTURE_VERSION) {
+    return describeReload(capture || {}, { why: unreadableReason(capture) })
+  }
+  if (capture.project && capture.project !== parts.editor.projectName) {
+    return describeReload(capture, { why: wrongProjectReason(capture, parts) })
+  }
+  return restoreNotice(capture, parts)
+}
+
+/**
  * The whole of it, in one call from the boot path.
  *
  * Put back whatever the last page left behind, say what happened on the first
@@ -314,53 +378,10 @@ export async function carryWorldThroughReload(parts) {
   armCapture(parts, store)
   if (!store) return null
 
-  let text = null
-  try { text = store.getItem(STORAGE_KEY) } catch { return null }
-  if (!text) return null
-  // Removed before it is used, not after: a capture that survived being applied
-  // once would be applied again by the next reload, over a world it does not
-  // describe.
-  try { store.removeItem(STORAGE_KEY) } catch { /* nothing to do about it */ }
+  const taken = takeCapture(store)
+  if (!taken.present) return null
 
-  let capture = null
-  try { capture = JSON.parse(text) } catch { /* the guard below is the one answer */ }
-  // A moment this engine cannot read is still a reload, and a reload nobody
-  // mentions is the whole problem this file exists to end.
-  if (!capture || capture.version !== CAPTURE_VERSION) {
-    const notice = describeReload(capture || {}, {
-      why: capture ? 'the moment was written by a different version of the engine' : 'the moment could not be read back'
-    })
-    announce(notice)
-    return notice
-  }
-  if (capture.project && capture.project !== parts.editor.projectName) {
-    const notice = describeReload(capture, {
-      why: `the moment belonged to project "${capture.project}" and this page serves "${parts.editor.projectName}"`
-    })
-    announce(notice)
-    return notice
-  }
-
-  let notice = null
-  if (!capture.entities) {
-    notice = describeReload(capture, {
-      why: capture.tooLarge
-        ? `the moment was ${capture.tooLarge} characters, larger than a session will hold`
-        : capture.failed || 'the moment could not be written down before the page went'
-    })
-  } else if (sameMoment(capture, captureWorld(parts, capture.cause))) {
-    notice = describeReload(capture, { unchanged: true })
-  } else {
-    try {
-      notice = describeReload(capture, { restored: await restoreWorld(capture, parts) })
-    } catch (error) {
-      // A half-restored world is worse than a rebuilt one. Go back to the level
-      // and report the reason rather than leaving something in between.
-      try { await parts.editor.loadLevel(parts.editor.levelName) } catch { /* the boot already tried */ }
-      notice = describeReload(capture, { why: `putting it back failed — ${error?.message || error}` })
-    }
-  }
-
+  const notice = await noticeFor(taken.capture, parts)
   announce(notice)
   return notice
 }

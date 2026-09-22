@@ -317,6 +317,17 @@ export async function pageReports(port, pageId, expression, { timeoutMillisecond
   }
 }
 
+/** The window bounds to ask for: the caller's size, the window's, or a default. */
+function requestedBounds(asked, width, height) {
+  return {
+    windowState: 'normal',
+    left: asked.left ?? 20,
+    top: asked.top ?? 20,
+    width: width ?? asked.width ?? 1400,
+    height: height ?? asked.height ?? 900
+  }
+}
+
 /**
  * Put one page's window on screen, and report whether it is really there.
  *
@@ -332,11 +343,7 @@ export async function showWindow(port, pageId, { width, height } = {}) {
   const asked = found.bounds ?? {}
   await browserCommand(port, 'Browser.setWindowBounds', {
     windowId: found.windowId,
-    bounds: {
-      windowState: 'normal',
-      left: asked.left ?? 20, top: asked.top ?? 20,
-      width: width ?? asked.width ?? 1400, height: height ?? asked.height ?? 900
-    }
+    bounds: requestedBounds(asked, width, height)
   })
   const settled = await windowOfPage(port, pageId)
   const visibility = await pageReports(port, pageId, 'document.visibilityState')
@@ -495,6 +502,29 @@ export const laneBrowserArguments = ({ port, profile, width, height, page }) => 
 ]
 
 /**
+ * Wait until this lane's own browser answers and has opened the page.
+ *
+ * A version alone proves only that some browser holds the port, and a lane
+ * declared ready on another browser's reply has no debugging port of its own.
+ * `answered` says whether any browser was there at all, which decides the
+ * failure sentence.
+ */
+async function waitForLanePage(debuggingPort, client, browser) {
+  let answered = false
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const version = await browserVersion(debuggingPort)
+    if (version) {
+      answered = true
+      const clients = await clientsOnPort(debuggingPort)
+      if (clients?.includes(client)) return { ready: true, answered, version }
+    }
+    if (browser.exitCode !== null) break
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
+  return { ready: false, answered, version: null }
+}
+
+/**
  * Start a headless browser for one lane and wait until its page is up.
  *
  * `client` becomes the page's bridge name, passed in the URL, so the caller
@@ -535,31 +565,54 @@ export async function startLaneBrowser(root, {
   // and stoppable rather than an orphan nothing recorded.
   recordLaneBrowser(root, entry)
 
-  // Ready means this lane's own browser answered. A version alone proves only
-  // that some browser holds the port, and a lane declared ready on another
-  // browser's reply has no debugging port of its own.
-  let answered = false
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const version = await browserVersion(debuggingPort)
-    if (version) {
-      answered = true
-      const clients = await clientsOnPort(debuggingPort)
-      if (clients?.includes(client)) {
-        return { ...recordLaneBrowser(root, { ...entry, version }), ready: true, browser }
-      }
-    }
-    if (browser.exitCode !== null) break
-    await new Promise(resolve => setTimeout(resolve, 250))
-  }
+  const outcome = await waitForLanePage(debuggingPort, client, browser)
+  if (outcome.ready) return { ...recordLaneBrowser(root, { ...entry, version: outcome.version }), ready: true, browser }
+
   try { browser.kill() } catch { /* already gone */ }
   forgetLaneBrowser(root, client)
   // Windows holds the profile until the process is gone; a start that failed
   // must not leave a directory nothing records.
   await new Promise(resolve => setTimeout(resolve, 500))
   try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
-  throw new Error(answered
+  throw new Error(outcome.answered
     ? `port ${debuggingPort} answers a browser that never opened "${client}"; another browser holds it`
     : `the lane browser for "${client}" never opened its debugging port ${debuggingPort}`)
+}
+
+/** Stop one recorded browser and forget it. */
+function stopLaneBrowser(root, entry) {
+  const was = alive(entry.pid) ? 'running' : 'gone'
+  try { if (was === 'running') process.kill(entry.pid) } catch { /* raced us */ }
+  forgetLaneBrowser(root, entry.client)
+  return { client: entry.client, port: entry.port, pid: entry.pid, was }
+}
+
+/** Remove a profile directory, once Windows has released it. */
+function removeLaneProfile(profile) {
+  if (!profile) return
+  try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+}
+
+/** Mark every stopped entry whose port still answers. */
+async function markStillAnswering(stopped) {
+  for (const entry of stopped) {
+    if (await answers(entry.port)) entry.stillAnswering = true
+  }
+}
+
+/**
+ * The warning for browsers this registry does not describe.
+ *
+ * A port that still answers is a browser this stop did not reach. Reporting the
+ * records removed without saying so would call the checkout clear.
+ */
+function unansweredWarning(missed) {
+  if (!missed.length) return {}
+  return {
+    warning: `port ${missed.map(entry => entry.port).join(', ')} still answers after the stop. `
+      + `A browser is attached that this registry does not describe. `
+      + 'See every instance with: node bin/engine.mjs supervisor, then stop one with: supervisor.stop <id>.'
+  }
 }
 
 /**
@@ -575,33 +628,15 @@ export async function startLaneBrowser(root, {
 export async function stopLaneBrowsers(root, client = null, { all = false } = {}) {
   const wanted = readLaneBrowsers(root).filter(entry =>
     all || (client === null ? entry.headless !== false : entry.client === client))
-  const stopped = []
-  for (const entry of wanted) {
-    const was = alive(entry.pid) ? 'running' : 'gone'
-    try { if (was === 'running') process.kill(entry.pid) } catch { /* raced us */ }
-    forgetLaneBrowser(root, entry.client)
-    stopped.push({ client: entry.client, port: entry.port, pid: entry.pid, was })
-  }
+  const stopped = wanted.map(entry => stopLaneBrowser(root, entry))
   // Give Windows a moment to release the profile before deleting it.
   if (stopped.length) await new Promise(resolve => setTimeout(resolve, 500))
-  for (const entry of wanted) {
-    if (entry.profile) {
-      try { fs.rmSync(entry.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
-    }
-  }
-  // A port that still answers is a browser this stop did not reach. Reporting
-  // the records removed without saying so would call the checkout clear.
-  for (const entry of stopped) {
-    if (await answers(entry.port)) entry.stillAnswering = true
-  }
+  for (const entry of wanted) removeLaneProfile(entry.profile)
+  await markStillAnswering(stopped)
   const missed = stopped.filter(entry => entry.stillAnswering)
   return {
     stopped,
     remaining: readLaneBrowsers(root).length,
-    ...(missed.length ? {
-      warning: `port ${missed.map(entry => entry.port).join(', ')} still answers after the stop. `
-        + `A browser is attached that this registry does not describe. `
-        + 'See every instance with: node bin/engine.mjs supervisor, then stop one with: supervisor.stop <id>.'
-    } : {})
+    ...unansweredWarning(missed)
   }
 }

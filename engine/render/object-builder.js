@@ -12,6 +12,55 @@ import {
 import { eachMaterial, setMaterialOpacity } from './material-vocabulary.js'
 import { reportOnce } from './report.js'
 
+/**
+ * Set one node's rotation from a captured clip value.
+ *
+ * A quaternion is what a captured clip carries — three axes per joint, which
+ * a hinge cannot hold. It REPLACES the node's rotation rather than adding to
+ * a rest angle, because a clip's value is already the joint's full local
+ * rotation; anything the target rig needs on top of that is retargeting, and
+ * is baked into the clip before it gets here.
+ *
+ * Returns false when the value is not a usable rotation, so the caller keeps going.
+ */
+function applyTurnArray(node, turn, name) {
+  if (turn.length !== 4 && turn.length !== 7) {
+    reportOnce(`[render] pose.${name}: a rotation is 4 numbers x,y,z,w, or 7 with a local position after, got ${turn.length}`)
+    return false
+  }
+  // Normalised because a clip stores rounded numbers, and an unnormalised
+  // quaternion scales the node it is set on.
+  node.quaternion.set(turn[0], turn[1], turn[2], turn[3]).normalize()
+  if (turn.length === 7) node.position.set(turn[4], turn[5], turn[6])
+  node.updateMatrix()
+  return true
+}
+
+/**
+ * Pose one named node.
+ *
+ * `indexNodes` traverses everything, so a skinned GLB's bones are named nodes
+ * like any other. Turning bones by name is therefore how a rig plays — no
+ * separate skinning path, and the mesh follows because three reads the bone
+ * matrices it already has.
+ */
+function poseNode(object, nodes, name, turn) {
+  const node = nodeNamed(nodes, name)
+  if (!node) {
+    reportOnce(`[render] ${object.userData.model || object.userData.entity}: no node named "${name}" to pose`)
+    return
+  }
+  if (Array.isArray(turn)) {
+    applyTurnArray(node, turn, name)
+    return
+  }
+  // The fast path: this runs for every limb of every character every frame,
+  // and naming the failure costs a string whether or not there is one.
+  const wanted = Number.isFinite(turn) ? turn : declaredNumber(turn, 0, `pose.${name}`)
+  node.rotation.x = (node.userData.restRotationX || 0) + wanted
+  node.updateMatrix()
+}
+
 export function makeObjectBuilder(state) {
   /**
    * The object standing for one entity.
@@ -248,47 +297,12 @@ export function makeObjectBuilder(state) {
    * A number is the cheap half: a walk cycle a behaviour computes from speed is
    * half a dozen angles, and a hinge per limb is all it needs. It adds to where
    * the part was declared to rest, so a `parts` body keeps its declared angle.
-   *
-   * A quaternion is what a captured clip carries — three axes per joint, which
-   * a hinge cannot hold. It REPLACES the node's rotation rather than adding to
-   * a rest angle, because a clip's value is already the joint's full local
-   * rotation; anything the target rig needs on top of that is retargeting, and
-   * is baked into the clip before it gets here.
-   *
-   * `indexNodes` traverses everything, so a skinned GLB's bones are named nodes
-   * like any other. Turning bones by name is therefore how a rig plays — no
-   * separate skinning path, and the mesh follows because three reads the bone
-   * matrices it already has.
    */
   function applyPose(object, pose) {
     const nodes = namedNodes.get(object)
     // Still loading. The next frame will pose it, and there is no state to keep.
     if (!nodes) return
-    for (const name of Object.keys(pose)) {
-      const node = nodeNamed(nodes, name)
-      if (!node) {
-        reportOnce(`[render] ${object.userData.model || object.userData.entity}: no node named "${name}" to pose`)
-        continue
-      }
-      const turn = pose[name]
-      if (Array.isArray(turn)) {
-        if (turn.length !== 4 && turn.length !== 7) {
-          reportOnce(`[render] pose.${name}: a rotation is 4 numbers x,y,z,w, or 7 with a local position after, got ${turn.length}`)
-          continue
-        }
-        // Normalised because a clip stores rounded numbers, and an unnormalised
-        // quaternion scales the node it is set on.
-        node.quaternion.set(turn[0], turn[1], turn[2], turn[3]).normalize()
-        if (turn.length === 7) node.position.set(turn[4], turn[5], turn[6])
-        node.updateMatrix()
-        continue
-      }
-      // The fast path: this runs for every limb of every character every frame,
-      // and naming the failure costs a string whether or not there is one.
-      const wanted = Number.isFinite(turn) ? turn : declaredNumber(turn, 0, `pose.${name}`)
-      node.rotation.x = (node.userData.restRotationX || 0) + wanted
-      node.updateMatrix()
-    }
+    for (const name of Object.keys(pose)) poseNode(object, nodes, name, pose[name])
   }
 
   state.buildObject = buildObject

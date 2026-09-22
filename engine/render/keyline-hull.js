@@ -72,17 +72,46 @@ function signedVolume(position, index) {
   return total
 }
 
+/** The positions and indices of one mesh, in the object's own space, or null when it is not shape. */
+function meshInObjectSpace(node, toLocal, point, relative) {
+  const attribute = node.isMesh ? node.geometry?.attributes?.position : null
+  if (!attribute) return null
+  relative.multiplyMatrices(toLocal, node.matrixWorld)
+
+  const own = []
+  for (let i = 0; i < attribute.count; i++) {
+    point.fromBufferAttribute(attribute, i).applyMatrix4(relative)
+    own.push(point.x, point.y, point.z)
+  }
+  const index = node.geometry.index
+  const ownIndices = []
+  if (index) for (let i = 0; i < index.count; i++) ownIndices.push(index.getX(i))
+  else for (let i = 0; i < attribute.count; i++) ownIndices.push(i)
+  return { own, ownIndices }
+}
+
+/** Add one mesh's geometry to the hull, unless it is a hull itself or wound inside out. */
+function appendMesh(node, positions, indices, toLocal, point, relative) {
+  // A hull already hanging off this object is not part of its shape.
+  if (node.userData.keyline) return
+  const mesh = meshInObjectSpace(node, toLocal, point, relative)
+  if (!mesh) return
+  // A mesh wound inside out is already an outline, modelled into the file as an
+  // inverted hull, and its faces would read as the near surface and paint the
+  // keyline colour across the body.
+  if (signedVolume(mesh.own, mesh.ownIndices) < 0) return
+  const first = positions.length / 3
+  for (const value of mesh.own) positions.push(value)
+  for (const at of mesh.ownIndices) indices.push(first + at)
+}
+
 /**
  * One geometry covering everything an object draws, in the object's own space.
  *
  * A keyline is one draw call per entity, so a model of fourteen meshes has to
  * become one buffer. Positions and normals only — a hull draws in one flat
  * colour and has no use for UVs or a second UV set.
- *
- * A mesh wound inside out is dropped: it is already an outline, modelled into
- * the file as an inverted hull, and its faces would read as the near surface
- * and paint the keyline colour across the body.
- */
+ * */
 export function hullGeometry(object) {
   object.updateWorldMatrix(false, true)
   const toLocal = new THREE.Matrix4().copy(object.matrixWorld).invert()
@@ -91,29 +120,7 @@ export function hullGeometry(object) {
   const positions = []
   const indices = []
 
-  object.traverse(node => {
-    // A hull already hanging off this object is not part of its shape.
-    if (node.userData.keyline) return
-    const attribute = node.isMesh ? node.geometry?.attributes?.position : null
-    if (!attribute) return
-    relative.multiplyMatrices(toLocal, node.matrixWorld)
-
-    const own = []
-    for (let i = 0; i < attribute.count; i++) {
-      point.fromBufferAttribute(attribute, i).applyMatrix4(relative)
-      own.push(point.x, point.y, point.z)
-    }
-    const index = node.geometry.index
-    const ownIndices = []
-    if (index) for (let i = 0; i < index.count; i++) ownIndices.push(index.getX(i))
-    else for (let i = 0; i < attribute.count; i++) ownIndices.push(i)
-
-    if (signedVolume(own, ownIndices) < 0) return
-
-    const first = positions.length / 3
-    for (const value of own) positions.push(value)
-    for (const at of ownIndices) indices.push(first + at)
-  })
+  object.traverse(node => appendMesh(node, positions, indices, toLocal, point, relative))
 
   if (!indices.length) return null
   const position = new Float32Array(positions)

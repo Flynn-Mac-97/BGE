@@ -159,6 +159,48 @@ async function askServer(port, milliseconds = 1500) {
   } catch { return null }
 }
 
+/** How long a recorded server has been up, in whole seconds. */
+function uptimeSeconds(entry) {
+  return Math.max(0, Math.round((Date.now() - Date.parse(entry.startedAt || 0)) / 1000)) || 0
+}
+
+/** Whether an answered server is this exact one: same process, same served directory. */
+function isSameServer(answer, entry) {
+  return answer.pid === entry.pid && path.resolve(answer.serves || '') === path.resolve(entry.serves || '')
+}
+
+function runningServer(seen, entry, answer) {
+  return {
+    ...seen, state: 'running', alive: true,
+    project: answer.project ?? entry.project, tabs: describeTabs(answer.tabs)
+  }
+}
+
+function replacedServer(seen, entry, answer) {
+  return {
+    ...seen, state: 'replaced', alive: false,
+    answering: { pid: answer.pid, serves: answer.serves, project: answer.project },
+    why: `port ${entry.port} answers, but as process ${answer.pid} serving ${answer.serves} — an op sent there would read a different project. `
+      + `Nothing on this port is stopped for you; see every engine instance with: node bin/engine.mjs supervisor`
+  }
+}
+
+function unresponsiveServer(seen, entry) {
+  return {
+    ...seen, state: 'unresponsive', alive: false,
+    why: `process ${entry.pid} is still there but port ${entry.port} answers nothing; it is either still starting or wedged`
+  }
+}
+
+function deadServer(seen, entry, image) {
+  return {
+    ...seen, state: 'dead', alive: false,
+    why: image
+      ? `process ${entry.pid} now belongs to ${image}, so this server is gone and its number has been reused`
+      : `process ${entry.pid} is gone`
+  }
+}
+
 /**
  * One server, as it really is rather than as the file remembers it.
  *
@@ -177,32 +219,11 @@ async function inspectServer(entry) {
   const answer = await askServer(entry.port)
   const processAlive = processIsAlive(entry.pid)
   const image = processAlive ? processImage(entry.pid) : null
-  const seen = {
-    ...entry,
-    processAlive,
-    uptimeSeconds: Math.max(0, Math.round((Date.now() - Date.parse(entry.startedAt || 0)) / 1000)) || 0
-  }
+  const seen = { ...entry, processAlive, uptimeSeconds: uptimeSeconds(entry) }
 
-  if (answer && answer.pid === entry.pid && path.resolve(answer.serves || '') === path.resolve(entry.serves || '')) {
-    return { ...seen, state: 'running', alive: true, project: answer.project ?? entry.project, tabs: describeTabs(answer.tabs) }
-  }
-  if (answer) {
-    return {
-      ...seen, state: 'replaced', alive: false,
-      answering: { pid: answer.pid, serves: answer.serves, project: answer.project },
-      why: `port ${entry.port} answers, but as process ${answer.pid} serving ${answer.serves} — an op sent there would read a different project. `
-        + `Nothing on this port is stopped for you; see every engine instance with: node bin/engine.mjs supervisor`
-    }
-  }
-  if (image && isNodeProcess(image)) {
-    return { ...seen, state: 'unresponsive', alive: false, why: `process ${entry.pid} is still there but port ${entry.port} answers nothing; it is either still starting or wedged` }
-  }
-  return {
-    ...seen, state: 'dead', alive: false,
-    why: image
-      ? `process ${entry.pid} now belongs to ${image}, so this server is gone and its number has been reused`
-      : `process ${entry.pid} is gone`
-  }
+  if (answer) return isSameServer(answer, entry) ? runningServer(seen, entry, answer) : replacedServer(seen, entry, answer)
+  if (image && isNodeProcess(image)) return unresponsiveServer(seen, entry)
+  return deadServer(seen, entry, image)
 }
 
 /**
@@ -266,14 +287,47 @@ export async function endProcess(pid) {
   return !processIsAlive(pid)
 }
 
+/** Whether an unregistered server serves inside this checkout. */
+function servesThisCheckout(server, checkout) {
+  return path.resolve(server.serves || '.').startsWith(mainWorktreeOf(checkout))
+}
+
+/**
+ * Stop one server, or say why it is left alone.
+ *
+ * A server that is not ours is reported and left alone — killing whatever
+ * happens to hold a port would be a worse bug than the one this fixes.
+ */
+async function stopOneServer(server, checkout) {
+  const named = { port: server.port, pid: server.pid, serves: server.serves, project: server.project }
+  if (server.state === 'dead') return { outcome: 'already-dead', named, why: server.why }
+  if (server.state === 'replaced') return { outcome: 'refused', named, why: server.why }
+  if (server.state === 'unregistered' && !servesThisCheckout(server, checkout)) {
+    return { outcome: 'refused', named, why: `nothing here started it and it serves ${server.serves}, which is outside this checkout` }
+  }
+  const gone = await endProcess(server.pid)
+  if (gone) return { outcome: 'stopped', named, was: server.state, tabsAttached: (server.tabs || []).length }
+  return {
+    outcome: 'refused', named,
+    why: `process ${server.pid} would not stop; stop it with ` + 'node bin/engine.mjs supervisor.stop <id>, or by hand'
+  }
+}
+
+/** Clear the records of every server proved dead, replaced or stopped. */
+function forgetServers(checkout, forget) {
+  if (!forget.length) return
+  editServerRegistry(checkout, registry => ({
+    ...registry,
+    servers: registry.servers.filter(entry => !forget.some(done => done.port === entry.port && done.pid === entry.pid))
+  }))
+}
+
 /**
  * Stop one server, or every one of them, and say what actually happened.
  *
  * Safe to run when nothing is running: an empty registry is an empty answer and
- * a clean exit. A server that is not ours is reported and left alone — killing
- * whatever happens to hold a port would be a worse bug than the one this fixes.
- * Records that are proved dead are cleared in the same pass, so running this
- * twice leaves nothing behind.
+ * a clean exit. Records that are proved dead are cleared in the same pass, so
+ * running this twice leaves nothing behind.
  */
 export async function stopServers(checkout, port = null) {
   const listed = await listServers(checkout, port == null ? [] : [port])
@@ -285,40 +339,14 @@ export async function stopServers(checkout, port = null) {
   const forget = []
 
   for (const server of targets) {
-    const named = { port: server.port, pid: server.pid, serves: server.serves, project: server.project }
-
-    if (server.state === 'dead') {
-      alreadyDead.push({ ...named, why: server.why })
-      forget.push(server)
-      continue
-    }
-    if (server.state === 'replaced') {
-      refused.push({ ...named, why: server.why })
-      forget.push(server)
-      continue
-    }
-    if (server.state === 'unregistered' && !path.resolve(server.serves || '.').startsWith(mainWorktreeOf(checkout))) {
-      refused.push({ ...named, why: `nothing here started it and it serves ${server.serves}, which is outside this checkout` })
-      continue
-    }
-
-    const gone = await endProcess(server.pid)
-    if (gone) {
-      stopped.push({ ...named, was: server.state, tabsAttached: (server.tabs || []).length })
-      forget.push(server)
-    } else {
-      refused.push({ ...named, why: `process ${server.pid} would not stop; stop it with `
-        + 'node bin/engine.mjs supervisor.stop <id>, or by hand' })
-    }
+    const outcome = await stopOneServer(server, checkout)
+    if (outcome.outcome === 'stopped') stopped.push({ ...outcome.named, was: outcome.was, tabsAttached: outcome.tabsAttached })
+    else if (outcome.outcome === 'already-dead') alreadyDead.push({ ...outcome.named, why: outcome.why })
+    else refused.push({ ...outcome.named, why: outcome.why })
+    if (outcome.outcome !== 'refused' || server.state === 'replaced') forget.push(server)
   }
 
-  if (forget.length) {
-    editServerRegistry(checkout, registry => ({
-      ...registry,
-      servers: registry.servers.filter(entry => !forget.some(done => done.port === entry.port && done.pid === entry.pid))
-    }))
-  }
-
+  forgetServers(checkout, forget)
   return {
     registry: serverRegistryFile(checkout),
     stopped,

@@ -156,6 +156,49 @@ export function restoreWorld(world, capture, makeEntity) {
   return { entities: rebuilt.map(one => one.entity), lost: capture.lost.length }
 }
 
+/** The simple placement fields an entity carries: where it is and how it is placed. */
+function placementFields(entity) {
+  const out = { type: entity.type, at: [round(entity.x), round(entity.y), round(entity.z)] }
+  if (entity.rotation) out.rotation = round(entity.rotation)
+  if (entity.scale !== 1) out.scale = round(entity.scale)
+  if (entity.note) out.note = entity.note
+  return out
+}
+
+/** The look overrides this placement carries, which a save must write back out. */
+function lookOverrides(entity) {
+  const out = {}
+  if (entity.collider && entity.collider !== entity._definition.collider) out.collider = entity.collider
+  // Same rule for the sprite: if this placement carries its own, it has
+  // to come back out, or changing one crate's art is lost on save.
+  if (entity.sprite && !sameLook(entity.sprite, entity._definition.sprite, 'image')) out.sprite = entity.sprite
+  // Only the keys this placement disagrees with its type about. Writing
+  // the whole mesh back turned one decision into a copy of the material.
+  const ownMesh = lookDiff(entity.mesh, expand(entity._definition.mesh, 'texture'))
+  if (ownMesh) out.mesh = ownMesh
+  return out
+}
+
+/** The overridden properties a placement disagrees with its type about. */
+function overrideProperties(entity) {
+  if (!entity.overrides.length) return {}
+  const properties = {}
+  for (const key of entity.overrides) properties[key] = entity.properties[key]
+  return { properties }
+}
+
+/** One entity as the level-shaped placement a save must not narrow. */
+function placementFromEntity(entity) {
+  const attached = behaviourPlacement(entity)
+  return {
+    ...entity._extraKeys,
+    ...placementFields(entity),
+    ...lookOverrides(entity),
+    ...(attached ? { behaviours: attached } : {}),
+    ...overrideProperties(entity)
+  }
+}
+
 /**
  * Serialise a world back to the level shape.
  *
@@ -170,27 +213,7 @@ export function restoreWorld(world, capture, makeEntity) {
 export function levelFromWorld(world, camera) {
   return {
     camera,
-    entities: world.entities.map(e => {
-      const out = { type: e.type, at: [round(e.x), round(e.y), round(e.z)] }
-      if (e.rotation) out.rotation = round(e.rotation)
-      if (e.scale !== 1) out.scale = round(e.scale)
-      if (e.note) out.note = e.note
-      if (e.collider && e.collider !== e._definition.collider) out.collider = e.collider
-      // Same rule for the sprite: if this placement carries its own, it has
-      // to come back out, or changing one crate's art is lost on save.
-      if (e.sprite && !sameLook(e.sprite, e._definition.sprite, 'image')) out.sprite = e.sprite
-      // Only the keys this placement disagrees with its type about. Writing
-      // the whole mesh back turned one decision into a copy of the material.
-      const ownMesh = lookDiff(e.mesh, expand(e._definition.mesh, 'texture'))
-      if (ownMesh) out.mesh = ownMesh
-      const attached = behaviourPlacement(e)
-      if (attached) out.behaviours = attached
-      if (e.overrides.length) {
-        out.properties = {}
-        for (const k of e.overrides) out.properties[k] = e.properties[k]
-      }
-      return { ...e._extraKeys, ...out }
-    })
+    entities: world.entities.map(placementFromEntity)
   }
 }
 

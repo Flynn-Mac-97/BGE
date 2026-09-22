@@ -139,6 +139,28 @@ export function makeEntityRecords(state) {
     return turn
   }
 
+  /** Whether the record's stored position and rotation still match the object's. */
+  function sameOrientation(record, object) {
+    return record.placedX === object.position.x
+      && record.placedY === object.position.y
+      && record.placedZ === object.position.z
+      && record.placedRotX === object.rotation.x
+      && record.placedRotY === object.rotation.y
+      && record.placedRotZ === object.rotation.z
+  }
+
+  /** Whether the record's stored scale still matches the object's. */
+  function sameScale(record, object) {
+    return record.placedScaleX === object.scale.x
+      && record.placedScaleY === object.scale.y
+      && record.placedScaleZ === object.scale.z
+  }
+
+  /** Whether the record last wrote exactly the transform the object carries now. */
+  function samePlace(record, object) {
+    return record.placedObject === object && sameOrientation(record, object) && sameScale(record, object)
+  }
+
   /**
    * Recompose an object's local matrix only when its transform really changed.
    *
@@ -149,17 +171,17 @@ export function makeEntityRecords(state) {
    * compared first.
    */
   function placeMatrix(object, record) {
-    const px = object.position.x, py = object.position.y, pz = object.position.z
-    const rx = object.rotation.x, ry = object.rotation.y, rz = object.rotation.z
-    const sx = object.scale.x, sy = object.scale.y, sz = object.scale.z
-    if (record.placedObject === object
-        && record.placedX === px && record.placedY === py && record.placedZ === pz
-        && record.placedRotX === rx && record.placedRotY === ry && record.placedRotZ === rz
-        && record.placedScaleX === sx && record.placedScaleY === sy && record.placedScaleZ === sz) return
+    if (samePlace(record, object)) return
     record.placedObject = object
-    record.placedX = px; record.placedY = py; record.placedZ = pz
-    record.placedRotX = rx; record.placedRotY = ry; record.placedRotZ = rz
-    record.placedScaleX = sx; record.placedScaleY = sy; record.placedScaleZ = sz
+    record.placedX = object.position.x
+    record.placedY = object.position.y
+    record.placedZ = object.position.z
+    record.placedRotX = object.rotation.x
+    record.placedRotY = object.rotation.y
+    record.placedRotZ = object.rotation.z
+    record.placedScaleX = object.scale.x
+    record.placedScaleY = object.scale.y
+    record.placedScaleZ = object.scale.z
     object.updateMatrix()
     state.shadowDirty = true
   }

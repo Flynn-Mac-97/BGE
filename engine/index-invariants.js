@@ -44,6 +44,56 @@ const INVARIANT_RULES = {
   }
 }
 
+/** The invariant a placement's type declares, with both entries, or null. */
+function declaredInvariant(index, placement) {
+  const typeName = placement?.type
+  const type = typeName && index.types[typeName]
+  const declared = type?.invariant
+  return declared ? { typeName, type, declared } : null
+}
+
+/** An invariant rule `check` does not know is reported, never silently passed. */
+function unknownRuleProblem(type, typeName, declared) {
+  return {
+    file: type.file, warning: true,
+    why: `type "${typeName}" declares invariant rule "${declared.rule}", which check does not know how to enforce`
+  }
+}
+
+/** A placement carrying too little to check is reported, never silently passed. */
+function uncomputableProblem(level, named, declared) {
+  return {
+    file: level.file, warning: true,
+    why: `${named} cannot be checked against its invariant "${declared.rule}" — not enough on the placement or its type to compute it`
+  }
+}
+
+/** A placement outside its declared tolerance, with the numbers that show it. */
+function brokenInvariantProblem(level, named, declared, result) {
+  const tolerance = Number.isFinite(declared.tolerance) ? declared.tolerance : 1e-6
+  if (Math.abs(result.actual - result.expected) <= tolerance) return null
+  const about = declared.about ? ` — ${declared.about}` : ''
+  return {
+    file: level.file,
+    why: `${named} breaks its invariant${about} — expected ${result.expected}, got ${result.actual}`
+  }
+}
+
+/** The problem one placement has with its type's invariant, or null when it passes. */
+function placementInvariantProblem(index, level, levelName, placement, at) {
+  const found = declaredInvariant(index, placement)
+  if (!found) return null
+  const { typeName, type, declared } = found
+  const named = `level "${levelName}" placement "${placement.id ?? `#${at}`}" (type "${typeName}")`
+  const rule = INVARIANT_RULES[declared.rule]
+  if (!rule) return unknownRuleProblem(type, typeName, declared)
+  const result = rule(declared, type, placement)
+  if (!result || !Number.isFinite(result.expected) || !Number.isFinite(result.actual)) {
+    return uncomputableProblem(level, named, declared)
+  }
+  return brokenInvariantProblem(level, named, declared, result)
+}
+
 /**
  * Every placement that breaks the invariant its type declares.
  *
@@ -65,37 +115,8 @@ export function invariantProblems(index, levelPlacements) {
     if (!level || level.error) continue
 
     placements.forEach((placement, at) => {
-      const typeName = placement?.type
-      const type = typeName && index.types[typeName]
-      const declared = type?.invariant
-      if (!declared) return
-
-      const named = `level "${levelName}" placement "${placement.id ?? `#${at}`}" (type "${typeName}")`
-      const rule = INVARIANT_RULES[declared.rule]
-      if (!rule) {
-        out.push({
-          file: type.file, warning: true,
-          why: `type "${typeName}" declares invariant rule "${declared.rule}", which check does not know how to enforce`
-        })
-        return
-      }
-
-      const result = rule(declared, type, placement)
-      if (!result || !Number.isFinite(result.expected) || !Number.isFinite(result.actual)) {
-        out.push({
-          file: level.file, warning: true,
-          why: `${named} cannot be checked against its invariant "${declared.rule}" — not enough on the placement or its type to compute it`
-        })
-        return
-      }
-
-      const tolerance = Number.isFinite(declared.tolerance) ? declared.tolerance : 1e-6
-      if (Math.abs(result.actual - result.expected) > tolerance) {
-        out.push({
-          file: level.file,
-          why: `${named} breaks its invariant${declared.about ? ` — ${declared.about}` : ''} — expected ${result.expected}, got ${result.actual}`
-        })
-      }
+      const problem = placementInvariantProblem(index, level, levelName, placement, at)
+      if (problem) out.push(problem)
     })
   }
   return out
@@ -112,6 +133,49 @@ function tintIsWhite(tint) {
   if (typeof tint === 'number') return tint === 0xffffff
   const said = String(tint ?? '').trim().toLowerCase()
   return said === 'white' || said === '#fff' || said === '#ffffff'
+}
+
+/** The texture a placement names, from the string shorthand or the mesh. */
+function placementTexture(placement) {
+  const mesh = placement?.mesh
+  return typeof mesh === 'string' ? mesh : mesh?.texture
+}
+
+/** Whether the placement states its own tint, in which the type's does not multiply. */
+function statesOwnTint(placement) {
+  const mesh = placement?.mesh
+  return Boolean(mesh && typeof mesh === 'object' && 'tint' in mesh)
+}
+
+/** The type this placement tints through, or null when there is nothing to report. */
+function tintedType(index, placement) {
+  const type = index.types[placement?.type]
+  if (!type || type.meshTint == null || tintIsWhite(type.meshTint)) return null
+  if (!placementTexture(placement) || statesOwnTint(placement)) return null
+  return type
+}
+
+/** Add one tinted placement to the per-type count for its level. */
+function collectTintHit(index, hit, placement, at) {
+  const type = tintedType(index, placement)
+  if (!type) return
+  const seen = hit.get(placement.type)
+    || { count: 0, first: placement.id ?? `#${at}`, tint: type.meshTint, typeFile: type.file }
+  seen.count++
+  hit.set(placement.type, seen)
+}
+
+/** The whole report for one tinted type, with the count and the first placement named. */
+function tintProblem(level, levelName, typeName, seen) {
+  const times = seen.count === 1 ? 'once' : `${seen.count} times`
+  return {
+    file: level.file,
+    warning: true,
+    why: `level "${levelName}" gives type "${typeName}" a textured mesh with no tint of its own ${times}` +
+      ` (first "${seen.first}"), and the type declares mesh.tint ${JSON.stringify(seen.tint)}` +
+      ` — a placement's mesh merges key by key, so that tint multiplies the texture on every one of them.` +
+      ` State a tint on the placements, or take it off ${seen.typeFile}.`
+  }
 }
 
 /**
@@ -137,31 +201,9 @@ export function tintProblems(index, levelPlacements) {
     if (!level || level.error) continue
 
     const hit = new Map()
-    placements.forEach((placement, at) => {
-      const type = index.types[placement?.type]
-      if (!type || type.meshTint == null || tintIsWhite(type.meshTint)) return
-      const mesh = placement?.mesh
-      // A string mesh is the texture shorthand and states no tint either, so it
-      // is caught by the same rule.
-      const texture = typeof mesh === 'string' ? mesh : mesh?.texture
-      if (!texture || (mesh && typeof mesh === 'object' && 'tint' in mesh)) return
-      const seen = hit.get(placement.type)
-        || { count: 0, first: placement.id ?? `#${at}`, tint: type.meshTint, typeFile: type.file }
-      seen.count++
-      hit.set(placement.type, seen)
-    })
+    placements.forEach((placement, at) => collectTintHit(index, hit, placement, at))
 
-    for (const [typeName, seen] of hit) {
-      const times = seen.count === 1 ? 'once' : `${seen.count} times`
-      out.push({
-        file: level.file,
-        warning: true,
-        why: `level "${levelName}" gives type "${typeName}" a textured mesh with no tint of its own ${times}` +
-          ` (first "${seen.first}"), and the type declares mesh.tint ${JSON.stringify(seen.tint)}` +
-          ` — a placement's mesh merges key by key, so that tint multiplies the texture on every one of them.` +
-          ` State a tint on the placements, or take it off ${seen.typeFile}.`
-      })
-    }
+    for (const [typeName, seen] of hit) out.push(tintProblem(level, levelName, typeName, seen))
   }
   return out
 }

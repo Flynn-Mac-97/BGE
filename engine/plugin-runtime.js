@@ -5,6 +5,58 @@
  * order systems run in cannot change mid-frame.
  */
 
+/** Every system by id, refusing an unknown phase or a repeated id. */
+function indexSystemsById(nodes) {
+  const byId = new Map()
+  for (const node of nodes) {
+    if (!['fixed', 'frame'].includes(node.phase)) throw new Error(`system ${node.id}: phase must be fixed or frame`)
+    if (byId.has(node.id)) throw new Error(`duplicate system id: ${node.id}`)
+    byId.set(node.id, node)
+  }
+  return byId
+}
+
+/** Record one system's before/after names as incoming edges for its phase. */
+function addConstraints(node, direction, phase, byId, incoming) {
+  if (node[direction] !== undefined && !Array.isArray(node[direction])) {
+    throw new Error(`${node.id}.${direction} must be an array`)
+  }
+  for (const target of node[direction] || []) {
+    if (!byId.has(target)) throw new Error(`system ${node.id}: missing ${direction} target ${target}`)
+    if (byId.get(target).phase !== phase) throw new Error(`system ${node.id}: ${target} belongs to another phase`)
+    const [from, to] = direction === 'after' ? [node.id, target] : [target, node.id]
+    incoming.get(from).add(to)
+  }
+}
+
+/** The incoming edges of every system in one phase. */
+function constraintsOf(group, phase, byId) {
+  const incoming = new Map(group.map(node => [node.id, new Set()]))
+  for (const node of group) {
+    for (const direction of ['before', 'after']) addConstraints(node, direction, phase, byId, incoming)
+  }
+  return incoming
+}
+
+/** Repeatedly take a system with nothing left to wait for; a cycle when none is left. */
+function orderByConstraints(group, incoming, phase) {
+  const ordered = []
+  while (incoming.size) {
+    const next = group.find(node => incoming.has(node.id) && incoming.get(node.id).size === 0)
+    if (!next) throw new Error(`system cycle (${phase}): ${[...incoming.keys()].join(' -> ')}`)
+    ordered.push(next)
+    incoming.delete(next.id)
+    for (const requirements of incoming.values()) requirements.delete(next.id)
+  }
+  return ordered
+}
+
+/** One phase of the schedule, ordered by its before/after constraints. */
+function orderPhase(nodes, phase, byId) {
+  const group = nodes.filter(node => node.phase === phase)
+  return orderByConstraints(group, constraintsOf(group, phase, byId), phase)
+}
+
 /**
  * Compile the fixed and frame orders from the contributed systems.
  *
@@ -16,34 +68,9 @@
  */
 export function compileSchedule(systems) {
   const nodes = systems.map((system, index) => ({ ...system, id: system.id || `${system.plugin}:${system.phase}:${index}` }))
-  const byId = new Map()
-  for (const node of nodes) {
-    if (!['fixed', 'frame'].includes(node.phase)) throw new Error(`system ${node.id}: phase must be fixed or frame`)
-    if (byId.has(node.id)) throw new Error(`duplicate system id: ${node.id}`)
-    byId.set(node.id, node)
-  }
+  const byId = indexSystemsById(nodes)
   const result = { fixed: [], frame: [] }
-  for (const phase of ['fixed', 'frame']) {
-    const group = nodes.filter(node => node.phase === phase)
-    const incoming = new Map(group.map(node => [node.id, new Set()]))
-    for (const node of group) {
-      for (const direction of ['before', 'after']) {
-        if (node[direction] !== undefined && !Array.isArray(node[direction])) throw new Error(`${node.id}.${direction} must be an array`)
-        for (const target of node[direction] || []) {
-          if (!byId.has(target)) throw new Error(`system ${node.id}: missing ${direction} target ${target}`)
-          if (byId.get(target).phase !== phase) throw new Error(`system ${node.id}: ${target} belongs to another phase`)
-          incoming.get(direction === 'after' ? node.id : target).add(direction === 'after' ? target : node.id)
-        }
-      }
-    }
-    while (incoming.size) {
-      const next = group.find(node => incoming.has(node.id) && incoming.get(node.id).size === 0)
-      if (!next) throw new Error(`system cycle (${phase}): ${[...incoming.keys()].join(' -> ')}`)
-      result[phase].push(next)
-      incoming.delete(next.id)
-      for (const requirements of incoming.values()) requirements.delete(next.id)
-    }
-  }
+  for (const phase of ['fixed', 'frame']) result[phase] = orderPhase(nodes, phase, byId)
   return result
 }
 

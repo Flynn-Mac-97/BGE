@@ -195,6 +195,22 @@ function subdivisionOf(declared, entity) {
 const planCache = new WeakMap()
 const planTextCache = new Map()
 
+/** The cache a plan belongs in, and the key for it. */
+function planKeyOf(entity, mesh, sprite) {
+  if (mesh) {
+    if (typeof mesh === 'object') return { store: planCache, key: mesh }
+    return { store: planTextCache, key: `m:${mesh}` }
+  }
+  if (sprite && typeof sprite === 'object') return { store: planCache, key: sprite }
+  return { store: planTextCache, key: `t:${entity.type}` }
+}
+
+/** Whether a cached plan was measured from the declaration this entity now has. */
+function planMatches(found, entity) {
+  return found.mesh === entity.mesh && found.sprite === entity.sprite
+    && found.type === entity.type && found.collider === entity.collider
+}
+
 /**
  * The cached plan for one entity, keyed by its declaration object.
  *
@@ -202,25 +218,11 @@ const planTextCache = new Map()
  * single lookup rather than one each.
  */
 export function entityPlan(entity) {
-  const mesh = entity.mesh
-  const sprite = entity.sprite
-  let weak = null
-  let text = null
-  if (mesh) {
-    if (typeof mesh === 'object') weak = mesh
-    else text = `m:${mesh}`
-  } else if (sprite && typeof sprite === 'object') {
-    weak = sprite
-  } else {
-    text = `t:${entity.type}`
-  }
-  const store = weak ? planCache : planTextCache
-  const found = store.get(weak || text)
-  if (found && found.mesh === mesh && found.sprite === sprite
-      && found.type === entity.type && found.collider === entity.collider) return found.plan
-
+  const { store, key } = planKeyOf(entity, entity.mesh, entity.sprite)
+  const found = store.get(key)
+  if (found && planMatches(found, entity)) return found.plan
   const plan = measurePlan(entity)
-  store.set(weak || text, { mesh, sprite, type: entity.type, collider: entity.collider, plan })
+  store.set(key, { mesh: entity.mesh, sprite: entity.sprite, type: entity.type, collider: entity.collider, plan })
   return plan
 }
 
@@ -272,48 +274,50 @@ export function meshShape(entity) {
   return entityPlan(entity).shape
 }
 
-/** The same measurement, against a declaration that has already been read. */
-function shapeOf(entity, declared, parts) {
-  const collider = Array.isArray(entity.collider?.box) ? entity.collider.box : []
-  if (parts && !declared.model) {
-    const stated = Array.isArray(declared.box) ? declared.box : null
-    if (!stated) return { kind: 'parts', ...parts.size }
-    return {
-      kind: 'parts',
-      w: declaredNumber(stated[0], parts.size.w, `${entity.type}.mesh.box[0]`),
-      h: declaredNumber(stated[1], parts.size.h, `${entity.type}.mesh.box[1]`),
-      d: declaredNumber(stated[2], parts.size.d, `${entity.type}.mesh.box[2]`)
-    }
+/** A body of boxes: its measured size, or the box the type states for it. */
+function partsShape(entity, declared, parts) {
+  const stated = Array.isArray(declared.box) ? declared.box : null
+  if (!stated) return { kind: 'parts', ...parts.size }
+  return {
+    kind: 'parts',
+    w: declaredNumber(stated[0], parts.size.w, `${entity.type}.mesh.box[0]`),
+    h: declaredNumber(stated[1], parts.size.h, `${entity.type}.mesh.box[1]`),
+    d: declaredNumber(stated[2], parts.size.d, `${entity.type}.mesh.box[2]`)
   }
+}
 
-  // Every branch below reads the numbers first and only builds the name of what
-  // went wrong when something did. This runs for every mesh entity every frame,
-  // and a template string per dimension per frame is a hundred thousand
-  // throwaway strings a second on a real map.
-  if (declared.sphere !== undefined) {
-    const said = Array.isArray(declared.sphere) ? declared.sphere : [declared.sphere, declared.sphere, declared.sphere]
-    const r = index => declaredNumber(said[index], 0.5, `${entity.type}.mesh.sphere[${index}]`) * 2
-    return { kind: 'sphere', w: r(0), h: r(1), d: r(2), segments: subdivisionOf(declared, entity) }
+/** A sphere of one radius, or one radius per axis. */
+function sphereShape(entity, declared) {
+  const said = Array.isArray(declared.sphere) ? declared.sphere : [declared.sphere, declared.sphere, declared.sphere]
+  const radius = index => declaredNumber(said[index], 0.5, `${entity.type}.mesh.sphere[${index}]`) * 2
+  return { kind: 'sphere', w: radius(0), h: radius(1), d: radius(2), segments: subdivisionOf(declared, entity) }
+}
+
+/** A flat picture, which has no depth. */
+function quadShape(entity, declared) {
+  const width = declared.quad[0]
+  const height = declared.quad[1]
+  const segments = subdivisionOf(declared, entity)
+  if (Number.isFinite(width) && Number.isFinite(height)) {
+    return { kind: 'quad', w: width, h: height, d: 0, segments }
   }
-
-  if (Array.isArray(declared.quad)) {
-    const w = declared.quad[0], h = declared.quad[1]
-    const segments = subdivisionOf(declared, entity)
-    if (Number.isFinite(w) && Number.isFinite(h)) return { kind: 'quad', w, h, d: 0, segments }
-    return {
-      kind: 'quad',
-      w: declaredNumber(w, 1, `${entity.type}.mesh.quad[0]`),
-      h: declaredNumber(h, 1, `${entity.type}.mesh.quad[1]`),
-      d: 0,
-      segments
-    }
+  return {
+    kind: 'quad',
+    w: declaredNumber(width, 1, `${entity.type}.mesh.quad[0]`),
+    h: declaredNumber(height, 1, `${entity.type}.mesh.quad[1]`),
+    d: 0,
+    segments
   }
+}
 
-  if (declared.model) {
-    const stand = Array.isArray(declared.box) ? declared.box : collider
-    return { kind: 'model', w: declaredNumber(stand[0]), h: declaredNumber(stand[1]), d: declaredNumber(stand[2]) }
-  }
+/** A model, whose stated box or collider says only how big it counts as. */
+function modelShape(entity, declared, collider) {
+  const stand = Array.isArray(declared.box) ? declared.box : collider
+  return { kind: 'model', w: declaredNumber(stand[0]), h: declaredNumber(stand[1]), d: declaredNumber(stand[2]) }
+}
 
+/** A box, from its own numbers, the collider's, or a metre cube as the last resort. */
+function boxShape(entity, declared, collider) {
   const declaredBox = Array.isArray(declared.box)
   const box = declaredBox ? declared.box : (collider.length >= 3 ? collider : null)
   if (!box) {
@@ -321,13 +325,44 @@ function shapeOf(entity, declared, parts) {
     return { kind: 'box', w: 1, h: 1, d: 1 }
   }
   const w = box[0], h = box[1], d = box[2]
-  if (Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(d)) return { kind: 'box', w, h, d, segments: subdivisionOf(declared, entity) }
+  if (Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(d)) {
+    return { kind: 'box', w, h, d, segments: subdivisionOf(declared, entity) }
+  }
   const where = declaredBox ? `${entity.type}.mesh.box` : `${entity.type}.collider.box`
   return {
     kind: 'box',
     w: declaredNumber(w, 1, `${where}[0]`),
     h: declaredNumber(h, 1, `${where}[1]`),
     d: declaredNumber(d, 1, `${where}[2]`)
+  }
+}
+
+/** The same measurement, against a declaration that has already been read. */
+function shapeOf(entity, declared, parts) {
+  const collider = Array.isArray(entity.collider?.box) ? entity.collider.box : []
+  if (parts && !declared.model) return partsShape(entity, declared, parts)
+  if (declared.sphere !== undefined) return sphereShape(entity, declared)
+  if (Array.isArray(declared.quad)) return quadShape(entity, declared)
+  if (declared.model) return modelShape(entity, declared, collider)
+  return boxShape(entity, declared, collider)
+}
+
+/** The first of these that is neither null nor undefined; 1 when none of them is. */
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value !== null && value !== undefined) return value
+  }
+  return 1
+}
+
+/**
+ * Sprite art wins over the collider box, which wins over a circle's diameter,
+ * and 1 is the last resort.
+ */
+function flatDrawSize(entity, diameter) {
+  return {
+    w: firstDefined(entity.sprite?.width, entity.collider?.box?.[0], diameter),
+    h: firstDefined(entity.sprite?.height, entity.collider?.box?.[1], diameter)
   }
 }
 
@@ -341,21 +376,36 @@ function shapeOf(entity, declared, parts) {
  * becoming 1x1. `d` is depth: zero for anything flat.
  */
 export function entityDrawSize(entity) {
-  const s = totalScale(entity)
+  const scale = totalScale(entity)
   const shape = meshShape(entity)
-  if (shape) return { w: shape.w * s, h: shape.h * s, d: shape.d * s }
+  if (shape) return { w: shape.w * scale, h: shape.h * scale, d: shape.d * scale }
   const diameter = entity.collider?.circle ? entity.collider.circle * 2 : null
-  return {
-    w: (entity.sprite?.width ?? entity.collider?.box?.[0] ?? diameter ?? 1) * s,
-    h: (entity.sprite?.height ?? entity.collider?.box?.[1] ?? diameter ?? 1) * s,
-    d: 0
-  }
+  const flat = flatDrawSize(entity, diameter)
+  return { w: flat.w * scale, h: flat.h * scale, d: 0 }
 }
 
 /** The image a sprite points at: a sheet or a single picture. */
 export const spriteSource = s => s?.sheet || s?.image || null
 
 // ------------------------------------------------------------- the material
+
+/**
+ * A tiling stated as an absolute number of repeats across the box.
+ *
+ * An array is absolute — three repeats across this box, whatever its size — so
+ * the bricks stay the same size instead of stretching.
+ */
+function absoluteTiling(tiling, shape, where) {
+  const width = shape.w || 1
+  const height = shape.h || 1
+  const u = tiling[0], v = tiling[1]
+  if (Number.isFinite(u) && Number.isFinite(v)) return [u / width, v / height]
+  const reference = index => (where ? `${where}[${index}]` : where)
+  return [
+    declaredNumber(u, 1, reference(0)) / width,
+    declaredNumber(v, 1, reference(1)) / height
+  ]
+}
 
 /**
  * How many times a texture repeats, from the declaration and the shape.
@@ -366,14 +416,7 @@ export const spriteSource = s => s?.sheet || s?.image || null
  * because one of those is one picture.
  */
 export function tilingOf(tiling, shape, where = null) {
-  if (Array.isArray(tiling)) {
-    const u = tiling[0], v = tiling[1]
-    if (Number.isFinite(u) && Number.isFinite(v)) return [u / (shape.w || 1), v / (shape.h || 1)]
-    return [
-      declaredNumber(u, 1, where && `${where}[0]`) / (shape.w || 1),
-      declaredNumber(v, 1, where && `${where}[1]`) / (shape.h || 1)
-    ]
-  }
+  if (Array.isArray(tiling)) return absoluteTiling(tiling, shape, where)
   if (Number.isFinite(tiling)) return [tiling, tiling]
   if (tiling !== undefined && tiling !== null) {
     const density = declaredNumber(tiling, 1, where)

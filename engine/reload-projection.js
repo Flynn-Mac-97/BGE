@@ -183,6 +183,71 @@ export function captureWorld({ world, loop, editor, view }, cause = {}) {
   return capture
 }
 
+/** Every captured entity placed back into the cleared world, live values on top. */
+function spawnCapturedEntities(capture, world, missing, notRestored) {
+  for (const held of capture.entities) {
+    const entity = world.spawn(held.type, placementOf(held))
+    applyLiveValues(entity, held, world, missing)
+    for (const bag of held.behaviours) {
+      const record = entity.behaviours.find(behaviour => behaviour.name === bag.name)
+      if (!record) {
+        notRestored.push(`"${held.id}" lost its "${bag.name}" behaviour`)
+        continue
+      }
+      Object.assign(record.bag, readField(bag.bag, world, missing, `${held.id}.${bag.name}`))
+    }
+  }
+}
+
+/**
+ * Put the world's shared state back.
+ *
+ * Mutated rather than replaced: a plugin that took a reference to the shared
+ * state at boot must still be looking at the same object.
+ */
+function assignWorldState(world, capture, missing) {
+  for (const key of Object.keys(world.state)) delete world.state[key]
+  Object.assign(world.state, readField(capture.state || {}, world, missing, 'world.state'))
+  world.simulated = !!capture.simulated
+}
+
+/**
+ * Tell the plugins play started, and start the loop, when the moment was playing.
+ *
+ * The entities are not started again: they already ran their start hooks in the
+ * page that went away, and running them twice would reset the very state this
+ * restore exists to keep.
+ */
+function startCapturedPlay(capture, loop, bus) {
+  if (!capture.playing || loop.running) return
+  bus.emit('play:started')
+  loop.start()
+}
+
+/**
+ * Put the clock and the random stream back where the capture left them.
+ *
+ * Last, because spawning an entity and starting play both reach plugins, and a
+ * plugin that took a random number while the world was being rebuilt would leave
+ * the stream a draw or two past where the run had it.
+ */
+function resumeCapturedClock(capture, loop) {
+  loop.resume({ steps: capture.steps ?? 0, seed: capture.seed, draws: capture.draws ?? 0 })
+}
+
+/** Announce the restored world, which a plugin that lists what it spawned rebuilds from. */
+function announceRestored(capture, editor, world, bus, context) {
+  editor.select(capture.selection || [])
+  bus.emit('world:changed')
+  // Said apart from `world:changed` because it means something that event does
+  // not: these entities are back from a run that already happened, not placed
+  // by a level. A plugin holding a list of what it spawned rebuilds it here, and
+  // that is the only way such a list can come back — the kernel cannot know
+  // which of its groups a restored entity belonged to.
+  bus.emit('world:restored', { level: editor.levelName, entities: world.entities.length, capture })
+  context?.redraw?.()
+}
+
 /**
  * Put a captured moment back into a freshly booted world.
  *
@@ -213,56 +278,15 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
   const fromLevel = new Set(world.entities.map(entity => entity.id))
 
   world.clear()
-
-  for (const held of capture.entities) {
-    const entity = world.spawn(held.type, placementOf(held))
-    applyLiveValues(entity, held, world, missing)
-
-    for (const bag of held.behaviours) {
-      const record = entity.behaviours.find(b => b.name === bag.name)
-      if (!record) {
-        notRestored.push(`"${held.id}" lost its "${bag.name}" behaviour`)
-        continue
-      }
-      Object.assign(record.bag, readField(bag.bag, world, missing, `${held.id}.${bag.name}`))
-    }
-  }
-
-  // Mutated rather than replaced: a plugin that took a reference to the shared
-  // state at boot must still be looking at the same object.
-  for (const key of Object.keys(world.state)) delete world.state[key]
-  Object.assign(world.state, readField(capture.state || {}, world, missing, 'world.state'))
-  world.simulated = !!capture.simulated
-
-  if (capture.playing && !loop.running) {
-    // The plugins are told play started, because they booted a moment ago and
-    // know nothing about it. The entities are not started again: they already
-    // ran their start hooks in the page that went away, and running them twice
-    // would reset the very state this restore exists to keep.
-    bus.emit('play:started')
-    loop.start()
-  }
-
-  // After everything that could draw from the stream or schedule a timer —
-  // spawning an entity and starting play both reach plugins, and a plugin that
-  // took a random number while the world was being rebuilt would leave the
-  // stream a draw or two past where the run had it. This puts both back last, so
-  // the clock and the stream end where the entities do.
-  loop.resume({ steps: capture.steps ?? 0, seed: capture.seed, draws: capture.draws ?? 0 })
+  spawnCapturedEntities(capture, world, missing, notRestored)
+  assignWorldState(world, capture, missing)
+  startCapturedPlay(capture, loop, bus)
+  resumeCapturedClock(capture, loop)
 
   // Last, because both play and the focus plugins move the camera when play
   // starts, and where the camera actually was is part of the moment.
   Object.assign(view, capture.view)
-  editor.select(capture.selection || [])
-
-  bus.emit('world:changed')
-  // Said apart from `world:changed` because it means something that event does
-  // not: these entities are back from a run that already happened, not placed
-  // by a level. A plugin holding a list of what it spawned rebuilds it here, and
-  // that is the only way such a list can come back — the kernel cannot know
-  // which of its groups a restored entity belonged to.
-  bus.emit('world:restored', { level: editor.levelName, entities: world.entities.length, capture })
-  context?.redraw?.()
+  announceRestored(capture, editor, world, bus, context)
 
   const { losses, hold } = restoreLosses(capture, { world, loop, missing, fromLevel })
   notRestored.push(...losses)
@@ -282,29 +306,67 @@ export async function restoreWorld(capture, { world, loop, editor, view, bus, co
   }
 }
 
+/** A rotation, included only when the entity had a nonzero one. */
+function rotationPlacement(held) {
+  return held.rotation ? { rotation: held.rotation } : {}
+}
+
+/** A scale, included only when the entity had a non-default one. */
+function scalePlacement(held) {
+  return held.scale !== 1 ? { scale: held.scale } : {}
+}
+
+/** A sprite, included only when the placement itself set it. */
+function spritePlacement(held) {
+  return held.setByPlacement?.sprite && held.sprite ? { sprite: held.sprite } : {}
+}
+
+/** A marker for a mesh the placement itself set; the live values write the mesh. */
+function meshPlacement(held) {
+  return held.setByPlacement?.mesh && held.mesh ? { mesh: {} } : {}
+}
+
+/** A collider, included only when the placement itself set it. */
+function colliderPlacement(held) {
+  return held.setByPlacement?.collider && held.collider ? { collider: held.collider } : {}
+}
+
+/** A behaviour bag, included only when the placement named one. */
+function behaviourPlacement(attached) {
+  return attached ? { behaviours: attached } : {}
+}
+
+/**
+ * The overrides whose value survived.
+ *
+ * An override naming a key with nothing behind it would write `undefined` into
+ * the level on the next save, which reads as a decision somebody made.
+ */
+function overrideProperties(held) {
+  return Object.fromEntries(held.overrides
+    .filter(key => held.properties[key] !== undefined)
+    .map(key => [key, held.properties[key]]))
+}
+
 /**
  * The placement a restored entity is spawned from.
  *
  * The placement flags decide what a later type reload is allowed to overwrite,
  * so they are restored as flags and the live values are written over the top
- * afterwards. Only the overrides whose value survived are kept: an override
- * naming a key with nothing behind it would write `undefined` into the level on
- * the next save, which reads as a decision somebody made.
+ * afterwards.
  */
 function placementOf(held) {
   const attached = placementBehaviours(held)
   return {
     id: held.id,
     at: held.at,
-    ...(held.rotation ? { rotation: held.rotation } : {}),
-    ...(held.scale !== 1 ? { scale: held.scale } : {}),
-    ...(held.setByPlacement?.sprite && held.sprite ? { sprite: held.sprite } : {}),
-    ...(held.setByPlacement?.mesh && held.mesh ? { mesh: {} } : {}),
-    ...(held.setByPlacement?.collider && held.collider ? { collider: held.collider } : {}),
-    properties: Object.fromEntries(held.overrides
-      .filter(key => held.properties[key] !== undefined)
-      .map(key => [key, held.properties[key]])),
-    ...(attached ? { behaviours: attached } : {}),
+    ...rotationPlacement(held),
+    ...scalePlacement(held),
+    ...spritePlacement(held),
+    ...meshPlacement(held),
+    ...colliderPlacement(held),
+    properties: overrideProperties(held),
+    ...behaviourPlacement(attached),
     ...held.extra
   }
 }
@@ -356,32 +418,80 @@ function applyLiveValues(entity, held, world, missing) {
  * Apart from the restore so the report is a value the caller acts on, and the
  * hold stays with the caller that owns the loop.
  */
+/** The loss for types whose files the project no longer has, or null. */
+function lostTypeLoss(capture, world) {
+  const lostTypes = (capture.types || []).filter(name => !world.types.has(name))
+  if (!lostTypes.length) return null
+  const plural = lostTypes.length === 1 ? '' : 's'
+  return `the type${plural} ${lostTypes.join(', ')}, whose file the project no longer has — entities of that name came back with no definition behind them`
+}
+
+/** The loss for a clock that did not land where the capture left it, or null. */
+function clockLoss(capture, loop) {
+  if (loop.steps === (capture.steps ?? 0)) return null
+  return `the clock, which was ${capture.time}s and is now ${round3(loop.time)}s`
+}
+
+/** The loss for a random stream that did not land where the capture left it, or null. */
+function streamLoss(capture, loop) {
+  if (loop.random.seed === capture.seed && loop.random.draws === (capture.draws ?? 0)) return null
+  return `the random stream, which was ${capture.draws ?? 0} draws into seed ${capture.seed} and is now ${loop.random.draws} into seed ${loop.random.seed}`
+}
+
+/** The loss for scheduled callbacks, which are closures and cannot be written down. */
+function timerLoss(capture) {
+  if (!capture.timers) return null
+  return `${capture.timers} scheduled ${capture.timers === 1 ? 'callback' : 'callbacks'}, which are closures and cannot be written down`
+}
+
+/** The loss for fields that held something other than data, or null. */
+function droppedLoss(capture) {
+  const dropped = capture.dropped
+  if (!dropped?.length) return null
+  return `${dropped.length} field${dropped.length === 1 ? '' : 's'} that held something other than data: ${dropped.slice(0, 8).join(', ')}`
+}
+
+/**
+ * Why the world may not run on: entities a plugin made came back with an empty
+ * driving list.
+ *
+ * The vague half of this used to be the whole of it, and a vague loss is one
+ * nobody acts on. These entities are countable, so count them and say what the
+ * consequence is.
+ */
+function pluginListLoss(madeInTheRun, total) {
+  return `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${total} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. `
+    + `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. `
+    + `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`
+}
+
+/**
+ * What the restore could not carry, and whether the world may run on.
+ *
+ * Read once the world is built, because every claim is about what came back: a
+ * type whose file is gone, a clock or stream that did not land where the capture
+ * left it, and the entities a plugin made, whose driving list came back empty.
+ * Apart from the restore so the report is a value the caller acts on, and the
+ * hold stays with the caller that owns the loop.
+ */
 function restoreLosses(capture, { world, loop, missing, fromLevel }) {
   const losses = [...missing]
-  const lostTypes = (capture.types || []).filter(name => !world.types.has(name))
-  if (lostTypes.length) losses.push(`the type${lostTypes.length === 1 ? '' : 's'} ${lostTypes.join(', ')}, whose file the project no longer has — entities of that name came back with no definition behind them`)
   // Claimed only when true. The clock and the stream are restored now, and a
   // notice that went on saying they were not would be the same silence in a
   // different voice.
-  if (loop.steps !== (capture.steps ?? 0)) losses.push(`the clock, which was ${capture.time}s and is now ${round3(loop.time)}s`)
-  if (loop.random.seed !== capture.seed || loop.random.draws !== (capture.draws ?? 0)) {
-    losses.push(`the random stream, which was ${capture.draws ?? 0} draws into seed ${capture.seed} and is now ${loop.random.draws} into seed ${loop.random.seed}`)
+  for (const loss of [
+    lostTypeLoss(capture, world),
+    clockLoss(capture, loop),
+    streamLoss(capture, loop),
+    timerLoss(capture),
+    droppedLoss(capture)
+  ]) {
+    if (loss) losses.push(loss)
   }
-  if (capture.timers) losses.push(`${capture.timers} scheduled ${capture.timers === 1 ? 'callback' : 'callbacks'}, which are closures and cannot be written down`)
-  if (capture.dropped?.length) losses.push(`${capture.dropped.length} field${capture.dropped.length === 1 ? '' : 's'} that held something other than data: ${capture.dropped.slice(0, 8).join(', ')}`)
 
-  // The vague half of this used to be the whole of it, and a vague loss is one
-  // nobody acts on. The entities a plugin made are countable, so count them and
-  // say what the consequence is.
   const madeInTheRun = capture.entities.filter(held => !fromLevel.has(held.id)).length
-  if (madeInTheRun) {
-    losses.push(
-      `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${capture.entities.length} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. `
-      + `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. `
-      + `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`)
-  } else {
-    losses.push('anything a plugin holds outside the world, which was rebuilt from boot')
-  }
+  if (madeInTheRun) losses.push(pluginListLoss(madeInTheRun, capture.entities.length))
+  else losses.push('anything a plugin holds outside the world, which was rebuilt from boot')
   return { losses, hold: madeInTheRun > 0 }
 }
 

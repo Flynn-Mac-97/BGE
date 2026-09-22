@@ -51,45 +51,78 @@ export function makeLighting(state) {
    * `autoUpdate` is turned off once and the flag is raised only on a changed
    * frame; a frame that changed nothing draws the map it already has.
    */
+  /**
+   * Whether the sun moved since the shadow map was drawn.
+   */
+  function sunMoved(light, remembered) {
+    return remembered.shadowAtX !== light.position.x
+      || remembered.shadowAtY !== light.position.y
+      || remembered.shadowAtZ !== light.position.z
+  }
+
+  /** Whether the thing the sun points at moved. */
+  function targetMoved(light, remembered) {
+    const target = light.target
+    if (!target) return false
+    return remembered.shadowTargetX !== target.position.x
+      || remembered.shadowTargetY !== target.position.y
+      || remembered.shadowTargetZ !== target.position.z
+  }
+
+  /** Whether the shadow camera's box changed, which changes what the map covers. */
+  function viewMoved(shadow, remembered) {
+    const view = shadow.camera
+    if (!view) return false
+    return remembered.shadowLeft !== view.left
+      || remembered.shadowRight !== view.right
+      || remembered.shadowTop !== view.top
+      || remembered.shadowBottom !== view.bottom
+      || remembered.shadowNear !== view.near
+      || remembered.shadowFar !== view.far
+  }
+
+  /** Whether the map was resized. */
+  function mapSizeMoved(shadow, remembered) {
+    return remembered.shadowWidth !== shadow.mapSize.width
+  }
+
+  /** Whether anything the map depends on moved. */
+  function shadowMoved(light, shadow, remembered) {
+    return sunMoved(light, remembered) || targetMoved(light, remembered)
+      || viewMoved(shadow, remembered) || mapSizeMoved(shadow, remembered)
+  }
+
+  /** Write down what the drawn map depends on, so the next frame compares against it. */
+  function rememberLight(light, shadow, remembered) {
+    remembered.shadowAtX = light.position.x
+    remembered.shadowAtY = light.position.y
+    remembered.shadowAtZ = light.position.z
+    remembered.shadowWidth = shadow.mapSize.width
+    const target = light.target
+    if (target) {
+      remembered.shadowTargetX = target.position.x
+      remembered.shadowTargetY = target.position.y
+      remembered.shadowTargetZ = target.position.z
+    }
+    const view = shadow.camera
+    if (view) {
+      remembered.shadowLeft = view.left
+      remembered.shadowRight = view.right
+      remembered.shadowTop = view.top
+      remembered.shadowBottom = view.bottom
+      remembered.shadowNear = view.near
+      remembered.shadowFar = view.far
+    }
+  }
+
   function updateShadows() {
-    for (const child of state.scene.children) {
-      if (!child.isLight || !child.castShadow || !child.shadow) continue
-      const shadow = child.shadow
-      const remembered = child.userData
-      const target = child.target
-      const view = shadow.camera
-      const moved = remembered.shadowAtX !== child.position.x
-        || remembered.shadowAtY !== child.position.y
-        || remembered.shadowAtZ !== child.position.z
-        || (target && (remembered.shadowTargetX !== target.position.x
-          || remembered.shadowTargetY !== target.position.y
-          || remembered.shadowTargetZ !== target.position.z))
-        || (view && (remembered.shadowLeft !== view.left
-          || remembered.shadowRight !== view.right
-          || remembered.shadowTop !== view.top
-          || remembered.shadowBottom !== view.bottom
-          || remembered.shadowNear !== view.near
-          || remembered.shadowFar !== view.far))
-        || remembered.shadowWidth !== shadow.mapSize.width
+    for (const light of state.scene.children) {
+      if (!light.isLight || !light.castShadow || !light.shadow) continue
+      const shadow = light.shadow
+      const remembered = light.userData
       shadow.autoUpdate = false
-      if (state.shadowDirty || moved) shadow.needsUpdate = true
-      remembered.shadowAtX = child.position.x
-      remembered.shadowAtY = child.position.y
-      remembered.shadowAtZ = child.position.z
-      remembered.shadowWidth = shadow.mapSize.width
-      if (target) {
-        remembered.shadowTargetX = target.position.x
-        remembered.shadowTargetY = target.position.y
-        remembered.shadowTargetZ = target.position.z
-      }
-      if (view) {
-        remembered.shadowLeft = view.left
-        remembered.shadowRight = view.right
-        remembered.shadowTop = view.top
-        remembered.shadowBottom = view.bottom
-        remembered.shadowNear = view.near
-        remembered.shadowFar = view.far
-      }
+      if (state.shadowDirty || shadowMoved(light, shadow, remembered)) shadow.needsUpdate = true
+      rememberLight(light, shadow, remembered)
     }
     state.shadowDirty = false
   }

@@ -74,6 +74,61 @@ export function wantedFields(asked, known) {
   return fields
 }
 
+/** The type definition behind an entity, or an empty one. */
+function definitionOf(entity) {
+  return entity._definition || {}
+}
+
+/** What the author wrote this type IS, for a single-entity reply. */
+function describedFields(definition) {
+  const out = {}
+  if (definition.about) out.about = definition.about
+  if (definition.appearance) out.appearance = definition.appearance
+  if (definition.looksWrongWhen) out.looksWrongWhen = definition.looksWrongWhen
+  return out
+}
+
+/** The fields every entity reply carries. */
+function entityBase(entity) {
+  return {
+    id: entity.id, type: entity.type,
+    at: [round3(entity.x), round3(entity.y), round3(entity.z)],
+    ...(entity.rotation ? { rotation: round3(entity.rotation) } : {}),
+    // Why this one is placed here. In a bulk list it is the only description
+    // that appears, and only on the placements that wrote one — what the type
+    // IS is said once per type, not once per entity.
+    ...(entity.note ? { note: entity.note } : {})
+  }
+}
+
+/** The trimmed fields a bulk reply carries. */
+function bulkView(entity, out) {
+  // In bulk, properties IS the override list — naming the keys twice is waste.
+  if (entity.overrides.length) {
+    out.properties = Object.fromEntries(entity.overrides.map(key => [key, entity.properties[key]]))
+  }
+  // Names only. What each one holds is in the index, once, rather than
+  // repeated on every entity that attached it.
+  if (entity.behaviours.length) out.behaviours = entity.behaviours.map(behaviour => behaviour.name)
+  return out
+}
+
+/** The complete fields a single-entity reply carries. */
+function fullView(entity, out) {
+  // What the author wrote this type IS, read through the definition rather than
+  // copied onto the entity, so editing the type file reaches every live entity
+  // with nothing to re-sync. Identity comes before the numbers because a reader
+  // has to know what the thing is to read them.
+  Object.assign(out, describedFields(definitionOf(entity)))
+  out.properties = entity.properties
+  if (entity.overrides.length) out.overrides = entity.overrides
+  if (entity.behaviours.length) {
+    out.behaviours = Object.fromEntries(entity.behaviours.map(behaviour =>
+      [behaviour.name, behaviour.error ? { error: behaviour.error } : behaviour.bag]))
+  }
+  return out
+}
+
 /**
  * One entity as a reply.
  *
@@ -83,38 +138,31 @@ export function wantedFields(asked, known) {
  * A single-entity lookup is cheap, so that one stays complete.
  */
 export function entityView(e, bulk = false) {
-  const out = {
-    id: e.id, type: e.type,
-    at: [round3(e.x), round3(e.y), round3(e.z)],
-    ...(e.rotation ? { rotation: round3(e.rotation) } : {}),
-    // Why this one is placed here. In a bulk list it is the only description
-    // that appears, and only on the placements that wrote one — what the type
-    // IS is said once per type, not once per entity.
-    ...(e.note ? { note: e.note } : {})
-  }
-  if (bulk) {
-    // In bulk, properties IS the override list — naming the keys twice is waste.
-    if (e.overrides.length) out.properties = Object.fromEntries(e.overrides.map(k => [k, e.properties[k]]))
-    // Names only. What each one holds is in the index, once, rather than
-    // repeated on every entity that attached it.
-    if (e.behaviours.length) out.behaviours = e.behaviours.map(b => b.name)
-  } else {
-    // What the author wrote this type IS, read through the definition rather
-    // than copied onto the entity, so editing the type file reaches every
-    // live entity with nothing to re-sync. Identity comes before the numbers
-    // because a reader has to know what the thing is to read them.
-    const definition = e._definition || {}
-    if (definition.about) out.about = definition.about
-    if (definition.appearance) out.appearance = definition.appearance
-    if (definition.looksWrongWhen) out.looksWrongWhen = definition.looksWrongWhen
-    out.properties = e.properties
-    if (e.overrides.length) out.overrides = e.overrides
-    if (e.behaviours.length) {
-      out.behaviours = Object.fromEntries(e.behaviours.map(b =>
-        [b.name, b.error ? { error: b.error } : b.bag]))
-    }
-  }
-  return out
+  const out = entityBase(e)
+  return bulk ? bulkView(e, out) : fullView(e, out)
+}
+
+/** Every plugin, by name where it has one and by file where it never loaded. */
+function pluginList(loader) {
+  return [...loader.plugins.entries()].map(([name, plugin]) => (plugin.file
+    // A file that never imported has no name to show. Say what it is
+    // instead of printing a path where a name belongs.
+    ? { file: plugin.file, loaded: false, builtin: plugin.builtin, error: plugin.error }
+    : { name, enabled: plugin.enabled, error: plugin.error }))
+}
+
+/** The entity rows a caller asked for, as rows or as columns. */
+function entityRows(world, options) {
+  const rows = world.entities.map(entity => entityView(entity, true))
+  return options.entities === true ? rows : asColumns(rows, wantedFields(options.entities, ENTITY_COLUMNS))
+}
+
+/** The extra sections a caller asked for by name. */
+function detailFields(out, options, { loader, loop, log }) {
+  if (options.plugins) out.plugins = pluginList(loader)
+  if (options.log) out.log = log.lines.slice(-40)
+  if (options.timers) out.timers = loop.timers
+  if (options.commands) out.commands = loader.contrib.commands.map(command => command.id)
 }
 
 /**
@@ -174,18 +222,7 @@ export function projectSnapshot({ world, loader, loop, files, editor, view, log,
     unsaved: files.pending > 0 || !!files.refused,
     ...(files.refused ? { refused: files.refused.message } : {})
   }
-  if (options.entities) {
-    const rows = world.entities.map(e => entityView(e, true))
-    out.entities = options.entities === true ? rows : asColumns(rows, wantedFields(options.entities, ENTITY_COLUMNS))
-  }
-  if (options.plugins) out.plugins = [...loader.plugins.entries()]
-    .map(([name, p]) => (p.file
-      // A file that never imported has no name to show. Say what it is
-      // instead of printing a path where a name belongs.
-      ? { file: p.file, loaded: false, builtin: p.builtin, error: p.error }
-      : { name, enabled: p.enabled, error: p.error }))
-  if (options.log) out.log = log.lines.slice(-40)
-  if (options.timers) out.timers = loop.timers
-  if (options.commands) out.commands = loader.contrib.commands.map(c => c.id)
+  if (options.entities) out.entities = entityRows(world, options)
+  detailFields(out, options, { loader, loop, log })
   return note(reload, out)
 }

@@ -2,23 +2,42 @@ import { sourceHash, replaceSource } from './document-store.mjs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-/** Source inspection has no write path and cannot leave the selected source directories. */
-export async function readSource(checkout, project, scope, file) {
-  const allowed = scope === 'engine' ? /^(?:index\.html|engine\/.+\.(?:js|mjs|cjs|css)|plugins\/builtin\/.+\.(?:js|mjs|cjs))$/ : /^(plugins|types|behaviours)\/.+\.(js|mjs|cjs)$/
-  if (!['engine', 'project'].includes(scope) || typeof file !== 'string' || !allowed.test(file) ||
-      file.includes('\\') || file.split('/').some(part => !part || part === '..' || part === '.')) {
+/** The one pattern of source files a scope will read. */
+function sourcePattern(scope) {
+  return scope === 'engine'
+    ? /^(?:index\.html|engine\/.+\.(?:js|mjs|cjs|css)|plugins\/builtin\/.+\.(?:js|mjs|cjs))$/
+    : /^(plugins|types|behaviours)\/.+\.(js|mjs|cjs)$/
+}
+
+/** Whether a path is plain and relative: no backslash, no climb and no empty part. */
+function isCleanRelativePath(file) {
+  if (file.includes('\\')) return false
+  return file.split('/').every(part => part && part !== '..' && part !== '.')
+}
+
+/** Refuse anything a source read must not be asked for. */
+function assertSourcePath(scope, file, allowed) {
+  const scopes = ['engine', 'project']
+  if (!scopes.includes(scope) || typeof file !== 'string' || !allowed.test(file) || !isCleanRelativePath(file)) {
     throw new Error('source path must name an engine, plugin, type or behaviour JavaScript file')
   }
+}
+
+/** Source inspection has no write path and cannot leave the selected source directories. */
+export async function readSource(checkout, project, scope, file) {
+  const allowed = sourcePattern(scope)
+  assertSourcePath(scope, file, allowed)
   const root = await fs.realpath(scope === 'engine' ? checkout : project)
   const absolute = await fs.realpath(path.resolve(root, file))
   const relative = path.relative(root, absolute)
-  if (relative.startsWith('..') || path.isAbsolute(relative) || !allowed.test(relative.replaceAll('\\', '/'))) throw new Error('source path leaves its root')
+  if (relative.startsWith('..') || path.isAbsolute(relative) || !allowed.test(relative.replaceAll('\\', '/'))) {
+    throw new Error('source path leaves its root')
+  }
   const information = await fs.stat(absolute)
   if (!information.isFile() || information.size > 2_000_000) throw new Error('source file exceeds inspection limit')
   const text = await fs.readFile(absolute, 'utf8')
-  return { scope, file, text, hash:sourceHash(text) }
+  return { scope, file, text, hash: sourceHash(text) }
 }
-
 
 /** The host supplies roots and labels; analysis consumes only the returned file data. */
 export async function sourceCatalog(checkout, project = checkout, selection = 'core') {
