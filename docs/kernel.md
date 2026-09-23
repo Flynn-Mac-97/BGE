@@ -41,7 +41,7 @@ in `ARCHITECTURE.md`.
 | `loader.js` | plugin order, contribution points, failure containment | any specific plugin |
 | `render.js` | one GL context, one draw order | game rules, or where the camera is |
 | `ui.js` | the vocabulary panels compose from | any specific panel |
-| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js` and the keyboard is `shell-shortcuts.js` |
+| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js`, the keyboard is `shell-shortcuts.js`, and the mountable regions are `shell-regions.js` |
 | `inspect.js` | the read-and-drive surface | whether anything is drawing |
 | `start-world.js` | boot, and the `context` everything receives | screens |
 | `index.js` | the browser: shell, renderer, the paint loop | game rules |
@@ -68,6 +68,7 @@ in `ARCHITECTURE.md`.
 | `loop-timers.js` | timers on the fixed clock | the wall clock |
 | `shell-layout.js` | the dock sizes and the four resize handles | what goes in the docks |
 | `shell-shortcuts.js` | the shortcut table, and the one keyboard listener | what a key does |
+| `shell-regions.js` | the named regions a plugin mounts DOM into, their order, and when a mount leaves | what the DOM is, or what a key does |
 | `log.js` | the process-wide error channels, and how a world's log reads them | what an error means |
 | `snapshot.js` | the snapshot projection | driving the engine |
 | `device-profile.js` | the screen shape a game declares | drawing it |
@@ -162,7 +163,9 @@ wanting the same key. It reports that collision by name and keeps the first.
 Turning a plugin off withdraws its contributions immediately; the next reload
 skips it entirely. A plugin cannot be un-loaded mid-session — its `onLoad` has
 already run and may hold DOM or listeners — so anything it added to `context`
-stays until reload.
+stays until reload. A DOM mount made through `context.ui.mount` is the
+exception: `shell.js` sweeps the mounts of a plugin that is no longer enabled,
+so a region entry cannot outlive its owner.
 
 ## Boot
 

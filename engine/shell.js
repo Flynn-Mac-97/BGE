@@ -6,12 +6,14 @@
  * point with nothing contributed to it renders nothing, so an unextended editor
  * stays as plain as it looks.
  *
- * The dock sizes live in `shell-layout.js` and the keyboard in
- * `shell-shortcuts.js`; this file builds the frame and draws it.
+ * The dock sizes live in `shell-layout.js`, the keyboard in
+ * `shell-shortcuts.js`, and the regions a plugin mounts DOM into in
+ * `shell-regions.js`; this file builds the frame and draws it.
  */
 import { makeUI } from './ui.js'
 import { makeLayout } from './shell-layout.js'
 import { makeShortcuts } from './shell-shortcuts.js'
+import { makeRegions } from './shell-regions.js'
 
 export { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from './shell-shortcuts.js'
 
@@ -50,6 +52,13 @@ export function makeShell(root, context) {
 
   const element = id => root.querySelector('#' + id)
   const frame = root.querySelector('.app')
+
+  // The one region a plugin can mount DOM into today. The four docks still take
+  // panels; a region is for DOM that is not a panel, and the overlay is the
+  // layer over the canvas. `context.ui` is the door, so a plugin never imports
+  // this file.
+  const regions = makeRegions({ overlay: element('viewport-ui') })
+  context.ui = { mount: regions.mount, unmount: regions.unmount, regions: regions.names }
   const layout = makeLayout(root, frame, () => rend()?.resize())
   layout.applyLayout()
   layout.installResizer('resize-left', 'left', 'x', 1)
@@ -288,7 +297,12 @@ export function makeShell(root, context) {
     else requestAnimationFrame(paint)
   }
 
-  bus.on('plugins:changed', draw)
+  // A disabled plugin's mounts leave with it. `rebuild` already announces the
+  // change; the sweep is what stops a region mount outliving its plugin.
+  bus.on('plugins:changed', () => {
+    regions.sweep(name => loader.plugins.get(name)?.enabled === true)
+    draw()
+  })
   bus.on('selection:changed', draw)
   bus.on('world:changed', draw)
   bus.on('files:writing', drawStatus)
