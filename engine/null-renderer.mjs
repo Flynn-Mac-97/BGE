@@ -39,6 +39,26 @@ function nullCanvas(width = 1, height = 1) {
 }
 
 /**
+ * A pass graph with the real one's verbs and no executor.
+ *
+ * A plugin registers a pass whether or not anything draws, so this keeps the
+ * pass set for a test to read and does nothing else. Nothing here reports a
+ * frame it did not draw.
+ */
+function makeNullGraph() {
+  const records = new Map()
+  return {
+    add(record) { if (record?.name) records.set(record.name, record) },
+    remove(name) { records.delete(name) },
+    replace(name, record) { records.set(name, { ...record, name }) },
+    disable(name) { const pass = records.get(name); if (pass) pass.enabled = false },
+    enable(name) { const pass = records.get(name); if (pass) pass.enabled = true },
+    get passes() { return [...records.values()].filter(pass => pass.enabled !== false) },
+    run() {}
+  }
+}
+
+/**
  * The renderer surface, with no GL behind it.
  *
  * `see.capture` and `see.moment` hold the See plugin's state-changing code —
@@ -77,7 +97,6 @@ export function nullRenderer(view, viewport, shape) {
   // everything but its subject, dimming the lights — has real children to walk.
   const objects = new Map()
   const stats = { entities: 0, frames: 0, readbacks: 0, drawCalls: 0, triangles: 0 }
-  let passList = []
 
   /** Set the viewport to the frame size a capture asked for. */
   const frameSize = (width, height) => {
@@ -133,10 +152,7 @@ export function nullRenderer(view, viewport, shape) {
 
     materials: { register() {}, has: () => false, get names() { return [] } },
 
-    passes: {
-      get list() { return [...passList] },
-      set(list) { passList = Array.isArray(list) ? list.filter(Boolean) : [] }
-    }
+    graph: makeNullGraph()
   }
 }
 

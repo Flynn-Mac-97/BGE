@@ -48,7 +48,7 @@ function captureContext() {
   renderer.scene.fog = { density: 1 }
   renderer.scene.add({ isLight: true, visible: true })
   renderer.scene.add({ visible: true, userData: { overlay: true } })
-  renderer.passes.set([{ name: 'grade' }])
+  renderer.graph.add({ name: 'grade', execute() {} })
   return { context, calls }
 }
 
@@ -58,7 +58,7 @@ function sceneState(context) {
     hidden: context.world.entities.map(entity => Boolean(entity.hidden)),
     background: context.renderer.scene.background, fog: context.renderer.scene.fog,
     children: context.renderer.scene.children.map(child => ({ child, visible: child.visible })),
-    passes: context.renderer.passes.list
+    passes: context.renderer.graph.passes.map(pass => pass.name)
   }
 }
 

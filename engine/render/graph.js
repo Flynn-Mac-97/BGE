@@ -216,14 +216,16 @@ export function makePassGraph(options = {}) {
 
   function rebuild() {
     for (const slot of slots) if (slot.target) pool.release(slot.target)
-    const enabled = [...records.values()].filter(pass => pass.enabled)
-    const supported = enabled.filter(pass => {
+    // A disabled pass keeps its record so a pass that orders against its label
+    // still has an edge; it is dropped from the run after the sort.
+    const supported = [...records.values()].filter(pass => {
+      if (!pass.enabled) return true
       const missing = pass.requires.filter(name => !hasFeature(name))
       if (!missing.length) return true
       report(`[render] graph: "${pass.name}" needs ${missing.join(', ')}, which this device does not have — the pass is dropped`)
       return false
     })
-    order = selectLive(topological(supported, report))
+    order = selectLive(topological(supported, report)).filter(pass => pass.enabled)
     const plan = planTargets(order)
     slots = plan.slots
     resourceSlot = plan.resourceSlot

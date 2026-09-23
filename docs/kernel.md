@@ -95,8 +95,8 @@ in `ARCHITECTURE.md`.
 | `render/entity-sync.js` | turning the entity list into scene objects | the world's rules |
 | `render/floor-mark.js` | the shape both floor marks share: the instanced unit quad | what either mark draws |
 | `render/frame-draw.js` | one frame out of the card, and what the last one cost | what is drawn |
-| `render/frame-stages.js` | the named stages one frame runs, and where a plugin draws in it | what a stage draws |
 | `render/geometry-cache.js` | solid geometry cached by its dimensions, and the one merge | materials |
+| `render/graph.js` | the ordered pass graph one frame runs, and the executor that sorts and runs it | which passes a frame runs |
 | `render/ground-band.js` | the TSL of a flat mark on the floor | the ring that uses it |
 | `render/ground-rings.js` | the ground ring, one actor named by a rule | a model's own materials |
 | `render/keyline-hull.js` | the geometry a keyline is drawn from, and the vertex node that grows it | the line that uses it |
@@ -109,11 +109,11 @@ in `ARCHITECTURE.md`.
 | `render/model-nodes.js` | a loaded model addressed by node name | the rest of the entity |
 | `render/object-builder.js` | the scene object that stands for one entity | the world's rules |
 | `render/picking.js` | a ray into the scene, and the world-point-to-pixel mapping | drawing |
-| `render/post-chain.js` | an ordered list of passes | what a pass does |
 | `render/read-value.js` | what a declared colour, intensity or vector means | the surface it lands on |
 | `render/readability-marks.js` | the three readability marks, and who gets them | a model's own materials |
 | `render/report.js` | the renderer's one history of messages already said | what each message means |
 | `render/scene-layers.js` | the two layers the scene draws on | what is on them |
+| `render/target-pool.js` | render targets reused across passes and frames, keyed by descriptor | what a pass writes |
 | `render/texture-cache.js` | one texture, cached, in three readings of the same file | what it is drawn on |
 | `render/viewmodel.js` | the weapon in first person, in its own pass | where the player is |
 

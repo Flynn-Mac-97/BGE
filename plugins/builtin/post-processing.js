@@ -45,24 +45,25 @@
  *      and one command.
  *   2. Every effect module, and three itself, sit behind a dynamic `import()`
  *      inside the build path. A game with no chain never downloads them.
- *   3. `renderer.passes.set` is only called when there is something to set, or
- *      something previously set to tear down. A renderer that has never been
- *      handed an effect makes no chain and allocates no render target, so the
- *      frame time is exactly what it was before this file existed.
+ *   3. The `post` pass is only registered when there is a chain, and dropped when
+ *      it empties. A renderer that has never been handed an effect makes no
+ *      chain and allocates no render target, so the frame time is exactly what
+ *      it was before this file existed.
  * A post-processing plugin that taxes every game that does not use it is a bad
  * plugin, and "it only costs one branch per frame" is how that starts.
  *
- * WHERE THE CHAIN LIVES: not here. `renderer.passes.set(list)` takes an ordered
- * list of effects and has, in its own words, no opinion whatever about what they
- * do. An effect is `{ name, needsNormals, apply(colour, parts) }` — a function
- * from the picture so far to a new picture. The renderer owns the context, the
- * render targets, the resize and the scene pass at the front; it has to, because
- * this engine switches between an orthographic and a perspective camera and only
- * the renderer knows which is drawing. Everything after that is this plugin's:
- * the effects the level asked for, in the order it wrote them. Nothing closes
- * the chain — three's `PostProcessing` tone-maps and encodes its own output,
- * which is what the old OutputPass was for.
+ * WHERE THE CHAIN LIVES: here, in `post-processing/chain.js`. It builds one
+ * three `RenderPipeline` over the scene and this plugin registers it as a `post`
+ * pass through `renderer.graph` — the same door every other pass uses. The
+ * renderer owns the context, the scene and the camera; it has to, because this
+ * engine switches between an orthographic and a perspective camera and only the
+ * renderer knows which is drawing. Everything after that is this plugin's: the
+ * effects the level asked for, in the order it wrote them. Nothing closes the
+ * chain — three's `PostProcessing` tone-maps and encodes its own output, which
+ * is what the old OutputPass was for.
  */
+
+import { makePostChain } from './post-processing/chain.js'
 
 /** Where a whole look can be named instead of spelled out. */
 const PRESETS = {
@@ -187,9 +188,23 @@ export default {
         return apply(context, post)
       },
 
+      /**
+       * Stop drawing the chain while a capture borrows the frame, and put it
+       * back. The pass stays registered; only its draw and the kernel draws it
+       * displaces change.
+       */
+      hold() { holdPostPass(context, post) },
+      release() { releasePostPass(context, post) },
+
       report: () => report(context, post)
     }
     context.post = post
+
+    // The chain and the one `post` pass that draws it. Both are held on `post`
+    // so the module functions below can reach them, and neither exists until a
+    // chain is wanted: an empty chain registers no pass and costs nothing.
+    post.chain = null
+    post.postPassAdded = false
 
     // The level's world block is the rule; re-read it whenever a level loads,
     // and drop whatever post.set chose — the file has just had the last word.
@@ -317,6 +332,60 @@ function readEffect(name, options, say) {
 /** The order front effects run in, whatever order they were switched on in. */
 const FRONT_ORDER = ['ssgi', 'traa']
 
+/**
+ * The chain for this renderer, built on first use.
+ *
+ * Building it is cheap; it is drawing that compiles shaders. It is created only
+ * when a chain is wanted, so a game with no effects never makes one.
+ */
+function chainFor(context, post) {
+  if (!post.chain && context.renderer) post.chain = makePostChain(context.renderer)
+  return post.chain
+}
+
+/** Add the `post` pass and stand the kernel's clear and scene draw down. */
+function addPostPass(context, post) {
+  if (post.postPassAdded || !chainFor(context, post)) return
+  const graph = context.renderer.graph
+  graph.add({
+    name: 'post', after: ['scene'], before: ['viewmodel'],
+    execute: frame => post.chain.draw(frame.camera)
+  })
+  // The chain renders the scene through three's pipeline, so the kernel draws
+  // nothing underneath it.
+  graph.disable('scene')
+  graph.disable('clear')
+  post.postPassAdded = true
+}
+
+/** Drop the `post` pass and give the kernel's clear and scene draw back. */
+function removePostPass(context, post) {
+  if (!post.postPassAdded) return
+  const graph = context.renderer.graph
+  graph.remove('post')
+  graph.enable('scene')
+  graph.enable('clear')
+  post.postPassAdded = false
+}
+
+/** Stop drawing the chain while a capture borrows the frame. */
+function holdPostPass(context, post) {
+  if (!post.postPassAdded) return
+  const graph = context.renderer.graph
+  graph.disable('post')
+  graph.enable('scene')
+  graph.enable('clear')
+}
+
+/** Draw the chain again after `holdPostPass`. */
+function releasePostPass(context, post) {
+  if (!post.postPassAdded) return
+  const graph = context.renderer.graph
+  graph.enable('post')
+  graph.disable('scene')
+  graph.disable('clear')
+}
+
 async function apply(context, post) {
   const say = message => sayOnce(post, message)
   // Lighting first, then the temporal pass that settles its grain.
@@ -339,22 +408,22 @@ async function apply(context, post) {
     return post.report()
   }
 
-  const passes = renderer.passes
-  if (!passes || typeof passes.set !== 'function') {
+  if (!renderer.graph || typeof renderer.graph.add !== 'function') {
     post.built = 0
-    post.status = 'this renderer has no pass registry'
+    post.status = 'this renderer has no pass graph'
     if (post.resolved.length) {
-      sayOnce(post, '[Post Processing] this renderer has no passes registry, so the level\'s "post" chain was read and then thrown away — nothing is being applied to the picture')
+      sayOnce(post, '[Post Processing] this renderer has no pass graph, so the level\'s "post" chain was read and then thrown away — nothing is being applied to the picture')
     }
     return post.report()
   }
 
   if (!post.resolved.length) {
     // Nothing asked for. Only say so if something was there before, or a game
-    // with no chain would be handed an empty list on every level load for no
+    // with no chain would be handed an empty chain on every level load for no
     // reason at all.
     if (post.built) {
-      passes.set([])
+      removePostPass(context, post)
+      chainFor(context, post)?.set([])
       post.built = 0
     }
     post.status = 'off'
@@ -376,7 +445,8 @@ async function apply(context, post) {
     return post.report()
   }
 
-  passes.set(built)
+  chainFor(context, post)?.set(built)
+  addPostPass(context, post)
   post.built = built.length
   post.status = built.length ? 'on' : 'off'
   return post.report()

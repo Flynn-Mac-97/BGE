@@ -31,15 +31,14 @@
  * only correct answer to a first-person weapon clipping into a wall, and it is
  * why "one draw order" is a decision this file owns rather than a fact about it.
  *
- * There are five doors into a frame and no more: `graph` is the pass graph, a
- * draw ordered by label; `materials` is what a surface is made of; `marks` is a
- * visual drawn beside one entity; `passes` is the effect chain over the finished
- * picture; and `stages` is the legacy named-point surface over the graph. All
- * are deliberately dumb. A renderer that holds the list of materials a game
- * uses, the marks it draws, the effects it wants, or the way it draws the world,
- * has started to know what the game is — and in this engine that knowledge lives
- * in a plugin. This file owns one GL context and one draw order, and it must
- * never learn what bloom is.
+ * There are three doors into a frame and no more: `graph` is the pass graph, the
+ * one place a pass is registered and ordered; `materials` is what a surface is
+ * made of; and `marks` is a visual drawn beside one entity. All are
+ * deliberately dumb. A renderer that holds the list of materials a game uses,
+ * the marks it draws, the passes it runs, or the way it draws the world, has
+ * started to know what the game is — and in this engine that knowledge lives in
+ * a plugin. This file owns one GL context and one draw order, and it must never
+ * learn what bloom is.
  *
  * What it does know about is cost. Several hundred walls that never move are
  * merged by material into a handful of meshes, each one still small enough to be
@@ -71,7 +70,6 @@ import { makeBatching } from './render/batching.js'
 import { makeMarkRegistry } from './render/mark-registry.js'
 import { makeEntitySync } from './render/entity-sync.js'
 import { makeViewmodel } from './render/viewmodel.js'
-import { makePostChain } from './render/post-chain.js'
 import { makePicking } from './render/picking.js'
 import { makeFrameDraw } from './render/frame-draw.js'
 
@@ -246,7 +244,6 @@ export async function makeRenderer(canvas, view, viewport) {
   makeMarkRegistry(state)
   state.readability = {}
   makeEntitySync(state)
-  makePostChain(state)
   makePicking(state)
   makeFrameDraw(state)
 
@@ -332,6 +329,20 @@ export async function makeRenderer(canvas, view, viewport) {
     forgetDrawRecords: state.forgetDrawRecords,
 
     /**
+     * Defer disposal while a pass compiles its shaders.
+     *
+     * three's `compileAsync` lists the scene's objects when it starts and makes a
+     * render record for each when it ends, so an object released in between gets
+     * a record nothing frees. A pass that compiles wraps that work in these two;
+     * `endCompile` disposes anything released meanwhile a second time.
+     */
+    beginCompile() { state.compilesRunning++ },
+    endCompile() {
+      state.compilesRunning--
+      state.releaseAgainAfterCompile()
+    },
+
+    /**
      * Push entity state into the scene graph. Called every frame.
      *
      * `blend` is `loop.blend`: bodies are drawn that far between their last two
@@ -347,7 +358,7 @@ export async function makeRenderer(canvas, view, viewport) {
     /** One draw of the world scene into a caller-owned render target, its pixels read back into `buffer`. */
     drawInto: state.drawInto,
 
-    // ---- the four hook points ----
+    // ---- the three hook points ----
     materials: state.materials,
     /**
      * The per-entity marks: a visual drawn beside one entity, by name.
@@ -359,30 +370,15 @@ export async function makeRenderer(canvas, view, viewport) {
      * `blocksMerge`, `forget` — so the core drives it without knowing its name.
      */
     marks: state.marks,
-    /** The ordered post-processing passes; an empty list means none at all. */
-    passes: state.passes,
     /**
      * The pass graph: the ordered draws one frame runs, orderable by label.
      *
      * `add`, `remove`, `replace`, `disable` and `enable` change the pass set;
-     * `passes` is the live order and `run` is the executor. A pass replaces a
-     * core draw by name, so a plugin that draws its own world replaces the
-     * `scene` pass and the kernel scene draw does not run underneath it.
+     * `passes` is the live order and `run` is the executor. A plugin that draws
+     * its own frame adds a pass and disables the core draw it takes over, so the
+     * kernel draw never runs underneath it.
      */
     graph: state.graph,
-    /**
-     * The named, ordered stages one frame runs through: `world`, `post`, then
-     * `viewmodel`.
-     *
-     * `add(name, draw, { before|after })` draws at a named point in the frame;
-     * `replace(stage, draw)` and `skip(stage)` take a core stage over, and
-     * `restore(stage)` puts the core draw back. A stage draw is called as
-     * `draw(frame)`, where `frame` is the camera, the render target the frame
-     * draws into, and the viewport size. A plugin that renders the frame its
-     * own way replaces `world`, so the core never draws underneath it.
-     */
-    stages: state.stages,
-
     /** The weapon in first person, in its own pass with its own depth buffer. */
     viewmodel: state.viewmodel,
 

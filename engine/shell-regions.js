@@ -4,7 +4,8 @@
  * `shell.js` builds the frame and owns the region elements. Which DOM sits in a
  * region, in what order, and when it leaves is a separate concern: this module
  * knows where a thing goes and when it leaves, never what the thing is. It is
- * the DOM counterpart of `render/frame-stages.js`.
+ * the DOM counterpart of the renderer's pass graph: one ordered list, and a
+ * slot only says where it goes.
  *
  * A mount writes to the DOM only when the set changes, never on a frame, and a
  * region with nothing mounted costs no work at all.

@@ -1,22 +1,20 @@
 /**
- * Kernel: an ordered list of passes, and no opinion whatever about what they do.
+ * Post Processing's chain: the ordered effects, composed into one pass record.
+ *
+ * This lives with the plugin because the effects a game wants are a game
+ * decision. The kernel hands over the device, the scene and the camera; this
+ * builds one three RenderPipeline over the scene. The plugin registers the
+ * result as a `post` pass through `renderer.graph`, which orders and runs it
+ * like any other pass.
  */
 import * as THREE from 'three/webgpu'
 import { mrt, output, pass, vec4 } from 'three/tsl'
 import * as TSL from 'three/tsl'
-import { reportOnce } from './report.js'
+import { reportOnce } from '../../../engine/render/report.js'
 
-export function makePostChain(state) {
-  /**
-   * An ordered list of passes, and no opinion whatever about what they do.
-   *
-   * The renderer must not grow a list of effects. Which effects a game wants —
-   * bloom on the muzzle flash, a flashbang wash, a scope blur — is a decision
-   * the game makes and therefore a decision a plugin makes, and putting the list
-   * here is the tempting wrong answer that turns one GL context into a framework.
-   * All this knows is the order, and that an empty list means draw straight to
-   * the canvas: no chain, no render target, no cost.
-   */
+export function makePostChain(renderer) {
+  // The effects, in draw order. An empty list takes the chain down: no render
+  // target, no pipeline, no cost.
   let passList = []
   // The chain that draws, and the one whose shaders are still compiling.
   // Each is `{ list, camera, chain, passes }`.
@@ -48,7 +46,7 @@ export function makePostChain(state) {
   /** The scene pass, with multisampling off when something needs a per-sample read. */
   function scenePassFor(list, camera, needsNormals) {
     const perSample = list.some(effect => effect.singleSample) || needsNormals
-    return perSample ? pass(state.scene, camera, { samples: 0 }) : pass(state.scene, camera)
+    return perSample ? pass(renderer.scene, camera, { samples: 0 }) : pass(renderer.scene, camera)
   }
 
   /**
@@ -105,7 +103,7 @@ export function makePostChain(state) {
 
     // Renamed in this version of three; the old name still works and warns.
     const Pipeline = THREE.RenderPipeline || THREE.PostProcessing
-    const chain = new Pipeline(state.renderer)
+    const chain = new Pipeline(renderer.threeRenderer)
     chain.outputNode = colour
     return { list, camera, chain, passes: [scenePass] }
   }
@@ -141,12 +139,11 @@ export function makePostChain(state) {
     warming = next
     // One pass at a time: each keeps its target and outputs set on the
     // renderer until it finishes, and shaders are built against those.
-    state.compilesRunning++
-    next.passes.reduce((before, one) => before.then(() => one.compileAsync(state.renderer)), Promise.resolve())
+    renderer.beginCompile()
+    next.passes.reduce((before, one) => before.then(() => one.compileAsync(renderer.threeRenderer)), Promise.resolve())
       .catch(error => reportOnce(`[render] passes: shaders could not be compiled ahead — ${error?.message || error}. They compile on first draw instead.`))
       .finally(() => {
-        state.compilesRunning--
-        state.releaseAgainAfterCompile()
+        renderer.endCompile()
         if (warming !== next) return
         warming = null
         keepChain(next)
@@ -162,7 +159,7 @@ export function makePostChain(state) {
     for (const [camera, old] of readyChains) {
       if (old.list !== passList) { old.chain.dispose?.(); readyChains.delete(camera); dropped = true }
     }
-    if (dropped) state.forgetDrawRecords()
+    if (dropped) renderer.forgetDrawRecords()
     if (entry.list !== passList) { entry.chain.dispose?.(); return }
     readyChains.get(entry.camera)?.chain.dispose?.()
     readyChains.set(entry.camera, entry)
@@ -179,76 +176,15 @@ export function makePostChain(state) {
   }
 
   /**
-   * The order each effect sits at, keyed by the effect object.
+   * Replace the whole chain.
    *
-   * Apart from the effect itself: an effect is the caller's own object, and
-   * `list` hands it back unchanged. A plain index is the fallback, so a list
-   * handed to `set` needs nothing written on it.
+   * The only door: Post Processing resolves the level's declaration into an
+   * ordered list of effects and states it here. An empty list takes the chain
+   * down, so a game with no effects builds no target.
    */
-  const passOrders = new Map()
-
-  /** The order one entry sits at. */
-  const orderAt = index => passOrders.get(passList[index]) ?? index
-
-  /** The highest order in the chain, or -1 when it is empty. */
-  function highestOrder() {
-    let highest = -1
-    for (let i = 0; i < passList.length; i++) highest = Math.max(highest, orderAt(i))
-    return highest
-  }
-
-  /** Drop every entry under this name, if any. */
-  function dropNamed(name) {
-    const kept = passList.filter(effect => effect.name !== name)
-    if (kept.length === passList.length) return false
-    for (const effect of passList) if (effect.name === name) passOrders.delete(effect)
-    passList = kept
-    return true
-  }
-
-  /** The ordered post-processing passes; an empty list means none at all. */
-  const passes = {
-    /** The current list, so a neutral draw can take it away and put it back. */
-    get list() { return [...passList] },
-    /**
-     * Replace the whole chain.
-     *
-     * The one destructive door, and Post Processing is its only caller. A
-     * plugin that wants to add an effect uses `add` so it cannot delete another
-     * plugin's chain.
-     */
-    set(list) {
-      passList = Array.isArray(list) ? list.filter(Boolean) : []
-      passOrders.clear()
-      passList.forEach((effect, index) => passOrders.set(effect, index))
-      if (!passList.length) dropPost()
-    },
-    /**
-     * Add or replace one named effect at its place in the chain.
-     *
-     * `order` is a number and a lower one draws earlier; without it the effect
-     * goes last. A name already in the chain is replaced, so two plugins adding
-     * the same name do not both draw.
-     */
-    add(name, effect, options = {}) {
-      if (typeof name !== 'string' || !name || typeof effect?.apply !== 'function') {
-        reportOnce(`[render] passes.add: needs a name and an effect with an apply function, got ${JSON.stringify(name)}`)
-        return
-      }
-      dropNamed(name)
-      const wanted = Number.isFinite(options.order) ? options.order : highestOrder() + 1
-      const named = { ...effect, name }
-      let at = passList.length
-      for (let i = 0; i < passList.length; i++) {
-        if (orderAt(i) > wanted) { at = i; break }
-      }
-      passList = [...passList.slice(0, at), named, ...passList.slice(at)]
-      passOrders.set(named, wanted)
-    },
-    /** Take one named effect out, and leave the rest of the chain alone. */
-    remove(name) {
-      if (dropNamed(name) && !passList.length) dropPost()
-    }
+  function setChain(list) {
+    passList = Array.isArray(list) ? list.filter(Boolean) : []
+    if (!passList.length) dropPost()
   }
 
   /** Whether the built chain was made for another pass list or another camera. */
@@ -264,7 +200,7 @@ export function makePostChain(state) {
    * from another camera, would show the tick's first view.
    */
   function advanceNodeFrame() {
-    const nodeFrame = state.renderer._nodes?.nodeFrame
+    const nodeFrame = renderer.threeRenderer._nodes?.nodeFrame
     if (nodeFrame && nodeFrame.frameId === drawnFrameId) nodeFrame.update()
     drawnFrameId = nodeFrame?.frameId
   }
@@ -281,27 +217,25 @@ export function makePostChain(state) {
    * renderer and a draw now would build pipelines for the wrong outputs.
    */
   function postDrawWorld(camera) {
-    if (passList.length && chainIsStale(camera)) warmPost(camera)
+    if (chainIsStale(camera)) warmPost(camera)
     if (warming) return
     if (built) {
       advanceNodeFrame()
       built.chain.render()
-      return
     }
-    state.renderer.clear()
-    state.renderer.render(state.scene, camera)
   }
 
-  /** What the post chain is doing, for `stats.post`. */
+  /** Whether a chain is built, still compiling, or absent. */
   function postStatus() {
     return built ? (warming ? 'drawing, next chain compiling' : 'drawing') : warming ? 'compiling' : 'none'
   }
 
-  state.passes = passes
-  state.postDrawWorld = postDrawWorld
-  // Whether a post chain will draw the world scene itself. The frame's
-  // `world` stage draws the scene directly only when no chain owns it, so
-  // the two never both draw and the default picture is unchanged.
-  state.postChainActive = () => passList.length > 0
-  state.postStatus = postStatus
+  return {
+    /** Replace the whole chain; a list of effects, in draw order. */
+    set: setChain,
+    /** Draw the frame: the chain when one is built, nothing while it compiles. */
+    draw: postDrawWorld,
+    /** Whether a chain is built, still compiling, or absent. */
+    status: postStatus
+  }
 }

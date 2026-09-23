@@ -28,16 +28,18 @@ await context.editor.loadLevel(LEVEL)
 const bare = await startWorldInNode({ project: FIXTURE })
 
 /** A sentinel of every piece a studio capture borrows, put into the live scene. */
-function loadTheScene() {
+async function loadTheScene() {
   const scene = context.renderer.scene
   context.renderer.sync(context.world)
+  // The post chain is the Post Processing plugin's pass, so the sentinel is a
+  // real chain: See must put it back after the capture.
+  await context.post.set([{ grade: {} }])
   scene.background = 'sentinel-background'
   scene.fog = { colour: 'sentinel-fog' }
   const light = { isLight: true, visible: true, name: 'sentinel-light' }
   const overlay = { visible: true, userData: { overlay: true }, name: 'sentinel-overlay' }
   scene.add(light)
   scene.add(overlay)
-  context.renderer.passes.set([{ name: 'sentinel-pass' }])
   Object.assign(context.view, { x: 11, y: 5, z: 2, yaw: 0.4, pitch: -0.2, fov: 70, mode: 'perspective', zoom: 32 })
   for (const entity of context.world.entities) entity.hidden = false
   return { scene, light, overlay, children: scene.children.length, view: { ...context.view } }
@@ -67,7 +69,7 @@ test('a blank frame is reported as blank and no image is written', async () => {
 })
 
 test('a studio capture puts the whole scene back', async () => {
-  const before = loadTheScene()
+  const before = await loadTheScene()
   const subject = firstEntity()
 
   const answer = await engine.run('see.capture', { subject, alone: true })
@@ -78,7 +80,8 @@ test('a studio capture puts the whole scene back', async () => {
   assert.deepEqual(before.scene.fog, { colour: 'sentinel-fog' }, 'the fog is put back')
   assert.equal(before.light.visible, true, 'the dimmed light is lit again')
   assert.equal(before.overlay.visible, true, 'the scene child is shown again')
-  assert.deepEqual(context.renderer.passes.list, [{ name: 'sentinel-pass' }], 'the post chain is put back')
+  assert.equal(context.post.built, 1, 'the post chain is put back')
+  assert.ok(context.renderer.graph.passes.some(pass => pass.name === 'post'), 'the post pass draws again')
   assert.deepEqual({ ...context.view }, before.view, 'the camera is handed back')
   assert.equal(before.scene.children.length, before.children, 'the light rig is taken out again')
   for (const entity of context.world.entities) {
@@ -87,7 +90,7 @@ test('a studio capture puts the whole scene back', async () => {
 })
 
 test('an entity the world had already hidden stays hidden', async () => {
-  loadTheScene()
+  await loadTheScene()
   const [subject, ...rest] = context.world.entities
   rest[0].hidden = true
 
@@ -99,14 +102,14 @@ test('an entity the world had already hidden stays hidden', async () => {
 })
 
 test('overlay children are concealed for the draw and revealed after it', async () => {
-  const before = loadTheScene()
+  const before = await loadTheScene()
   await engine.run('see.capture', { ui: false })
   assert.equal(before.overlay.visible, true, 'the overlay is shown again')
   assert.deepEqual({ ...context.view }, before.view, 'an unmoved camera is left where it was')
 })
 
 test('a stated frame size is put back on the way out', async () => {
-  loadTheScene()
+  await loadTheScene()
   const shape = { width: context.viewport.width, height: context.viewport.height }
 
   const answer = await engine.run('see.capture', { ui: false, size: [320, 240] })
@@ -117,7 +120,7 @@ test('a stated frame size is put back on the way out', async () => {
 })
 
 test('a moment sheet steps the world, hands the camera back, and says it drew no sheet', async () => {
-  const before = loadTheScene()
+  const before = await loadTheScene()
   const subject = firstEntity()
   const clock = context.loop.time
 

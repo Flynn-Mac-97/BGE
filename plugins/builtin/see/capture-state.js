@@ -19,10 +19,12 @@ export async function prepareStudio(context, subjectEntity, state) {
   }
   const THREE = await import('three/webgpu')
   const scene = context.renderer.scene
-  const studio = state.studio = { THREE, scene, background: scene.background, fog: scene.fog, dimmed: [], passes: context.renderer.passes?.list || [] }
+  const studio = state.studio = { THREE, scene, background: scene.background, fog: scene.fog, dimmed: [] }
   scene.fog = null
   scene.background = null
-  context.renderer.passes?.set([])
+  // The post chain is the Post Processing plugin's pass; ask it to stand down so
+  // the studio frame is the raw scene. `restoreCapture` asks for it back.
+  context.post?.hold?.()
   for (const child of scene.children) {
     if (child.isLight && child.visible) { child.visible = false; studio.dimmed.push(child) }
   }
@@ -54,7 +56,7 @@ export function restoreCapture(context, state) {
     studio.scene.background = studio.background
     studio.scene.fog = studio.fog
     for (const child of studio.dimmed) child.visible = true
-    context.renderer.passes?.set(studio.passes)
+    context.post?.release?.()
   }
   if (moved) Object.assign(view, kept)
   delete view.borrowedBy
