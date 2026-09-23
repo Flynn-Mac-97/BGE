@@ -43,6 +43,87 @@ function isSink(pass) {
   return pass.always || pass.name === 'present' || pass.target == null
 }
 
+/** Add one edge unless it is a self-edge or already recorded. */
+function addEdge(seen, out, indegree, from, to) {
+  if (from === to) return
+  let set = seen.get(from)
+  if (!set) {
+    set = new Set()
+    seen.set(from, set)
+  }
+  if (set.has(to)) return
+  set.add(to)
+  out.get(from).push(to)
+  indegree.set(to, indegree.get(to) + 1)
+}
+
+/**
+ * Record one pass's `after` labels: each names a pass that runs before it.
+ *
+ * A label no pass carries is reported and ignored, so a plugin that orders
+ * against a pass this device dropped still leaves a runnable graph.
+ */
+function addAfterEdges(pass, byName, indegree, out, seen, report) {
+  for (const label of pass.after) {
+    if (byName.has(label)) addEdge(seen, out, indegree, label, pass.name)
+    else
+      report(
+        `[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" after — the edge is ignored`
+      )
+  }
+}
+
+/** Record one pass's `before` labels: each names a pass that runs after it. */
+function addBeforeEdges(pass, byName, indegree, out, seen, report) {
+  for (const label of pass.before) {
+    if (byName.has(label)) addEdge(seen, out, indegree, pass.name, label)
+    else
+      report(
+        `[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" before — the edge is ignored`
+      )
+  }
+}
+
+/** Record every label edge in registration order, so the tie-break is stable. */
+function addLabelEdges(list, byName, indegree, out, seen, report) {
+  for (const pass of list) {
+    addAfterEdges(pass, byName, indegree, out, seen, report)
+    addBeforeEdges(pass, byName, indegree, out, seen, report)
+  }
+}
+
+/** The passes with no incoming edge, in registration order. */
+function sourcesInOrder(list, indegree) {
+  const ready = []
+  for (const pass of list) if (indegree.get(pass.name) === 0) ready.push(pass.name)
+  return ready
+}
+
+/** Kahn's walk: drain the ready queue, appending each pass's freed successors. */
+function walkOrder(ready, byName, indegree, out) {
+  const ordered = []
+  for (let head = 0; head < ready.length; head++) {
+    const name = ready[head]
+    ordered.push(byName.get(name))
+    for (const to of out.get(name)) {
+      const left = indegree.get(to) - 1
+      indegree.set(to, left)
+      if (left === 0) ready.push(to)
+    }
+  }
+  return ordered
+}
+
+/** Append the passes a cycle stranded, keeping registration order. */
+function appendStuck(ordered, list, report) {
+  if (ordered.length >= list.length) return ordered
+  const placed = new Set(ordered.map(pass => pass.name))
+  const stuck = list.filter(pass => !placed.has(pass.name)).map(pass => pass.name)
+  report(`[render] graph: a cycle among ${stuck.join(', ')} — those passes keep registration order`)
+  for (const pass of list) if (!placed.has(pass.name)) ordered.push(pass)
+  return ordered
+}
+
 /**
  * Order the passes by their label edges.
  *
@@ -55,57 +136,53 @@ function topological(list, report) {
   const indegree = new Map(list.map(pass => [pass.name, 0]))
   const out = new Map(list.map(pass => [pass.name, []]))
   const seen = new Map()
+  addLabelEdges(list, byName, indegree, out, seen, report)
+  const ordered = walkOrder(sourcesInOrder(list, indegree), byName, indegree, out)
+  return appendStuck(ordered, list, report)
+}
 
-  function addEdge(from, to) {
-    if (from === to) return
-    let set = seen.get(from)
-    if (!set) {
-      set = new Set()
-      seen.set(from, set)
-    }
-    if (set.has(to)) return
-    set.add(to)
-    out.get(from).push(to)
-    indegree.set(to, indegree.get(to) + 1)
-  }
-
-  for (const pass of list) {
-    for (const label of pass.after) {
-      if (byName.has(label)) addEdge(label, pass.name)
-      else
-        report(
-          `[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" after — the edge is ignored`
-        )
-    }
-    for (const label of pass.before) {
-      if (byName.has(label)) addEdge(pass.name, label)
-      else
-        report(
-          `[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" before — the edge is ignored`
-        )
+/** Map each read resource to the passes that read it. */
+function readersByResource(ordered) {
+  const readers = new Map()
+  for (const pass of ordered) {
+    for (const name of pass.reads) {
+      const list = readers.get(name)
+      if (list) list.push(pass)
+      else readers.set(name, [pass])
     }
   }
+  return readers
+}
 
-  const ready = []
-  for (const pass of list) if (indegree.get(pass.name) === 0) ready.push(pass.name)
-  const ordered = []
-  for (let head = 0; head < ready.length; head++) {
-    const name = ready[head]
-    ordered.push(byName.get(name))
-    for (const to of out.get(name)) {
-      const left = indegree.get(to) - 1
-      indegree.set(to, left)
-      if (left === 0) ready.push(to)
+/** A pass that survives on its own: a sink, or one that reads and writes nothing. */
+function isAlwaysLive(pass) {
+  return isSink(pass) || (pass.reads.length === 0 && pass.writes.length === 0)
+}
+
+/** Whether a live pass reads one of this pass's written resources. */
+function isReadByLive(pass, readers, live) {
+  for (const written of pass.writes) {
+    const list = readers.get(written)
+    if (list?.some(reader => live.has(reader.name))) return true
+  }
+  return false
+}
+
+/** Grow the live set until no dead pass's writes feed a live pass. */
+function growLive(ordered, readers) {
+  const live = new Set(ordered.filter(isAlwaysLive).map(pass => pass.name))
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const pass of ordered) {
+      if (live.has(pass.name)) continue
+      if (isReadByLive(pass, readers, live)) {
+        live.add(pass.name)
+        changed = true
+      }
     }
   }
-
-  if (ordered.length < list.length) {
-    const placed = new Set(ordered.map(pass => pass.name))
-    const stuck = list.filter(pass => !placed.has(pass.name)).map(pass => pass.name)
-    report(`[render] graph: a cycle among ${stuck.join(', ')} — those passes keep registration order`)
-    for (const pass of list) if (!placed.has(pass.name)) ordered.push(pass)
-  }
-  return ordered
+  return live
 }
 
 /**
@@ -117,34 +194,8 @@ function topological(list, report) {
  * dependency of a dead pass dies with it.
  */
 function selectLive(ordered) {
-  const readers = new Map()
-  for (const pass of ordered) {
-    for (const name of pass.reads) {
-      const list = readers.get(name)
-      if (list) list.push(pass)
-      else readers.set(name, [pass])
-    }
-  }
-
-  const live = new Set()
-  for (const pass of ordered) {
-    if (isSink(pass) || (pass.reads.length === 0 && pass.writes.length === 0)) live.add(pass.name)
-  }
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const pass of ordered) {
-      if (live.has(pass.name)) continue
-      for (const written of pass.writes) {
-        const list = readers.get(written)
-        if (list?.some(reader => live.has(reader.name))) {
-          live.add(pass.name)
-          changed = true
-          break
-        }
-      }
-    }
-  }
+  const readers = readersByResource(ordered)
+  const live = growLive(ordered, readers)
   return ordered.filter(pass => live.has(pass.name))
 }
 

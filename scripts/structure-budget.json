@@ -1,6 +1,6 @@
 {
-  "comment": "Scope is the kernel closure: engine/** minus the peripheral tooling named in kernel-trellis.yaml. sloppinessIndex is not budgeted: 20 of its points are the audit's unresolved-import floor, produced by the dynamic imports hot reload and plugin discovery need, so the number does not move when the kernel's shape improves. erodedCount 2 is both in render/graph.js; importCycleGroups 0 fails on any new cycle.",
-  "erodedCount": 2,
+  "comment": "Scope is the kernel closure: engine/** minus the peripheral tooling named in kernel-trellis.yaml. sloppinessIndex is not budgeted: its 20 remaining points are the audit's incomplete-graph floor, not kernel debt. Six deliberate dynamic imports (index.js x2, start-world-node.mjs x2, project-index.mjs, and plugin-interface.mjs reaching the plugin tree above engine/) cannot resolve statically; the Trellis config schema is a strict object of source/providers/policy with no key that declares or ignores them, so only a graph that lied would read complete. The floor is bounded instead: kernel-trellis.yaml sets policy.budgets.graph.edges.unresolved to max 6, so a seventh unresolved import fails the audit. erodedCount, duplicationGroups and importCycleGroups are the real gate.",
+  "erodedCount": 0,
   "duplicationGroups": 0,
   "importCycleGroups": 0
 }

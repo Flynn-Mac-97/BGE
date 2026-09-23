@@ -86,7 +86,7 @@ export function makePicking(state) {
 
     // rayHits has just aimed the shared raycaster through this pixel, so the
     // ray is the one to intersect the ground with — no need to build a second.
-    const castRay = raycaster.castRay
+    const castRay = raycaster.ray
     const toGround = castRay.direction.y < -1e-6 ? -castRay.origin.y / castRay.direction.y : 0
     const p = castRay.at(toGround > 0 ? toGround : 10, new THREE.Vector3())
     return { x: p.x, y: p.y, z: p.z }

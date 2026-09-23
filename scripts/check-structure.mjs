@@ -8,9 +8,11 @@
  * non-budgeted ones as information. A budgeted number above its budget fails
  * the check; `importCycleGroups` at 0 fails on any new cycle.
  *
- * `sloppinessIndex` is printed but not budgeted. At least 20 of its points are
- * the audit's penalty for the dynamic imports hot reload and plugin discovery
- * need, so it does not move when the kernel's shape improves. See the comment in
+ * `sloppinessIndex` is printed but not budgeted. Its remaining points are the
+ * audit's incomplete-graph floor, produced by the deliberate dynamic imports at
+ * hot reload and plugin discovery, so it does not move when the kernel's shape
+ * improves. `kernel-trellis.yaml` bounds that floor through
+ * `policy.budgets.graph.edges.unresolved` instead. See the comment in
  * `structure-budget.json`.
  */
 import { spawnSync } from 'node:child_process'
@@ -60,7 +62,11 @@ for (const [field, metricId] of Object.entries(BUDGET_METRICS)) {
   overBudget ||= over
   console.log(`  ${over ? 'OVER' : 'ok  '} ${field}: ${measured} (budget ${budget[field]})`)
 }
-console.log(`  info sloppinessIndex: ${report.score.index} (not budgeted: the unresolved-dynamic-import floor)`)
+const unresolved = report.metrics['graph.edges.unresolved'].value
+console.log(
+  `  info sloppinessIndex: ${report.score.index} (not budgeted: ${unresolved} deliberate dynamic ` +
+    `import(s) leave the graph incomplete; bounded by policy.budgets in kernel-trellis.yaml)`
+)
 console.log(`  info completeness: ${report.completeness}`)
 console.log(
   `  info kernel closure: ${report.sourceCoverage.production.files} files, ` +
