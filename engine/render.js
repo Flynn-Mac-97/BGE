@@ -31,14 +31,15 @@
  * only correct answer to a first-person weapon clipping into a wall, and it is
  * why "one draw order" is a decision this file owns rather than a fact about it.
  *
- * There are four hook points and no more: `materials` for what a surface is
- * made of, `marks` for a visual drawn beside one entity, `passes` for the effect
- * chain over the finished picture, and `stages` for a draw at a named point in
- * the frame. All are deliberately dumb. A renderer that holds the list of
- * materials a game uses, the marks it draws, the effects it wants, or the way it
- * draws the world, has started to know what the game is — and in this engine
- * that knowledge lives in a plugin. This file owns one GL context and one draw
- * order, and it must never learn what bloom is.
+ * There are five doors into a frame and no more: `graph` is the pass graph, a
+ * draw ordered by label; `materials` is what a surface is made of; `marks` is a
+ * visual drawn beside one entity; `passes` is the effect chain over the finished
+ * picture; and `stages` is the legacy named-point surface over the graph. All
+ * are deliberately dumb. A renderer that holds the list of materials a game
+ * uses, the marks it draws, the effects it wants, or the way it draws the world,
+ * has started to know what the game is — and in this engine that knowledge lives
+ * in a plugin. This file owns one GL context and one draw order, and it must
+ * never learn what bloom is.
  *
  * What it does know about is cost. Several hundred walls that never move are
  * merged by material into a handful of meshes, each one still small enough to be
@@ -360,6 +361,15 @@ export async function makeRenderer(canvas, view, viewport) {
     marks: state.marks,
     /** The ordered post-processing passes; an empty list means none at all. */
     passes: state.passes,
+    /**
+     * The pass graph: the ordered draws one frame runs, orderable by label.
+     *
+     * `add`, `remove`, `replace`, `disable` and `enable` change the pass set;
+     * `passes` is the live order and `run` is the executor. A pass replaces a
+     * core draw by name, so a plugin that draws its own world replaces the
+     * `scene` pass and the kernel scene draw does not run underneath it.
+     */
+    graph: state.graph,
     /**
      * The named, ordered stages one frame runs through: `world`, `post`, then
      * `viewmodel`.

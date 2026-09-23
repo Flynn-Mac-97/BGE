@@ -1,11 +1,14 @@
 /**
  * Kernel: one frame out of the card, and what the last one cost.
  *
- * The frame is three named stages — the world, the post chain, the viewmodel —
- * and `frame-stages.js` owns that order. This file supplies the core draw at
- * each stage and runs the walk.
+ * The frame is the default graph — `clear`, `scene`, `post`, `viewmodel`, `ui`,
+ * `present` — registered through the same door a plugin uses. `scene` draws the
+ * world unless a post chain owns it; `post` draws the chain; `viewmodel` draws
+ * the weapon against a cleared depth buffer. The graph executor runs them, so
+ * this file supplies the draws and the counters, not the order.
  */
 import * as THREE from 'three/webgpu'
+import { makePassGraph } from './graph.js'
 import { makeFrameStages } from './frame-stages.js'
 
 export function makeFrameDraw(state) {
@@ -33,35 +36,46 @@ export function makeFrameDraw(state) {
     cpuMs: 0
   }
 
-  /**
-   * The core draw at the world stage.
-   *
-   * A built post chain draws the scene itself, so the two stages must not both
-   * draw: the chain owns the scene pass and this stage stands down. That keeps
-   * exactly one world draw in a default frame.
-   */
-  function drawWorldStage(frame) {
+  const graph = makePassGraph()
+  state.graph = graph
+
+  /** The core world draw: the scene straight to the frame, or nothing when a chain owns it. */
+  function drawScene(frame) {
     if (state.postChainActive()) return
-    state.renderer.clear()
     state.renderer.render(state.scene, frame.camera)
   }
 
-  /** The core draw at the post stage: the chain when one is active, nothing otherwise. */
-  function drawPostStage(frame) {
+  /** The core post draw: the chain when one owns the world, nothing otherwise. */
+  function drawPost(frame) {
     if (!state.postChainActive()) return
     state.postDrawWorld(frame.camera)
   }
 
-  makeFrameStages(state, [
-    { name: 'world', draw: drawWorldStage },
-    { name: 'post', draw: drawPostStage },
-    { name: 'viewmodel', draw: () => state.viewmodelDraw() }
-  ])
+  /** The viewmodel draw, in its own pass over a cleared depth buffer. */
+  function drawViewmodel() {
+    state.viewmodelDraw()
+  }
 
-  // One frame record, rewritten each frame. A stage draw gets the camera, the
-  // render target it draws into and the viewport size, and nothing is allocated
-  // for a frame that registers no stage.
-  const frame = { camera: null, target: null, width: 0, height: 0 }
+  // The default graph, ordered by label. The four labels `clear`, `scene`, `ui`
+  // and `present` are the kernel's; `post` and `viewmodel` are the step-one
+  // bridge passes that keep the current picture and become plugin passes next.
+  // The chain owns the clear of its own targets, and while it compiles the
+  // canvas keeps its last frame, so this pass clears only when the scene will
+  // draw straight to the canvas.
+  graph.add({ name: 'clear', before: ['scene'], execute: () => { if (!state.postChainActive()) state.renderer.clear() } })
+  graph.add({
+    name: 'scene', after: ['clear'], before: ['post'],
+    // One world-matrix update per frame. The renderer would otherwise repeat it
+    // for every scene pass, so it is CPU work that must finish before any draw.
+    prepare: () => { state.scene.updateMatrixWorld(); state.updateShadows() },
+    execute: drawScene
+  })
+  graph.add({ name: 'post', after: ['scene'], before: ['viewmodel'], execute: drawPost })
+  graph.add({ name: 'viewmodel', after: ['post'], before: ['ui'], execute: drawViewmodel })
+  graph.add({ name: 'ui', after: ['viewmodel'], before: ['present'], execute: () => {} })
+  graph.add({ name: 'present', after: ['ui'], execute: () => {} })
+
+  makeFrameStages(state, { world: drawScene, post: drawPost, viewmodel: drawViewmodel })
 
   /**
    * How long the card took on the last frame, in milliseconds.
@@ -116,24 +130,16 @@ export function makeFrameDraw(state) {
     return false
   }
 
-  /** Draw one frame: the named stages in order, then the counters. */
+  /** Draw one frame: the graph's passes in order, then the counters. */
   function draw() {
     const startedAt = performance.now()
     const camera = state.readyCamera()
-    // One world-matrix update for every pass this frame. The renderer would
-    // otherwise repeat it for each scene pass.
-    state.scene.updateMatrixWorld()
-    state.updateShadows()
     state.renderer.info.reset()
 
-    frame.camera = camera
-    frame.target = state.renderer.getRenderTarget()
-    frame.width = state.viewport.width
-    frame.height = state.viewport.height
-    state.runStages(frame)
+    graph.run(camera, state.renderer.getRenderTarget(), state.viewport.width, state.viewport.height)
 
     stats.post = state.postStatus()
-    // A headless frame has no card to draw into. The stages still run, so a
+    // A headless frame has no card to draw into. The passes still run, so a
     // plugin's draw and the frame handed to it can be exercised with no GL, but
     // nothing is submitted and no card time is reported.
     if (state.headless) return
