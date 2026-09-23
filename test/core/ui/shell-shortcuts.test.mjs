@@ -15,15 +15,23 @@ import assert from 'node:assert/strict'
 import { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from '../../../engine/shell-shortcuts.js'
 
 /** A key event with the modifiers a browser reports. */
-const keyEvent = (key, { ctrl = false, shift = false, alt = false, meta = false } = {}) =>
-  ({ key, ctrlKey: ctrl, shiftKey: shift, altKey: alt, metaKey: meta })
+const keyEvent = (key, { ctrl = false, shift = false, alt = false, meta = false } = {}) => ({
+  key,
+  ctrlKey: ctrl,
+  shiftKey: shift,
+  altKey: alt,
+  metaKey: meta
+})
 
 test('a key event spells into the declared order', () => {
   assert.equal(shortcutFromEvent(keyEvent('z', { ctrl: true })), 'ctrl+z')
   assert.equal(shortcutFromEvent(keyEvent('z', { meta: true })), 'ctrl+z', 'Command means ctrl')
   assert.equal(shortcutFromEvent(keyEvent('Z', { ctrl: true, shift: true })), 'ctrl+shift+z')
   assert.equal(shortcutFromEvent(keyEvent('Delete')), 'delete')
-  assert.equal(shortcutFromEvent(keyEvent('ArrowLeft', { alt: true, shift: true, ctrl: true })), 'ctrl+shift+alt+arrowleft')
+  assert.equal(
+    shortcutFromEvent(keyEvent('ArrowLeft', { alt: true, shift: true, ctrl: true })),
+    'ctrl+shift+alt+arrowleft'
+  )
 })
 
 test('a declaration reads back in the same order, or is refused', () => {
@@ -35,9 +43,7 @@ test('a declaration reads back in the same order, or is refused', () => {
 })
 
 test('the table matches a declaration against the keys a browser reports', () => {
-  const table = collectShortcuts([
-    { key: 'ctrl+z', what: 'command', name: 'history.undo', plugin: 'History' }
-  ])
+  const table = collectShortcuts([{ key: 'ctrl+z', what: 'command', name: 'history.undo', plugin: 'History' }])
   const matched = event => table.get(shortcutFromEvent(event))?.name ?? null
   assert.equal(matched(keyEvent('z', { ctrl: true })), 'history.undo')
   assert.equal(matched(keyEvent('z', { meta: true })), 'history.undo')
@@ -55,14 +61,19 @@ test('a shortcut stays out of a place that is typing', () => {
 
 test('two claims on one key are reported by name, and the first keeps it', () => {
   const said = []
-  const table = collectShortcuts([
-    { key: 'ctrl+z', what: 'command', name: 'history.undo', plugin: 'History' },
-    { key: 'ctrl+z', what: 'command', name: 'edit.duplicate', plugin: 'Transform Tool' },
-    { key: 'meta+q', what: 'command', name: 'app.quit', plugin: 'Nonsense' }
-  ], message => said.push(message))
+  const table = collectShortcuts(
+    [
+      { key: 'ctrl+z', what: 'command', name: 'history.undo', plugin: 'History' },
+      { key: 'ctrl+z', what: 'command', name: 'edit.duplicate', plugin: 'Transform Tool' },
+      { key: 'meta+q', what: 'command', name: 'app.quit', plugin: 'Nonsense' }
+    ],
+    message => said.push(message)
+  )
   assert.equal(table.get('ctrl+z').name, 'history.undo')
   assert.deepEqual([...table.keys()], ['ctrl+z'])
-  assert.ok(said[0].includes('history.undo') && said[0].includes('edit.duplicate') && said[0].includes('Transform Tool'))
+  assert.ok(
+    said[0].includes('history.undo') && said[0].includes('edit.duplicate') && said[0].includes('Transform Tool')
+  )
   assert.ok(said[1].includes('app.quit') && said[1].includes('meta+q'))
   assert.equal(said.length, 2)
 })

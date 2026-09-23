@@ -11,13 +11,20 @@ const LAYOUT_KEY = 'browser-game-engine.layout.v1'
 
 /** The stored layout, over the defaults, or the defaults when storage is blocked. */
 function readLayout(fallback) {
-  try { return { ...fallback, ...JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') } }
-  catch { return { ...fallback } }
+  try {
+    return { ...fallback, ...JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') }
+  } catch {
+    return { ...fallback }
+  }
 }
 
 /** Store the layout for the next page. Blocked storage is not an error. */
 function saveLayout(layout) {
-  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)) } catch { /* storage may be blocked */ }
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout))
+  } catch {
+    /* storage may be blocked */
+  }
 }
 
 /**

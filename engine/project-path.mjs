@@ -84,18 +84,38 @@ export async function ensureProject(projectPath, name) {
   const put = async (file, text) => {
     const target = path.join(projectPath, file)
     await fs.mkdir(path.dirname(target), { recursive: true })
-    if (await fs.stat(target).then(() => true, () => false)) return false
+    if (
+      await fs.stat(target).then(
+        () => true,
+        () => false
+      )
+    )
+      return false
     await fs.writeFile(target, text, 'utf8')
     return true
   }
   await fs.mkdir(projectPath, { recursive: true })
-  await put('game.json', JSON.stringify({
-    title: name || projectName(projectPath),
-    startLevel: 'main'
-  }, null, 2) + '\n')
-  await put('levels/main.json', JSON.stringify({
-    camera: { mode: 'ortho', at: [0, 0], zoom: 48 },
-    entities: []
-  }, null, 2) + '\n')
+  await put(
+    'game.json',
+    JSON.stringify(
+      {
+        title: name || projectName(projectPath),
+        startLevel: 'main'
+      },
+      null,
+      2
+    ) + '\n'
+  )
+  await put(
+    'levels/main.json',
+    JSON.stringify(
+      {
+        camera: { mode: 'ortho', at: [0, 0], zoom: 48 },
+        entities: []
+      },
+      null,
+      2
+    ) + '\n'
+  )
   return projectPath
 }

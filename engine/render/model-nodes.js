@@ -35,8 +35,7 @@ export const attachedModels = new WeakMap()
 
 /** Whether three draws this node kind directly. */
 function drawsSomething(node) {
-  return node.isMesh || node.isSprite || node.isPoints
-    || node.isLine || node.isLight || node.isCamera
+  return node.isMesh || node.isSprite || node.isPoints || node.isLine || node.isLight || node.isCamera
 }
 
 /** Register a node by name, and give it a rig it can share with its siblings. */
@@ -60,7 +59,9 @@ function collectKeeps(instance, holder, rigs) {
   for (const rig of rigs) {
     for (const bone of rig.bones) if (bone) for (let at = bone; at; at = at.parent) keeps.add(at)
   }
-  instance.traverse(node => { if (drawsSomething(node)) for (let at = node; at; at = at.parent) keeps.add(at) })
+  instance.traverse(node => {
+    if (drawsSomething(node)) for (let at = node; at; at = at.parent) keeps.add(at)
+  })
   return keeps
 }
 
@@ -101,7 +102,9 @@ export function indexNodes(holder, instance) {
     node.updateMatrix()
     if (drawsSomething(node)) markDrawn(node, draws)
   })
-  instance.traverse(node => { if (!draws.has(node)) node.visible = false })
+  instance.traverse(node => {
+    if (!draws.has(node)) node.visible = false
+  })
   // A node that draws nothing and leads to nothing drawn or skinned is dead
   // weight: three still walks it on every `updateMatrixWorld`, and a rig brings
   // hundreds of them. Remove the top of each such subtree; anything an
@@ -242,7 +245,7 @@ function placeAttachment(holder, name, spec, record, nodes, where) {
 }
 
 /** Attach every model the declaration names. */
-function applyEachAttachment(holder, declared, record, nodes, where, release) {
+function applyEachAttachment(holder, declared, record, nodes, where) {
   for (const name of Object.keys(declared)) {
     const spec = attachmentOf(declared[name], `${where}.attachments.${name}`)
     if (spec) placeAttachment(holder, name, spec, record, nodes, where)
@@ -281,27 +284,34 @@ export function applyAttachments(holder, declared, release) {
   removeStaleAttachments(record, declared, where, release)
 
   if (!declared) return
-  applyEachAttachment(holder, declared, record, nodes, where, release)
+  applyEachAttachment(holder, declared, record, nodes, where)
 }
 
 /** Load one attachment model and add it to its group, unless either has gone stale first. */
 function loadAttachment(holder, group, file) {
-  cachedModel(file, loaded => {
-    // Either the attachment or the thing it hangs off may have gone while the
-    // file was in the air — and the second body to want a model already in the
-    // cache is answered before its group has been parented at all, so the flags
-    // are the only honest test.
-    if (group.userData.stale || holder.userData.stale) return
-    const instance = cloneModel(loaded)
-    // A holder marked `neverCull` is in front of the eye by construction, so
-    // culling it against a frustum it is always inside costs a test per frame
-    // and can only ever be wrong. A model in somebody else's hands is culled
-    // like anything else.
-    if (holder.userData.neverCull) instance.traverse(node => { node.frustumCulled = false })
-    group.add(instance)
-  }, () => {
-    // `cachedModel()` has already named the file on the console. An empty hand is the
-    // least bad answer here: a fallback block held in a fist reads as artwork
-    // rather than as a failure, which is the one thing it must not do.
-  })
+  cachedModel(
+    file,
+    loaded => {
+      // Either the attachment or the thing it hangs off may have gone while the
+      // file was in the air — and the second body to want a model already in the
+      // cache is answered before its group has been parented at all, so the flags
+      // are the only honest test.
+      if (group.userData.stale || holder.userData.stale) return
+      const instance = cloneModel(loaded)
+      // A holder marked `neverCull` is in front of the eye by construction, so
+      // culling it against a frustum it is always inside costs a test per frame
+      // and can only ever be wrong. A model in somebody else's hands is culled
+      // like anything else.
+      if (holder.userData.neverCull)
+        instance.traverse(node => {
+          node.frustumCulled = false
+        })
+      group.add(instance)
+    },
+    () => {
+      // `cachedModel()` has already named the file on the console. An empty hand is the
+      // least bad answer here: a fallback block held in a fist reads as artwork
+      // rather than as a failure, which is the one thing it must not do.
+    }
+  )
 }

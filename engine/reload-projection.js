@@ -57,9 +57,24 @@ const LOOK_ONLY = 'restored-world'
  * is captured by value.
  */
 const MODELLED = new Set([
-  'id', 'type', 'x', 'y', 'z', 'rotation', 'scale', 'sprite', 'mesh', 'collider',
-  'properties', 'overrides', 'hidden', 'behaviours',
-  '_definition', '_detached', '_setByPlacement', '_extraKeys'
+  'id',
+  'type',
+  'x',
+  'y',
+  'z',
+  'rotation',
+  'scale',
+  'sprite',
+  'mesh',
+  'collider',
+  'properties',
+  'overrides',
+  'hidden',
+  'behaviours',
+  '_definition',
+  '_detached',
+  '_setByPlacement',
+  '_extraKeys'
 ])
 
 /**
@@ -127,8 +142,14 @@ export function captureWorld({ world, loop, editor, view }, cause = {}) {
     // loss reportable.
     timers: loop.timers.length,
     view: {
-      x: view.x, y: view.y, z: view.z, zoom: view.zoom,
-      mode: view.mode, yaw: view.yaw, pitch: view.pitch, fov: view.fov
+      x: view.x,
+      y: view.y,
+      z: view.z,
+      zoom: view.zoom,
+      mode: view.mode,
+      yaw: view.yaw,
+      pitch: view.pitch,
+      fov: view.fov
     },
     selection: [...editor.selection],
     // Kept beside the entities rather than counted off them, so the notice can
@@ -343,9 +364,9 @@ function behaviourPlacement(attached) {
  * the level on the next save, which reads as a decision somebody made.
  */
 function overrideProperties(held) {
-  return Object.fromEntries(held.overrides
-    .filter(key => held.properties[key] !== undefined)
-    .map(key => [key, held.properties[key]]))
+  return Object.fromEntries(
+    held.overrides.filter(key => held.properties[key] !== undefined).map(key => [key, held.properties[key]])
+  )
 }
 
 /**
@@ -377,9 +398,14 @@ function placementOf(held) {
  * rather than guessed at.
  */
 function readField(value, world, missing, where) {
-  return resolve(value, id => world.byId(id), (at, id) => {
-    missing.push(`${at} pointed at "${id}", which is not in the restored world`)
-  }, where)
+  return resolve(
+    value,
+    id => world.byId(id),
+    (at, id) => {
+      missing.push(`${at} pointed at "${id}", which is not in the restored world`)
+    },
+    where
+  )
 }
 
 /**
@@ -460,9 +486,11 @@ function droppedLoss(capture) {
  * consequence is.
  */
 function pluginListLoss(madeInTheRun, total) {
-  return `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${total} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. `
-    + `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. `
-    + `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`
+  return (
+    `the lists plugins keep of what they spawned. ${madeInTheRun} of the ${total} entities were made during the run rather than by the level, and the crowd, pool or wave counter that drove them came back empty — so this world will not simulate the same as the one that was lost. ` +
+    `It is held still under the name "${LOOK_ONLY}" for that reason: look at it, and do not run it on. ` +
+    `engine.stop() gives you the level as authored; engine.loop.release("${LOOK_ONLY}") runs it anyway, knowing that`
+  )
 }
 
 /**

@@ -58,7 +58,11 @@ async function withProject(files, body) {
   const project = await temporaryProject(files, 'rewind-')
   try {
     const worlds = []
-    const open = async () => { const context = await boot(project); worlds.push(context); return context }
+    const open = async () => {
+      const context = await boot(project)
+      worlds.push(context)
+      return context
+    }
     return await body(await open(), open)
   } finally {
     await fs.rm(project, { recursive: true, force: true })
@@ -76,7 +80,11 @@ test('a step back lands where the run would have been', async () => {
     const expected = stateHash(straight.world)
 
     loop.step(300)
-    assert.notEqual(stateHash(context.world), expected, 'the two counts are different worlds, so the comparison means something')
+    assert.notEqual(
+      stateHash(context.world),
+      expected,
+      'the two counts are different worlds, so the comparison means something'
+    )
 
     const back = engine.stepBack(60)
 
@@ -110,8 +118,11 @@ test('a rewind replays the keys the run was played with', async () => {
     loop.step(270)
 
     assert.equal(loop.steps, 300)
-    assert.equal(stateHash(world), ranOn,
-      'a replay with the recorded timeline is the run that happened, not a run nobody touched')
+    assert.equal(
+      stateHash(world),
+      ranOn,
+      'a replay with the recorded timeline is the run that happened, not a run nobody touched'
+    )
   })
 })
 
@@ -145,7 +156,10 @@ test('the ring marks as the run goes, on its stride', async () => {
 
     // A mark describes the world at the count the clock reads, so the count the run
     // is on is the first one with no mark on it yet.
-    assert.deepEqual(held.marks.map(one => one.steps), [0, 60, 120, 180, 240])
+    assert.deepEqual(
+      held.marks.map(one => one.steps),
+      [0, 60, 120, 180, 240]
+    )
     assert.equal(held.stride, 60)
     assert.equal(held.oldest, 0)
     assert.equal(held.steps, 300)
@@ -156,10 +170,16 @@ test('a ring holds only as deep as it is told to, and says how far back it reach
   await withProject(PROJECT, ({ loop, world, checkpoints }) => {
     const ring = makeRewind({ world, loop, checkpoints, depth: 3, stride: 10 })
     assert.equal(ring.oldest, null, 'a fresh ring holds nothing')
-    for (let at = 0; at < 4; at++) { ring.observe(); loop.step(10) }
+    for (let at = 0; at < 4; at++) {
+      ring.observe()
+      loop.step(10)
+    }
 
-    assert.deepEqual(ring.marks.map(one => one.steps), [10, 20, 30],
-      'the oldest went when the ring got deeper than three')
+    assert.deepEqual(
+      ring.marks.map(one => one.steps),
+      [10, 20, 30],
+      'the oldest went when the ring got deeper than three'
+    )
 
     const short = ring.to(0)
     assert.equal(short.reached, false)
@@ -193,8 +213,11 @@ test('a level load drops the marks of the world before it', async () => {
     assert.deepEqual(engine.marks().marks, [], 'the marks of the world that ended went with it')
 
     loop.step(100)
-    assert.deepEqual(engine.marks().marks.map(one => one.steps), [0, 60],
-      'and the run that follows is marked from the count the new level starts on')
+    assert.deepEqual(
+      engine.marks().marks.map(one => one.steps),
+      [0, 60],
+      'and the run that follows is marked from the count the new level starts on'
+    )
 
     const back = engine.seek(0)
 
@@ -216,8 +239,11 @@ test('a mark is a moment of the whole world, an edit included', async () => {
 
     engine.seek(60)
 
-    assert.equal(world.byId(spawned.id), undefined,
-      'going back past an edit undoes the edit — a mark is the world, not a list of entities')
+    assert.equal(
+      world.byId(spawned.id),
+      undefined,
+      'going back past an edit undoes the edit — a mark is the world, not a list of entities'
+    )
   })
 })
 

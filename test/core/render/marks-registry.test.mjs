@@ -86,18 +86,44 @@ test('registration order is draw order, and re-registering keeps a name in place
 
 test('the core drives every frame hook a mark carries, without knowing its name', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
-  const seen = { begin: 0, grow: [], draws: [], place: 0, count: [], heldId: [], changed: 0, holds: 0, holdsMoving: 0, blocksMerge: 0 }
+  const seen = {
+    begin: 0,
+    grow: [],
+    draws: [],
+    place: 0,
+    count: [],
+    heldId: [],
+    changed: 0,
+    holds: 0,
+    holdsMoving: 0,
+    blocksMerge: 0
+  }
   frame.marks.register('lifecycle', {
     begin: () => seen.begin++,
     grow: count => seen.grow.push(count),
     draw: entity => seen.draws.push(entity.id),
     place: () => seen.place++,
     count: stats => seen.count.push(stats.entities),
-    heldId: view => { seen.heldId.push(view); return null },
-    changed: () => { seen.changed++; return false },
-    holds: () => { seen.holds++; return false },
-    holdsMoving: () => { seen.holdsMoving++; return false },
-    blocksMerge: () => { seen.blocksMerge++; return false }
+    heldId: view => {
+      seen.heldId.push(view)
+      return null
+    },
+    changed: () => {
+      seen.changed++
+      return false
+    },
+    holds: () => {
+      seen.holds++
+      return false
+    },
+    holdsMoving: () => {
+      seen.holdsMoving++
+      return false
+    },
+    blocksMerge: () => {
+      seen.blocksMerge++
+      return false
+    }
   })
 
   frame.sync({ entities: [box('a'), box('b')] })

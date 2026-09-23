@@ -68,7 +68,10 @@ export function makeInputRecord({ step }) {
     const now = step()
     while (applied < events.length && events[applied].at <= now) {
       const record = events[applied++]
-      if (!record.down) { keysDown.delete(record.code); continue }
+      if (!record.down) {
+        keysDown.delete(record.code)
+        continue
+      }
       keysDown.add(record.code)
       // Pressed means the step it was stamped for, which is this one.
       if (record.at === now) pressedNow.add(record.code)
@@ -131,7 +134,10 @@ export function makeInputRecord({ step }) {
     releaseAll() {
       const held = [...keysDown]
       if (held.length) forgetAfter()
-      for (const code of held) { keysDown.delete(code); events.push({ at: step(), code, down: false }) }
+      for (const code of held) {
+        keysDown.delete(code)
+        events.push({ at: step(), code, down: false })
+      }
       applied = events.length
       pressedNow.clear()
       return held.length
@@ -150,13 +156,17 @@ export function makeInputRecord({ step }) {
     pressed: code => pressedNow.has(code),
 
     /** Every input event, oldest first, stamped with the step it arrived at. */
-    get events() { return events.map(record => ({ at: record.at, code: record.code, down: record.down })) },
+    get events() {
+      return events.map(record => ({ at: record.at, code: record.code, down: record.down }))
+    },
 
     /** Apply every recorded event stamped for the step about to run. */
     applyAt,
 
     /** A key that went down since the last step is pressed for this one only. */
-    clearPressed() { pressedNow.clear() },
+    clearPressed() {
+      pressedNow.clear()
+    },
 
     restore,
 

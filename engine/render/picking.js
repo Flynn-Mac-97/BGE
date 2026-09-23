@@ -86,9 +86,9 @@ export function makePicking(state) {
 
     // rayHits has just aimed the shared raycaster through this pixel, so the
     // ray is the one to intersect the ground with — no need to build a second.
-    const ray = raycaster.ray
-    const toGround = ray.direction.y < -1e-6 ? -ray.origin.y / ray.direction.y : 0
-    const p = ray.at(toGround > 0 ? toGround : 10, new THREE.Vector3())
+    const castRay = raycaster.castRay
+    const toGround = castRay.direction.y < -1e-6 ? -castRay.origin.y / castRay.direction.y : 0
+    const p = castRay.at(toGround > 0 ? toGround : 10, new THREE.Vector3())
     return { x: p.x, y: p.y, z: p.z }
   }
 
@@ -99,7 +99,8 @@ export function makePicking(state) {
       const hits = world.entities.filter(e => {
         const { w, h } = entityDrawSize(e)
         const a = -spinRadians(e)
-        const dx = p.x - e.x, dy = p.y - e.y
+        const dx = p.x - e.x,
+          dy = p.y - e.y
         const lx = dx * Math.cos(a) - dy * Math.sin(a)
         const ly = dx * Math.sin(a) + dy * Math.cos(a)
         return Math.abs(lx) <= w / 2 && Math.abs(ly) <= h / 2

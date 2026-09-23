@@ -14,9 +14,9 @@ import { assetURL } from '../ui.js'
 import { reportOnce } from './report.js'
 
 const loader = new THREE.TextureLoader()
-const texCache = new Map()      // "mode:src"        -> the shared original
-const texState = new Map()      // "mode:src"        -> { status, waiting }
-const variantCache = new Map()  // "mode:u,v:src"    -> a copy with its own repeat
+const texCache = new Map() // "mode:src"        -> the shared original
+const texState = new Map() // "mode:src"        -> { status, waiting }
+const variantCache = new Map() // "mode:u,v:src"    -> a copy with its own repeat
 
 /**
  * The best anisotropy this GL context will do, read from the renderer once.
@@ -29,7 +29,9 @@ let maxAnisotropy = 1
 
 /** Whether a texture's file has arrived, is still loading, or failed. */
 /** Record the best anisotropy this context will do. Called once, at init. */
-export function setMaxAnisotropy(value) { maxAnisotropy = value }
+export function setMaxAnisotropy(value) {
+  maxAnisotropy = value
+}
 
 export const textureStatus = (src, mode) => texState.get(`${mode}:${src}`)?.status || 'unknown'
 
@@ -64,7 +66,8 @@ export function cachedTexture(src, mode, onFail) {
 
   const url = assetURL(src)
   const state = { status: 'loading', waiting: onFail ? [onFail] : [] }
-  const t = loader.load(url,
+  const t = loader.load(
+    url,
     () => {
       state.status = 'ready'
       // Copies made while the file was in flight are holding off their upload
@@ -83,7 +86,8 @@ export function cachedTexture(src, mode, onFail) {
       state.status = 'failed'
       for (const fn of state.waiting) fn()
       state.waiting.length = 0
-    })
+    }
+  )
 
   if (mode === 'sprite') {
     // pixel art stays crisp: no smoothing, no mipmaps
@@ -119,8 +123,13 @@ function guardUpload(base, copy, src, mode) {
   copy.version = 0
   const state = texState.get(`${mode}:${src}`)
   if (!state) return copy
-  if (state.status === 'ready') { copy.needsUpdate = true; return copy }
-  ;(state.ready = state.ready || []).push(() => { copy.needsUpdate = true })
+  if (state.status === 'ready') {
+    copy.needsUpdate = true
+    return copy
+  }
+  ;(state.ready = state.ready || []).push(() => {
+    copy.needsUpdate = true
+  })
   return copy
 }
 
@@ -157,7 +166,6 @@ export function privateTexture(src, mode, onFail) {
   const base = cachedTexture(src, mode, onFail)
   return guardUpload(base, base.clone(), src, mode)
 }
-
 
 /**
  * Drop every cached reading of one edited file.

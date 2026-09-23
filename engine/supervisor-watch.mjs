@@ -35,7 +35,7 @@ export function formatAge(startedAt, now = Date.now()) {
 }
 
 /** Cut a value to its column, marking that it was cut. */
-const clip = (text, width) => text.length <= width ? text : text.slice(0, Math.max(0, width - 1)) + '…'
+const clip = (text, width) => (text.length <= width ? text : text.slice(0, Math.max(0, width - 1)) + '…')
 
 /**
  * The fields every row carries, in display order, with the room each needs.
@@ -111,11 +111,14 @@ function summaryLine({ port, pid, startedAt, instances }, now, width) {
 }
 
 /** One table for a listing, with the supervisor's own facts above it. */
-export function formatSupervisorTable({ port, pid, startedAt, instances = [] }, now = Date.now(), width = process.stdout.columns || 80) {
+export function formatSupervisorTable(
+  { port, pid, startedAt, instances = [] },
+  now = Date.now(),
+  width = process.stdout.columns || 80
+) {
   const columns = columnsFor(width)
-  const row = read => columns
-    .map(column => clip(String(read(column) ?? '-'), column.width).padEnd(column.width))
-    .join('  ')
+  const row = read =>
+    columns.map(column => clip(String(read(column) ?? '-'), column.width).padEnd(column.width)).join('  ')
   return [
     summaryLine({ port, pid, startedAt, instances }, now, width),
     '',
@@ -138,12 +141,16 @@ const EVENT_LIMIT = 10
  */
 export function formatEvents(events = [], limit = EVENT_LIMIT, width = process.stdout.columns || 80) {
   if (!events.length) return 'no events yet'
-  return events.slice(-limit).map(event => {
-    const parsed = new Date(event.at)
-    const time = Number.isNaN(parsed.getTime()) ? String(event.at ?? '-') : parsed.toISOString().slice(11, 19)
-    const line = `${time}  ${String(event.event).padEnd(7)} ${String(event.id).padEnd(18)} ${event.detail ?? ''}`.trimEnd()
-    return clip(line, width)
-  }).join('\n')
+  return events
+    .slice(-limit)
+    .map(event => {
+      const parsed = new Date(event.at)
+      const time = Number.isNaN(parsed.getTime()) ? String(event.at ?? '-') : parsed.toISOString().slice(11, 19)
+      const line =
+        `${time}  ${String(event.event).padEnd(7)} ${String(event.id).padEnd(18)} ${event.detail ?? ''}`.trimEnd()
+      return clip(line, width)
+    })
+    .join('\n')
 }
 
 /** The supervisor's own facts, every instance, and the event feed under them. */
@@ -151,9 +158,16 @@ async function readView(checkout, width) {
   const health = await askSupervisor(checkout, 'GET', '/health', null, LIST_TIMEOUT_MILLISECONDS)
   const listed = await askSupervisor(checkout, 'GET', '/instances', null, LIST_TIMEOUT_MILLISECONDS)
   const recorded = await askSupervisor(checkout, 'GET', '/events', null, LIST_TIMEOUT_MILLISECONDS)
-  const table = formatSupervisorTable({
-    port: health.port, pid: health.pid, startedAt: health.startedAt, instances: listed.instances
-  }, Date.now(), width)
+  const table = formatSupervisorTable(
+    {
+      port: health.port,
+      pid: health.pid,
+      startedAt: health.startedAt,
+      instances: listed.instances
+    },
+    Date.now(),
+    width
+  )
   return `${table}\n\n${formatEvents(recorded.events, EVENT_LIMIT, width)}`
 }
 
@@ -162,13 +176,16 @@ const windowWidth = () => process.stdout.columns || 80
 
 /** The keys line, shortened so it fits the same window as the table. */
 function keysLine(width) {
-  const full = '[d] open dev server   [e] open editor tab   [h] open headless   [s] stop one   [a] stop all   [r] refresh   [q] quit'
+  const full =
+    '[d] open dev server   [e] open editor tab   [h] open headless   [s] stop one   [a] stop all   [r] refresh   [q] quit'
   if (full.length <= width) return full
   return clip('[d]dev [e]edit [h]headless [s]stop [a]all [r]refresh [q]quit', width)
 }
 
-const openInstance = (checkout, request) => askSupervisor(checkout, 'POST', '/instances', request, OPEN_TIMEOUT_MILLISECONDS)
-const stopInstance = (checkout, id) => askSupervisor(checkout, 'DELETE', `/instances/${encodeURIComponent(id)}`, null, STOP_TIMEOUT_MILLISECONDS)
+const openInstance = (checkout, request) =>
+  askSupervisor(checkout, 'POST', '/instances', request, OPEN_TIMEOUT_MILLISECONDS)
+const stopInstance = (checkout, id) =>
+  askSupervisor(checkout, 'DELETE', `/instances/${encodeURIComponent(id)}`, null, STOP_TIMEOUT_MILLISECONDS)
 const stopAllInstances = checkout => askSupervisor(checkout, 'DELETE', '/instances', null, STOP_TIMEOUT_MILLISECONDS)
 
 const describeStarted = instance =>
@@ -188,7 +205,7 @@ const describeStopped = answer => {
  */
 export async function watchSupervisor(checkout) {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    process.stdout.write(await readView(checkout, windowWidth()) + '\n')
+    process.stdout.write((await readView(checkout, windowWidth())) + '\n')
     return
   }
 
@@ -204,9 +221,7 @@ export async function watchSupervisor(checkout) {
     try {
       const width = windowWidth()
       const view = await readView(checkout, width)
-      const prompt = asking === null
-        ? keysLine(width)
-        : clip(`stop which id? ${asking}`, width)
+      const prompt = asking === null ? keysLine(width) : clip(`stop which id? ${asking}`, width)
       process.stdout.write(`\x1b[2J\x1b[3J\x1b[H${view}\n\n${prompt}\n${clip(notice, width)}\n`)
     } catch (error) {
       finished = true
@@ -217,7 +232,11 @@ export async function watchSupervisor(checkout) {
   }
 
   const act = async run => {
-    try { notice = await run() } catch (error) { notice = error.message }
+    try {
+      notice = await run()
+    } catch (error) {
+      notice = error.message
+    }
     await draw()
   }
 
@@ -227,7 +246,7 @@ export async function watchSupervisor(checkout) {
   }
 
   const onKey = (text, key) => {
-    if (finished) return
+    if (finished) return undefined
     if ((key.ctrl && key.name === 'c') || text === 'q') return quit()
     if (asking !== null) {
       if (key.name === 'return') {
@@ -235,17 +254,37 @@ export async function watchSupervisor(checkout) {
         asking = null
         return void act(async () => describeStopped(await stopInstance(checkout, id)))
       }
-      if (key.name === 'escape') { asking = null; notice = 'cancelled'; return void draw() }
-      if (key.name === 'backspace') { asking = asking.slice(0, -1); return void draw() }
-      if (text && text.length === 1 && !key.ctrl) { asking += text; return void draw() }
-      return
+      if (key.name === 'escape') {
+        asking = null
+        notice = 'cancelled'
+        return void draw()
+      }
+      if (key.name === 'backspace') {
+        asking = asking.slice(0, -1)
+        return void draw()
+      }
+      if (text && text.length === 1 && !key.ctrl) {
+        asking += text
+        return void draw()
+      }
+      return undefined
     }
     if (text === 'd') return void act(async () => describeStarted(await openInstance(checkout, { kind: 'dev-server' })))
-    if (text === 'e') return void act(async () => describeStarted(await openInstance(checkout, { kind: 'editor-browser' })))
-    if (text === 'h') return void act(async () => describeStarted(await openInstance(checkout, { kind: 'lane-browser' })))
+    if (text === 'e')
+      return void act(async () => describeStarted(await openInstance(checkout, { kind: 'editor-browser' })))
+    if (text === 'h')
+      return void act(async () => describeStarted(await openInstance(checkout, { kind: 'lane-browser' })))
     if (text === 'a') return void act(async () => describeStopped(await stopAllInstances(checkout)))
-    if (text === 's') { asking = ''; notice = 'type an instance id, then Enter'; return void draw() }
-    if (text === 'r') { notice = 'refreshed'; return void draw() }
+    if (text === 's') {
+      asking = ''
+      notice = 'type an instance id, then Enter'
+      return void draw()
+    }
+    if (text === 'r') {
+      notice = 'refreshed'
+      return void draw()
+    }
+    return undefined
   }
 
   readline.emitKeypressEvents(process.stdin)
@@ -253,13 +292,18 @@ export async function watchSupervisor(checkout) {
   process.stdin.resume()
   process.stdin.setEncoding('utf8')
   process.stdin.on('keypress', onKey)
-  const timer = setInterval(() => { if (asking === null) draw() }, REFRESH_MILLISECONDS)
+  const timer = setInterval(() => {
+    if (asking === null) draw()
+  }, REFRESH_MILLISECONDS)
   timer.unref()
 
   await draw()
   await new Promise(resolve => {
     const wait = setInterval(() => {
-      if (finished) { clearInterval(wait); resolve() }
+      if (finished) {
+        clearInterval(wait)
+        resolve()
+      }
     }, 50)
   })
   clearInterval(timer)

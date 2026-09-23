@@ -26,7 +26,9 @@ const CLI = path.join(ROOT, 'bin/engine.mjs')
 const run = (args, options = {}) => {
   try {
     const stdout = execFileSync(process.execPath, [CLI, ...args], {
-      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...options
     })
     return { code: 0, stdout, stderr: '' }
   } catch (e) {
@@ -69,10 +71,17 @@ test('servers keeps the record of a live process that has not bound its port', a
   try {
     const port = await freePort()
     fs.mkdirSync(path.join(root, '.engine'), { recursive: true })
-    fs.writeFileSync(path.join(root, '.engine/servers.json'), JSON.stringify({
-      version: 1,
-      servers: [{ port, pid: child.pid, serves: root, project: null, startedAt: new Date().toISOString() }]
-    }, null, 2))
+    fs.writeFileSync(
+      path.join(root, '.engine/servers.json'),
+      JSON.stringify(
+        {
+          version: 1,
+          servers: [{ port, pid: child.pid, serves: root, project: null, startedAt: new Date().toISOString() }]
+        },
+        null,
+        2
+      )
+    )
 
     const result = run(['servers', '--root', root])
     assert.equal(result.code, 0, result.stderr)
@@ -82,10 +91,17 @@ test('servers keeps the record of a live process that has not bound its port', a
     assert.equal(seen?.state, 'unresponsive', 'a live process that answers nothing is still starting, not litter')
 
     const registry = JSON.parse(fs.readFileSync(path.join(root, '.engine/servers.json'), 'utf8'))
-    assert.equal(registry.servers.some(server => server.pid === child.pid), true,
-      'the record of a live process survives a listing')
+    assert.equal(
+      registry.servers.some(server => server.pid === child.pid),
+      true,
+      'the record of a live process survives a listing'
+    )
   } finally {
-    try { process.kill(child.pid, 'SIGKILL') } catch { /* already gone */ }
+    try {
+      process.kill(child.pid, 'SIGKILL')
+    } catch {
+      /* already gone */
+    }
     fs.rmSync(root, { recursive: true, force: true })
   }
 })
@@ -181,13 +197,21 @@ test('an entity list can be projected to named columns', () => {
   const projected = JSON.parse(run(['--headless', '--project', FIXTURE, 'snapshot', '{"entities":["id","at"]}']).stdout)
 
   assert.ok(Array.isArray(asRows.entities), 'the flag on its own still gives rows of objects')
-  assert.ok(asRows.entities.every(row => row.id && row.at), 'and every row carries what it always did')
+  assert.ok(
+    asRows.entities.every(row => row.id && row.at),
+    'and every row carries what it always did'
+  )
   assert.deepEqual(projected.entities.columns, ['id', 'at'])
   assert.equal(projected.entities.rows.length, asRows.entities.length)
-  assert.deepEqual(projected.entities.rows[0], [asRows.entities[0].id, asRows.entities[0].at],
-    'the same data, with the names written once')
-  assert.ok(JSON.stringify(projected).length < JSON.stringify(asRows).length,
-    'and the point of it: fewer characters for the same answer')
+  assert.deepEqual(
+    projected.entities.rows[0],
+    [asRows.entities[0].id, asRows.entities[0].at],
+    'the same data, with the names written once'
+  )
+  assert.ok(
+    JSON.stringify(projected).length < JSON.stringify(asRows).length,
+    'and the point of it: fewer characters for the same answer'
+  )
 })
 
 test('a projection naming a field that does not exist is refused, with the ones that do', () => {
@@ -207,20 +231,35 @@ test('a projection written as a bare flag is refused, not quietly answered witho
 })
 
 test('the determinism lint names each banned source with a line', () => {
-  const problems = lint('probe.js', [
-    'export default {',
-    '  update() {',
-    '    const now = performance.now()',
-    '    const r = Math.random()',
-    '    setTimeout(() => {}, 1)',
-    '    // a comment may say performance.now() without being a problem',
-    '  }',
-    '}'
-  ].join('\n'))
-  assert.ok(problems.some(p => /performance\.now/.test(p.why)), 'names the wall clock')
-  assert.ok(problems.some(p => /Math\.random/.test(p.why)), 'names the random source')
-  assert.ok(problems.some(p => /setTimeout/.test(p.why)), 'names the scheduler')
-  assert.ok(problems.every(p => p.line > 0), 'every problem has a line number')
+  const problems = lint(
+    'probe.js',
+    [
+      'export default {',
+      '  update() {',
+      '    const now = performance.now()',
+      '    const r = Math.random()',
+      '    setTimeout(() => {}, 1)',
+      '    // a comment may say performance.now() without being a problem',
+      '  }',
+      '}'
+    ].join('\n')
+  )
+  assert.ok(
+    problems.some(p => /performance\.now/.test(p.why)),
+    'names the wall clock'
+  )
+  assert.ok(
+    problems.some(p => /Math\.random/.test(p.why)),
+    'names the random source'
+  )
+  assert.ok(
+    problems.some(p => /setTimeout/.test(p.why)),
+    'names the scheduler'
+  )
+  assert.ok(
+    problems.every(p => p.line > 0),
+    'every problem has a line number'
+  )
   assert.equal(problems.length, 3, 'the comment line is not a problem')
 })
 
@@ -229,18 +268,26 @@ test('check passes clean with nothing running, and a warning never fails it', ()
   const reply = JSON.parse(r.stdout)
   assert.equal(r.code, 0)
   assert.equal(reply.ok, true)
-  assert.deepEqual(reply.problems.filter(p => !p.warning), [], 'nothing fatal')
+  assert.deepEqual(
+    reply.problems.filter(p => !p.warning),
+    [],
+    'nothing fatal'
+  )
   // Undescribed types are reported and must never fail the run: a check that
   // failed the build the day it shipped is a check somebody switches off.
-  assert.ok(reply.problems.every(p => p.warning), 'anything left is a warning')
+  assert.ok(
+    reply.problems.every(p => p.warning),
+    'anything left is a warning'
+  )
 })
 
 test('a placement that keeps the invariant its type declares passes check', async () => {
   // The whole path, not the pure function below: a type declares a rule, a
   // level places it correctly, and `check` says nothing.
-  const project = await temporaryProject({
-    'game.json': { title: 'invariant', startLevel: 'main' },
-    'types/slab.js': `export default {
+  const project = await temporaryProject(
+    {
+      'game.json': { title: 'invariant', startLevel: 'main' },
+      'types/slab.js': `export default {
   about: 'a floor whose top face is the ground line',
   appearance: 'A wide flat slab.',
   looksWrongWhen: 'anything stands inside it.',
@@ -248,8 +295,10 @@ test('a placement that keeps the invariant its type declares passes check', asyn
   invariant: { rule: 'topFaceAtY', value: 0, about: 'top face at y = 0' }
 }
 `,
-    'levels/main.json': { entities: [{ id: 'floor', type: 'slab', at: [0, -0.5, 0] }] }
-  }, 'engine-invariant-')
+      'levels/main.json': { entities: [{ id: 'floor', type: 'slab', at: [0, -0.5, 0] }] }
+    },
+    'engine-invariant-'
+  )
   const reply = JSON.parse(run(['check', '--project', project]).stdout)
   const broken = reply.problems.filter(problem => /invariant/.test(problem.why))
   assert.deepEqual(broken, [], 'a correct placement reports no invariant problem')
@@ -266,7 +315,13 @@ test('invariantProblems: a placement that satisfies its type is silent', () => {
 
 test('invariantProblems: names the type, the placement, and both numbers', () => {
   const index = {
-    types: { ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0, about: 'top face at y = 0' }, meshBox: [40, 1, 40] } },
+    types: {
+      ground: {
+        file: 'types/ground.js',
+        invariant: { rule: 'topFaceAtY', value: 0, about: 'top face at y = 0' },
+        meshBox: [40, 1, 40]
+      }
+    },
     levels: { meadow: { file: 'levels/meadow.json' } }
   }
   const placements = { meadow: [{ id: 'floor', type: 'ground', at: [0, -6.5, 0] }] }
@@ -281,12 +336,14 @@ test('invariantProblems: names the type, the placement, and both numbers', () =>
   assert.match(problems[0].why, /expected 0, got -6/)
 })
 
-test('invariantProblems: a placement collider with no box replaces the type\'s, not merges', () => {
+test("invariantProblems: a placement collider with no box replaces the type's, not merges", () => {
   // engine/world.js makeEntity: `collider: placement.collider ?? type.collider`
   // — whole object, never key-merged. A placement that swaps in a circle
   // collider has no box at all, even though the type's box would have one.
   const index = {
-    types: { ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0 }, colliderBox: [40, 1, 40] } },
+    types: {
+      ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0 }, colliderBox: [40, 1, 40] }
+    },
     levels: { meadow: { file: 'levels/meadow.json' } }
   }
   const placements = { meadow: [{ id: 'floor', type: 'ground', at: [0, -0.5, 0], collider: { circle: 2 } }] }
@@ -312,7 +369,16 @@ test('invariantProblems: an unknown rule name is reported, never ignored', () =>
 test('pain records, lists and resolves against an isolated file', () => {
   const file = painFile()
   try {
-    const recorded = withPain(file, ['pain', 'the thing was hard', '--cost', '500', '--kind', 'cli', '--where', 'bin/engine.mjs'])
+    const recorded = withPain(file, [
+      'pain',
+      'the thing was hard',
+      '--cost',
+      '500',
+      '--kind',
+      'cli',
+      '--where',
+      'bin/engine.mjs'
+    ])
     assert.equal(recorded.code, 0)
     assert.equal(JSON.parse(recorded.stdout).id, 'p1', 'first id is p1')
 
@@ -344,9 +410,18 @@ test('pain rejects a bad kind', () => {
 test('insight records, ranks by saving, and adopts', () => {
   const file = insightFile()
   try {
-    const recorded = withInsight(file, ['insight', 'derive it from live pids',
-      '--problem', 'state that goes stale after a crash', '--saves', '6000',
-      '--kind', 'method', '--tool', 'a lock verb'])
+    const recorded = withInsight(file, [
+      'insight',
+      'derive it from live pids',
+      '--problem',
+      'state that goes stale after a crash',
+      '--saves',
+      '6000',
+      '--kind',
+      'method',
+      '--tool',
+      'a lock verb'
+    ])
     assert.equal(recorded.code, 0)
     const first = JSON.parse(recorded.stdout)
     assert.equal(first.id, 'i1', 'first id is i1')
@@ -358,7 +433,11 @@ test('insight records, ranks by saving, and adopts', () => {
     assert.equal(listed.open, 2)
     assert.equal(listed.saves, 6100)
     assert.equal(listed.byKind.method.saves, 6000)
-    assert.deepEqual(listed.insights.map(record => record.id), ['i1', 'i2'], 'the bigger saving ranks first')
+    assert.deepEqual(
+      listed.insights.map(record => record.id),
+      ['i1', 'i2'],
+      'the bigger saving ranks first'
+    )
 
     const adopted = withInsight(file, ['insight.adopt', 'i1', 'added the lock verb'])
     assert.equal(JSON.parse(adopted.stdout).id, 'i1')
@@ -384,7 +463,10 @@ test('insight.list searches every record, adopted or not', () => {
     // Without words the same adopted record is hidden, so searching and
     // listing cannot be answering the same question.
     const listed = JSON.parse(withInsight(file, ['insight.list']).stdout)
-    assert.deepEqual(listed.insights.map(record => record.id), ['i2'])
+    assert.deepEqual(
+      listed.insights.map(record => record.id),
+      ['i2']
+    )
 
     assert.equal(JSON.parse(withInsight(file, ['insight.list', 'nothingmatchesthis']).stdout).found, 0)
   } finally {
@@ -436,18 +518,34 @@ test('a headless world starts with nothing running', () => {
  * `tools/fanout/`, and no test run spawns one.
  */
 test('a headless run that stepped a solver exits 0', async () => {
-  const project = await temporaryProject({
-    'game.json': { title: 'exit-code', startLevel: 'main', plugins: { disabled: ['Physics 3D', 'Physics 2D'] } },
-    'levels/main.json': {
-      camera: { at: [0, 4] },
-      entities: [{ type: 'floor', at: [0, -1, 0] }, { type: 'crate', at: [0, 3, 0] }]
+  const project = await temporaryProject(
+    {
+      'game.json': { title: 'exit-code', startLevel: 'main', plugins: { disabled: ['Physics 3D', 'Physics 2D'] } },
+      'levels/main.json': {
+        camera: { at: [0, 4] },
+        entities: [
+          { type: 'floor', at: [0, -1, 0] },
+          { type: 'crate', at: [0, 3, 0] }
+        ]
+      },
+      'types/floor.js': "export default { collider: { box: [8, 0.4, 8] }, properties: { body: 'solid' } }\n",
+      'types/crate.js': "export default { collider: { box: [0.5, 0.5, 0.5] }, properties: { body: 'dynamic' } }\n"
     },
-    'types/floor.js': "export default { collider: { box: [8, 0.4, 8] }, properties: { body: 'solid' } }\n",
-    'types/crate.js': "export default { collider: { box: [0.5, 0.5, 0.5] }, properties: { body: 'dynamic' } }\n"
-  }, 'engine-exit-code-')
+    'engine-exit-code-'
+  )
 
   try {
-    const r = run(['--headless', '--project', project, 'script', JSON.stringify([['snapshot', {}], ['simulate', 1], ['snapshot', {}]])])
+    const r = run([
+      '--headless',
+      '--project',
+      project,
+      'script',
+      JSON.stringify([
+        ['snapshot', {}],
+        ['simulate', 1],
+        ['snapshot', {}]
+      ])
+    ])
     assert.equal(r.code, 0, `the run exited ${r.code}: ${r.stderr.trim().split('\n')[0]}`)
     assert.doesNotMatch(r.stderr, /UV_HANDLE_CLOSING/, 'and it was not an assertion on the way out')
     const reply = JSON.parse(r.stdout)
@@ -490,33 +588,47 @@ test('a plugin that failed to import is named everywhere a command turns up miss
   const wholesome = await inspectOver(healthy, bus)
   assert.deepEqual(healthy.failures(), [])
   assert.equal(wholesome.snapshot().pluginsFailed, undefined, 'a healthy snapshot gains nothing')
-  await assert.rejects(() => wholesome.run('nope.nothing'),
+  await assert.rejects(
+    () => wholesome.run('nope.nothing'),
     /^Error: no command "nope\.nothing"\. Try engine\.commands\(\)$/,
-    'an ordinary typo keeps the short answer')
+    'an ordinary typo keeps the short answer'
+  )
 
   const broken = makeLoader(makeBus())
   broken.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), true)
   broken.boot({})
   const engine = await inspectOver(broken, makeBus())
 
-  assert.deepEqual(broken.failures(), [{
-    name: null,
-    file: 'plugins/builtin/see.js',
-    error: "SyntaxError: Unexpected token '}'",
-    builtin: true,
-    failedToImport: true
-  }])
+  assert.deepEqual(broken.failures(), [
+    {
+      name: null,
+      file: 'plugins/builtin/see.js',
+      error: "SyntaxError: Unexpected token '}'",
+      builtin: true,
+      failedToImport: true
+    }
+  ])
 
   const snapshot = engine.snapshot()
   assert.match(snapshot.pluginsFailed[0], /plugins\/builtin\/see\.js failed to import/)
-  assert.match(snapshot.errors.at(-1).message, /Every command it contributes is missing/,
-    'the default snapshot carries it without being asked')
-  assert.deepEqual(engine.snapshot({ plugins: true }).plugins, [{
-    file: 'plugins/builtin/see.js', loaded: false, builtin: true, error: "SyntaxError: Unexpected token '}'"
-  }])
-  await assert.rejects(() => engine.run('see.capture'),
+  assert.match(
+    snapshot.errors.at(-1).message,
+    /Every command it contributes is missing/,
+    'the default snapshot carries it without being asked'
+  )
+  assert.deepEqual(engine.snapshot({ plugins: true }).plugins, [
+    {
+      file: 'plugins/builtin/see.js',
+      loaded: false,
+      builtin: true,
+      error: "SyntaxError: Unexpected token '}'"
+    }
+  ])
+  await assert.rejects(
+    () => engine.run('see.capture'),
     /plugins\/builtin\/see\.js failed to import: SyntaxError: Unexpected token/,
-    'the reply names the file and the reason')
+    'the reply names the file and the reason'
+  )
 })
 
 /**

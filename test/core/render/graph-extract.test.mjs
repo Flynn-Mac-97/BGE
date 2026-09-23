@@ -27,9 +27,13 @@ test('every extract and prepare runs before the first execute', () => {
   graph.add({ name: 'present', execute: () => steps.push('present execute') })
   graph.run(null, null, 8, 8)
   assert.deepEqual(steps, [
-    'first extract', 'second extract',
-    'first prepare', 'second prepare',
-    'first execute', 'second execute', 'present execute'
+    'first extract',
+    'second extract',
+    'first prepare',
+    'second prepare',
+    'first execute',
+    'second execute',
+    'present execute'
   ])
 })
 
@@ -37,7 +41,16 @@ test('extract and prepare run once per pass per frame', () => {
   const graph = makePassGraph({ report: noop })
   let extracts = 0
   let prepares = 0
-  graph.add({ name: 'probe', extract: () => { extracts++ }, prepare: () => { prepares++ }, execute: noop })
+  graph.add({
+    name: 'probe',
+    extract: () => {
+      extracts++
+    },
+    prepare: () => {
+      prepares++
+    },
+    execute: noop
+  })
   graph.add({ name: 'present', execute: noop })
   graph.run(null, null, 8, 8)
   graph.run(null, null, 8, 8)
@@ -48,7 +61,12 @@ test('extract and prepare run once per pass per frame', () => {
 test('a disabled pass gets no extract, prepare or execute', () => {
   const graph = makePassGraph({ report: noop })
   const seen = []
-  graph.add({ name: 'probe', extract: () => seen.push('extract'), prepare: () => seen.push('prepare'), execute: () => seen.push('execute') })
+  graph.add({
+    name: 'probe',
+    extract: () => seen.push('extract'),
+    prepare: () => seen.push('prepare'),
+    execute: () => seen.push('execute')
+  })
   graph.add({ name: 'present', execute: noop })
   graph.disable('probe')
   graph.run(null, null, 8, 8)

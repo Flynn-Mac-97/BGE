@@ -71,9 +71,11 @@ test('an active run holds the person out of every writing op', t => {
 })
 
 test('a lane browser holds the lock while its process runs', t => {
-  const lock = workLock(checkout(t, {
-    browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID, startedAt: '2026-08-31T07:00:00Z' }]
-  }))
+  const lock = workLock(
+    checkout(t, {
+      browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID, startedAt: '2026-08-31T07:00:00Z' }]
+    })
+  )
   assert.equal(lock.locked, true)
   assert.equal(lock.holders[0].kind, 'browser')
   assert.equal(lock.holders[0].pid, LIVE_PID)
@@ -81,9 +83,11 @@ test('a lane browser holds the lock while its process runs', t => {
 })
 
 test('a killed lane browser holds nothing, and the reply says to clear it', t => {
-  const lock = workLock(checkout(t, {
-    browsers: [{ client: 'charlie', port: 9401, pid: DEAD_PID, startedAt: '2026-08-31T07:00:00Z' }]
-  }))
+  const lock = workLock(
+    checkout(t, {
+      browsers: [{ client: 'charlie', port: 9401, pid: DEAD_PID, startedAt: '2026-08-31T07:00:00Z' }]
+    })
+  )
   assert.equal(lock.locked, false, 'a record whose process is gone holds nothing')
   assert.deepEqual(lock.holders, [])
   assert.equal(lock.stale.length, 1)
@@ -101,24 +105,34 @@ test('a record with no pid cannot be proved, so it holds nothing', t => {
 })
 
 test('a dead record does not hide a live one', t => {
-  const lock = workLock(checkout(t, {
-    browsers: [
-      { client: 'charlie', port: 9401, pid: DEAD_PID },
-      { client: 'delta', port: 9402, pid: LIVE_PID }
-    ]
-  }))
+  const lock = workLock(
+    checkout(t, {
+      browsers: [
+        { client: 'charlie', port: 9401, pid: DEAD_PID },
+        { client: 'delta', port: 9402, pid: LIVE_PID }
+      ]
+    })
+  )
   assert.equal(lock.locked, true)
-  assert.deepEqual(lock.holders.map(holder => holder.id), ['delta'])
+  assert.deepEqual(
+    lock.holders.map(holder => holder.id),
+    ['delta']
+  )
   assert.match(lock.why, /delta/)
   assert.match(lock.why, /charlie/, 'the stale record is reported in the same reply')
   assert.match(lock.why, /lanes\.stop/)
 })
 
 test('several holders are all named, once each', t => {
-  const lock = workLock(checkout(t, {
-    runs: [{ id: 'crowd', status: 'active' }, { id: 'hero', status: 'active' }],
-    browsers: [{ client: 'crowd', port: 9400, pid: LIVE_PID }]
-  }))
+  const lock = workLock(
+    checkout(t, {
+      runs: [
+        { id: 'crowd', status: 'active' },
+        { id: 'hero', status: 'active' }
+      ],
+      browsers: [{ client: 'crowd', port: 9400, pid: LIVE_PID }]
+    })
+  )
   assert.match(lock.why, /2 lanes are working/, 'one lane with a browser is still one lane')
   assert.match(lock.why, /crowd/)
   assert.match(lock.why, /hero/)
@@ -145,7 +159,7 @@ test('a visible editor window holds nothing and may write', t => {
     browsers: [{ client: 'editor', port: 9400, pid: LIVE_PID, headless: false }]
   })
   const lock = workLock(root)
-  assert.equal(lock.locked, false, 'the person\'s own window is not a lane')
+  assert.equal(lock.locked, false, "the person's own window is not a lane")
   assert.deepEqual(lock.holders, [])
   assert.deepEqual(lock.stale, [], 'and its live record is not stale litter')
   assert.equal(roleOfClient(root, 'editor'), 'person')

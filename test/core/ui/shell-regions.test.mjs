@@ -30,14 +30,21 @@ class FakeElement {
   insertBefore(child, before) {
     if (child.parentNode) child.parentNode.removeChild(child)
     const at = this.children.indexOf(before)
-    if (at === -1) { this.children.push(child); child.parentNode = this; return }
+    if (at === -1) {
+      this.children.push(child)
+      child.parentNode = this
+      return
+    }
     this.children.splice(at, 0, child)
     child.parentNode = this
   }
 
   removeChild(child) {
     const at = this.children.indexOf(child)
-    if (at !== -1) { this.children.splice(at, 1); child.parentNode = null }
+    if (at !== -1) {
+      this.children.splice(at, 1)
+      child.parentNode = null
+    }
   }
 }
 
@@ -115,7 +122,7 @@ test('clear empties one region and leaves another alone', () => {
   assert.deepEqual(names(bar), ['b'])
 })
 
-test('a disabled plugin\'s mount is swept', () => {
+test("a disabled plugin's mount is swept", () => {
   const overlay = new FakeElement('overlay')
   const regions = makeRegions({ overlay })
 

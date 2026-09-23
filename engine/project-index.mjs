@@ -34,16 +34,28 @@ const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 export const HOOKS = ['start', 'update', 'onCollide', 'onDestroy']
 
+/** Folder prefixes a project file's kind comes from, most specific first. */
+const KIND_BY_PREFIX = [
+  ['types/', 'type'],
+  ['behaviours/', 'behaviour'],
+  ['levels/', 'level'],
+  ['tests/', 'test']
+]
+
+/** Extensions a project file's kind comes from. */
+const KIND_BY_EXTENSION = [
+  [/\.(png|jpg|jpeg|webp|gif|svg)$/i, 'image'],
+  [/\.(wav|mp3|ogg)$/i, 'sound'],
+  [/\.(glb|gltf)$/i, 'model']
+]
+
 /** The kind of thing a project file is, from its folder and extension. */
-export const KIND = f =>
-  f.startsWith('types/')  ? 'type'
-  : f.startsWith('behaviours/') ? 'behaviour'
-  : f.startsWith('levels/') ? 'level'
-  : f.startsWith('tests/') ? 'test'
-  : /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(f) ? 'image'
-  : /\.(wav|mp3|ogg)$/i.test(f) ? 'sound'
-  : /\.(glb|gltf)$/i.test(f) ? 'model'
-  : 'config'
+export function KIND(file) {
+  const byPrefix = KIND_BY_PREFIX.find(([prefix]) => file.startsWith(prefix))
+  if (byPrefix) return byPrefix[1]
+  const byExtension = KIND_BY_EXTENSION.find(([pattern]) => pattern.test(file))
+  return byExtension ? byExtension[1] : 'config'
+}
 
 /** Every file under a directory, as paths relative to it. A directory that will not read yields nothing. */
 export async function walk(directory, base = '') {
@@ -58,7 +70,10 @@ export async function walk(directory, base = '') {
   const root = path.resolve(directory)
   const out = []
   for (const item of items) {
-    const rel = path.relative(root, path.join(item.parentPath ?? root, item.name)).split(path.sep).join('/')
+    const rel = path
+      .relative(root, path.join(item.parentPath ?? root, item.name))
+      .split(path.sep)
+      .join('/')
     if (rel.split('/').some(part => part.startsWith('.'))) continue
     if (!item.isDirectory()) out.push(base ? `${base}/${rel}` : rel)
   }
@@ -68,12 +83,16 @@ export async function walk(directory, base = '') {
 /** The per-folder walk, for a node whose `readdir` has no recursive listing. */
 async function walkByFolder(directory, base = '') {
   const out = []
-  let items = []
-  try { items = await fs.readdir(directory, { withFileTypes: true }) } catch { return out }
+  let items
+  try {
+    items = await fs.readdir(directory, { withFileTypes: true })
+  } catch {
+    return out
+  }
   for (const it of items) {
     if (it.name.startsWith('.')) continue
     const rel = base ? `${base}/${it.name}` : it.name
-    if (it.isDirectory()) out.push(...await walkByFolder(path.join(directory, it.name), rel))
+    if (it.isDirectory()) out.push(...(await walkByFolder(path.join(directory, it.name), rel)))
     else out.push(rel)
   }
   return out
@@ -90,13 +109,18 @@ async function walkByFolder(directory, base = '') {
  */
 export function assetReferences(source) {
   const out = []
-  const add = (value, where) => { if (typeof value === 'string' && value.trim()) out.push({ reference: value, where }) }
+  const add = (value, where) => {
+    if (typeof value === 'string' && value.trim()) out.push({ reference: value, where })
+  }
   if (!source || typeof source !== 'object') return out
 
   // `sprite` is a string when simple and an object when detailed, and the object
   // may point at a single `image` or at a `sheet`.
   if (typeof source.sprite === 'string') add(source.sprite, 'sprite')
-  else if (source.sprite) { add(source.sprite.sheet, 'sprite.sheet'); add(source.sprite.image, 'sprite.image') }
+  else if (source.sprite) {
+    add(source.sprite.sheet, 'sprite.sheet')
+    add(source.sprite.image, 'sprite.image')
+  }
 
   // `mesh` follows the same shorthand: a string is the texture, an object spells
   // out a texture, a model and a baked lightmap.
@@ -113,10 +137,13 @@ export function assetReferences(source) {
 }
 
 /** The names in an attachment list, whichever of the two forms it was written in. */
-export const attachedNames = v =>
-  !v ? []
-  : Array.isArray(v) ? v.filter(n => typeof n === 'string')
-  : Object.entries(v).filter(([, config]) => config !== false).map(([n]) => n)
+export function attachedNames(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter(name => typeof name === 'string')
+  return Object.entries(value)
+    .filter(([, config]) => config !== false)
+    .map(([name]) => name)
+}
 
 let readCount = 0
 
@@ -160,11 +187,15 @@ const builtinPlugins = checkout => path.join(checkout, 'plugins/builtin')
 
 /** Read the generated catalog, or scan the sources when there is none. */
 async function builtinRegisteredTypes(checkout) {
-  const stored = await fs.readFile(path.join(checkout, BUILTIN_REGISTERED_TYPES), 'utf8')
-    .then(text => JSON.parse(text), () => null)
+  const stored = await fs.readFile(path.join(checkout, BUILTIN_REGISTERED_TYPES), 'utf8').then(
+    text => JSON.parse(text),
+    () => null
+  )
   if (Array.isArray(stored?.types)) return stored.types
   const names = (await fs.readdir(builtinPlugins(checkout)).catch(() => [])).filter(name => name.endsWith('.js'))
-  const texts = await Promise.all(names.map(name => fs.readFile(path.join(builtinPlugins(checkout), name), 'utf8').catch(() => '')))
+  const texts = await Promise.all(
+    names.map(name => fs.readFile(path.join(builtinPlugins(checkout), name), 'utf8').catch(() => ''))
+  )
   return [...new Set(texts.flatMap(registeredTypeNames))].sort()
 }
 
@@ -200,9 +231,7 @@ export function recordModuleSources() {
       if (typeof url === 'string' && url.startsWith('file:') && result && result.source != null) {
         // The loader hands the text back as bytes; a reader wants the same
         // string a disk read would have produced.
-        const text = typeof result.source === 'string'
-          ? result.source
-          : Buffer.from(result.source).toString('utf8')
+        const text = typeof result.source === 'string' ? result.source : Buffer.from(result.source).toString('utf8')
         loadedSources.set(path.resolve(fileURLToPath(url.split('?')[0].split('#')[0])), text)
       }
       return result
@@ -236,8 +265,14 @@ export const loadedModuleSource = file => loadedSources.get(path.resolve(file))
 async function typesRegisteredByPlugins(projectFiles, projectDirectory, checkout, sources) {
   const found = new Set(await builtinRegisteredTypes(checkout))
   const project = projectFiles.filter(file => /^plugins\/[^/]+\.js$/.test(file))
-  const texts = await Promise.all(project.map(file =>
-    fs.readFile(path.join(projectDirectory, file), 'utf8').then(text => text, () => null)))
+  const texts = await Promise.all(
+    project.map(file =>
+      fs.readFile(path.join(projectDirectory, file), 'utf8').then(
+        text => text,
+        () => null
+      )
+    )
+  )
   project.forEach((file, at) => {
     // A plugin file is read once here for the names it registers and again by
     // the determinism lint below. Hand the text over so the lint can skip its read.
@@ -259,7 +294,18 @@ async function typesRegisteredByPlugins(projectFiles, projectDirectory, checkout
  */
 const AGENT_VIEW = {
   types: {
-    keep: ['file', 'about', 'appearance', 'looksWrongWhen', 'invariant', 'properties', 'hooks', 'uses', 'behaviours', 'error'],
+    keep: [
+      'file',
+      'about',
+      'appearance',
+      'looksWrongWhen',
+      'invariant',
+      'properties',
+      'hooks',
+      'uses',
+      'behaviours',
+      'error'
+    ],
     always: ['file', 'properties', 'hooks']
   },
   behaviours: {
@@ -311,7 +357,7 @@ async function readIndexFile(index, file, inside, levelPlacements) {
  */
 async function lintSourceFile(index, file, inside, pluginSources) {
   if (!file.endsWith('.js')) return
-  const text = loadedModuleSource(inside(file)) ?? pluginSources.get(file) ?? await fs.readFile(inside(file), 'utf8')
+  const text = loadedModuleSource(inside(file)) ?? pluginSources.get(file) ?? (await fs.readFile(inside(file), 'utf8'))
   index.warnings.push(...lint(file, text))
 }
 
@@ -384,7 +430,14 @@ export async function buildIndex(projectDirectory, checkout = CHECKOUT, { write 
   // basename and so cannot answer "is this exact file there" — two folders may
   // hold a `jump.wav` — and that question is the one the asset check asks.
   const index = {
-    types: {}, behaviours: {}, levels: {}, tests: {}, assets: {}, files, config: [], warnings: [],
+    types: {},
+    behaviours: {},
+    levels: {},
+    tests: {},
+    assets: {},
+    files,
+    config: [],
+    warnings: [],
     pluginTypes: await typesRegisteredByPlugins(files, projectDirectory, checkout, pluginSources)
   }
   /** One project file by its path from the project directory. */
@@ -465,7 +518,9 @@ const READERS = {
   test: async (index, file, inside) => {
     index.tests[path.basename(file, '.js')] = await readTest(inside(file), file)
   },
-  config: async (index, file) => { index.config.push(file) }
+  config: async (index, file) => {
+    index.config.push(file)
+  }
 }
 
 /** Every way a type can name a file, and which key named which. */
@@ -587,7 +642,7 @@ async function readLevel(file, relative) {
     })
     // The level's own world block names one too, and a sky that is not there
     // is exactly as invisible as a texture that is not there.
-    if (typeof raw.world?.skyTexture === 'string') note(raw.world.skyTexture, 'the level\'s world.skyTexture')
+    if (typeof raw.world?.skyTexture === 'string') note(raw.world.skyTexture, "the level's world.skyTexture")
 
     return {
       name,
@@ -646,8 +701,9 @@ async function writeAtomic(file, text) {
   // comparison read is the price, and a file that is not there yet — the first
   // build — pays none of it.
   const current = await fs.stat(file).then(
-    stat => stat.size === Buffer.byteLength(text) ? fs.readFile(file, 'utf8').catch(() => null) : null,
-    () => null)
+    stat => (stat.size === Buffer.byteLength(text) ? fs.readFile(file, 'utf8').catch(() => null) : null),
+    () => null
+  )
   if (current === text) return
   // The pid is not enough on its own. One process rebuilds the index on every
   // save, and two of those overlap the moment saves come faster than a write —
@@ -678,7 +734,9 @@ async function writeAtomic(file, text) {
 async function renameWhenAllowed(from, to, tries = 5) {
   const BUSY = new Set(['EPERM', 'EBUSY', 'EACCES'])
   for (let attempt = 1; ; attempt++) {
-    try { return await fs.rename(from, to) } catch (error) {
+    try {
+      return await fs.rename(from, to)
+    } catch (error) {
       if (attempt >= tries || !BUSY.has(error.code)) throw error
       await new Promise(resolve => setTimeout(resolve, attempt * 20))
     }

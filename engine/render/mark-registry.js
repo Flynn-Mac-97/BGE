@@ -83,7 +83,9 @@ export function makeMarkRegistry(state) {
     },
 
     has: name => marks.has(name),
-    get names() { return [...marks.keys()] }
+    get names() {
+      return [...marks.keys()]
+    }
   }
 
   /**

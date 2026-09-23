@@ -42,11 +42,13 @@ let cloneSkinned = null
  */
 export function cloneModel(loaded) {
   let skinned = false
-  loaded.traverse(node => { if (node.isSkinnedMesh) skinned = true })
+  loaded.traverse(node => {
+    if (node.isSkinnedMesh) skinned = true
+  })
   return skinned ? cloneSkinned(loaded) : loaded.clone(true)
 }
 
-export const modelCache = new Map()   // file -> { status, scene, waiting }
+export const modelCache = new Map() // file -> { status, scene, waiting }
 
 /**
  * A loaded model, once — and then cloned per entity.
@@ -80,16 +82,21 @@ export function cachedModel(file, onReady, onFail) {
     entry.waiting.length = 0
   }
 
-  gltf().then(instance => instance.load(url,
-    result => {
-      entry.status = 'ready'
-      entry.scene = result.scene
-      for (const w of entry.waiting) w.onReady(entry.scene)
-      entry.waiting.length = 0
-    },
-    undefined,
-    error => fail(error?.message)
-  )).catch(error => fail(error?.message))
+  gltf()
+    .then(instance =>
+      instance.load(
+        url,
+        result => {
+          entry.status = 'ready'
+          entry.scene = result.scene
+          for (const w of entry.waiting) w.onReady(entry.scene)
+          entry.waiting.length = 0
+        },
+        undefined,
+        error => fail(error?.message)
+      )
+    )
+    .catch(error => fail(error?.message))
 }
 
 /**

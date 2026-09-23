@@ -41,7 +41,11 @@ test('a capture put back is the world it was taken from', async () => {
   world.restore(mark)
 
   assert.equal(stateHash(world), wasHash, 'the whole world, to the bit')
-  assert.deepEqual(world.entities.map(entity => entity.id), wasOrder, 'the same entities in the same order')
+  assert.deepEqual(
+    world.entities.map(entity => entity.id),
+    wasOrder,
+    'the same entities in the same order'
+  )
   assert.equal(world.entities.length, wasCount, 'and none left over from after the checkpoint')
 })
 

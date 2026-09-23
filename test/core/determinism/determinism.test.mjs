@@ -66,8 +66,11 @@ test('the drawing stream is separate, so an effect cannot move a spawn', () => {
   withEffects.reset(1234)
   for (let index = 0; index < 50; index++) withEffects.drawing()
 
-  assert.deepEqual([withEffects.random(), withEffects.random(), withEffects.random()], spawns,
-    'drawing a picture must not advance the simulation stream')
+  assert.deepEqual(
+    [withEffects.random(), withEffects.random(), withEffects.random()],
+    spawns,
+    'drawing a picture must not advance the simulation stream'
+  )
 })
 
 test('a restore puts plugins back before the world, and the loop last', async () => {
@@ -75,7 +78,10 @@ test('a restore puts plugins back before the world, and the loop last', async ()
   let seen = null
   context.checkpoints.add('Order', {
     capture: () => ({ at: 0 }),
-    restore: () => { seen = context.loop.steps; return true }
+    restore: () => {
+      seen = context.loop.steps
+      return true
+    }
   })
 
   context.loop.step(30)

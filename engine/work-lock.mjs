@@ -18,20 +18,46 @@ import path from 'node:path'
 
 /** Parse one coordination file, or null when it is missing or broken. */
 const readJson = file => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null }
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return null
+  }
 }
 
 /** Ops that change the project. Everything else answers while locked. */
 export const WRITING_OPS = new Set([
-  'set', 'spawn', 'destroy', 'select', 'play', 'stop', 'simulate', 'seed',
-  'saveLevel', 'place.at', 'new.file', 'code.save', 'scene.deleteSelected',
-  'edit.duplicate', 'history.undo', 'history.redo', 'history.jump', 'history.clear'
+  'set',
+  'spawn',
+  'destroy',
+  'select',
+  'play',
+  'stop',
+  'simulate',
+  'seed',
+  'saveLevel',
+  'place.at',
+  'new.file',
+  'code.save',
+  'scene.deleteSelected',
+  'edit.duplicate',
+  'history.undo',
+  'history.redo',
+  'history.jump',
+  'history.clear'
 ])
 
 /** Ops that write a file, whoever asks. */
 export const WRITES_A_FILE = new Set([
-  'saveLevel', 'new.file', 'code.save', 'set', 'spawn', 'destroy',
-  'place.at', 'scene.deleteSelected', 'edit.duplicate'
+  'saveLevel',
+  'new.file',
+  'code.save',
+  'set',
+  'spawn',
+  'destroy',
+  'place.at',
+  'scene.deleteSelected',
+  'edit.duplicate'
 ])
 
 /**
@@ -88,9 +114,11 @@ function proveLaneBrowsers(browsers) {
 const staleSentence = stale => {
   if (!stale.length) return ''
   const one = stale.length === 1
-  return `Stale lane browser record${one ? '' : 's'}, process gone: ` +
+  return (
+    `Stale lane browser record${one ? '' : 's'}, process gone: ` +
     `${stale.map(entry => entry.id).join(', ')}. Run lanes.stop to clear ${one ? 'it' : 'them'}. ` +
     `Every instance has a supervisor id: list them with node bin/engine.mjs supervisor and stop one with supervisor.stop <id>.`
+  )
 }
 
 /**
@@ -112,7 +140,13 @@ export function workLock(root) {
   const working = runs.filter(run => run.status === 'active')
   const holders = [
     ...working.map(run => ({ kind: 'run', id: run.id, files: run.files || [], since: run.startedAt })),
-    ...live.map(entry => ({ kind: 'browser', id: entry.client, pid: entry.pid, port: entry.port, since: entry.startedAt }))
+    ...live.map(entry => ({
+      kind: 'browser',
+      id: entry.client,
+      pid: entry.pid,
+      port: entry.port,
+      since: entry.startedAt
+    }))
   ]
   const staleRecords = stale.map(entry => ({
     kind: 'browser',
@@ -129,7 +163,8 @@ export function workLock(root) {
     locked: true,
     holders,
     stale: staleRecords,
-    why: `${names.length === 1 ? 'a lane is' : `${names.length} lanes are`} working: ${names.join(', ')}. ` +
+    why:
+      `${names.length === 1 ? 'a lane is' : `${names.length} lanes are`} working: ${names.join(', ')}. ` +
       `Editing here would change files they are building against. ` +
       `They release with agent.release, and lanes.stop ends a lane browser. ` +
       `A browser is also a supervisor instance: list ids with node bin/engine.mjs supervisor and stop one with supervisor.stop <id>.` +
@@ -151,7 +186,9 @@ export function workLock(root) {
  */
 export function roleOfClient(root, clientId) {
   if (!clientId) return 'person'
-  const browsers = readJson(path.join(process.env.ENGINE_STATE_ROOT || path.join(root, COORDINATION), 'lane-browsers.json'))?.browsers || []
+  const browsers =
+    readJson(path.join(process.env.ENGINE_STATE_ROOT || path.join(root, COORDINATION), 'lane-browsers.json'))
+      ?.browsers || []
   const record = browsers.find(entry => entry.client === clientId)
   return record && isLaneRecord(record) && processAlive(record.pid) ? 'lane' : 'person'
 }
@@ -165,7 +202,10 @@ export function roleOfClient(root, clientId) {
 export function permits(lock, op, role = 'person') {
   if (role === 'lane') {
     if (WRITES_A_FILE.has(op)) {
-      return { allowed: false, why: `"${op}" writes to the checkout, and a lane render page is a viewer. Its world is its own; the files are not.` }
+      return {
+        allowed: false,
+        why: `"${op}" writes to the checkout, and a lane render page is a viewer. Its world is its own; the files are not.`
+      }
     }
     return { allowed: true }
   }

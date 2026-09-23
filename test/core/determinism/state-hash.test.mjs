@@ -73,17 +73,69 @@ test('everything an entity carries is in the number', async () => {
     assert.equal(stateHash(context.world), start, `${label} put back must give the number back`)
   }
 
-  probe('a moved position', () => { body.x += 1 }, () => { body.x -= 1 })
-  probe('a rotation written as a vector',
-    () => { body.rotation = [1, 2, 3] }, () => { body.rotation = 0 })
-  probe('a scale written as a vector',
-    () => { body.scale = [16, 1, 2] }, () => { body.scale = [16, 1, 1] })
-  probe('a velocity physics writes', () => { body.velocityX = 3 }, () => { delete body.velocityX })
-  probe('a frame an animation writes', () => { body.frame = 7 }, () => { delete body.frame })
-  probe('a game value the entity carries',
-    () => { body.properties.probe = 42 }, () => { delete body.properties.probe })
-  probe('the shared game state',
-    () => { context.world.state.probe = 1 }, () => { delete context.world.state.probe })
+  probe(
+    'a moved position',
+    () => {
+      body.x += 1
+    },
+    () => {
+      body.x -= 1
+    }
+  )
+  probe(
+    'a rotation written as a vector',
+    () => {
+      body.rotation = [1, 2, 3]
+    },
+    () => {
+      body.rotation = 0
+    }
+  )
+  probe(
+    'a scale written as a vector',
+    () => {
+      body.scale = [16, 1, 2]
+    },
+    () => {
+      body.scale = [16, 1, 1]
+    }
+  )
+  probe(
+    'a velocity physics writes',
+    () => {
+      body.velocityX = 3
+    },
+    () => {
+      delete body.velocityX
+    }
+  )
+  probe(
+    'a frame an animation writes',
+    () => {
+      body.frame = 7
+    },
+    () => {
+      delete body.frame
+    }
+  )
+  probe(
+    'a game value the entity carries',
+    () => {
+      body.properties.probe = 42
+    },
+    () => {
+      delete body.properties.probe
+    }
+  )
+  probe(
+    'the shared game state',
+    () => {
+      context.world.state.probe = 1
+    },
+    () => {
+      delete context.world.state.probe
+    }
+  )
 })
 
 test('two different vectors do not read alike', async () => {
@@ -126,8 +178,11 @@ test('the number comes from the world, not from how it got there', async () => {
   await played.editor.loadLevel(FIXTURE_LEVEL)
   const fresh = await boot()
 
-  assert.equal(stateHash(played.world), stateHash(fresh.world),
-    'a level loaded again must read the same as a level never played')
+  assert.equal(
+    stateHash(played.world),
+    stateHash(fresh.world),
+    'a level loaded again must read the same as a level never played'
+  )
 })
 
 /**
@@ -168,8 +223,11 @@ test('a level with a scoped plugin in it is the level never played, reloaded or 
     await played.editor.loadLevel('main')
     played.loop.step(200)
 
-    assert.equal(stateHash(played.world), expected,
-      'a level played, reloaded and played again is the level played once')
+    assert.equal(
+      stateHash(played.world),
+      expected,
+      'a level played, reloaded and played again is the level played once'
+    )
   } finally {
     await fs.rm(project, { recursive: true, force: true })
   }

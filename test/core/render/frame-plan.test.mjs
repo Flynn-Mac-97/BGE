@@ -22,7 +22,10 @@ test('a mesh is described by a shape and a material it can share', () => {
 
 test('size stays out of the material key, so a big wall and a small step share one draw', () => {
   const big = describeEntity(wall({ texture: 'brick.png' }))
-  const small = describeEntity({ ...wall({ texture: 'brick.png' }), mesh: { box: [0.4, 0.4, 0.4], texture: 'brick.png' } })
+  const small = describeEntity({
+    ...wall({ texture: 'brick.png' }),
+    mesh: { box: [0.4, 0.4, 0.4], texture: 'brick.png' }
+  })
   assert.equal(small.material, big.material, 'different sizes of one surface must share a material')
   assert.notEqual(small.look, big.look, 'but a resized box has to rebuild its object')
 })
@@ -41,7 +44,10 @@ test('a declared mark does not change the look, so it never reads as a move', ()
 
 test('a part-built body has one look for the whole part list and no single material', () => {
   const described = describeEntity({
-    id: 'cat', type: 'cat', x: 0, y: 0,
+    id: 'cat',
+    type: 'cat',
+    x: 0,
+    y: 0,
     mesh: { tint: '#e8a55c', parts: [{ box: [0.4, 0.3, 0.6] }, { box: [0.3, 0.3, 0.3], at: [0, 0.2, -0.4] }] }
   })
   assert.equal(described.material, null, 'parts are drawn from the mesh, not one material')

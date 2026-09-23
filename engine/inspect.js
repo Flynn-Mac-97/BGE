@@ -33,14 +33,14 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
   // they raised. Read that back out of the loader. A log passed in was already
   // listening and has it all, in the order it happened.
   const listenedFromTheStart = log != null
-  log ??= makeLog(bus)
+  const activeLog = log ?? makeLog(bus)
   if (!listenedFromTheStart) {
-    for (const failure of loader.failures()) log.push('error', 'plugin', reasonFor(failure))
+    for (const failure of loader.failures()) activeLog.push('error', 'plugin', reasonFor(failure))
   }
 
   const api = {
     snapshot(options = {}) {
-      return projectSnapshot({ world, loader, loop, files, editor, view, log, reload }, options)
+      return projectSnapshot({ world, loader, loop, files, editor, view, log: activeLog, reload }, options)
     },
 
     /**
@@ -65,10 +65,12 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     // bridge — await the answer, so an async command reports what it measured
     // instead of a pending promise.
     async run(id, args) {
-      const command = loader.contrib.commands.find(c => c.id === id)
-        || loader.contrib.menus.find(m => m.id === id)
+      const command = loader.contrib.commands.find(c => c.id === id) || loader.contrib.menus.find(m => m.id === id)
       if (!command) throw new Error(missingCommand(id, loader.failures()))
-      validateCommandInput(command.inputSchema, args === undefined && command.inputSchema?.type === 'object' ? {} : args)
+      validateCommandInput(
+        command.inputSchema,
+        args === undefined && command.inputSchema?.type === 'object' ? {} : args
+      )
       const out = await command.run(editor.context, args)
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
@@ -89,7 +91,9 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     /** Select ids, as clicking them in the editor would. */
     select: ids => editor.select(ids),
     /** Enter play mode. A no-op when the world is already playing. */
-    play: () => { if (!loop.running) editor.togglePlay() },
+    play: () => {
+      if (!loop.running) editor.togglePlay()
+    },
 
     /**
      * Back to the level as authored. simulate() advances time without ever
@@ -156,8 +160,8 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       } else e[key] = value
       bus.emit('world:changed')
       const saved = await editor.saveLevel()
-      const view = entityView(e)
-      return saved?.skipped ? { ...view, notSaved: saved.skipped } : view
+      const savedView = entityView(e)
+      return saved?.skipped ? { ...savedView, notSaved: saved.skipped } : savedView
     },
 
     /**
@@ -172,11 +176,13 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     },
 
     /** The last `n` log lines, oldest first. */
-    log: (n = 40) => log.lines.slice(-n),
+    log: (n = 40) => activeLog.lines.slice(-n),
     /** Every error-level line in the ring. */
-    errors: () => log.lines.filter(l => l.level === 'error'),
+    errors: () => activeLog.lines.filter(l => l.level === 'error'),
     /** Empty the log ring. */
-    clearLog: () => { log.lines.length = 0 },
+    clearLog: () => {
+      activeLog.lines.length = 0
+    },
 
     // ---- going back through the run ----
 
@@ -186,7 +192,13 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      * Counts rather than moments: a moment is hundreds of kilobytes with a solver
      * in it, and what a caller wants to know is how far back it can go.
      */
-    marks: () => ({ steps: loop.steps, stride: rewind.stride, depth: rewind.depth, oldest: rewind.oldest, marks: rewind.marks }),
+    marks: () => ({
+      steps: loop.steps,
+      stride: rewind.stride,
+      depth: rewind.depth,
+      oldest: rewind.oldest,
+      marks: rewind.marks
+    }),
 
     /**
      * Take a mark now.
@@ -209,11 +221,19 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     seek: (steps = 0) => rewind.to(steps),
 
     // direct handles for anything the summary does not cover
-    world, loader, loop, files, bus, editor, view,
+    world,
+    loader,
+    loop,
+    files,
+    bus,
+    editor,
+    view,
 
     // Undefined when nothing is drawing, which is the honest answer rather than
     // a stub that pretends to render.
-    get renderer() { return editor.context?.renderer },
+    get renderer() {
+      return editor.context?.renderer
+    },
 
     /**
      * What the last frame cost: draw calls, triangles, and whatever else the
@@ -228,8 +248,15 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       const backend = renderer.backend
       // The optional features, named. A game may take a faster path when one is
       // there, so a terminal has to be able to see which it got.
-      const optional = ['shader-f16', 'subgroups', 'float32-filterable', 'clip-distances',
-        'dual-source-blending', 'timestamp-query', 'texture-compression-bc']
+      const optional = [
+        'shader-f16',
+        'subgroups',
+        'float32-filterable',
+        'clip-distances',
+        'dual-source-blending',
+        'timestamp-query',
+        'texture-compression-bc'
+      ]
       return {
         ...renderer.stats,
         backend: backend && {
@@ -255,9 +282,13 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
  */
 const missingCommand = (id, failures) => {
   if (!failures.length) return `no command "${id}". Try engine.commands()`
-  const why = failures.map(f => f.file
-    ? `Plugin file ${f.file} failed to import: ${f.error}.`
-    : `Plugin "${f.name}" failed to load: ${f.error}.`).join(' ')
-  return `no command "${id}". ${why} Every command those plugins contribute is missing, ` +
+  const why = failures
+    .map(f =>
+      f.file ? `Plugin file ${f.file} failed to import: ${f.error}.` : `Plugin "${f.name}" failed to load: ${f.error}.`
+    )
+    .join(' ')
+  return (
+    `no command "${id}". ${why} Every command those plugins contribute is missing, ` +
     `which may be this one. Try engine.commands()`
+  )
 }

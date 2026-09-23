@@ -22,12 +22,20 @@ export function makeFrameDraw(state) {
    * much of the map the merge actually caught.
    */
   const stats = {
-    drawCalls: 0, triangles: 0,
-    entities: 0, merged: 0, batches: 0,
+    drawCalls: 0,
+    triangles: 0,
+    entities: 0,
+    merged: 0,
+    batches: 0,
     // One draw call each, and one for every contact shadow together — one more
     // for every ground ring together.
-    keylines: 0, contactShadows: 0, groundRings: 0,
-    materials: 0, textures: 0, geometries: 0, programs: 0,
+    keylines: 0,
+    contactShadows: 0,
+    groundRings: 0,
+    materials: 0,
+    textures: 0,
+    geometries: 0,
+    programs: 0,
     // Milliseconds the card spent on the last frame it reported. Null where the
     // backend cannot time itself, which is every WebGL 2 one.
     gpuMs: null,
@@ -53,8 +61,12 @@ export function makeFrameDraw(state) {
   // because world matrices and shadow flags are frame setup, not a draw, and
   // every draw reads them.
   graph.add({
-    name: 'frame', before: ['clear'],
-    prepare: () => { state.scene.updateMatrixWorld(); state.updateShadows() },
+    name: 'frame',
+    before: ['clear'],
+    prepare: () => {
+      state.scene.updateMatrixWorld()
+      state.updateShadows()
+    },
     execute: () => {}
   })
   graph.add({ name: 'clear', after: ['frame'], before: ['scene'], execute: () => state.renderer.clear() })
@@ -128,7 +140,10 @@ export function makeFrameDraw(state) {
     const ordered = graph.passes
     stats.post = 'none'
     for (let at = 0; at < ordered.length; at++) {
-      if (ordered[at].name === 'post') { stats.post = 'drawing'; break }
+      if (ordered[at].name === 'post') {
+        stats.post = 'drawing'
+        break
+      }
     }
     // A headless frame has no card to draw into. The passes still run, so a
     // plugin's draw and the frame handed to it can be exercised with no GL, but
@@ -176,8 +191,7 @@ export function makeFrameDraw(state) {
     // Reading a target back is asynchronous on this renderer. The bytes are
     // returned rather than filled in, so they are copied into the caller's
     // buffer here and every caller awaits.
-    const pixels = await state.renderer.readRenderTargetPixelsAsync(
-      target, read.x, read.y, read.width, read.height)
+    const pixels = await state.renderer.readRenderTargetPixelsAsync(target, read.x, read.y, read.width, read.height)
     buffer.set(pixels.subarray(0, buffer.length))
     state.renderer.setRenderTarget(keptTarget)
     state.renderer.setClearColor(keptColour, keptAlpha)

@@ -9,24 +9,46 @@ import { buildIndex as buildProjectIndex, walk, KIND } from './project-index.mjs
 import { problemsIn, fatal } from './project-problems.mjs'
 import { recordServer, forgetServer } from './project-servers.mjs'
 import { writeGeneratedAgentFiles } from './agent-registration.mjs'
-import { chooseClient, describeClient, explainClientError, isLive, mergeClient, ownNonce, publicClient } from './bridge-clients.mjs'
+import {
+  chooseClient,
+  describeClient,
+  explainClientError,
+  isLive,
+  mergeClient,
+  ownNonce,
+  publicClient
+} from './bridge-clients.mjs'
 import { readLaneBrowsers } from './lane-browsers.mjs'
 import { workLock, permits, roleOfClient } from './work-lock.mjs'
 import { PROJECT_PREFIX } from './asset-path.js'
 import { pluginGuides } from './plugin-guides.mjs'
 import { pluginInterfaceReader } from './plugin-interface.mjs'
 import { openPage } from './open-page.mjs'
-import { ensureProject, isUntitled, projectName, projectsRoot, resolveProject, untitledProject, UNTITLED } from './project-path.mjs'
+import {
+  ensureProject,
+  isUntitled,
+  projectName,
+  projectsRoot,
+  resolveProject,
+  untitledProject,
+  UNTITLED
+} from './project-path.mjs'
 
-export function engineServerConfig({ root = process.cwd(), project = process.env.ENGINE_PROJECT, desktop = false, desktopSnapshot, desktopCapture } = {}) {
+// eslint-disable-next-line max-lines-per-function -- one Vite config factory; its plugin factories share the mutable PROJECT and client maps, so splitting it needs a shared-state record. A redesign.
+export function engineServerConfig({
+  root = process.cwd(),
+  project = process.env.ENGINE_PROJECT,
+  desktop = false,
+  desktopSnapshot,
+  desktopCapture
+} = {}) {
   const ROOT = root
 
   let PROJECT = resolveProject(ROOT, project)
 
   let PROJECT_NAME = projectName(PROJECT)
   const readProjectName = async () => {
-    const game = JSON.parse(
-      await fs.readFile(path.join(PROJECT, 'game.json'), 'utf8').catch(() => '{}'))
+    const game = JSON.parse(await fs.readFile(path.join(PROJECT, 'game.json'), 'utf8').catch(() => '{}'))
     PROJECT_NAME = projectName(PROJECT, game.title)
     return PROJECT_NAME
   }
@@ -72,7 +94,9 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
 
   async function renameWhenFree(from, to, attempts = 20) {
     for (let attempt = 0; ; attempt++) {
-      try { return await fs.rename(from, to) } catch (error) {
+      try {
+        return await fs.rename(from, to)
+      } catch (error) {
         const busy = ['EPERM', 'EBUSY', 'EACCES', 'ENOTEMPTY'].includes(error.code)
         if (!busy || attempt >= attempts) throw error
         await new Promise(resolve => setTimeout(resolve, 25))
@@ -86,11 +110,12 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
     res.end(JSON.stringify(body))
   }
 
-  const readBody = req => new Promise(resolve => {
-    let s = ''
-    req.on('data', c => (s += c))
-    req.on('end', () => resolve(s ? JSON.parse(s) : {}))
-  })
+  const readBody = req =>
+    new Promise(resolve => {
+      let s = ''
+      req.on('data', c => (s += c))
+      req.on('end', () => resolve(s ? JSON.parse(s) : {}))
+    })
 
   function safe(rel) {
     const abs = path.resolve(PROJECT, rel)
@@ -99,11 +124,19 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
   }
 
   function safeAgent(scope, rel) {
-    const base = scope === 'engine' ? ROOT : scope === 'project' ? PROJECT : null
+    let base = null
+    if (scope === 'engine') base = ROOT
+    else if (scope === 'project') base = PROJECT
     const clean = slash(String(rel || '')).replace(/^\.\//, '')
-    const allowed = scope === 'engine'
-      ? clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md' || clean.startsWith('agents/') || clean.startsWith('docs/') || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-      : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+    const allowed =
+      scope === 'engine'
+        ? clean === 'AGENTS.md' ||
+          clean === 'ENGINE-BASE.md' ||
+          clean === 'ARCHITECTURE.md' ||
+          clean.startsWith('agents/') ||
+          clean.startsWith('docs/') ||
+          /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+        : clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
     if (!base || !allowed) return null
     const abs = path.resolve(base, clean)
     return abs.startsWith(base + path.sep) ? abs : null
@@ -138,14 +171,20 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
       configureServer(server) {
         // Created if it is not there. Opening the editor with nothing on disk is
         // the blank-project case, and it has to leave a project behind.
-        ensureProject(PROJECT).then(readProjectName).then(() => buildIndex()).catch(error => {
-          console.error(`[engine] cannot open ${PROJECT}: ${error.message}`)
-        })
+        ensureProject(PROJECT)
+          .then(readProjectName)
+          .then(() => buildIndex())
+          .catch(error => {
+            console.error(`[engine] cannot open ${PROJECT}: ${error.message}`)
+          })
         // Vite watches its own root. A project outside it is watched only if the
         // watcher is told, and without that no project edit reaches the editor.
         watchProject(server)
         server.middlewares.use((req, res, next) => {
-          if (!req.url?.startsWith(mount)) return next()
+          if (!req.url?.startsWith(mount)) {
+            next()
+            return
+          }
           const rest = req.url.slice(mount.length)
           req.url = '/@fs' + slash(path.join(PROJECT, rest)).replace(/^(?![/])/, '/')
           next()
@@ -155,8 +194,14 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
   }
 
   const API_ROUTES = {
-    '/api/client-role': async ({ url }) => ({ status: 200, body: { role: roleOfClient(ROOT, url.searchParams.get('client')) } }),
-    '/api/desktop': async () => ({ status: 200, body: desktopSnapshot ? desktopSnapshot() : { supported: false, instances: [] } }),
+    '/api/client-role': async ({ url }) => ({
+      status: 200,
+      body: { role: roleOfClient(ROOT, url.searchParams.get('client')) }
+    }),
+    '/api/desktop': async () => ({
+      status: 200,
+      body: desktopSnapshot ? desktopSnapshot() : { supported: false, instances: [] }
+    }),
     '/api/desktop/capture': async ({ url }) => {
       if (!desktopCapture) return { status: 404, body: { error: 'Editor capture requires the desktop engine' } }
       return { status: 200, body: await desktopCapture(Object.fromEntries(url.searchParams)) }
@@ -212,7 +257,10 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
         status: 200,
         body: {
           projects: home,
-          names: entries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name).sort()
+          names: entries
+            .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+            .map(e => e.name)
+            .sort()
         }
       }
     },
@@ -226,7 +274,10 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
       const said = String((await readBody(req)).path || '').trim()
       if (!said) return { status: 400, body: { error: 'which project? a directory path' } }
       const wanted = path.resolve(ROOT, said)
-      const there = await fs.stat(wanted).then(s => s.isDirectory(), () => false)
+      const there = await fs.stat(wanted).then(
+        s => s.isDirectory(),
+        () => false
+      )
       if (!there) return { status: 404, body: { error: `no project directory at ${wanted}` } }
       const opened = await openProject(server, wanted)
       await buildIndex()
@@ -253,10 +304,20 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
       if (refused) return { status: 423, body: refused }
       const name = String((await readBody(req)).name || '').trim()
       if (!/^[A-Za-z0-9._-]+$/.test(name) || name.startsWith('.')) {
-        return { status: 400, body: { error: `"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot` } }
+        return {
+          status: 400,
+          body: {
+            error: `"${name}" is not a project name — letters, digits, dot, dash or underscore, one segment, no leading dot`
+          }
+        }
       }
       const target = path.join(projectsRoot(ROOT), name)
-      if (await fs.stat(target).then(() => true, () => false)) {
+      if (
+        await fs.stat(target).then(
+          () => true,
+          () => false
+        )
+      ) {
         return { status: 409, body: { error: `${target} already exists — pick another name` } }
       }
       await fs.mkdir(path.dirname(target), { recursive: true })
@@ -264,19 +325,23 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
       // The title is the project's own, so it travels with the files. It is
       // written before the server reads the name back.
       const game = JSON.parse(await fs.readFile(path.join(target, 'game.json'), 'utf8').catch(() => '{}'))
-      await fs.writeFile(path.join(target, 'game.json'), JSON.stringify({ ...game, title: name }, null, 2) + '\n', 'utf8')
+      await fs.writeFile(
+        path.join(target, 'game.json'),
+        JSON.stringify({ ...game, title: name }, null, 2) + '\n',
+        'utf8'
+      )
       const opened = await openProject(server, target)
       await buildIndex()
       return { status: 200, body: { ...opened, saved: true } }
     },
 
-    '/api/systems/catalog': async ({ url, req }) => req.method === 'GET'
-      ? { status: 200, body: await sourceCatalog(ROOT, PROJECT, url.searchParams.get('selection') || 'core') }
-      : null,
+    '/api/systems/catalog': async ({ url, req }) =>
+      req.method === 'GET'
+        ? { status: 200, body: await sourceCatalog(ROOT, PROJECT, url.searchParams.get('selection') || 'core') }
+        : null,
 
-    '/api/systems/documents': async ({ req }) => req.method === 'GET'
-      ? { status: 200, body: await listDocuments(PROJECT) }
-      : null,
+    '/api/systems/documents': async ({ req }) =>
+      req.method === 'GET' ? { status: 200, body: await listDocuments(PROJECT) } : null,
 
     '/api/systems/document': async ({ url, req }) => {
       if (req.method === 'GET') {
@@ -296,7 +361,10 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
         const refused = refusedFileWrite(req)
         if (refused) return { status: 423, body: refused }
         const body = await readBody(req)
-        return { status: 200, body: await writeSource(ROOT, PROJECT, body.scope, body.file, body.text, body.expectedHash) }
+        return {
+          status: 200,
+          body: await writeSource(ROOT, PROJECT, body.scope, body.file, body.text, body.expectedHash)
+        }
       }
       if (req.method !== 'GET') return null
       const scope = url.searchParams.get('scope')
@@ -376,7 +444,7 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
       name: 'engine-bridge',
 
       handleHotUpdate({ file, server }) {
-        if (!inProject(file)) return
+        if (!inProject(file)) return undefined
 
         // Returning [] alone stops the reload *and* the invalidation, so the
         // re-import would be served the cached transform and the edit would
@@ -401,15 +469,20 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
         server.watcher.on('all', async (event, abs) => {
           const engineFile = path.relative(ROOT, abs).replaceAll('\\', '/')
           const projectFile = path.relative(PROJECT, abs).replaceAll('\\', '/')
-          const scope = /^plugins\/builtin\/[^/]+\.js$/.test(engineFile) ? 'engine'
-            : /^plugins\/[^/]+\.js$/.test(projectFile) ? 'project' : null
+          let scope = null
+          if (/^plugins\/builtin\/[^/]+\.js$/.test(engineFile)) scope = 'engine'
+          else if (/^plugins\/[^/]+\.js$/.test(projectFile)) scope = 'project'
           if (scope && event !== 'unlink') {
-            try { await agentInterface(scope, scope === 'engine' ? engineFile : projectFile) }
-            catch (error) { console.warn(`[engine] could not update plugin interface: ${error.message}`) }
+            try {
+              await agentInterface(scope, scope === 'engine' ? engineFile : projectFile)
+            } catch (error) {
+              console.warn(`[engine] could not update plugin interface: ${error.message}`)
+            }
           }
           if (abs.includes('interface.generated.md')) return
           if (!inProject(abs)) {
-            if (slash(abs) === slash(path.join(ROOT, 'agents/bootstrap.md')) && event !== 'unlink') await writeAgentDoc()
+            if (slash(abs) === slash(path.join(ROOT, 'agents/bootstrap.md')) && event !== 'unlink')
+              await writeAgentDoc()
             return
           }
           const rel = relative(abs)
@@ -431,11 +504,13 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
           // the process — the editor vanishes mid-edit and the last thing on
           // screen is a stack trace about a temporary file. Say what happened and
           // keep serving; the next save rebuilds anyway.
-          try { await buildIndex() } catch (error) {
+          try {
+            await buildIndex()
+          } catch (error) {
             console.warn(`[engine] could not rebuild the index: ${error?.message || error}`)
           }
           server.ws.send('engine:changed', {
-            event,                                   // add | change | unlink
+            event, // add | change | unlink
             file: rel,
             kind: KIND(rel),
             name: path.basename(rel).replace(/\.[^.]+$/, '')
@@ -481,7 +556,11 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
           const { allowed, why: held } = permits(lock, op, roleOfClient(ROOT, chosen.id))
           if (!allowed) {
             return send(res, 423, {
-              ok: false, code: 'held', error: held, lock, serves: ROOT
+              ok: false,
+              code: 'held',
+              error: held,
+              lock,
+              serves: ROOT
             })
           }
 
@@ -603,11 +682,18 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
 
   async function newestLaneFrame(client) {
     if (!client || /[\\/]/.test(client)) return null
-    let names = []
-    try { names = await fs.readdir(SEE_DIRECTORY) } catch { return null }
+    let names
+    try {
+      names = await fs.readdir(SEE_DIRECTORY)
+    } catch {
+      return null
+    }
     let newest = null
-    for (const name of names.filter(name => name.endsWith('.png') && name.includes(client))) {
-      const when = await fs.stat(path.join(SEE_DIRECTORY, name)).then(stat => stat.mtimeMs, () => null)
+    for (const name of names.filter(entryName => entryName.endsWith('.png') && entryName.includes(client))) {
+      const when = await fs.stat(path.join(SEE_DIRECTORY, name)).then(
+        stat => stat.mtimeMs,
+        () => null
+      )
       if (when !== null && (!newest || when > newest.when)) newest = { name, when }
     }
     return newest
@@ -622,9 +708,16 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
 
       resolveId: id => ([TAB_BEACON, TAB_BEACON_URL].includes(id) ? TAB_BEACON_MODULE : null),
       load: id => (id === TAB_BEACON_MODULE ? TAB_BEACON_SOURCE : null),
-      transformIndexHtml: { order: 'pre', handler: () => [{
-        tag: 'script', attrs: { type: 'module', src: TAB_BEACON_URL }, injectTo: 'head'
-      }] },
+      transformIndexHtml: {
+        order: 'pre',
+        handler: () => [
+          {
+            tag: 'script',
+            attrs: { type: 'module', src: TAB_BEACON_URL },
+            injectTo: 'head'
+          }
+        ]
+      },
 
       configureServer(server) {
         // Keyed by the raw socket, so a tab that closes takes its entry with it.
@@ -632,25 +725,26 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
         // asks for; this server holds the list and nothing more.
         // A page announces again every few seconds, so a socket refused once is
         // refused again. Warn per socket, or the log buries everything else.
-      const warned = new WeakSet()
-      const observed = new WeakSet()
+        const warned = new WeakSet()
+        const observed = new WeakSet()
         server.ws.on('engine:tab', (said, client) => {
           const socket = client.socket
           // Which checkout and project this is comes from the server, last, so a
           // page cannot report a project it is not being served.
-          const merged = mergeClient(clients, socket, client,
-            { ...said, project: PROJECT_NAME, serves: ROOT })
+          const merged = mergeClient(clients, socket, client, { ...said, project: PROJECT_NAME, serves: ROOT })
           if (merged.error) {
             if (!warned.has(socket)) {
               warned.add(socket)
-              console.warn(`[engine] tab "${said?.id}" refused — ${merged.error}: ${describeClient(merged.existing)} holds that name`)
+              console.warn(
+                `[engine] tab "${said?.id}" refused — ${merged.error}: ${describeClient(merged.existing)} holds that name`
+              )
             }
             return
           }
-        if (!observed.has(socket)) {
-          observed.add(socket)
-          socket.once?.('close', () => clients.delete(socket))
-        }
+          if (!observed.has(socket)) {
+            observed.add(socket)
+            socket.once?.('close', () => clients.delete(socket))
+          }
         })
 
         // What this server is, asked over the wire. A record on disk says what was
@@ -700,17 +794,26 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
             url: `http://localhost:${port}`,
             startedAt: new Date().toISOString()
           }
-          try { recordServer(ROOT, record) } catch (error) {
+          try {
+            recordServer(ROOT, record)
+          } catch (error) {
             console.warn(`[engine] could not write the server registry: ${error?.message || error}`)
           }
         })
 
         const forget = () => {
           if (!record) return
-          try { forgetServer(ROOT, record.port, record.pid) } catch { /* leaving a corpse is survivable; the reader proves liveness */ }
+          try {
+            forgetServer(ROOT, record.port, record.pid)
+          } catch {
+            /* leaving a corpse is survivable; the reader proves liveness */
+          }
           record = null
         }
-        server.httpServer?.on('close', () => { forget(); process.removeListener('exit', forget) })
+        server.httpServer?.on('close', () => {
+          forget()
+          process.removeListener('exit', forget)
+        })
         process.on('exit', forget)
       }
     }
@@ -732,9 +835,11 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
           // open is reported when it resolves.
           openPage(`http://localhost:${port}/`, { checkout: ROOT, profile: 'editor' })
             .then(opened => {
-              console.log(opened.opened
-                ? `[engine] editor opened in ${opened.chrome}`
-                : `[engine] could not open the editor: ${opened.problem}`)
+              console.log(
+                opened.opened
+                  ? `[engine] editor opened in ${opened.chrome}`
+                  : `[engine] could not open the editor: ${opened.problem}`
+              )
             })
             .catch(error => {
               console.log(`[engine] could not open the editor: ${error?.message || error}`)
@@ -748,8 +853,11 @@ export function engineServerConfig({ root = process.cwd(), project = process.env
     await writeGeneratedAgentFiles(ROOT, PROJECT)
     for (const node of await pluginGuides(ROOT, PROJECT)) {
       if (!node.source) continue
-      try { await agentInterface(node.scope, node.source) }
-      catch (error) { console.warn(`[engine] could not update plugin interface: ${error.message}`) }
+      try {
+        await agentInterface(node.scope, node.source)
+      } catch (error) {
+        console.warn(`[engine] could not update plugin interface: ${error.message}`)
+      }
     }
   }
 

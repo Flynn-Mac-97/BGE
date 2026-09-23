@@ -27,11 +27,17 @@ export function serverRegistryFile(checkout) {
 /** The main worktree of a checkout, so a registry file survives its lane worktree being deleted. */
 function mainWorktreeOf(checkout) {
   try {
-    const line = execFileSync('git', ['-C', checkout, 'worktree', 'list', '--porcelain'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
-      .split(/\r?\n/).find(value => value.startsWith('worktree '))
+    const line = execFileSync('git', ['-C', checkout, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true
+    })
+      .split(/\r?\n/)
+      .find(value => value.startsWith('worktree '))
     if (line) return path.resolve(line.slice('worktree '.length))
-  } catch { /* not a git checkout — this checkout is the right answer */ }
+  } catch {
+    /* not a git checkout — this checkout is the right answer */
+  }
   return path.resolve(checkout)
 }
 
@@ -40,7 +46,9 @@ export function readServerRegistry(checkout) {
   try {
     const value = JSON.parse(readFileSync(serverRegistryFile(checkout), 'utf8'))
     return { version: 1, servers: Array.isArray(value.servers) ? value.servers : [] }
-  } catch { return { version: 1, servers: [] } }
+  } catch {
+    return { version: 1, servers: [] }
+  }
 }
 
 /** A registry edit is one read and one rename; a lock older than this is a corpse. */
@@ -60,8 +68,13 @@ function editServerRegistry(checkout, change) {
     handle = openSync(lock, 'wx')
   } catch {
     const age = Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now())
-    if (age < STALE_LOCK_MILLISECONDS) throw new Error('another process is updating the server registry; retry in a moment')
-    try { unlinkSync(lock) } catch { /* already gone */ }
+    if (age < STALE_LOCK_MILLISECONDS)
+      throw new Error('another process is updating the server registry; retry in a moment')
+    try {
+      unlinkSync(lock)
+    } catch {
+      /* already gone */
+    }
     handle = openSync(lock, 'wx')
   }
   try {
@@ -73,7 +86,11 @@ function editServerRegistry(checkout, change) {
     return next
   } finally {
     if (handle != null) closeSync(handle)
-    try { unlinkSync(lock) } catch { /* already gone */ }
+    try {
+      unlinkSync(lock)
+    } catch {
+      /* already gone */
+    }
   }
 }
 
@@ -88,10 +105,7 @@ function editServerRegistry(checkout, change) {
 export function recordServer(checkout, server) {
   return editServerRegistry(checkout, registry => ({
     ...registry,
-    servers: [
-      ...registry.servers.filter(entry => entry.port !== server.port && processIsAlive(entry.pid)),
-      server
-    ]
+    servers: [...registry.servers.filter(entry => entry.port !== server.port && processIsAlive(entry.pid)), server]
   }))
 }
 
@@ -111,7 +125,12 @@ export function forgetServer(checkout, port, pid) {
  */
 export function processIsAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false
-  try { process.kill(pid, 0); return true } catch (error) { return error.code === 'EPERM' }
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
 }
 
 /**
@@ -125,14 +144,24 @@ export function processIsAlive(pid) {
 function processImage(pid) {
   try {
     if (process.platform === 'win32') {
-      const row = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim()
+      const row = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      }).trim()
       if (!row || !row.startsWith('"')) return null
       return row.slice(1).split('"')[0]
     }
-    return execFileSync('ps', ['-o', 'comm=', '-p', String(pid)],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim() || null
-  } catch { return null }
+    return (
+      execFileSync('ps', ['-o', 'comm=', '-p', String(pid)], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      }).trim() || null
+    )
+  } catch {
+    return null
+  }
 }
 
 /** Whether a process image name is node, the only program a dev server starts as. */
@@ -156,7 +185,9 @@ async function askServer(port, milliseconds = 1500) {
     if (!response.ok) return null
     const said = await response.json()
     return typeof said?.pid === 'number' ? said : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 /** How long a recorded server has been up, in whole seconds. */
@@ -171,30 +202,40 @@ function isSameServer(answer, entry) {
 
 function runningServer(seen, entry, answer) {
   return {
-    ...seen, state: 'running', alive: true,
-    project: answer.project ?? entry.project, tabs: describeTabs(answer.tabs)
+    ...seen,
+    state: 'running',
+    alive: true,
+    project: answer.project ?? entry.project,
+    tabs: describeTabs(answer.tabs)
   }
 }
 
 function replacedServer(seen, entry, answer) {
   return {
-    ...seen, state: 'replaced', alive: false,
+    ...seen,
+    state: 'replaced',
+    alive: false,
     answering: { pid: answer.pid, serves: answer.serves, project: answer.project },
-    why: `port ${entry.port} answers, but as process ${answer.pid} serving ${answer.serves} — an op sent there would read a different project. `
-      + `Nothing on this port is stopped for you; see every engine instance with: node bin/engine.mjs supervisor`
+    why:
+      `port ${entry.port} answers, but as process ${answer.pid} serving ${answer.serves} — an op sent there would read a different project. ` +
+      `Nothing on this port is stopped for you; see every engine instance with: node bin/engine.mjs supervisor`
   }
 }
 
 function unresponsiveServer(seen, entry) {
   return {
-    ...seen, state: 'unresponsive', alive: false,
+    ...seen,
+    state: 'unresponsive',
+    alive: false,
     why: `process ${entry.pid} is still there but port ${entry.port} answers nothing; it is either still starting or wedged`
   }
 }
 
 function deadServer(seen, entry, image) {
   return {
-    ...seen, state: 'dead', alive: false,
+    ...seen,
+    state: 'dead',
+    alive: false,
     why: image
       ? `process ${entry.pid} now belongs to ${image}, so this server is gone and its number has been reused`
       : `process ${entry.pid} is gone`
@@ -221,7 +262,8 @@ async function inspectServer(entry) {
   const image = processAlive ? processImage(entry.pid) : null
   const seen = { ...entry, processAlive, uptimeSeconds: uptimeSeconds(entry) }
 
-  if (answer) return isSameServer(answer, entry) ? runningServer(seen, entry, answer) : replacedServer(seen, entry, answer)
+  if (answer)
+    return isSameServer(answer, entry) ? runningServer(seen, entry, answer) : replacedServer(seen, entry, answer)
   if (image && isNodeProcess(image)) return unresponsiveServer(seen, entry)
   return deadServer(seen, entry, image)
 }
@@ -231,10 +273,13 @@ async function inspectServer(entry) {
  * blank. It is the single most confusing failure this listing exists to
  * explain, so it is spelled out rather than left as a flag to interpret.
  */
-const describeTabs = tabs => (Array.isArray(tabs) ? tabs : []).map(tab => ({
-  ...tab,
-  ...(tab.hidden ? { why: 'hidden — a hidden tab does not draw, so a capture taken through it comes back blank' } : {})
-}))
+const describeTabs = tabs =>
+  (Array.isArray(tabs) ? tabs : []).map(tab => ({
+    ...tab,
+    ...(tab.hidden
+      ? { why: 'hidden — a hidden tab does not draw, so a capture taken through it comes back blank' }
+      : {})
+  }))
 
 /**
  * Every server this checkout knows about, proved one by one.
@@ -253,11 +298,19 @@ export async function listServers(checkout, alsoProbe = []) {
     const answer = await askServer(port)
     if (!answer) continue
     servers.push({
-      port, pid: answer.pid, serves: answer.serves, project: answer.project,
-      url: `http://localhost:${port}`, startedAt: answer.startedAt,
-      state: 'unregistered', alive: true, processAlive: true, tabs: describeTabs(answer.tabs),
-      why: `an engine server nothing wrote down is listening on port ${port}, serving ${answer.serves}; `
-        + `see and stop it through the supervisor: node bin/engine.mjs supervisor`
+      port,
+      pid: answer.pid,
+      serves: answer.serves,
+      project: answer.project,
+      url: `http://localhost:${port}`,
+      startedAt: answer.startedAt,
+      state: 'unregistered',
+      alive: true,
+      processAlive: true,
+      tabs: describeTabs(answer.tabs),
+      why:
+        `an engine server nothing wrote down is listening on port ${port}, serving ${answer.serves}; ` +
+        `see and stop it through the supervisor: node bin/engine.mjs supervisor`
     })
   }
 
@@ -276,11 +329,16 @@ export async function endProcess(pid) {
       // `npm run dev` is the parent of the vite process that holds the port, so
       // the tree is killed rather than the one process — otherwise the shell is
       // left behind holding the terminal.
-      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      })
     } else {
       process.kill(pid, 'SIGTERM')
     }
-  } catch { /* it may have died between the check and the kill, which is a win */ }
+  } catch {
+    /* it may have died between the check and the kill, which is a win */
+  }
   for (let attempt = 0; attempt < 20 && processIsAlive(pid); attempt++) {
     await new Promise(resolve => setTimeout(resolve, 100))
   }
@@ -303,12 +361,17 @@ async function stopOneServer(server, checkout) {
   if (server.state === 'dead') return { outcome: 'already-dead', named, why: server.why }
   if (server.state === 'replaced') return { outcome: 'refused', named, why: server.why }
   if (server.state === 'unregistered' && !servesThisCheckout(server, checkout)) {
-    return { outcome: 'refused', named, why: `nothing here started it and it serves ${server.serves}, which is outside this checkout` }
+    return {
+      outcome: 'refused',
+      named,
+      why: `nothing here started it and it serves ${server.serves}, which is outside this checkout`
+    }
   }
   const gone = await endProcess(server.pid)
   if (gone) return { outcome: 'stopped', named, was: server.state, tabsAttached: (server.tabs || []).length }
   return {
-    outcome: 'refused', named,
+    outcome: 'refused',
+    named,
     why: `process ${server.pid} would not stop; stop it with ` + 'node bin/engine.mjs supervisor.stop <id>, or by hand'
   }
 }
@@ -340,7 +403,8 @@ export async function stopServers(checkout, port = null) {
 
   for (const server of targets) {
     const outcome = await stopOneServer(server, checkout)
-    if (outcome.outcome === 'stopped') stopped.push({ ...outcome.named, was: outcome.was, tabsAttached: outcome.tabsAttached })
+    if (outcome.outcome === 'stopped')
+      stopped.push({ ...outcome.named, was: outcome.was, tabsAttached: outcome.tabsAttached })
     else if (outcome.outcome === 'already-dead') alreadyDead.push({ ...outcome.named, why: outcome.why })
     else refused.push({ ...outcome.named, why: outcome.why })
     if (outcome.outcome !== 'refused' || server.state === 'replaced') forget.push(server)

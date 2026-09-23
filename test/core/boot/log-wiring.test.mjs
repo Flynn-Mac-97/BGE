@@ -58,7 +58,10 @@ test('a console error lands in every world once, not once per world', async () =
 
     console.error('probe console message')
 
-    for (const [which, context] of [['first', first], ['second', second]]) {
+    for (const [which, context] of [
+      ['first', first],
+      ['second', second]
+    ]) {
       const seen = context.engine.errors().filter(entry => /probe console message/.test(entry.message))
       assert.equal(seen.length, 1, `the ${which} world logged it ${seen.length} times`)
       assert.equal(seen[0].source, 'console')

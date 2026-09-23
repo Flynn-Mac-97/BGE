@@ -55,30 +55,36 @@ export function makeLighting(state) {
    * Whether the sun moved since the shadow map was drawn.
    */
   function sunMoved(light, remembered) {
-    return remembered.shadowAtX !== light.position.x
-      || remembered.shadowAtY !== light.position.y
-      || remembered.shadowAtZ !== light.position.z
+    return (
+      remembered.shadowAtX !== light.position.x ||
+      remembered.shadowAtY !== light.position.y ||
+      remembered.shadowAtZ !== light.position.z
+    )
   }
 
   /** Whether the thing the sun points at moved. */
   function targetMoved(light, remembered) {
     const target = light.target
     if (!target) return false
-    return remembered.shadowTargetX !== target.position.x
-      || remembered.shadowTargetY !== target.position.y
-      || remembered.shadowTargetZ !== target.position.z
+    return (
+      remembered.shadowTargetX !== target.position.x ||
+      remembered.shadowTargetY !== target.position.y ||
+      remembered.shadowTargetZ !== target.position.z
+    )
   }
 
   /** Whether the shadow camera's box changed, which changes what the map covers. */
   function viewMoved(shadow, remembered) {
     const view = shadow.camera
     if (!view) return false
-    return remembered.shadowLeft !== view.left
-      || remembered.shadowRight !== view.right
-      || remembered.shadowTop !== view.top
-      || remembered.shadowBottom !== view.bottom
-      || remembered.shadowNear !== view.near
-      || remembered.shadowFar !== view.far
+    return (
+      remembered.shadowLeft !== view.left ||
+      remembered.shadowRight !== view.right ||
+      remembered.shadowTop !== view.top ||
+      remembered.shadowBottom !== view.bottom ||
+      remembered.shadowNear !== view.near ||
+      remembered.shadowFar !== view.far
+    )
   }
 
   /** Whether the map was resized. */
@@ -88,8 +94,12 @@ export function makeLighting(state) {
 
   /** Whether anything the map depends on moved. */
   function shadowMoved(light, shadow, remembered) {
-    return sunMoved(light, remembered) || targetMoved(light, remembered)
-      || viewMoved(shadow, remembered) || mapSizeMoved(shadow, remembered)
+    return (
+      sunMoved(light, remembered) ||
+      targetMoved(light, remembered) ||
+      viewMoved(shadow, remembered) ||
+      mapSizeMoved(shadow, remembered)
+    )
   }
 
   /** Write down what the drawn map depends on, so the next frame compares against it. */
@@ -129,9 +139,7 @@ export function makeLighting(state) {
 
   /** A flat background colour, or null to leave the page showing through. */
   function setSky(colour) {
-    state.scene.background = colour === null || colour === undefined
-      ? null
-      : readColour(colour, 'setSky')
+    state.scene.background = colour === null || colour === undefined ? null : readColour(colour, 'setSky')
   }
 
   /**
@@ -141,7 +149,10 @@ export function makeLighting(state) {
    */
   function setFog(density, colour) {
     const amount = Number(density) || 0
-    if (amount <= 0) { state.scene.fog = null; return }
+    if (amount <= 0) {
+      state.scene.fog = null
+      return
+    }
     state.scene.fog = new THREE.FogExp2(readColour(colour, 'setFog') || new THREE.Color('#8a94a3'), amount)
   }
 

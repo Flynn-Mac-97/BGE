@@ -55,14 +55,22 @@ export function makeStartup(bus) {
       // Caught here so a failed start cannot arrive as an unhandled rejection,
       // and so the failure is reported by the name the reader knows.
       const settled = Promise.resolve(promise).then(
-        () => { finished.add(name) },
-        error => { finished.add(name); report(name, error) })
+        () => {
+          finished.add(name)
+        },
+        error => {
+          finished.add(name)
+          report(name, error)
+        }
+      )
       starts.set(name, settled)
       return settled
     },
 
     /** The names still starting. Empty means the world is ready to step. */
-    get pending() { return [...starts.keys()].filter(name => !finished.has(name)) },
+    get pending() {
+      return [...starts.keys()].filter(name => !finished.has(name))
+    },
 
     /**
      * Wait for every declared start, bounded.
@@ -74,7 +82,10 @@ export function makeStartup(bus) {
       const names = [...starts.keys()]
       if (!names.length) return { ready: [], pending: [] }
       let timer = 0
-      const expired = new Promise(resolve => { timer = setTimeout(resolve, timeoutMs); timer.unref?.() })
+      const expired = new Promise(resolve => {
+        timer = setTimeout(resolve, timeoutMs)
+        timer.unref?.()
+      })
       await Promise.race([Promise.all([...starts.values()]), expired])
       clearTimeout(timer)
       return {

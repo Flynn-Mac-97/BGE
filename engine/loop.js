@@ -139,7 +139,11 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   let reportedAt = -Infinity
 
   /** Start a fresh rate window at `now`; it closes when a full window has passed. */
-  const openWindow = now => { windowStart = now; windowTicks = 0; windowFixed = fixed }
+  const openWindow = now => {
+    windowStart = now
+    windowTicks = 0
+    windowFixed = fixed
+  }
 
   /**
    * Baseline the rate measurement against the clock as it is now.
@@ -158,8 +162,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   }
 
   /** Wall seconds the engine clock has lost since play started. */
-  const behindBy = () =>
-    running ? Math.max(0, (performance.now() - startedWall) / 1000 - (fixed - startedFixed)) : 0
+  const behindBy = () => (running ? Math.max(0, (performance.now() - startedWall) / 1000 - (fixed - startedFixed)) : 0)
 
   /**
    * Ticks and engine seconds per wall second.
@@ -171,9 +174,10 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
    */
   function measure() {
     const openSeconds = (performance.now() - windowStart) / 1000
-    const sample = openSeconds * 1000 >= RATE_WINDOW
-      ? { seconds: openSeconds, ticks: windowTicks, advanced: fixed - windowFixed }
-      : measured
+    const sample =
+      openSeconds * 1000 >= RATE_WINDOW
+        ? { seconds: openSeconds, ticks: windowTicks, advanced: fixed - windowFixed }
+        : measured
     if (!sample || sample.seconds <= 0) return null
     return {
       ticksPerSecond: round3(sample.ticks / sample.seconds),
@@ -195,7 +199,10 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
    */
   function reportIfSlow(now) {
     const rate = measure()
-    if (!rate || rate.gameSpeed >= SLOW) { reportedAt = -Infinity; return }
+    if (!rate || rate.gameSpeed >= SLOW) {
+      reportedAt = -Infinity
+      return
+    }
     if (now - reportedAt < REPORT_EVERY) return
     reportedAt = now
     console.error(slowSentence(rate))
@@ -219,10 +226,16 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     // reads the same on the far side of a pause. The step still runs, because a
     // paused game is still a game being looked at.
     try {
-      if (holds.size) { onFixed(0, fixed); return }
+      if (holds.size) {
+        onFixed(0, fixed)
+        return
+      }
       fixed = ++steps * STEP
       timers.run(fixed)
-      if (held > 0) { held--; return }
+      if (held > 0) {
+        held--
+        return
+      }
       onFixed(STEP, fixed)
     } finally {
       // A key that went down since the last step reads as pressed for this step
@@ -244,7 +257,10 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     if (canAnimate) cancelAnimationFrame(raf)
     clearInterval(timer)
     timer = 0
-    if (!running) { driver = 'stopped'; return }
+    if (!running) {
+      driver = 'stopped'
+      return
+    }
     if (onScreen()) {
       driver = 'requestAnimationFrame'
       raf = requestAnimationFrame(tick)
@@ -258,7 +274,9 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
 
   // Switching tabs mid-play swaps drivers rather than stalling.
   if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => { if (running) schedule() })
+    document.addEventListener('visibilitychange', () => {
+      if (running) schedule()
+    })
   }
 
   /**
@@ -316,21 +334,31 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
   }
 
   return {
-    get running() { return running },
+    get running() {
+      return running
+    },
 
     /** Engine time in seconds. Not the wall clock, on purpose. */
-    get time() { return fixed },
-    get elapsed() { return fixed },
+    get time() {
+      return fixed
+    },
+    get elapsed() {
+      return fixed
+    },
 
     /**
      * Fixed steps run. The clock is derived from this, so this is the honest
      * form of "where the clock is" — a time in seconds is a rounding of it and
      * would not survive a round trip.
      */
-    get steps() { return steps },
+    get steps() {
+      return steps
+    },
 
     /** The fraction of a step the frame being drawn is past the last one. See `blend` above. */
-    get blend() { return blend },
+    get blend() {
+      return blend
+    },
 
     random,
     drawing,
@@ -347,11 +375,20 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     input,
 
     /** Stop time under this name. Naming it is what lets two holders overlap. */
-    hold(reason = 'paused') { holds.add(reason); return reason },
-    release(reason = 'paused') { return holds.delete(reason) },
-    get paused() { return holds.size > 0 },
+    hold(reason = 'paused') {
+      holds.add(reason)
+      return reason
+    },
+    release(reason = 'paused') {
+      return holds.delete(reason)
+    },
+    get paused() {
+      return holds.size > 0
+    },
     /** Who is holding, so "why is nothing moving" is answerable from a snapshot. */
-    get holds() { return [...holds] },
+    get holds() {
+      return [...holds]
+    },
 
     /**
      * What is driving the frames and how fast the run is really going.
@@ -469,7 +506,10 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
       if (scheduled !== undefined) timers.clear()
       else timers.shiftBy(shift)
       random.resume(seed ?? random.seed, draws)
-      if (holdNames) { holds.clear(); for (const reason of holdNames) holds.add(reason) }
+      if (holdNames) {
+        holds.clear()
+        for (const reason of holdNames) holds.add(reason)
+      }
       if (hitStop !== undefined) held = Math.max(0, Math.round(hitStop))
       // A world picked up mid-run was played with a key held, and the step about
       // to run sees whatever was pressed on it. Carried rather than re-pressed,
@@ -533,20 +573,30 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     },
 
     /** Seconds of hold left. Zero when the world is running normally. */
-    get holding() { return held * STEP },
+    get holding() {
+      return held * STEP
+    },
 
     // ---- scheduling, on the fixed clock ----
 
     /** Run `fn` once, `seconds` of engine time from now. */
-    after(seconds, fn) { return timers.after(seconds, fixed, fn) },
+    after(seconds, fn) {
+      return timers.after(seconds, fixed, fn)
+    },
 
     /** Run `fn` every `seconds` of engine time, starting one interval from now. */
-    every(seconds, fn) { return timers.every(seconds, fixed, fn) },
+    every(seconds, fn) {
+      return timers.every(seconds, fixed, fn)
+    },
 
     /** Cancel one scheduled timer. Returns whether it was still pending. */
-    cancel(id) { return timers.cancel(id) },
+    cancel(id) {
+      return timers.cancel(id)
+    },
 
-    get timers() { return timers.list(fixed) },
+    get timers() {
+      return timers.list(fixed)
+    },
 
     /**
      * Advance by N fixed steps, ignoring wall clock and requestAnimationFrame
@@ -565,7 +615,6 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
     }
   }
 }
-
 
 /** One fixed step, in engine seconds. */
 export const FIXED_STEP = STEP

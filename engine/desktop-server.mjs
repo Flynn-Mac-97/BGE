@@ -7,7 +7,19 @@ import { watch } from 'chokidar'
 import { engineServerConfig } from './server-config.mjs'
 import { ensureProject, resolveProject } from './project-path.mjs'
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.wav': 'audio/wav', '.woff2': 'font/woff2' }
+const MIME = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.wasm': 'application/wasm',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.jpg': 'image/jpeg',
+  '.wav': 'audio/wav',
+  '.woff2': 'font/woff2'
+}
 const inside = (file, root) => {
   const relative = path.relative(root, file)
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
@@ -26,7 +38,9 @@ export async function startDesktopServer({ root, project, port = 0, desktopSnaps
     try {
       const origin = request.headers.origin
       if (origin && origin !== `http://${request.headers.host}`) {
-        response.writeHead(403); response.end('Origin refused'); return
+        response.writeHead(403)
+        response.end('Origin refused')
+        return
       }
       let position = 0
       const next = async () => {
@@ -46,8 +60,10 @@ export async function startDesktopServer({ root, project, port = 0, desktopSnaps
     middlewares: { use: handler => middleware.push(handler) },
     ws: {
       on: (event, callback) => events.on(event, callback),
-      send: (event, data) => {
-        for (const socket of sockets.clients) if (socket.readyState === 1) socket.send(JSON.stringify({ event, data }))
+      send: (event, payload) => {
+        // eslint-disable-next-line id-denylist -- the wire message field is named data
+        const message = { event, data: payload }
+        for (const socket of sockets.clients) if (socket.readyState === 1) socket.send(JSON.stringify(message))
       }
     }
   }
@@ -60,20 +76,32 @@ export async function startDesktopServer({ root, project, port = 0, desktopSnaps
     const real = await fs.realpath(file).catch(() => null)
     const allowed = await Promise.all(roots.map(folder => fs.realpath(folder).catch(() => folder)))
     if (!real || !allowed.some(folder => inside(real, folder))) {
-      response.writeHead(404); response.end('Not found'); return
+      response.writeHead(404)
+      response.end('Not found')
+      return
     }
     const bytes = await fs.readFile(real)
-    response.writeHead(200, { 'content-type': MIME[path.extname(real)] || 'application/octet-stream', 'cache-control': 'no-cache' })
+    response.writeHead(200, {
+      'content-type': MIME[path.extname(real)] || 'application/octet-stream',
+      'cache-control': 'no-cache'
+    })
     response.end(bytes)
   }
   server.on('upgrade', (request, socket, head) => {
     if (request.url !== '/engine-events' || request.headers.origin !== `http://${request.headers.host}`) {
-      socket.destroy(); return
+      socket.destroy()
+      return
     }
     sockets.handleUpgrade(request, socket, head, client => {
-      const peer = { socket: client, send: (event, data) => client.send(JSON.stringify({ event, data })) }
+      // eslint-disable-next-line id-denylist -- the wire message field is named data
+      const peer = { socket: client, send: (event, payload) => client.send(JSON.stringify({ event, data: payload })) }
       client.on('message', bytes => {
-        try { const message = JSON.parse(bytes); events.emit(message.event, message.data, peer) } catch { /* invalid message */ }
+        try {
+          const message = JSON.parse(bytes)
+          events.emit(message.event, message.data, peer)
+        } catch {
+          /* invalid message */
+        }
       })
     })
   })

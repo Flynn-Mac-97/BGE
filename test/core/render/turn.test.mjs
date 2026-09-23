@@ -14,7 +14,7 @@ import * as THREE from 'three/webgpu'
 import { turnObject } from '../../../engine/render.js'
 
 /** The module's own order of operations, so the values are compared exactly. */
-const radiansOf = degrees => degrees * Math.PI / 180
+const radiansOf = degrees => (degrees * Math.PI) / 180
 
 /** An object turned to match a `rotation` declaration. */
 const turned = rotation => {
@@ -83,6 +83,12 @@ test('a rotation that is not a number is named and treated as zero', () => {
   } finally {
     console.error = wasErroring
   }
-  assert.ok(said.some(line => line.includes('post.rotation:')), said.join('\n'))
-  assert.ok(said.some(line => line.includes('post.rotation[1]:')), said.join('\n'))
+  assert.ok(
+    said.some(line => line.includes('post.rotation:')),
+    said.join('\n')
+  )
+  assert.ok(
+    said.some(line => line.includes('post.rotation[1]:')),
+    said.join('\n')
+  )
 })

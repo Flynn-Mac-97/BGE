@@ -41,14 +41,17 @@ function wireOnce() {
   if (wired) return
   wired = true
 
-  const uncaught = (error, at) => reportToLogs('error', 'uncaught',
-    error?.stack || error?.message || String(error), { at })
-  const rejected = reason => reportToLogs('error', 'rejection',
-    reason?.stack || reason?.message || String(reason))
+  const uncaught = (error, at) =>
+    reportToLogs('error', 'uncaught', error?.stack || error?.message || String(error), { at })
+  const rejected = reason => reportToLogs('error', 'rejection', reason?.stack || reason?.message || String(reason))
 
   if (typeof addEventListener === 'function') {
-    addEventListener('error', event => uncaught(event.error || event.message,
-      event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined))
+    addEventListener('error', event =>
+      uncaught(
+        event.error || event.message,
+        event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined
+      )
+    )
     addEventListener('unhandledrejection', event => rejected(event.reason))
   } else if (typeof process !== 'undefined' && typeof process.on === 'function') {
     process.on('uncaughtException', error => uncaught(error))
@@ -57,7 +60,7 @@ function wireOnce() {
 
   const original = console.error
   console.error = (...args) => {
-    reportToLogs('error', 'console', args.map(a => (a?.stack || a?.message || String(a))).join(' '))
+    reportToLogs('error', 'console', args.map(a => a?.stack || a?.message || String(a)).join(' '))
     original.apply(console, args)
   }
 }
@@ -73,6 +76,13 @@ function wireOnce() {
  * Make this first, hand it to `makeInspect` at the end, and everything that
  * went wrong on the way is already in it.
  */
+/** What one hot swap did, in a few words. */
+function hotAppliedNote(change) {
+  if (change.removed) return 'removed'
+  if (change.entities != null) return `→ ${change.entities} entities`
+  return change.skipped || 'applied'
+}
+
 export function makeLog(bus) {
   const lines = []
 
@@ -82,7 +92,8 @@ export function makeLog(bus) {
   }
 
   bus.on('plugin:error', failure =>
-    push('error', failure.file ? 'plugin' : `plugin:${failure.name}`, reasonFor(failure)))
+    push('error', failure.file ? 'plugin' : `plugin:${failure.name}`, reasonFor(failure))
+  )
   bus.on('files:written', ({ path }) => push('info', 'files', `wrote ${path}`))
   // An error, not a note: a write that did not land is the one thing a reader
   // must not miss, and the reason names who is holding the file.
@@ -90,8 +101,7 @@ export function makeLog(bus) {
 
   // "I wrote the file — did it take?" has to be answerable from the log, or an
   // agent has no way to tell a hot swap that worked from one that never ran.
-  bus.on('hot:applied', c => push('info', 'hot',
-    `${c.file} ${c.removed ? 'removed' : c.entities != null ? `→ ${c.entities} entities` : c.skipped || 'applied'}`))
+  bus.on('hot:applied', change => push('info', 'hot', `${change.file} ${hotAppliedNote(change)}`))
   bus.on('hot:failed', c => push('error', 'hot', `${c.file} — ${c.error}`))
 
   const log = { lines, push }
@@ -103,6 +113,7 @@ export function makeLog(bus) {
 }
 
 /** One plugin failure in a sentence, for a log line or a snapshot. */
-export const reasonFor = failure => failure.file
-  ? `${failure.file} failed to import — ${failure.error}. Every command it contributes is missing.`
-  : `plugin "${failure.name}" failed to load — ${failure.error}. Every command it contributes is missing.`
+export const reasonFor = failure =>
+  failure.file
+    ? `${failure.file} failed to import — ${failure.error}. Every command it contributes is missing.`
+    : `plugin "${failure.name}" failed to load — ${failure.error}. Every command it contributes is missing.`

@@ -69,7 +69,9 @@ export function makeCheckpoints(bus) {
     },
 
     /** The plugins holding something of their own. */
-    get names() { return [...entries.keys()] },
+    get names() {
+      return [...entries.keys()]
+    },
 
     /**
      * Ask every plugin for what it holds.
@@ -115,9 +117,14 @@ export function makeCheckpoints(bus) {
       const restored = []
       const refused = []
       for (const [name, entry] of entries) {
-        let wentBack = false
-        try { wentBack = entry.restore?.(name in held ? held[name] : null) === true }
-        catch (error) { report(name, `would not go back — ${error?.message || error}`); refused.push(name); continue }
+        let wentBack
+        try {
+          wentBack = entry.restore?.(name in held ? held[name] : null) === true
+        } catch (error) {
+          report(name, `would not go back — ${error?.message || error}`)
+          refused.push(name)
+          continue
+        }
         if (wentBack) restored.push(name)
         else {
           report(name, 'would not go back to the moment this checkpoint holds')
@@ -209,5 +216,7 @@ export function restoreMoment(moment, { world, loop, checkpoints }, { input } = 
 function scheduledLosses(scheduled) {
   if (!scheduled) return []
   const one = scheduled === 1
-  return [`${scheduled} scheduled ${one ? 'callback' : 'callbacks'}, which ${one ? 'is a closure' : 'are closures'} and cannot be written down`]
+  return [
+    `${scheduled} scheduled ${one ? 'callback' : 'callbacks'}, which ${one ? 'is a closure' : 'are closures'} and cannot be written down`
+  ]
 }

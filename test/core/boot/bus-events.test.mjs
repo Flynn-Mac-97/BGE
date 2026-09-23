@@ -17,11 +17,24 @@ import { CHECKOUT, FIXTURE } from '../../fixture-project.mjs'
 import { startWorldInNode } from '../../../engine/start-world-node.mjs'
 
 const NAMES = [
-  'plugins:changed', 'level:loaded', 'world:changed', 'world:restored',
-  'selection:changed', 'tool:changed', 'open:file', 'plugin:error',
-  'files:writing', 'files:written', 'files:refused',
-  'entity:added', 'entity:removed', 'type:changed', 'behaviour:changed',
-  'play:started', 'play:stopped', 'context:replaced'
+  'plugins:changed',
+  'level:loaded',
+  'world:changed',
+  'world:restored',
+  'selection:changed',
+  'tool:changed',
+  'open:file',
+  'plugin:error',
+  'files:writing',
+  'files:written',
+  'files:refused',
+  'entity:added',
+  'entity:removed',
+  'type:changed',
+  'behaviour:changed',
+  'play:started',
+  'play:stopped',
+  'context:replaced'
 ]
 
 /** Boot the fixture and record every named event from now on. */
@@ -86,8 +99,12 @@ test('a world put back from a reload capture is announced as restored, not merel
   const { context, seen } = await worldWithRecorder()
   const capture = captureWorld({ world: context.world, loop: context.loop, editor: context.editor, view: context.view })
   await restoreWorld(capture, {
-    world: context.world, loop: context.loop, editor: context.editor, view: context.view,
-    bus: context.bus, context
+    world: context.world,
+    loop: context.loop,
+    editor: context.editor,
+    view: context.view,
+    bus: context.bus,
+    context
   })
   assert.equal(seen.includes('world:restored'), true)
   assert.equal(seen.includes('world:changed'), true)
@@ -95,7 +112,10 @@ test('a world put back from a reload capture is announced as restored, not merel
 
 test('play mode announces started and stopped', async () => {
   const { context, seen } = await worldWithRecorder()
-  const saved = { requestAnimationFrame: globalThis.requestAnimationFrame, cancelAnimationFrame: globalThis.cancelAnimationFrame }
+  const saved = {
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame
+  }
   globalThis.requestAnimationFrame = () => 1
   globalThis.cancelAnimationFrame = () => {}
   try {
@@ -115,15 +135,30 @@ test('a plugin that cannot load is announced with its error', async () => {
   const { loader, seen, context } = await worldWithRecorder()
   context.bus.on('plugin:error', payload => seen.push(payload.error))
 
-  assert.throws(() => loader.add({ name: 'Broken', onLoad() { throw new Error('boot failure') } }))
-  assert.equal(seen.some(entry => typeof entry === 'string' && entry.includes('boot failure')), true)
+  assert.throws(() =>
+    loader.add({
+      name: 'Broken',
+      onLoad() {
+        throw new Error('boot failure')
+      }
+    })
+  )
+  assert.equal(
+    seen.some(entry => typeof entry === 'string' && entry.includes('boot failure')),
+    true
+  )
 })
 
 test('a plugin that replaces a context key it did not own is announced', () => {
   const bus = makeBus()
   const loader = makeLoader(bus)
   const context = { bus, loader, world: {} }
-  loader.add({ name: 'Replacer', onLoad(value) { value.world = {} } })
+  loader.add({
+    name: 'Replacer',
+    onLoad(value) {
+      value.world = {}
+    }
+  })
 
   const replaced = []
   bus.on('context:replaced', payload => replaced.push(payload))
@@ -144,7 +179,11 @@ test('a file write and a refusal are announced with a pending count', async () =
   assert.deepEqual(events, ['writing:1', 'written', 'writing:0'], 'a write rises, lands, and settles')
 
   events.length = 0
-  const refused = makeFiles(bus, { async write() { throw new Error('disk is read-only') } })
+  const refused = makeFiles(bus, {
+    async write() {
+      throw new Error('disk is read-only')
+    }
+  })
   await assert.rejects(refused.write('levels/main.json', '{}'))
   assert.deepEqual(events, ['writing:1', 'refused', 'writing:0'])
   assert.equal(refused.refused.path, 'levels/main.json')

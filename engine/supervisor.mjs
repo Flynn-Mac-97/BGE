@@ -15,17 +15,35 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
-import { spawn } from 'node:child_process'
+import { endProcess, processIsAlive, readServerRegistry, recordServer, forgetServer } from './project-servers.mjs'
 import {
-  endProcess, processIsAlive, readServerRegistry, recordServer, forgetServer
-} from './project-servers.mjs'
-import {
-  activatePage, closePage, findFreeDebuggingPort, freeLaneName, laneBrowserArguments,
-  pagesOnPort, readLaneBrowsers, recordLaneBrowser, forgetLaneBrowser, showWindow
+  activatePage,
+  closePage,
+  findFreeDebuggingPort,
+  freeLaneName,
+  laneBrowserArguments,
+  pagesOnPort,
+  readLaneBrowsers,
+  recordLaneBrowser,
+  forgetLaneBrowser,
+  showWindow
 } from './lane-browsers.mjs'
 import { openPage, pageOnUrl } from './open-page.mjs'
 import { findChrome } from './chrome-path.mjs'
 import { mainWorktree } from './agent-workspace-node.mjs'
+import {
+  badRequest,
+  closeServer,
+  listen,
+  parseJson,
+  readBody,
+  readSupervisorRecord,
+  removeSupervisorRecord,
+  requestOnPort,
+  sendJson,
+  spawnDetached,
+  writeSupervisorRecord
+} from './supervisor-transport.mjs'
 
 const DEFAULT_SUPERVISOR_PORT = 5179
 const FIRST_DEV_SERVER_PORT = 5180
@@ -42,9 +60,6 @@ const MAXIMUM_EVENTS = 200
 const INSTANCE_KINDS = new Set(['dev-server', 'editor-browser', 'lane-browser', 'headless-session'])
 const BROWSER_KINDS = new Set(['editor-browser', 'lane-browser'])
 
-/** A refusal a caller caused, which the route answers with 400 rather than 500. */
-const badRequest = message => Object.assign(new Error(message), { statusCode: 400 })
-
 /**
  * Add one thing that happened to the feed the watch view draws.
  *
@@ -60,7 +75,13 @@ function recordEvent(state, event) {
 // Electron views and terminals report lifecycle events directly. They share
 // the instance list without pretending to be independently listening servers.
 export function registerManaged(state, fields, stop) {
-  const entry = { id: nextId(state, fields.kind), startedAt: new Date().toISOString(), state: 'running', owned: true, ...fields }
+  const entry = {
+    id: nextId(state, fields.kind),
+    startedAt: new Date().toISOString(),
+    state: 'running',
+    owned: true,
+    ...fields
+  }
   state.managed.set(entry.id, stop)
   state.instances.push(entry)
   recordEvent(state, { event: 'opened', id: entry.id, detail: entry.label || entry.kind })
@@ -83,145 +104,9 @@ export function supervisorEvent(state, id, event, detail) {
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
 
-/** The supervisor record path for a checkout. */
-const supervisorRecordFile = checkout => path.join(process.env.ENGINE_STATE_ROOT || path.join(checkout, '.engine'), 'supervisor.json')
-
 /** Where one instance's output goes, so a startup failure can be read. */
-const instanceLogFile = (checkout, id) => path.join(process.env.ENGINE_STATE_ROOT || path.join(checkout, 'agent-runs'), 'supervisor', `${id}.log`)
-
-/** The supervisor record on disk, or null when it is missing or broken. */
-function readSupervisorRecord(checkout) {
-  try { return JSON.parse(fs.readFileSync(supervisorRecordFile(checkout), 'utf8')) } catch { return null }
-}
-
-/** Write the record only once the port is bound, so a reader never sees a port that is not there. */
-function writeSupervisorRecord(checkout, record) {
-  const file = supervisorRecordFile(checkout)
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, JSON.stringify(record, null, 2) + '\n', 'utf8')
-}
-
-/** Remove the record. A missing file is already the goal. */
-function removeSupervisorRecord(checkout) {
-  try { fs.unlinkSync(supervisorRecordFile(checkout)) } catch { /* already gone */ }
-}
-
-/**
- * The loopback addresses a server may answer on.
- *
- * A dev server binds `localhost`, which resolves to the IPv6 address first on
- * Windows, and a Chrome debugging port binds `127.0.0.1`. Asking one address
- * reports a healthy server as unresponsive, which is the one answer a prover
- * must never give, so both are asked in turn.
- */
-const LOOPBACK_HOSTS = ['127.0.0.1', '::1']
-
-/**
- * Ask one address for a JSON answer, or null when nothing answers.
- *
- * `node:http` with `agent: false`, not fetch: fetch keeps its connection in a
- * pool this code cannot close, and a socket still closing when the CLI exits
- * aborts the process on Windows with a libuv assertion.
- */
-function requestOnHost(host, port, method, requestPath, body, milliseconds = 1500) {
-  return new Promise(resolve => {
-    const payload = body == null ? null : JSON.stringify(body)
-    const request = http.request({
-      host, port, path: requestPath, method, agent: false, timeout: milliseconds,
-      headers: payload
-        ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }
-        : {}
-    }, response => {
-      let text = ''
-      response.setEncoding('utf8')
-      response.on('data', chunk => { text += chunk })
-      response.once('end', () => {
-        request.destroy()
-        let parsed = null
-        try { parsed = text ? JSON.parse(text) : null } catch { parsed = null }
-        resolve({ status: response.statusCode, body: parsed, text })
-      })
-    })
-    const fail = () => { request.destroy(); resolve(null) }
-    request.once('error', fail)
-    request.once('timeout', fail)
-    if (payload) request.write(payload)
-    request.end()
-  })
-}
-
-/** Ask a port on either loopback address, and take the first answer. */
-async function requestOnPort(port, method, requestPath, body, milliseconds = 1500) {
-  for (const host of LOOPBACK_HOSTS) {
-    const answer = await requestOnHost(host, port, method, requestPath, body, milliseconds)
-    if (answer) return answer
-  }
-  return null
-}
-
-/** Read a request body as text. */
-function readBody(request) {
-  return new Promise((resolve, reject) => {
-    let text = ''
-    request.setEncoding('utf8')
-    request.on('data', chunk => { text += chunk })
-    request.once('end', () => resolve(text))
-    request.once('error', reject)
-  })
-}
-
-/** Parse a body, treating an empty one as absent. */
-function parseJson(text) {
-  if (!text) return null
-  try { return JSON.parse(text) } catch { throw badRequest('the request body is not JSON') }
-}
-
-/** One JSON reply, with the length set so the socket closes cleanly. */
-function sendJson(response, status, value) {
-  const body = JSON.stringify(value)
-  response.writeHead(status, {
-    'content-type': 'application/json',
-    'content-length': Buffer.byteLength(body)
-  })
-  response.end(body)
-}
-
-/** Bind and resolve, so a port already in use rejects the start. */
-function listen(server, port) {
-  return new Promise((resolve, reject) => {
-    const failed = error => reject(error)
-    server.once('error', failed)
-    server.listen(port, '127.0.0.1', () => {
-      server.off('error', failed)
-      resolve()
-    })
-  })
-}
-
-/** Stop accepting connections. In-flight replies are given a moment, then cut. */
-function closeServer(server) {
-  return new Promise(resolve => {
-    if (!server || !server.listening) return resolve()
-    server.close(() => resolve())
-    server.closeIdleConnections?.()
-    setTimeout(() => server.closeAllConnections?.(), 200)
-  })
-}
-
-/** Start a detached process with its output in the instance log. */
-function spawnDetached(command, args, { cwd, env, logPath }) {
-  fs.mkdirSync(path.dirname(logPath), { recursive: true })
-  const log = fs.openSync(logPath, 'a')
-  try {
-    const child = spawn(command, args, {
-      cwd, env: { ...env, ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }, detached: true, windowsHide: true, stdio: ['ignore', log, log]
-    })
-    child.unref()
-    return child
-  } finally {
-    fs.closeSync(log)
-  }
-}
+const instanceLogFile = (checkout, id) =>
+  path.join(process.env.ENGINE_STATE_ROOT || path.join(checkout, 'agent-runs'), 'supervisor', `${id}.log`)
 
 /** The next stable id for a kind, unique for the supervisor's life. */
 function nextId(state, kind) {
@@ -248,8 +133,10 @@ async function allocatePort(state, asked, from) {
   const wanted = Number(asked)
   if (wanted) {
     if (state.instances.some(entry => entry.port === wanted)) {
-      throw badRequest(`port ${wanted} is already used by another instance; list them with `
-        + 'node bin/engine.mjs supervisor and stop one with supervisor.stop <id>, or leave the port unset to take a free one')
+      throw badRequest(
+        `port ${wanted} is already used by another instance; list them with ` +
+          'node bin/engine.mjs supervisor and stop one with supervisor.stop <id>, or leave the port unset to take a free one'
+      )
     }
     return wanted
   }
@@ -286,10 +173,16 @@ function servedCheckout(state, request) {
   if (request.checkout == null) return state.checkout
   const wanted = path.resolve(String(request.checkout))
   let main
-  try { main = mainWorktree(state.checkout) } catch { main = path.resolve(state.checkout) }
+  try {
+    main = mainWorktree(state.checkout)
+  } catch {
+    main = path.resolve(state.checkout)
+  }
   if (!insideDirectory(wanted, main)) {
-    throw badRequest(`${wanted} is outside this checkout's main worktree ${main}; `
-      + 'a dev server this supervisor starts serves this checkout or a worktree inside it')
+    throw badRequest(
+      `${wanted} is outside this checkout's main worktree ${main}; ` +
+        'a dev server this supervisor starts serves this checkout or a worktree inside it'
+    )
   }
   if (!fs.existsSync(wanted)) throw badRequest(`no directory at ${wanted}`)
   return wanted
@@ -318,18 +211,25 @@ async function startDevServer(state, id, request, logPath) {
     logPath
   })
   const entry = {
-    id, kind: 'dev-server', pid: child.pid, port,
+    id,
+    kind: 'dev-server',
+    pid: child.pid,
+    port,
     url: `http://localhost:${port}/`,
     serves,
     project: request.project ?? null,
     startedAt: new Date().toISOString(),
-    state: 'running', owned: true
+    state: 'running',
+    owned: true
   }
   // Recorded before the wait, so a server that never answers is still findable
   // by the next supervisor start.
   recordServer(state.checkout, {
-    port, pid: child.pid, serves,
-    project: entry.project, startedAt: entry.startedAt
+    port,
+    pid: child.pid,
+    serves,
+    project: entry.project,
+    startedAt: entry.startedAt
   })
   return entry
 }
@@ -342,7 +242,7 @@ function samePath(left, right) {
 }
 
 /** The article a browser kind takes: `an editor-browser`, `a lane-browser`. */
-const articleFor = kind => /^[aeiou]/i.test(kind) ? 'an' : 'a'
+const articleFor = kind => (/^[aeiou]/i.test(kind) ? 'an' : 'a')
 
 /**
  * The dev server a browser with no url opens on.
@@ -353,12 +253,16 @@ const articleFor = kind => /^[aeiou]/i.test(kind) ? 'an' : 'a'
 export function chooseDevServer(instances, kind) {
   const servers = instances.filter(entry => entry.kind === 'dev-server' && entry.state === 'running')
   if (servers.length === 0) {
-    throw badRequest(`no dev server is running to open ${articleFor(kind)} ${kind} on; start one with `
-      + '`node bin/engine.mjs supervisor.open dev-server`')
+    throw badRequest(
+      `no dev server is running to open ${articleFor(kind)} ${kind} on; start one with ` +
+        '`node bin/engine.mjs supervisor.open dev-server`'
+    )
   }
   if (servers.length > 1) {
     const named = servers.map(entry => `${entry.id} (${entry.url})`).join(', ')
-    throw badRequest(`several dev servers are running: ${named}; pass the url of the one to open ${articleFor(kind)} ${kind} on`)
+    throw badRequest(
+      `several dev servers are running: ${named}; pass the url of the one to open ${articleFor(kind)} ${kind} on`
+    )
   }
   return servers[0]
 }
@@ -414,20 +318,32 @@ async function startBrowser(state, id, kind, request, logPath) {
     // One visible browser holds every editor tab, so the profile is named for
     // the window, not for the instance.
     const browser = request.profile || 'editor'
-    const running = await editorOnUrl(state, page)
-    if (running) {
-      running.bounds = await showWindow(running.port, running.pageId, { width, height })
-      return running
+    const runningEditor = await editorOnUrl(state, page)
+    if (runningEditor) {
+      runningEditor.bounds = await showWindow(runningEditor.port, runningEditor.pageId, { width, height })
+      return runningEditor
     }
     state.opening.add(`browser:${browser}`)
     const opened = await openPage(page, { checkout: state.checkout, profile: browser, width, height })
     if (!opened.opened) throw badRequest(opened.problem)
     return {
-      id, kind, pid: opened.pid, port: opened.port, url: page, client, browser,
-      profile: opened.profile, chrome: opened.chrome, headless: false, project,
-      pageId: opened.pageId, startedBrowser: opened.reused !== true,
+      id,
+      kind,
+      pid: opened.pid,
+      port: opened.port,
+      url: page,
+      client,
+      browser,
+      profile: opened.profile,
+      chrome: opened.chrome,
+      headless: false,
+      project,
+      pageId: opened.pageId,
+      startedBrowser: opened.reused !== true,
       bounds: await showWindow(opened.port, opened.pageId, { width, height }),
-      startedAt: new Date().toISOString(), state: 'running', owned: true
+      startedAt: new Date().toISOString(),
+      state: 'running',
+      owned: true
     }
   }
 
@@ -438,16 +354,37 @@ async function startBrowser(state, id, kind, request, logPath) {
   const chrome = request.chrome || findChrome(state.checkout)
   const profile = fs.mkdtempSync(path.join(process.env.TEMP || '/tmp', `supervisor-${id}-`))
   state.opening.add(`browser:${client}`)
-  const child = spawnDetached(chrome, laneBrowserArguments({ port, profile, page, width, height }),
-    { cwd: state.checkout, env: process.env, logPath })
+  const child = spawnDetached(chrome, laneBrowserArguments({ port, profile, page, width, height }), {
+    cwd: state.checkout,
+    env: process.env,
+    logPath
+  })
   const entry = {
-    id, kind, pid: child.pid, port, url: page, client, browser: client, profile, chrome,
-    headless: true, project,
-    startedAt: new Date().toISOString(), state: 'running', owned: true
+    id,
+    kind,
+    pid: child.pid,
+    port,
+    url: page,
+    client,
+    browser: client,
+    profile,
+    chrome,
+    headless: true,
+    project,
+    startedAt: new Date().toISOString(),
+    state: 'running',
+    owned: true
   }
   recordLaneBrowser(state.checkout, {
-    client, port, url: page, pid: child.pid, profile, serves: state.checkout,
-    chrome, headless: true, startedAt: entry.startedAt
+    client,
+    port,
+    url: page,
+    pid: child.pid,
+    profile,
+    serves: state.checkout,
+    chrome,
+    headless: true,
+    startedAt: entry.startedAt
   })
   return entry
 }
@@ -483,27 +420,41 @@ async function startHeadlessSession(state, id, request, logPath) {
     logPath
   })
   return {
-    id, kind: 'headless-session', pid: child.pid, port: null, url: null,
+    id,
+    kind: 'headless-session',
+    pid: child.pid,
+    port: null,
+    url: null,
     project: request.project ?? null,
     startedAt: new Date().toISOString(),
-    state: 'running', owned: true
+    state: 'running',
+    owned: true
   }
 }
 
 /** Kill a process tree and remove a headless lane's temp profile, which is free only after the kill. */
 async function killInstance(state, entry) {
-  if (state.managed.has(entry.id)) return state.managed.get(entry.id)()
+  if (state.managed.has(entry.id)) {
+    await state.managed.get(entry.id)()
+    return
+  }
   if (entry.kind === 'editor-browser') {
     // A browser another tab is still using is that tab's to close, so the wait
     // for an empty window is skipped rather than spent and given up on.
-    const shared = state.instances.some(other =>
-      other !== entry && (other.browser || other.client) === (entry.browser || entry.client))
-    return closeEditorBrowser(entry, { shared })
+    const shared = state.instances.some(
+      other => other !== entry && (other.browser || other.client) === (entry.browser || entry.client)
+    )
+    await closeEditorBrowser(entry, { shared })
+    return
   }
   await endProcess(entry.pid)
   if (entry.profile && entry.headless !== false) {
     await sleep(200)
-    try { fs.rmSync(entry.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+    try {
+      fs.rmSync(entry.profile, { recursive: true, force: true })
+    } catch {
+      /* held; harmless */
+    }
   }
 }
 
@@ -517,20 +468,29 @@ async function killInstance(state, entry) {
  * survives.
  */
 async function closeEditorBrowser(entry, { shared = false } = {}) {
-  if (entry.port != null) {
-    const pages = await pagesOnPort(entry.port)
-    if (pages) {
-      const page = entry.pageId
-        ? pages.find(one => one.id === entry.pageId)
-        : pageOnUrl(pages, entry.url)
-      if (page) await closePage(entry.port, page.id)
-    }
-  }
+  await closeInstancePage(entry)
   if (entry.startedBrowser !== true || shared) return
-  // Closing the last page ends the window, which Chrome reports a moment
-  // later. Killing on the first read would race a close that is still in
-  // flight; killing a browser that still holds a page would take a sibling's
-  // page with it, so the kill waits for zero and gives up on any.
+  await killWhenEmpty(entry)
+}
+
+/** Close the page this instance opened, if the browser still lists it. */
+async function closeInstancePage(entry) {
+  if (entry.port == null) return
+  const pages = await pagesOnPort(entry.port)
+  if (!pages) return
+  const page = entry.pageId ? pages.find(one => one.id === entry.pageId) : pageOnUrl(pages, entry.url)
+  if (page) await closePage(entry.port, page.id)
+}
+
+/**
+ * Kill the browser once its last page is gone.
+ *
+ * Closing the last page ends the window, which Chrome reports a moment later.
+ * Killing on the first read would race a close that is still in flight; killing
+ * a browser that still holds a page would take a sibling's page with it, so the
+ * kill waits for zero and gives up on any.
+ */
+async function killWhenEmpty(entry) {
   for (let attempt = 0; attempt < 50; attempt++) {
     const remaining = entry.port == null ? [] : await pagesOnPort(entry.port)
     if (remaining === null || remaining.length === 0) {
@@ -589,15 +549,19 @@ async function closeOrphanedPages(state, server) {
   }
   // A tab nothing holds a record for — opened by hand in the engine's window —
   // is closed too, for the same reason: it answers nothing and looks alive.
-  const ports = new Set(state.instances
-    .filter(entry => BROWSER_KINDS.has(entry.kind) && entry.port != null)
-    .map(entry => entry.port))
+  const ports = new Set(
+    state.instances.filter(entry => BROWSER_KINDS.has(entry.kind) && entry.port != null).map(entry => entry.port)
+  )
   for (const port of ports) {
     const pages = await pagesOnPort(port)
     if (!pages) continue
     for (const page of pages.filter(one => servedBy(one.url, server.url))) {
       await closePage(port, page.id)
-      recordEvent(state, { event: 'closed', id: `page ${page.id.slice(0, 8)}`, detail: `its server ${server.id} is gone` })
+      recordEvent(state, {
+        event: 'closed',
+        id: `page ${page.id.slice(0, 8)}`,
+        detail: `its server ${server.id} is gone`
+      })
     }
   }
 }
@@ -610,8 +574,11 @@ async function closeOrphanedPages(state, server) {
  * full url would call every page a stranger's and close none of them.
  */
 const servedBy = (pageUrl, serverUrl) => {
-  try { return new URL(pageUrl).origin === new URL(serverUrl).origin }
-  catch { return String(pageUrl) === String(serverUrl) }
+  try {
+    return new URL(pageUrl).origin === new URL(serverUrl).origin
+  } catch {
+    return String(pageUrl) === String(serverUrl)
+  }
 }
 
 /**
@@ -631,6 +598,13 @@ function startFailure(entry) {
  * is still stoppable. A start that fails is killed and forgotten rather than
  * left as an orphan.
  */
+/** Open the kind of instance the request named. */
+function openInstance(state, kind, id, request, logPath) {
+  if (kind === 'dev-server') return startDevServer(state, id, request, logPath)
+  if (BROWSER_KINDS.has(kind)) return startBrowser(state, id, kind, request, logPath)
+  return startHeadlessSession(state, id, request, logPath)
+}
+
 async function startInstance(state, request) {
   if (!request || typeof request !== 'object') throw badRequest('an instance request must be a JSON object')
   const kind = request.kind
@@ -641,11 +615,7 @@ async function startInstance(state, request) {
   const logPath = instanceLogFile(state.checkout, id)
   let entry
   try {
-    entry = kind === 'dev-server'
-      ? await startDevServer(state, id, request, logPath)
-      : BROWSER_KINDS.has(kind)
-        ? await startBrowser(state, id, kind, request, logPath)
-        : await startHeadlessSession(state, id, request, logPath)
+    entry = await openInstance(state, kind, id, request, logPath)
 
     // An editor open that reused the running browser returns a row that is
     // already listed. Adding it again would report two instances for one page.
@@ -662,7 +632,7 @@ async function startInstance(state, request) {
     // whole set is safe: starts are serialised, so only this one is in flight.
     state.opening.clear()
   }
-  if (!await waitUntilRunning(state, entry)) {
+  if (!(await waitUntilRunning(state, entry))) {
     const failure = startFailure(entry)
     await discardInstance(state, entry, failure)
     throw badRequest(`the ${kind} ${id} never came up (${failure.detail}); its output is in ${logPath}`)
@@ -670,7 +640,8 @@ async function startInstance(state, request) {
   entry.state = 'running'
   state.unresponsive.delete(entry.id)
   recordEvent(state, {
-    event: 'opened', id: entry.id,
+    event: 'opened',
+    id: entry.id,
     detail: entry.port == null ? `pid ${entry.pid}` : `port ${entry.port}`
   })
   return entry
@@ -681,7 +652,10 @@ async function startInstance(state, request) {
  * the same free port before either wrote it down.
  */
 export function spawnInstance(state, request) {
-  const started = state.spawning.then(() => startInstance(state, request), () => startInstance(state, request))
+  const started = state.spawning.then(
+    () => startInstance(state, request),
+    () => startInstance(state, request)
+  )
   state.spawning = started.catch(() => {})
   return started
 }
@@ -697,7 +671,10 @@ export function spawnInstance(state, request) {
  * having stopped it: the second finds the first's work and says so.
  */
 export function stopInstance(state, id) {
-  const stopped = state.stopping.then(() => stopOneInstance(state, id), () => stopOneInstance(state, id))
+  const stopped = state.stopping.then(
+    () => stopOneInstance(state, id),
+    () => stopOneInstance(state, id)
+  )
   state.stopping = stopped.catch(() => {})
   return stopped
 }
@@ -713,9 +690,10 @@ async function stopOneInstance(state, id) {
   }
   if (state.knownIds.has(id)) return { stopped: [], alreadyStopped: [id] }
   const existing = state.instances.map(other => other.id)
-  throw Object.assign(new Error(
-    `no instance is called "${id}"; existing ids: ${existing.length ? existing.join(', ') : 'none'}`),
-    { statusCode: 404 })
+  throw Object.assign(
+    new Error(`no instance is called "${id}"; existing ids: ${existing.length ? existing.join(', ') : 'none'}`),
+    { statusCode: 404 }
+  )
 }
 
 /** Stop every instance this supervisor started. Adopted ones are left for their owner. */
@@ -743,10 +721,13 @@ async function proveInstance(state, entry) {
   if (entry.kind === 'headless-session') return processIsAlive(entry.pid) ? 'running' : 'gone'
   const answer = await requestOnPort(entry.port, 'GET', entry.kind === 'dev-server' ? '/api/server' : '/json/list')
   if (entry.kind === 'dev-server') {
-    const mine = answer && answer.status === 200
-      && Number(answer.body?.pid) === entry.pid
-      && samePath(answer.body?.serves, entry.serves || state.checkout)
-    return mine ? 'running' : processIsAlive(entry.pid) ? 'unresponsive' : 'gone'
+    const mine =
+      answer &&
+      answer.status === 200 &&
+      Number(answer.body?.pid) === entry.pid &&
+      samePath(answer.body?.serves, entry.serves || state.checkout)
+    if (mine) return 'running'
+    return processIsAlive(entry.pid) ? 'unresponsive' : 'gone'
   }
   if (!answer || answer.status !== 200) return processIsAlive(entry.pid) ? 'unresponsive' : 'gone'
   if (entry.kind !== 'editor-browser') return 'running'
@@ -834,13 +815,17 @@ async function stampShowing(state) {
   for (const entry of state.instances) {
     if (!BROWSER_KINDS.has(entry.kind)) continue
     const tab = tabs.get(entry.client)
-    entry.showing = tab ? (tab.hidden ? 'hidden' : 'visible') : null
+    if (!tab) entry.showing = null
+    else entry.showing = tab.hidden ? 'hidden' : 'visible'
   }
 }
 
 /** Run the prover without letting two passes overlap. */
 function proveInstances(state) {
-  state.proving = state.proving.then(() => runProver(state), () => runProver(state))
+  state.proving = state.proving.then(
+    () => runProver(state),
+    () => runProver(state)
+  )
   return state.proving.then(() => state.instances)
 }
 
@@ -848,7 +833,7 @@ function proveInstances(state) {
 async function waitUntilRunning(state, entry) {
   const deadline = Date.now() + state.startTimeoutMilliseconds
   while (Date.now() < deadline) {
-    if (await proveInstance(state, entry) === 'running') return true
+    if ((await proveInstance(state, entry)) === 'running') return true
     if (!processIsAlive(entry.pid)) return false
     await sleep(250)
   }
@@ -873,18 +858,25 @@ async function waitUntilRunning(state, entry) {
 async function adoptNewRecords(state) {
   // Matched within a kind: a row of another kind holding this process id says
   // nothing about whether this record is already listed.
-  const known = (kind, pid) => state.instances.some(entry =>
-    entry.pid === pid && (kind === 'dev-server' ? entry.kind === 'dev-server' : BROWSER_KINDS.has(entry.kind)))
+  const known = (kind, pid) =>
+    state.instances.some(
+      entry =>
+        entry.pid === pid && (kind === 'dev-server' ? entry.kind === 'dev-server' : BROWSER_KINDS.has(entry.kind))
+    )
   for (const server of readServerRegistry(state.checkout).servers) {
     if (state.desktopCommand && server.pid === state.pid) continue
     if (known('dev-server', server.pid) || state.opening.has(`server:${server.port}`)) continue
     state.instances.push({
-      id: nextId(state, 'dev-server'), kind: 'dev-server',
-      pid: server.pid, port: server.port,
+      id: nextId(state, 'dev-server'),
+      kind: 'dev-server',
+      pid: server.pid,
+      port: server.port,
       url: `http://localhost:${server.port}/`,
       serves: server.serves || state.checkout,
       project: server.project ?? null,
-      startedAt: server.startedAt, state: 'running', owned: false
+      startedAt: server.startedAt,
+      state: 'running',
+      owned: false
     })
   }
   for (const browser of readLaneBrowsers(state.checkout)) {
@@ -894,9 +886,16 @@ async function adoptNewRecords(state) {
     if (known('browser', browser.pid) || held || state.opening.has(`browser:${browser.client}`)) continue
     const kind = browser.headless === false ? 'editor-browser' : 'lane-browser'
     const row = {
-      pid: browser.pid, port: browser.port, browser: browser.client,
-      profile: browser.profile, chrome: browser.chrome, headless: browser.headless,
-      project: null, startedAt: browser.startedAt, state: 'running', owned: false,
+      pid: browser.pid,
+      port: browser.port,
+      browser: browser.client,
+      profile: browser.profile,
+      chrome: browser.chrome,
+      headless: browser.headless,
+      project: null,
+      startedAt: browser.startedAt,
+      state: 'running',
+      owned: false,
       startedBrowser: browser.startedBrowser === true
     }
     // One record backs one browser, and a visible browser holds a tab per
@@ -906,8 +905,12 @@ async function adoptNewRecords(state) {
     if (pages && pages.length) {
       for (const page of pages) {
         state.instances.push({
-          ...row, id: nextId(state, kind), kind,
-          url: page.url, pageId: page.id, client: clientOfUrl(page.url) || browser.client
+          ...row,
+          id: nextId(state, kind),
+          kind,
+          url: page.url,
+          pageId: page.id,
+          client: clientOfUrl(page.url) || browser.client
         })
       }
       continue
@@ -918,7 +921,11 @@ async function adoptNewRecords(state) {
 
 /** The bridge client name a page url carries, or null. */
 function clientOfUrl(url) {
-  try { return new URL(url).searchParams.get('client') } catch { return null }
+  try {
+    return new URL(url).searchParams.get('client')
+  } catch {
+    return null
+  }
 }
 
 /** Read the registries an earlier process left, then prove them at once. */
@@ -929,7 +936,9 @@ async function adoptInstances(state) {
 
 /** Kill what is owned before the process goes, and leave no record. */
 function registerLifecycle(state) {
-  state.onSignal = () => { shutdownSupervisor(state).finally(() => process.exit(0)) }
+  state.onSignal = () => {
+    shutdownSupervisor(state).finally(() => process.exit(0))
+  }
   state.onExit = () => {
     removeSupervisorRecord(state.checkout)
     for (const entry of state.instances) if (entry.owned && !state.managed.has(entry.id)) endProcess(entry.pid)
@@ -953,7 +962,10 @@ async function finishSupervisor(state) {
   if (state.finished) return
   state.finished = true
   removeSupervisorRecord(state.checkout)
-  if (state.timer) { clearInterval(state.timer); state.timer = null }
+  if (state.timer) {
+    clearInterval(state.timer)
+    state.timer = null
+  }
   unregisterLifecycle(state)
   await closeServer(state.server)
 }
@@ -965,6 +977,80 @@ async function shutdownSupervisor(state) {
   return { stopped }
 }
 
+/** The supervisor's routes, tried in order against the method and path. */
+const SUPERVISOR_ROUTES = [
+  {
+    method: 'POST',
+    matches: routePath => routePath === '/handoff',
+    handle: async ({ state, response }) => {
+      if (state.managed.size) return sendJson(response, 409, { error: 'the desktop is already running' })
+      sendJson(response, 200, { ok: true })
+      void finishSupervisor(state)
+      return undefined
+    }
+  },
+  {
+    method: 'GET',
+    matches: routePath => routePath === '/snapshot',
+    handle: async ({ state, response }) => sendJson(response, 200, { instances: state.instances, events: state.events })
+  },
+  {
+    method: 'POST',
+    matches: routePath => routePath === '/desktop',
+    handle: async ({ state, request, response }) => {
+      if (!state.desktopCommand) return sendJson(response, 404, { error: 'no desktop attached' })
+      const body = parseJson(await readBody(request))
+      return sendJson(response, 200, await state.desktopCommand(body))
+    }
+  },
+  {
+    method: 'GET',
+    matches: routePath => routePath === '/health',
+    handle: async ({ state, response }) =>
+      sendJson(response, 200, { ok: true, pid: process.pid, port: state.port, startedAt: state.startedAt })
+  },
+  {
+    method: 'GET',
+    matches: routePath => routePath === '/instances',
+    handle: async ({ state, response }) => sendJson(response, 200, { instances: await proveInstances(state) })
+  },
+  {
+    method: 'GET',
+    matches: routePath => routePath === '/events',
+    handle: async ({ state, response }) => sendJson(response, 200, { events: state.events })
+  },
+  {
+    method: 'POST',
+    matches: routePath => routePath === '/instances',
+    handle: async ({ state, request, response }) =>
+      sendJson(response, 200, await spawnInstance(state, parseJson(await readBody(request))))
+  },
+  {
+    method: 'DELETE',
+    matches: routePath => routePath === '/instances',
+    handle: async ({ state, response }) => sendJson(response, 200, { stopped: await stopOwnedInstances(state) })
+  },
+  {
+    method: 'DELETE',
+    matches: routePath => routePath.startsWith('/instances/'),
+    handle: async ({ state, response, requestPath }) => {
+      const id = decodeURIComponent(requestPath.slice('/instances/'.length))
+      return sendJson(response, 200, await stopInstance(state, id))
+    }
+  },
+  {
+    method: 'POST',
+    matches: routePath => routePath === '/shutdown',
+    handle: async ({ state, response }) => {
+      const stopped = await stopOwnedInstances(state)
+      sendJson(response, 200, { ok: true, stopped })
+      // Close after the reply is written, so the caller hears the answer.
+      finishSupervisor(state)
+      return undefined
+    }
+  }
+]
+
 /** Route one HTTP request. Every reply is JSON; an error is a sentence. */
 async function handleSupervisorRequest(state, request, response) {
   const address = new URL(request.url || '/', 'http://127.0.0.1')
@@ -974,47 +1060,9 @@ async function handleSupervisorRequest(state, request, response) {
     if (request.headers.origin && request.headers.origin !== `http://${request.headers.host}`) {
       return sendJson(response, 403, { error: 'origin refused' })
     }
-    if (method === 'POST' && requestPath === '/handoff') {
-      if (state.managed.size) return sendJson(response, 409, { error: 'the desktop is already running' })
-      sendJson(response, 200, { ok: true })
-      void finishSupervisor(state)
-      return
-    }
-    if (method === 'GET' && requestPath === '/snapshot') {
-      return sendJson(response, 200, { instances: state.instances, events: state.events })
-    }
-    if (method === 'POST' && requestPath === '/desktop') {
-      if (!state.desktopCommand) return sendJson(response, 404, { error: 'no desktop attached' })
-      const body = parseJson(await readBody(request))
-      return sendJson(response, 200, await state.desktopCommand(body))
-    }
-    if (method === 'GET' && requestPath === '/health') {
-      return sendJson(response, 200, { ok: true, pid: process.pid, port: state.port, startedAt: state.startedAt })
-    }
-    if (method === 'GET' && requestPath === '/instances') {
-      return sendJson(response, 200, { instances: await proveInstances(state) })
-    }
-    if (method === 'GET' && requestPath === '/events') {
-      return sendJson(response, 200, { events: state.events })
-    }
-    if (method === 'POST' && requestPath === '/instances') {
-      return sendJson(response, 200, await spawnInstance(state, parseJson(await readBody(request))))
-    }
-    if (method === 'DELETE' && requestPath === '/instances') {
-      return sendJson(response, 200, { stopped: await stopOwnedInstances(state) })
-    }
-    if (method === 'DELETE' && requestPath.startsWith('/instances/')) {
-      const id = decodeURIComponent(requestPath.slice('/instances/'.length))
-      return sendJson(response, 200, await stopInstance(state, id))
-    }
-    if (method === 'POST' && requestPath === '/shutdown') {
-      const stopped = await stopOwnedInstances(state)
-      sendJson(response, 200, { ok: true, stopped })
-      // Close after the reply is written, so the caller hears the answer.
-      finishSupervisor(state)
-      return
-    }
-    return sendJson(response, 404, { error: `no route for ${method} ${requestPath}` })
+    const route = SUPERVISOR_ROUTES.find(entry => entry.method === method && entry.matches(requestPath))
+    if (!route) return sendJson(response, 404, { error: `no route for ${method} ${requestPath}` })
+    return await route.handle({ state, request, response, requestPath })
   } catch (error) {
     return sendJson(response, error.statusCode || 500, { error: error.message })
   }
@@ -1029,9 +1077,8 @@ async function handleSupervisorRequest(state, request, response) {
  * `stopInstance` without going through HTTP.
  */
 export async function startSupervisor(checkout, { port, startTimeoutMilliseconds } = {}) {
-  const wanted = port === undefined
-    ? Number(process.env.ENGINE_SUPERVISOR_PORT || DEFAULT_SUPERVISOR_PORT)
-    : Number(port)
+  const wanted =
+    port === undefined ? Number(process.env.ENGINE_SUPERVISOR_PORT || DEFAULT_SUPERVISOR_PORT) : Number(port)
   const state = {
     checkout,
     port: null,
@@ -1066,7 +1113,9 @@ export async function startSupervisor(checkout, { port, startTimeoutMilliseconds
     await listen(state.server, wanted)
     state.port = state.server.address().port
     writeSupervisorRecord(checkout, { port: state.port, pid: state.pid, startedAt: state.startedAt })
-    state.timer = setInterval(() => { proveInstances(state).catch(() => {}) }, PROVER_INTERVAL_MILLISECONDS)
+    state.timer = setInterval(() => {
+      proveInstances(state).catch(() => {})
+    }, PROVER_INTERVAL_MILLISECONDS)
     state.timer.unref()
     registerLifecycle(state)
     await adoptInstances(state)

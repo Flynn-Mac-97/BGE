@@ -23,6 +23,13 @@ export { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from './s
  * The shell composes panels without knowing them: `panelsFor` asks the loader
  * for whatever a plugin contributed to a dock.
  */
+/** What the status line says about the level being on disk. */
+function saveStatus(editor, files) {
+  if (editor.projectUntitled) return 'untitled · edits held, name it to keep them'
+  if (files.pending) return 'saving…'
+  return 'saved to disk'
+}
+
 export function makeShell(root, context) {
   const { loader, bus, editor } = context
   // renderer is read lazily: the canvas it draws into is created below, so the
@@ -137,7 +144,10 @@ export function makeShell(root, context) {
         b.className = 'panel-act'
         b.textContent = a.label
         b.title = a.title || a.label
-        b.onclick = () => { a.run(context); draw() }
+        b.onclick = () => {
+          a.run(context)
+          draw()
+        }
         head.append(b)
       }
     }
@@ -179,40 +189,43 @@ export function makeShell(root, context) {
   }
 
   /** The play/stop button. */
-  function drawPlayButton(bar, context) {
-    const running = context.loop.running
+  function drawPlayButton(bar, shellContext) {
+    const running = shellContext.loop.running
     const play = document.createElement('button')
     play.className = 'play' + (running ? ' on' : '')
     play.textContent = running ? 'STOP' : 'PLAY'
-    play.onclick = () => context.editor.togglePlay()
+    play.onclick = () => shellContext.editor.togglePlay()
     bar.append(play)
   }
 
   /** The project and level path. */
-  function drawProjectPath(bar, context) {
+  function drawProjectPath(bar, shellContext) {
     const label = document.createElement('span')
     label.className = 'path'
-    label.innerHTML = `${context.editor.projectName} / <b>${context.editor.levelName}</b>`
+    label.innerHTML = `${shellContext.editor.projectName} / <b>${shellContext.editor.levelName}</b>`
     bar.append(label)
   }
 
   /** One tool button. */
-  function toolButton(tool, context) {
+  function toolButton(tool, shellContext) {
     const button = document.createElement('button')
-    button.className = 'tool' + (context.editor.tool === tool.id ? ' on' : '')
+    button.className = 'tool' + (shellContext.editor.tool === tool.id ? ' on' : '')
     button.textContent = tool.icon || tool.id[0]
     button.title = `${tool.label}${tool.key ? ` (${tool.key})` : ''} — ${tool.plugin}`
-    button.onclick = () => { context.editor.setTool(tool.id); draw() }
+    button.onclick = () => {
+      shellContext.editor.setTool(tool.id)
+      draw()
+    }
     return button
   }
 
   /** The tool rail, drawn only once something contributes a second tool. */
-  function drawToolRail(bar, context) {
+  function drawToolRail(bar, shellContext) {
     const tools = loader.contrib.tools
     if (tools.length <= 1) return
     const rail = document.createElement('span')
     rail.className = 'rail'
-    for (const tool of tools) rail.append(toolButton(tool, context))
+    for (const tool of tools) rail.append(toolButton(tool, shellContext))
     bar.append(rail)
   }
 
@@ -222,13 +235,16 @@ export function makeShell(root, context) {
    * This is what `menus` is for: a way to reach something that is not always on
    * screen, without a plugin needing to touch the toolbar itself.
    */
-  function drawMenus(bar, context) {
+  function drawMenus(bar, shellContext) {
     for (const menu of loader.contrib.menus) {
       const button = document.createElement('button')
-      button.className = 'menu' + (menu.on?.(context) ? ' on' : '')
+      button.className = 'menu' + (menu.on?.(shellContext) ? ' on' : '')
       button.textContent = menu.label
       button.title = `${menu.title || menu.label} — ${menu.plugin}`
-      button.onclick = () => { menu.run(context); draw() }
+      button.onclick = () => {
+        menu.run(shellContext)
+        draw()
+      }
       bar.append(button)
     }
   }
@@ -259,9 +275,7 @@ export function makeShell(root, context) {
     const sel = [...editor.selection]
     // An untitled project never writes its level, so claiming "saved to disk"
     // would be a lie a person only finds out about by losing work.
-    const saved = editor.projectUntitled
-      ? 'untitled · edits held, name it to keep them'
-      : (context.files.pending ? 'saving…' : 'saved to disk')
+    const saved = saveStatus(editor, context.files)
     s.innerHTML = `<span>${sel.length ? sel.join(', ') : 'nothing selected'}</span>
       <span>AI: run agent.context, not screenshots</span>
       <span class="end">${saved}</span>`
@@ -323,6 +337,8 @@ export function makeShell(root, context) {
     // What is bound right now, so an agent can ask which keys are taken instead
     // of pressing them to find out.
     shortcuts: keyboard.list,
-    get focused() { return frame?.classList.contains('focused') === true }
+    get focused() {
+      return frame?.classList.contains('focused') === true
+    }
   }
 }

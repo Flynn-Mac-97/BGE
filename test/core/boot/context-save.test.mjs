@@ -36,14 +36,22 @@ test('context.save() and context.save(options) both write the open level', async
     const { context } = await startWorldInNode({ root: CHECKOUT, project: directory })
     assert.equal(context.level(), 'main', 'a level is open to save')
 
-    assert.deepEqual(await context.save(), { saved: 'levels/main.json' },
-      'a bare context.save() writes the level instead of throwing')
-    assert.deepEqual(await context.save({ naming: false }), { saved: 'levels/main.json' },
-      'an options argument is accepted too')
+    assert.deepEqual(
+      await context.save(),
+      { saved: 'levels/main.json' },
+      'a bare context.save() writes the level instead of throwing'
+    )
+    assert.deepEqual(
+      await context.save({ naming: false }),
+      { saved: 'levels/main.json' },
+      'an options argument is accepted too'
+    )
 
     const written = JSON.parse(await fs.readFile(path.join(directory, 'levels/main.json'), 'utf8'))
-    assert.ok(written.entities.some(entity => entity.id === 'marker'),
-      'the written level holds the entity that was open')
+    assert.ok(
+      written.entities.some(entity => entity.id === 'marker'),
+      'the written level holds the entity that was open'
+    )
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
   }

@@ -21,11 +21,21 @@ export function makeCountingPool(pool = makeTargetPool()) {
       released++
       return pool.release(target)
     },
-    resize(width, height) { pool.resize(width, height) },
-    dispose() { pool.dispose() },
+    resize(width, height) {
+      pool.resize(width, height)
+    },
+    dispose() {
+      pool.dispose()
+    },
     key: pool.key,
-    get created() { return pool.created },
-    get acquired() { return acquired },
-    get released() { return released }
+    get created() {
+      return pool.created
+    },
+    get acquired() {
+      return acquired
+    },
+    get released() {
+      return released
+    }
   }
 }

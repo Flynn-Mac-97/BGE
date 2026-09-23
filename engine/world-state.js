@@ -47,7 +47,8 @@ const { project, resolve } = makeValueProjection({
   report(lost, loss) {
     if (loss.reason === 'function') lost.push(`${loss.where} is a function`)
     else if (loss.reason === 'deep') lost.push(`${loss.where} is deeper than ${loss.maxDepth}`)
-    else if (loss.reason === 'notPlain') lost.push(`${loss.where} is a ${loss.name || 'object'}, which a checkpoint cannot copy`)
+    else if (loss.reason === 'notPlain')
+      lost.push(`${loss.where} is a ${loss.name || 'object'}, which a checkpoint cannot copy`)
   }
 })
 
@@ -122,7 +123,8 @@ export function captureWorld(world) {
  * @returns {object} The entities for the store, and how much was lost.
  */
 export function restoreWorld(world, capture, makeEntity) {
-  if (capture?.version !== CHECKPOINT_VERSION) throw new Error(`checkpoint version ${capture?.version} is not ${CHECKPOINT_VERSION}`)
+  if (capture?.version !== CHECKPOINT_VERSION)
+    throw new Error(`checkpoint version ${capture?.version} is not ${CHECKPOINT_VERSION}`)
   const byId = new Map(world.entities.map(entity => [entity.id, entity]))
   const resolveEntity = id => byId.get(id)
 
@@ -244,5 +246,4 @@ function behaviourPlacement(e) {
  * is pitch, yaw and roll in degrees. A list must stay a list — `Math.round` of
  * one is NaN, and JSON writes NaN as null, so a save would drop it.
  */
-const round = value =>
-  Array.isArray(value) ? value.map(round) : round3(value)
+const round = value => (Array.isArray(value) ? value.map(round) : round3(value))

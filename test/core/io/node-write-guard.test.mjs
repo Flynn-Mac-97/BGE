@@ -85,7 +85,8 @@ const working = [{ id: 'lane-a', status: 'active', files: ['engine/render.js'], 
 
 const headless = (root, ...args) => {
   const run = spawnSync(process.execPath, [CLI, '--headless', '--root', root, '--project', 'game', ...args], {
-    cwd: REPO, encoding: 'utf8'
+    cwd: REPO,
+    encoding: 'utf8'
   })
   return { code: run.status, out: run.stdout, error: run.stderr }
 }

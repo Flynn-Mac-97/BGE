@@ -50,7 +50,7 @@ export function cameraProjection(view, viewport) {
     pitch: view.pitch || 0,
     fov,
     aspect: width / height,
-    focal: 1 / Math.tan(fov * Math.PI / 180 / 2)
+    focal: 1 / Math.tan((fov * Math.PI) / 180 / 2)
   }
 }
 
@@ -79,14 +79,16 @@ export function makeProjector(view, viewport) {
       },
       /** Screen percent size of a thing `w` by `h` world units, at any depth. */
       sizeAt(depth, w, h) {
-        return { w: (w * zoom / width) * 100, h: (h * zoom / height) * 100 }
+        return { w: ((w * zoom) / width) * 100, h: ((h * zoom) / height) * 100 }
       }
     }
   }
 
   const { x, y, z, yaw, pitch, focal, aspect } = projection
-  const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw)
-  const cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch)
+  const cosYaw = Math.cos(yaw),
+    sinYaw = Math.sin(yaw)
+  const cosPitch = Math.cos(pitch),
+    sinPitch = Math.sin(pitch)
 
   /** World point into camera space: translate to the eye, undo yaw, undo pitch. */
   function toCamera(worldX, worldY, worldZ) {
@@ -109,8 +111,8 @@ export function makeProjector(view, viewport) {
       const inFront = cam.z < -0.001
       const away = inFront ? -cam.z : 0.001
       return {
-        x: ((cam.x * focal / aspect / away) + 1) / 2 * 100,
-        y: (1 - (cam.y * focal / away)) / 2 * 100,
+        x: (((cam.x * focal) / aspect / away + 1) / 2) * 100,
+        y: ((1 - (cam.y * focal) / away) / 2) * 100,
         depth: away,
         inFront
       }
@@ -118,8 +120,8 @@ export function makeProjector(view, viewport) {
     sizeAt(depth, w, h) {
       const away = Math.max(0.001, depth)
       return {
-        w: (w * focal / aspect / away) / 2 * 100,
-        h: (h * focal / away) / 2 * 100
+        w: ((w * focal) / aspect / away / 2) * 100,
+        h: ((h * focal) / away / 2) * 100
       }
     }
   }

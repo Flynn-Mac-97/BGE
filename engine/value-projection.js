@@ -82,7 +82,8 @@ export function makeValueProjection(policy) {
     return {
       $map: [...value].map(([key, item]) => [
         project(key, live, lost, `${where} key`, depth + 1),
-        project(item, live, lost, `${where}[${String(key)}]`, depth + 1)])
+        project(item, live, lost, `${where}[${String(key)}]`, depth + 1)
+      ])
     }
   }
 
@@ -170,9 +171,12 @@ export function makeValueProjection(policy) {
   }
 
   function resolveMap(copy, resolveEntity, onMissing, where) {
-    return new Map(copy.$map.map(([key, item]) => [
-      resolve(key, resolveEntity, onMissing, where),
-      resolve(item, resolveEntity, onMissing, where)]))
+    return new Map(
+      copy.$map.map(([key, item]) => [
+        resolve(key, resolveEntity, onMissing, where),
+        resolve(item, resolveEntity, onMissing, where)
+      ])
+    )
   }
 
   /** A plain object resolves each member at its own path. */

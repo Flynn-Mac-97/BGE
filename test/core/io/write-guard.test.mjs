@@ -16,8 +16,12 @@ const recorder = () => {
   const written = []
   return {
     written,
-    async write(path, text) { written.push({ scope: 'project', path, text }) },
-    async writeAgent(scope, path, text) { written.push({ scope, path, text }) }
+    async write(path, text) {
+      written.push({ scope: 'project', path, text })
+    },
+    async writeAgent(scope, path, text) {
+      written.push({ scope, path, text })
+    }
   }
 }
 
@@ -27,7 +31,11 @@ const silentBus = () => ({ emit() {} })
 const asLaneRenderPage = async (lane, body) => {
   const before = globalThis.__engineViewer
   globalThis.__engineViewer = lane
-  try { return await body() } finally { globalThis.__engineViewer = before }
+  try {
+    return await body()
+  } finally {
+    globalThis.__engineViewer = before
+  }
 }
 
 test('an unguarded write reaches disk', async () => {
@@ -38,9 +46,10 @@ test('an unguarded write reaches disk', async () => {
   await files.writeJSON('levels/other.json', { entities: [] })
   await files.writeAgent('project', 'agents/notes.md', 'text')
 
-  assert.deepEqual(transport.written.map(one => one.path), [
-    'levels/meadow.json', 'levels/other.json', 'agents/notes.md'
-  ])
+  assert.deepEqual(
+    transport.written.map(one => one.path),
+    ['levels/meadow.json', 'levels/other.json', 'agents/notes.md']
+  )
   assert.equal(files.pending, 0)
 })
 
@@ -56,7 +65,8 @@ test('a lane render page is refused, and the reason names the lane and the file'
         assert.match(error.message, /lane-a/, 'says who asked')
         assert.match(error.message, /never writes the shared checkout/, 'says why')
         return true
-      })
+      }
+    )
     await assert.rejects(() => files.writeAgent('engine', 'agents/core.md', 'rewritten'))
   })
 
@@ -68,13 +78,10 @@ test('the same page writes again once it is not rendering for a lane', async () 
   const transport = recorder()
   const files = makeFiles(silentBus(), transport)
 
-  await asLaneRenderPage('lane-a', () =>
-    assert.rejects(() => files.write('levels/meadow.json', 'rewritten')))
+  await asLaneRenderPage('lane-a', () => assert.rejects(() => files.write('levels/meadow.json', 'rewritten')))
   await files.write('levels/meadow.json', 'edited by the person')
 
-  assert.deepEqual(transport.written, [
-    { scope: 'project', path: 'levels/meadow.json', text: 'edited by the person' }
-  ])
+  assert.deepEqual(transport.written, [{ scope: 'project', path: 'levels/meadow.json', text: 'edited by the person' }])
 })
 
 test('the kernel guard cannot be removed by a plugin taking its own back off', async () => {
@@ -87,7 +94,8 @@ test('the kernel guard cannot be removed by a plugin taking its own back off', a
   await files.write('levels/meadow.json', 'x')
 
   await asLaneRenderPage('lane-a', () =>
-    assert.rejects(() => files.write('levels/meadow.json', 'x'), /never writes the shared checkout/))
+    assert.rejects(() => files.write('levels/meadow.json', 'x'), /never writes the shared checkout/)
+  )
   assert.equal(transport.written.length, 1, 'only the write nobody refused landed')
 })
 
@@ -111,7 +119,9 @@ test('a guard that throws refuses the write', async () => {
   const transport = recorder()
   const files = makeFiles(silentBus(), transport)
 
-  files.guardWrites(() => { throw new Error('the registry is unreadable') })
+  files.guardWrites(() => {
+    throw new Error('the registry is unreadable')
+  })
   await assert.rejects(() => files.write('levels/meadow.json', 'x'), /the registry is unreadable/)
   assert.deepEqual(transport.written, [])
 })

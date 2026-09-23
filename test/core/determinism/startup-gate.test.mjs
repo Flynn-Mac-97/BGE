@@ -58,12 +58,9 @@ test('a run that steps at once and one that waits first are the same world', asy
     const immediately = await run(project)
     const afterWaiting = await run(project, 1500)
 
-    assert.ok(immediately.y < FALL_FROM,
-      `the body should have fallen, so the solver was there (y=${immediately.y})`)
-    assert.equal(immediately.y, afterWaiting.y,
-      'waiting for a solver that had not finished must not change the answer')
-    assert.deepEqual(immediately.held, [],
-      'the hold should be released once the solver is ready')
+    assert.ok(immediately.y < FALL_FROM, `the body should have fallen, so the solver was there (y=${immediately.y})`)
+    assert.equal(immediately.y, afterWaiting.y, 'waiting for a solver that had not finished must not change the answer')
+    assert.deepEqual(immediately.held, [], 'the hold should be released once the solver is ready')
   } finally {
     await fs.rm(project, { recursive: true, force: true })
   }

@@ -13,7 +13,8 @@ const noop = () => {}
 test('equal descriptors share a key and one changed field makes a different key', () => {
   assert.equal(
     descriptorKey({ scale: 0.5, format: 'half-float' }),
-    descriptorKey({ scale: 0.5, format: 'half-float', samples: 0, depth: true }))
+    descriptorKey({ scale: 0.5, format: 'half-float', samples: 0, depth: true })
+  )
   assert.notEqual(descriptorKey({ format: 'half-float' }), descriptorKey({ format: 'unsigned-byte' }))
   assert.notEqual(descriptorKey({ scale: 0.5 }), descriptorKey({ scale: 1 }))
   assert.notEqual(descriptorKey({ samples: 0 }), descriptorKey({ samples: 4 }))

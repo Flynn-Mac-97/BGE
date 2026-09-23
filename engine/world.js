@@ -271,7 +271,10 @@ export function makeWorld(bus) {
     const fromPlacement = asAttached(placement.behaviours)
     for (const name of [...Object.keys(fromType), ...Object.keys(fromPlacement)]) {
       if (entity.behaviours.some(behaviour => behaviour.name === name)) continue
-      if (fromPlacement[name] === false) { entity._detached.add(name); continue }
+      if (fromPlacement[name] === false) {
+        entity._detached.add(name)
+        continue
+      }
       addBehaviour(entity, name, {
         own: !(name in fromType),
         typeProps: fromType[name] || {},
@@ -378,12 +381,18 @@ export function makeWorld(bus) {
   function hook(e, which, ...args) {
     for (const b of e.behaviours) {
       if (typeof b.definition[which] !== 'function') continue
-      try { b.definition[which](e, ...args, b.bag) }
-      catch (err) { console.error(`[${e.type}:${b.name}] ${which}`, err) }
+      try {
+        b.definition[which](e, ...args, b.bag)
+      } catch (err) {
+        console.error(`[${e.type}:${b.name}] ${which}`, err)
+      }
     }
     if (typeof e._definition?.[which] !== 'function') return
-    try { e._definition[which](e, ...args) }
-    catch (err) { console.error(`[${e.type}] ${which}`, err) }
+    try {
+      e._definition[which](e, ...args)
+    } catch (err) {
+      console.error(`[${e.type}] ${which}`, err)
+    }
   }
 
   /**
@@ -415,14 +424,17 @@ export function makeWorld(bus) {
     target.x = before.x + (entity.x - before.x) * blend
     target.y = before.y + (entity.y - before.y) * blend
     target.z = before.z + (z - before.z) * blend
-    target.yaw = Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
-      ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
-      : entity.yaw
+    target.yaw =
+      Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
+        ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
+        : entity.yaw
     return target
   }
 
   const world = {
-    get entities() { return entities },
+    get entities() {
+      return entities
+    },
     types,
     behaviours,
     hook,
@@ -479,7 +491,9 @@ export function makeWorld(bus) {
     },
 
     /** Put a type definition in the registry, for the next spawn to read. */
-    registerType(name, definition) { types.set(name, definition) },
+    registerType(name, definition) {
+      types.set(name, definition)
+    },
 
     /**
      * Replace a type's definition and bring every live entity onto it.
@@ -532,7 +546,9 @@ export function makeWorld(bus) {
 
     // ---------------------------------------------------------- behaviours
     /** Put a behaviour definition in the registry, for the next attach to read. */
-    registerBehaviour(name, definition) { behaviours.set(name, definition) },
+    registerBehaviour(name, definition) {
+      behaviours.set(name, definition)
+    },
 
     /**
      * retype's counterpart: re-point every live user at the new definition.
@@ -550,9 +566,7 @@ export function makeWorld(bus) {
       for (const e of entities) {
         const record = e.behaviours.find(b => b.name === name)
         if (!record || RESERVED.has(name)) continue
-        const runtime = Object.fromEntries(
-          Object.entries(record.bag).filter(([k]) => !(k in (old.properties || {})))
-        )
+        const runtime = Object.fromEntries(Object.entries(record.bag).filter(([k]) => !(k in (old.properties || {}))))
         const kept = {}
         for (const k of record.overrides) kept[k] = record.bag[k]
 
@@ -572,7 +586,10 @@ export function makeWorld(bus) {
       behaviours.delete(name)
       for (const e of entities) {
         const record = e.behaviours.find(b => b.name === name)
-        if (record) { record.definition = {}; record.error = `no behaviours/${name}.js` }
+        if (record) {
+          record.definition = {}
+          record.error = `no behaviours/${name}.js`
+        }
       }
       bus.emit('behaviour:changed', { name, removed: true })
     },
@@ -640,11 +657,17 @@ export function makeWorld(bus) {
     },
 
     /** The first entity of a type. */
-    find(typeName) { return entities.find(e => e.type === typeName) },
+    find(typeName) {
+      return entities.find(e => e.type === typeName)
+    },
     /** Every entity of a type. */
-    all(typeName) { return entities.filter(e => e.type === typeName) },
+    all(typeName) {
+      return entities.filter(e => e.type === typeName)
+    },
     /** One entity by its level id. */
-    byId(id) { return entities.find(e => e.id === id) },
+    byId(id) {
+      return entities.find(e => e.id === id)
+    },
 
     /** Everything about this world a checkpoint has to carry. Built in `world-state.js`. */
     capture() {

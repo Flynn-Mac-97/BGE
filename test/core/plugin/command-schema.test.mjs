@@ -46,7 +46,10 @@ test('type validation runs before the pattern', () => {
 
 test('a pattern is unanchored unless the schema anchors it', () => {
   validateCommandInput({ type: 'string', pattern: '[0-9]+' }, 'abc123')
-  assert.throws(() => validateCommandInput({ type: 'string', pattern: '^[a-z]+$' }, 'abc1'), /args: does not match pattern/)
+  assert.throws(
+    () => validateCommandInput({ type: 'string', pattern: '^[a-z]+$' }, 'abc1'),
+    /args: does not match pattern/
+  )
 })
 
 test('a pattern applies only to strings', () => {
@@ -54,13 +57,22 @@ test('a pattern applies only to strings', () => {
 })
 
 test('a malformed pattern is reported as a schema defect, not tested against the value', () => {
-  assert.throws(() => validateCommandInput({ type: 'string', pattern: '[' }, 'anything'), /args: invalid schema pattern "\["/)
+  assert.throws(
+    () => validateCommandInput({ type: 'string', pattern: '[' }, 'anything'),
+    /args: invalid schema pattern "\["/
+  )
 })
 
 test('a non-string pattern is refused rather than coerced', () => {
-  assert.throws(() => validateCommandInput({ type: 'string', pattern: 7 }, '7'), /args: schema pattern must be a string/)
+  assert.throws(
+    () => validateCommandInput({ type: 'string', pattern: 7 }, '7'),
+    /args: schema pattern must be a string/
+  )
 })
 
 test('a keyword outside the subset is refused by name', () => {
-  assert.throws(() => validateCommandInput({ type: 'string', format: 'email' }, 'a@b'), /args: unsupported schema keyword format/)
+  assert.throws(
+    () => validateCommandInput({ type: 'string', format: 'email' }, 'a@b'),
+    /args: unsupported schema keyword format/
+  )
 })

@@ -8,7 +8,18 @@
  */
 
 /** Placement keys the entity models directly; everything else is preserved verbatim. */
-export const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties', 'sprite', 'mesh', 'collider', 'behaviours', 'note'])
+export const HANDLED = new Set([
+  'type',
+  'at',
+  'rotation',
+  'scale',
+  'properties',
+  'sprite',
+  'mesh',
+  'collider',
+  'behaviours',
+  'note'
+])
 
 /**
  * Names a behaviour may not take.
@@ -18,9 +29,30 @@ export const HANDLED = new Set(['type', 'at', 'rotation', 'scale', 'properties',
  * be a thing that stops drawing. Refused by name instead, at attach time.
  */
 export const RESERVED = new Set([
-  'id', 'type', 'x', 'y', 'z', 'rotation', 'scale', 'sprite', 'mesh', 'collider',
-  'properties', 'overrides', 'behaviours', 'hidden', 'play', 'note',
-  'velocityX', 'velocityY', 'velocityZ', 'grounded', 'animation', 'frame', 'flip', 'animationDone'
+  'id',
+  'type',
+  'x',
+  'y',
+  'z',
+  'rotation',
+  'scale',
+  'sprite',
+  'mesh',
+  'collider',
+  'properties',
+  'overrides',
+  'behaviours',
+  'hidden',
+  'play',
+  'note',
+  'velocityX',
+  'velocityY',
+  'velocityZ',
+  'grounded',
+  'animation',
+  'frame',
+  'flip',
+  'animationDone'
 ])
 
 /**

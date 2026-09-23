@@ -114,9 +114,9 @@ export function makeEntityScans(state, records) {
     // moving counterpart: a simple mesh, out of every batch, whose outline is
     // already resolved, so a frame that only moved it needs to write a place.
     snapshot[at + SLOT_FLAGS] =
-      (record.settled && record.idle && !record.moved ? SLOT_QUIET : 0)
-      | (record.outline ? SLOT_OUTLINE : 0)
-      | (record.steady ? SLOT_STEADY : 0)
+      (record.settled && record.idle && !record.moved ? SLOT_QUIET : 0) |
+      (record.outline ? SLOT_OUTLINE : 0) |
+      (record.steady ? SLOT_STEADY : 0)
   }
 
   /** The fields both scans need to match, and the slot each is remembered in. */
@@ -164,12 +164,14 @@ export function makeEntityScans(state, records) {
    * it was, on a still frame and on a playing frame alike.
    */
   function isQuiet(entity, at, ringedId) {
-    return snapshot[at] === entity
-      && (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0
-      && snapshot[at + SLOT_X] === entity.x
-      && snapshot[at + SLOT_Y] === entity.y
-      && snapshot[at + SLOT_Z] === entity.z
-      && sameApartFromPlace(entity, at, ringedId)
+    return (
+      snapshot[at] === entity &&
+      (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0 &&
+      snapshot[at + SLOT_X] === entity.x &&
+      snapshot[at + SLOT_Y] === entity.y &&
+      snapshot[at + SLOT_Z] === entity.z &&
+      sameApartFromPlace(entity, at, ringedId)
+    )
   }
 
   /** The entities the quiet scan could not answer, filled by `scanQuiet`. */
@@ -211,7 +213,8 @@ export function makeEntityScans(state, records) {
   function isPlaceable(entity, at, drawn, flags, ringedId) {
     if (snapshot[at] !== entity) return false
     if ((flags & SLOT_STEADY) === 0) return false
-    if (drawnPlaces[drawn] === entity.x && drawnPlaces[drawn + 1] === entity.y && drawnPlaces[drawn + 2] === entity.z) return false
+    if (drawnPlaces[drawn] === entity.x && drawnPlaces[drawn + 1] === entity.y && drawnPlaces[drawn + 2] === entity.z)
+      return false
     return sameApartFromPlace(entity, at, ringedId)
   }
 

@@ -9,6 +9,13 @@ export const UNIT_PLANE = new THREE.PlaneGeometry(1, 1)
 /** Geometry cached by kind and dimensions, so a map of walls shares a handful of sizes. */
 const geometryCache = new Map()
 
+/** One solid shape per kind, built from its size and segment count. */
+const SOLID_BY_KIND = {
+  sphere: (w, h, d, parts) => new THREE.SphereGeometry(0.5, Math.max(8, parts * 2), Math.max(6, parts)).scale(w, h, d),
+  quad: (w, h, d, parts) => new THREE.PlaneGeometry(w, h, parts, parts),
+  box: (w, h, d, parts) => new THREE.BoxGeometry(w, h, d, parts, parts, parts)
+}
+
 /**
  * Solid geometry, cached by its dimensions.
  *
@@ -26,11 +33,8 @@ export function solidGeometry(kind, w, h, d, segments = 1) {
   // makes a displacing material possible at all. Capped: past a point the
   // triangles cost more than the shape is worth, and an author who types a
   // thousand meant a hundred.
-  const geometry =
-    kind === 'sphere' ? new THREE.SphereGeometry(0.5, Math.max(8, parts * 2), Math.max(6, parts))
-      .scale(w, h, d)
-    : kind === 'quad' ? new THREE.PlaneGeometry(w, h, parts, parts)
-    : new THREE.BoxGeometry(w, h, d, parts, parts, parts)
+  const build = SOLID_BY_KIND[kind] || SOLID_BY_KIND.box
+  const geometry = build(w, h, d, parts)
   // The second UV set is copied off the first BEFORE it is rewritten in metres,
   // so it is still the 0..1 parameterisation a baked lightmap wants. Two floats
   // per vertex on geometry that is already shared by every wall of this size is
@@ -57,7 +61,17 @@ function measureUVsInMetres(geometry, kind, w, h, d) {
   // A sphere is one continuous surface with one UV wrap; measuring it in metres
   // per "face" would tear it at the seam.
   if (kind === 'sphere') return
-  const faces = kind === 'quad' ? [[w, h]] : [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]
+  const faces =
+    kind === 'quad'
+      ? [[w, h]]
+      : [
+          [d, h],
+          [d, h],
+          [w, d],
+          [w, d],
+          [w, h],
+          [w, h]
+        ]
   const perFace = uv.count / faces.length
   for (let i = 0; i < uv.count; i++) {
     const [faceWidth, faceHeight] = faces[Math.floor(i / perFace)]
@@ -105,11 +119,17 @@ export function mergeMeshes(members) {
     for (let i = 0; i < p.count; i++) {
       const at = vertexAt + i
       point.fromBufferAttribute(p, i).applyMatrix4(mesh.matrix)
-      position[at * 3] = point.x; position[at * 3 + 1] = point.y; position[at * 3 + 2] = point.z
+      position[at * 3] = point.x
+      position[at * 3 + 1] = point.y
+      position[at * 3 + 2] = point.z
       point.fromBufferAttribute(n, i).applyMatrix3(normalMatrix).normalize()
-      normal[at * 3] = point.x; normal[at * 3 + 1] = point.y; normal[at * 3 + 2] = point.z
-      uv[at * 2] = t.getX(i); uv[at * 2 + 1] = t.getY(i)
-      uv1[at * 2] = t1.getX(i); uv1[at * 2 + 1] = t1.getY(i)
+      normal[at * 3] = point.x
+      normal[at * 3 + 1] = point.y
+      normal[at * 3 + 2] = point.z
+      uv[at * 2] = t.getX(i)
+      uv[at * 2 + 1] = t.getY(i)
+      uv1[at * 2] = t1.getX(i)
+      uv1[at * 2 + 1] = t1.getY(i)
     }
     for (let i = 0; i < geometry.index.count; i++) index[indexAt + i] = vertexAt + geometry.index.getX(i)
 

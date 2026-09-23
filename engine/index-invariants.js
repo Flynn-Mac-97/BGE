@@ -17,9 +17,8 @@
  */
 function placedHeight(type, placement) {
   const meshBox = Array.isArray(placement.mesh?.box) ? placement.mesh.box : type.meshBox
-  const colliderBox = placement.collider
-    ? (Array.isArray(placement.collider.box) ? placement.collider.box : undefined)
-    : type.colliderBox
+  let colliderBox = type.colliderBox
+  if (placement.collider) colliderBox = Array.isArray(placement.collider.box) ? placement.collider.box : undefined
   const height = meshBox?.[1] ?? colliderBox?.[1]
   return Number.isFinite(height) ? height : null
 }
@@ -55,7 +54,8 @@ function declaredInvariant(index, placement) {
 /** An invariant rule `check` does not know is reported, never silently passed. */
 function unknownRuleProblem(type, typeName, declared) {
   return {
-    file: type.file, warning: true,
+    file: type.file,
+    warning: true,
     why: `type "${typeName}" declares invariant rule "${declared.rule}", which check does not know how to enforce`
   }
 }
@@ -63,7 +63,8 @@ function unknownRuleProblem(type, typeName, declared) {
 /** A placement carrying too little to check is reported, never silently passed. */
 function uncomputableProblem(level, named, declared) {
   return {
-    file: level.file, warning: true,
+    file: level.file,
+    warning: true,
     why: `${named} cannot be checked against its invariant "${declared.rule}" — not enough on the placement or its type to compute it`
   }
 }
@@ -131,7 +132,9 @@ export function invariantProblems(index, levelPlacements) {
  */
 function tintIsWhite(tint) {
   if (typeof tint === 'number') return tint === 0xffffff
-  const said = String(tint ?? '').trim().toLowerCase()
+  const said = String(tint ?? '')
+    .trim()
+    .toLowerCase()
   return said === 'white' || said === '#fff' || said === '#ffffff'
 }
 
@@ -159,8 +162,12 @@ function tintedType(index, placement) {
 function collectTintHit(index, hit, placement, at) {
   const type = tintedType(index, placement)
   if (!type) return
-  const seen = hit.get(placement.type)
-    || { count: 0, first: placement.id ?? `#${at}`, tint: type.meshTint, typeFile: type.file }
+  const seen = hit.get(placement.type) || {
+    count: 0,
+    first: placement.id ?? `#${at}`,
+    tint: type.meshTint,
+    typeFile: type.file
+  }
   seen.count++
   hit.set(placement.type, seen)
 }
@@ -171,7 +178,8 @@ function tintProblem(level, levelName, typeName, seen) {
   return {
     file: level.file,
     warning: true,
-    why: `level "${levelName}" gives type "${typeName}" a textured mesh with no tint of its own ${times}` +
+    why:
+      `level "${levelName}" gives type "${typeName}" a textured mesh with no tint of its own ${times}` +
       ` (first "${seen.first}"), and the type declares mesh.tint ${JSON.stringify(seen.tint)}` +
       ` — a placement's mesh merges key by key, so that tint multiplies the texture on every one of them.` +
       ` State a tint on the placements, or take it off ${seen.typeFile}.`

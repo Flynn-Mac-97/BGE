@@ -28,7 +28,13 @@ const VIEWS = [
   { mode: 'perspective', x: 0, y: 2, z: 20 }
 ]
 
-const POINTS = [[0, 0, 0], [2, 3, -1], [-3.5, 1.25, 2], [1.5, -0.5, 4], [8, -6, 0]]
+const POINTS = [
+  [0, 0, 0],
+  [2, 3, -1],
+  [-3.5, 1.25, 2],
+  [1.5, -0.5, 4],
+  [8, -6, 0]
+]
 
 /** A camera owner with just the fields `makeCamera` reads. */
 function cameraStateFor(view) {
@@ -54,13 +60,11 @@ test('makeProjector and the Three camera agree on the same view and viewport', (
       checked++
 
       const ndc = new THREE.Vector3(worldX, worldY, worldZ).project(camera)
-      const screenX = (ndc.x + 1) / 2 * 100
-      const screenY = (1 - ndc.y) / 2 * 100
+      const screenX = ((ndc.x + 1) / 2) * 100
+      const screenY = ((1 - ndc.y) / 2) * 100
 
-      assert.ok(Math.abs(screenX - projected.x) < 1e-9,
-        `${view.mode} x: projector ${projected.x}, three ${screenX}`)
-      assert.ok(Math.abs(screenY - projected.y) < 1e-9,
-        `${view.mode} y: projector ${projected.y}, three ${screenY}`)
+      assert.ok(Math.abs(screenX - projected.x) < 1e-9, `${view.mode} x: projector ${projected.x}, three ${screenX}`)
+      assert.ok(Math.abs(screenY - projected.y) < 1e-9, `${view.mode} y: projector ${projected.y}, three ${screenY}`)
     }
 
     assert.ok(checked > 0, `${view.mode} view had no point in front of the eye`)

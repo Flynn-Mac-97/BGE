@@ -45,12 +45,18 @@ import { loadLevel, loadTypes, reloadBehaviour, reloadType, saveLevel, togglePla
  * had no camera at all. It is a game value, so it lives with the game.
  */
 const DEFAULT_VIEW = {
-  x: 7, y: 3, z: 0, zoom: 48, mode: 'ortho',
+  x: 7,
+  y: 3,
+  z: 0,
+  zoom: 48,
+  mode: 'ortho',
   // Where a perspective camera is pointed. Radians, Y-up, rotation order YXZ:
   // yaw turns left around +Y, pitch looks up around +X, and 0/0 faces -Z.
   // They sit here rather than in the renderer for the same reason x and y do —
   // a first-person camera plugin writes them whether or not anything is drawing.
-  yaw: 0, pitch: 0, fov: 90
+  yaw: 0,
+  pitch: 0,
+  fov: 90
 }
 
 /**
@@ -119,7 +125,11 @@ export async function startWorld({
   // for, which sets the viewport, and the plugins that are off, which must be
   // off before any of them boots.
   let game = {}
-  try { game = JSON.parse(await files.read('game.json')) } catch { /* optional */ }
+  try {
+    game = JSON.parse(await files.read('game.json'))
+  } catch {
+    /* optional */
+  }
   const device = readDevice(game)
   const viewport = measuredViewport || { width: device.width, height: device.height }
 
@@ -243,8 +253,10 @@ export async function startWorld({
   // cannot be exact says so rather than answering anyway.
   const started = await starting
   if (started.pending.length) {
-    console.error(`[startup] still starting when the world opened: ${started.pending.join(', ')}. ` +
-      'A step taken now runs without it, and the loop holds the world until it lands.')
+    console.error(
+      `[startup] still starting when the world opened: ${started.pending.join(', ')}. ` +
+        'A step taken now runs without it, and the loop holds the world until it lands.'
+    )
   }
 
   // `reload` reports that the page reloaded and the world was rebuilt. It is a

@@ -23,7 +23,8 @@ export function missingAttachments(index) {
   /** Push one problem for each name that has no behaviour file. */
   const check = (names, file, where) => {
     for (const n of names || []) {
-      if (!index.behaviours[n]) out.push({ file, why: `${where} attaches behaviour "${n}" — no project/behaviours/${n}.js` })
+      if (!index.behaviours[n])
+        out.push({ file, why: `${where} attaches behaviour "${n}" — no project/behaviours/${n}.js` })
     }
   }
   for (const [name, t] of Object.entries(index.types)) check(t.behaviours, t.file, `type "${name}"`)
@@ -73,10 +74,12 @@ export function missingAssets(index) {
   // one that is empty while something names an asset means the index was never
   // built, and every reference would be reported as absent.
   if (!onDisk.size && out.length) {
-    return [{
-      file: `${PROJECT_PREFIX}/.engine/index.json`,
-      why: 'the index carries no file list, so no asset reference could be checked — rebuild it with `node bin/engine.mjs index`'
-    }]
+    return [
+      {
+        file: `${PROJECT_PREFIX}/.engine/index.json`,
+        why: 'the index carries no file list, so no asset reference could be checked — rebuild it with `node bin/engine.mjs index`'
+      }
+    ]
   }
   return out
 }
@@ -95,7 +98,10 @@ export function missingTypes(index) {
       if (typeof type !== 'string' || !type.trim()) {
         out.push({ file: l.file, why: `level "${name}" has a placement with no "type" — it will place nothing` })
       } else if (!index.types[type] && !(index.pluginTypes || []).includes(type)) {
-        out.push({ file: l.file, why: `level "${name}" places type "${type}" — there is no project/types/${type}.js, so those placements are empty` })
+        out.push({
+          file: l.file,
+          why: `level "${name}" places type "${type}" — there is no project/types/${type}.js, so those placements are empty`
+        })
       }
     }
   }
@@ -117,12 +123,15 @@ function assetSummary(missing) {
   // A map naming four absent textures on 231 brushes is four things to draw and
   // 231 places it shows, and both numbers are worth having.
   const named = references === missing.length ? '' : `, named ${references} times`
-  return [{
-    file: files.length === 1 ? files[0] : 'project',
-    why: missing.length === 1
-      ? `one missing asset, in ${where}${named} — it is the next line`
-      : `${missing.length} missing assets, in ${where}${named} — every one is listed below`
-  }]
+  return [
+    {
+      file: files.length === 1 ? files[0] : 'project',
+      why:
+        missing.length === 1
+          ? `one missing asset, in ${where}${named} — it is the next line`
+          : `${missing.length} missing assets, in ${where}${named} — every one is listed below`
+    }
+  ]
 }
 
 /**
@@ -164,9 +173,13 @@ export async function pluginImportFailures(checkout, projectDirectory) {
   ]
   const out = []
   for (const { directory, builtin } of places) {
-    let names = []
-    try { names = await fs.readdir(directory) } catch { continue }
-    for (const name of names.filter(name => name.endsWith('.js')).sort()) {
+    let names
+    try {
+      names = await fs.readdir(directory)
+    } catch {
+      continue
+    }
+    for (const name of names.filter(fileName => fileName.endsWith('.js')).sort()) {
       const file = path.join(directory, name)
       const said = path.relative(checkout, file).split(path.sep).join('/')
       const href = pathToFileURL(file).href
@@ -175,17 +188,30 @@ export async function pluginImportFailures(checkout, projectDirectory) {
         // and every failure is collected rather than thrown.
         const loaded = await import(href + '?plugin=' + ++importCount)
         if (!loaded.default) {
-          out.push({ name: null, file: said, builtin, failedToImport: false, noDefaultExport: true, error: 'no default export' })
+          out.push({
+            name: null,
+            file: said,
+            builtin,
+            failedToImport: false,
+            noDefaultExport: true,
+            error: 'no default export'
+          })
         }
       } catch (error) {
         // Where it broke, which is the first thing anybody wants. A file that
         // threw while running says so in its stack; a file that would not parse
         // says nothing at all, because node keeps the position of a module
         // syntax error out of the error object — so ask for it separately.
-        const frame = String(error?.stack || '').split('\n').map(line => line.trim()).find(line => line.includes(href))
+        const frame = String(error?.stack || '')
+          .split('\n')
+          .map(line => line.trim())
+          .find(line => line.includes(href))
         const line = Number(frame?.match(/:(\d+)(?::\d+)?\)?$/)?.[1]) || syntaxErrorLine(file)
         out.push({
-          name: null, file: said, builtin, failedToImport: true,
+          name: null,
+          file: said,
+          builtin,
+          failedToImport: true,
           error: String(error?.message || error).split('\n')[0],
           ...(Number.isFinite(line) ? { line } : {})
         })
@@ -201,13 +227,14 @@ export async function pluginImportFailures(checkout, projectDirectory) {
  * Kept apart from the finding so either source of failures — these imports, or
  * a running loader's own list — reads out the same way.
  */
-export const pluginProblems = failures => failures.map(failure => ({
-  file: failure.file,
-  ...(Number.isFinite(failure.line) ? { line: failure.line } : {}),
-  why: failure.failedToImport
-    ? `plugin "${failure.file}" failed to import — ${failure.error}. Every command in it is missing until this loads.`
-    : `plugin "${failure.file}" has no default export, so the loader skips it and every command it meant to register is missing`
-}))
+export const pluginProblems = failures =>
+  failures.map(failure => ({
+    file: failure.file,
+    ...(Number.isFinite(failure.line) ? { line: failure.line } : {}),
+    why: failure.failedToImport
+      ? `plugin "${failure.file}" failed to import — ${failure.error}. Every command in it is missing until this loads.`
+      : `plugin "${failure.file}" has no default export, so the loader skips it and every command it meant to register is missing`
+  }))
 
 /**
  * The line a file will not parse at.
@@ -221,7 +248,13 @@ function syntaxErrorLine(file) {
     execFileSync(process.execPath, ['--check', file], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
     return null
   } catch (error) {
-    return Number(String(error.stderr || '').split('\n')[0]?.match(/:(\d+)\s*$/)?.[1]) || null
+    return (
+      Number(
+        String(error.stderr || '')
+          .split('\n')[0]
+          ?.match(/:(\d+)\s*$/)?.[1]
+      ) || null
+    )
   }
 }
 
@@ -250,9 +283,10 @@ function describedProblems(index) {
       out.push({
         file: type.file,
         warning: true,
-        why: field === 'about'
-          ? `type "${name}" has an about of ${written.length} characters — it is repeated once per marked type in every See sidecar, so keep it under ${cap}`
-          : `type "${name}" has an ${field} of ${written.length} characters — it should read as one sentence, so keep it under ${cap}`
+        why:
+          field === 'about'
+            ? `type "${name}" has an about of ${written.length} characters — it is repeated once per marked type in every See sidecar, so keep it under ${cap}`
+            : `type "${name}" has an ${field} of ${written.length} characters — it should read as one sentence, so keep it under ${cap}`
       })
     }
     if (!type.about) {
@@ -307,7 +341,8 @@ export function problemsIn(index) {
     ...(index.tintProblems || []),
     ...assetSummary(missing),
     ...missing,
-    ...Object.entries(index.tests).filter(([, t]) => t.error)
+    ...Object.entries(index.tests)
+      .filter(([, t]) => t.error)
       .map(([name, t]) => ({ file: t.file, why: `test "${name}" failed to load — ${t.error}` })),
     ...describedProblems(index),
     ...index.warnings

@@ -43,7 +43,12 @@ test('size reports the viewport, and frameSize changes it', async () => {
 
 test('toScreen and toWorld are inverses in the flat view', async () => {
   const frame = await makeRenderer(null, ORTHO, viewport())
-  const cases = [[0, 0], [3, -2], [-4, 5], [12.5, 7.25]]
+  const cases = [
+    [0, 0],
+    [3, -2],
+    [-4, 5],
+    [12.5, 7.25]
+  ]
   for (const [x, y] of cases) {
     const pixel = frame.toScreen(x, y, 0)
     const back = frame.toWorld(pixel.x, pixel.y)
@@ -68,7 +73,11 @@ test('pick answers the entities under a pixel, front to back', async () => {
     ['nothing under an empty pixel', 5, 5, []]
   ]
   for (const [label, px, py, expected] of cases) {
-    assert.deepEqual(frame.pick(world, px, py).map(entity => entity.id), expected, label)
+    assert.deepEqual(
+      frame.pick(world, px, py).map(entity => entity.id),
+      expected,
+      label
+    )
   }
 })
 

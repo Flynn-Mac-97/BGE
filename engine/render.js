@@ -113,7 +113,11 @@ if (!uniformBufferLimit.forcedBoneTexture) {
  */
 function wantsWebGL() {
   if (typeof localStorage === 'undefined') return false
-  try { return localStorage.getItem('engine.forceWebGL') === 'true' } catch { return false }
+  try {
+    return localStorage.getItem('engine.forceWebGL') === 'true'
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -136,13 +140,23 @@ function wantsWebGL() {
  */
 function headlessRenderer() {
   return {
-    setSize() {}, setPixelRatio() {}, getMaxAnisotropy: () => 1,
-    autoClear: false, shadowMap: { enabled: false, type: THREE.PCFShadowMap },
-    backend: null, hasFeature: () => false,
+    setSize() {},
+    setPixelRatio() {},
+    getMaxAnisotropy: () => 1,
+    autoClear: false,
+    shadowMap: { enabled: false, type: THREE.PCFShadowMap },
+    backend: null,
+    hasFeature: () => false,
+    // eslint-disable-next-line id-denylist -- three.js names this renderer field info.
     info: { autoReset: false, reset() {}, render: {}, memory: {}, programs: [] },
-    render() {}, clear() {}, clearDepth() {},
-    setRenderTarget() {}, getRenderTarget: () => null,
-    setClearColor() {}, getClearColor: color => color, getClearAlpha: () => 0,
+    render() {},
+    clear() {},
+    clearDepth() {},
+    setRenderTarget() {},
+    getRenderTarget: () => null,
+    setClearColor() {},
+    getClearColor: color => color,
+    getClearAlpha: () => 0,
     dispose() {}
   }
 }
@@ -158,13 +172,18 @@ export async function makeRenderer(canvas, view, viewport) {
   // question and answers neither "is this shader heavy" nor "how many of these
   // can I draw".
   const headless = !canvas
-  const renderer = headless ? headlessRenderer() : new THREE.WebGPURenderer({
-    canvas, antialias: true, alpha: true, trackTimestamp: true,
-    // Raw GLSL is inserted into the shader three generates, and the WebGPU
-    // backend generates WGSL, so a project drawing GLSL-only shaders asks for
-    // WebGL. Read here because the backend is chosen once, during init.
-    forceWebGL: wantsWebGL()
-  })
+  const renderer = headless
+    ? headlessRenderer()
+    : new THREE.WebGPURenderer({
+        canvas,
+        antialias: true,
+        alpha: true,
+        trackTimestamp: true,
+        // Raw GLSL is inserted into the shader three generates, and the WebGPU
+        // backend generates WGSL, so a project drawing GLSL-only shaders asks for
+        // WebGL. Read here because the backend is chosen once, during init.
+        forceWebGL: wantsWebGL()
+      })
   if (headless) {
     // The counters survive both passes in a drawing world; a headless one still
     // reports them, as zero.
@@ -206,8 +225,13 @@ export async function makeRenderer(canvas, view, viewport) {
   // `engine/render/` takes this and reads only the fields its concern needs; a
   // name is added here only when two modules must both reach it.
   const state = {
-    canvas, view, viewport, headless, renderer, scene,
-    meshes: new Map(),   // entity id -> the object standing for it
+    canvas,
+    view,
+    viewport,
+    headless,
+    renderer,
+    scene,
+    meshes: new Map(), // entity id -> the object standing for it
     /**
      * Whether a shadow map this frame needs redrawing.
      *
@@ -275,12 +299,18 @@ export async function makeRenderer(canvas, view, viewport) {
     // Both are the session's objects, re-exposed so existing plugins that reach
     // for renderer.view keep working.
     view,
-    get size() { return { w: viewport.width, h: viewport.height } },
+    get size() {
+      return { w: viewport.width, h: viewport.height }
+    },
     scene,
     // The one currently drawing, so a caller that wants the camera gets the one
     // the picture came out of rather than whichever was built first.
-    get camera() { return state.activeCamera() },
-    get stats() { return { ...state.stats } },
+    get camera() {
+      return state.activeCamera()
+    },
+    get stats() {
+      return { ...state.stats }
+    },
     /**
      * Which backend is drawing, and which optional features it has.
      *
@@ -295,7 +325,13 @@ export async function makeRenderer(canvas, view, viewport) {
       return {
         name: renderer.backend?.constructor?.name || 'unknown',
         webgpu: !renderer.backend?.isWebGLBackend,
-        has: name => { try { return renderer.hasFeature(name) === true } catch { return false } }
+        has: name => {
+          try {
+            return renderer.hasFeature(name) === true
+          } catch {
+            return false
+          }
+        }
       }
     },
     /** 'loading' | 'ready' | 'failed' | null — so a capture can wait for a
@@ -303,13 +339,17 @@ export async function makeRenderer(canvas, view, viewport) {
     modelState: file => modelCache.get(file)?.status || null,
     // Which lights cast is a decision about the level, and the plugin that owns
     // the lights needs somewhere to read the switch and set its quality.
-    get shadowMap() { return renderer.shadowMap },
+    get shadowMap() {
+      return renderer.shadowMap
+    },
     /**
      * three's own renderer, for a plugin that sets how the frame is rendered —
      * tone mapping, exposure, an environment map it has to build on the GPU.
      * How the picture looks is a plugin's decision, so this file holds none.
      */
-    get threeRenderer() { return renderer },
+    get threeRenderer() {
+      return renderer
+    },
 
     /**
      * The defaults the Readability plugin's marks fall back to, filled by that
@@ -332,7 +372,9 @@ export async function makeRenderer(canvas, view, viewport) {
      * a record nothing frees. A pass that compiles wraps that work in these two;
      * `endCompile` disposes anything released meanwhile a second time.
      */
-    beginCompile() { state.compilesRunning++ },
+    beginCompile() {
+      state.compilesRunning++
+    },
     endCompile() {
       state.compilesRunning--
       state.releaseAgainAfterCompile()
@@ -344,7 +386,9 @@ export async function makeRenderer(canvas, view, viewport) {
      * `blend` is `loop.blend`: bodies are drawn that far between their last two
      * fixed steps, so motion is smooth on a screen faster than the step rate.
      */
-    sync(world, blend = 1) { state.sync(world, blend) },
+    sync(world, blend = 1) {
+      state.sync(world, blend)
+    },
     /** How long the card took on the last frame, in milliseconds. */
     gpuTime: state.gpuTime,
     /** Wait until the card has finished everything submitted so far. */

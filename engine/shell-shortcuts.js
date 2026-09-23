@@ -47,7 +47,20 @@ export function readShortcut(declaration) {
 }
 
 /** The input types that swallow a character, so a shortcut must stay out of them. */
-const TEXT_INPUT = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week'])
+const TEXT_INPUT = new Set([
+  'text',
+  'search',
+  'url',
+  'tel',
+  'email',
+  'password',
+  'number',
+  'date',
+  'time',
+  'datetime-local',
+  'month',
+  'week'
+])
 
 /**
  * Is this element taking text, so a shortcut must stay out of it?
@@ -81,14 +94,18 @@ export function collectShortcuts(declarations, report = () => {}) {
   for (const entry of declarations) {
     const shortcut = readShortcut(entry.key)
     if (!shortcut) {
-      report(`${entry.what} "${entry.name}" (${entry.plugin}) declares key ${JSON.stringify(entry.key)}` +
-        ' — a shortcut is ctrl, shift and alt in that order, then the key, so nothing was bound')
+      report(
+        `${entry.what} "${entry.name}" (${entry.plugin}) declares key ${JSON.stringify(entry.key)}` +
+          ' — a shortcut is ctrl, shift and alt in that order, then the key, so nothing was bound'
+      )
       continue
     }
     const taken = table.get(shortcut)
     if (taken) {
-      report(`"${shortcut}" is claimed twice: ${taken.what} "${taken.name}" (${taken.plugin}) keeps it,` +
-        ` ${entry.what} "${entry.name}" (${entry.plugin}) will never fire — one of the two has to change`)
+      report(
+        `"${shortcut}" is claimed twice: ${taken.what} "${taken.name}" (${taken.plugin}) keeps it,` +
+          ` ${entry.what} "${entry.name}" (${entry.plugin}) will never fire — one of the two has to change`
+      )
       continue
     }
     table.set(shortcut, entry)
@@ -109,16 +126,23 @@ export function collectShortcuts(declarations, report = () => {}) {
 export function makeShortcuts(context, draw) {
   const { loader, bus, editor } = context
 
-  const declaredShortcuts = () => [
-    ...loader.contrib.commands.map(command => ({
-      key: command.key, what: 'command', name: command.id, plugin: command.plugin,
-      run: () => context.run(command.id)
-    })),
-    ...loader.contrib.tools.map(tool => ({
-      key: tool.key, what: 'tool', name: tool.id, plugin: tool.plugin,
-      run: () => editor.setTool(tool.id)
-    }))
-  ].filter(entry => entry.key != null)
+  const declaredShortcuts = () =>
+    [
+      ...loader.contrib.commands.map(command => ({
+        key: command.key,
+        what: 'command',
+        name: command.id,
+        plugin: command.plugin,
+        run: () => context.run(command.id)
+      })),
+      ...loader.contrib.tools.map(tool => ({
+        key: tool.key,
+        what: 'tool',
+        name: tool.id,
+        plugin: tool.plugin,
+        run: () => editor.setTool(tool.id)
+      }))
+    ].filter(entry => entry.key != null)
 
   // Said once each. Contributions are rebuilt whenever a plugin is enabled or
   // the tool changes, and the same collision repeated on every rebuild would
@@ -147,7 +171,9 @@ export function makeShortcuts(context, draw) {
 
   let shortcuts = new Map()
   /** Rebuild the key table from the current contributions, reporting each collision once. */
-  const gatherShortcuts = () => { shortcuts = collectShortcuts(declaredShortcuts(), reportShortcut) }
+  const gatherShortcuts = () => {
+    shortcuts = collectShortcuts(declaredShortcuts(), reportShortcut)
+  }
   gatherShortcuts()
   bus.on('plugins:changed', gatherShortcuts)
 
@@ -185,7 +211,9 @@ export function makeShortcuts(context, draw) {
     // ever the synchronous half. Redraw after it settles, not before, or the
     // repaint shows the world as it was.
     let running
-    try { running = wanted.run() } catch (error) {
+    try {
+      running = wanted.run()
+    } catch (error) {
       console.error(`[shortcut] ${wanted.what} "${wanted.name}" failed`, error)
       draw()
       return
@@ -199,7 +227,6 @@ export function makeShortcuts(context, draw) {
     handleKey,
     // What is bound right now, so an agent can ask which keys are taken instead
     // of pressing them to find out.
-    list: () => [...shortcuts].map(([key, entry]) =>
-      ({ key, kind: entry.what, id: entry.name, plugin: entry.plugin }))
+    list: () => [...shortcuts].map(([key, entry]) => ({ key, kind: entry.what, id: entry.name, plugin: entry.plugin }))
   }
 }

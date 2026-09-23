@@ -57,8 +57,12 @@ async function findPlugins(root, projectDirectory, loader) {
   const found = []
 
   for (const { directory, builtin } of places) {
-    let names = []
-    try { names = await fs.readdir(directory) } catch { continue }
+    let names
+    try {
+      names = await fs.readdir(directory)
+    } catch {
+      continue
+    }
     for (const name of names.sort()) {
       if (!name.endsWith('.js')) continue
       const file = path.join(directory, name)

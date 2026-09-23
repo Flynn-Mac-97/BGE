@@ -23,11 +23,11 @@ export function makeBatching(state) {
    * simply never in a batch. A merged entity keeps its own mesh for picking, on
    * a layer the camera does not draw.
    */
-  const MERGE_CELL = 32      // metres; big enough to group, small enough to cull
-  const MERGE_MINIMUM = 4    // below this, merging costs more than it saves
-  const SETTLE = 45          // frames of stillness before a thing counts as static
+  const MERGE_CELL = 32 // metres; big enough to group, small enough to cull
+  const MERGE_MINIMUM = 4 // below this, merging costs more than it saves
+  const SETTLE = 45 // frames of stillness before a thing counts as static
 
-  const batches = new Map()  // batch key -> { material, members, object, dirty }
+  const batches = new Map() // batch key -> { material, members, object, dirty }
 
   /**
    * Take an entity out of its batch and put its own mesh back on the drawn layer.
@@ -43,7 +43,10 @@ export function makeBatching(state) {
     if (record) record.batchKey = null
     if (!key) return
     const batch = batches.get(key)
-    if (batch) { batch.members.delete(id); batch.dirty = true }
+    if (batch) {
+      batch.members.delete(id)
+      batch.dirty = true
+    }
     object.userData.batch = null
     drawOn(object, DRAWN)
   }
@@ -107,13 +110,12 @@ export function makeBatching(state) {
   }
 
   /** Whether this entity is standing still enough, and plainly enough, to merge. */
-  function canMergeNow(entity, described, declared, opacity, isModel) {
-    // A model is a scene graph rather than one box, so there is nothing here to
-    // merge; a dimmed entity has its own material and would take the whole batch
-    // with it; a hidden one has to be able to disappear on its own. An entity a
-    // mark owns keeps its own mesh — a keyline hangs off it — and a merged entity
+  function canMergeNow(entity, declared) {
+    // A dimmed entity has its own material and would take the whole batch with
+    // it; a hidden one has to be able to disappear on its own. An entity a mark
+    // owns keeps its own mesh — a keyline hangs off it — and a merged entity
     // draws on a layer the camera ignores, which would take the mark with it.
-    return !isModel && opacity >= 1 && !entity.hidden && !state.markBlocksMerge(declared)
+    return (entity.opacity ?? 1) >= 1 && !entity.hidden && !state.markBlocksMerge(declared)
   }
 
   /**
@@ -124,11 +126,16 @@ export function makeBatching(state) {
    * declaration holds, so that compare finds the same instance.
    */
   function hasMoved(entity, described, turn, record) {
-    return record.sigX !== entity.x || record.sigY !== entity.y
-      || record.sigZ !== (entity.z || 0)
-      || record.sigTurnX !== turn.x || record.sigTurnY !== turn.y || record.sigTurnZ !== turn.z
-      || record.sigScale !== (entity.scale ?? 1)
-      || record.sigLook !== described.look
+    return (
+      record.sigX !== entity.x ||
+      record.sigY !== entity.y ||
+      record.sigZ !== (entity.z || 0) ||
+      record.sigTurnX !== turn.x ||
+      record.sigTurnY !== turn.y ||
+      record.sigTurnZ !== turn.z ||
+      record.sigScale !== (entity.scale ?? 1) ||
+      record.sigLook !== described.look
+    )
   }
 
   /** Write down the place and look this pass drew, so the next pass compares against it. */
@@ -182,8 +189,8 @@ export function makeBatching(state) {
     if (!wanted && record.batchKey !== null) leaveBatch(entity.id, record)
   }
 
-  function considerForMerging(entity, object, described, declared, opacity, isModel, turn, record) {
-    const canMerge = canMergeNow(entity, described, declared, opacity, isModel)
+  function considerForMerging(entity, object, described, turn, record) {
+    const canMerge = record.simple && canMergeNow(entity, record.declared)
     if (hasMoved(entity, described, turn, record)) {
       recordMove(entity, described, turn, canMerge, record)
       return

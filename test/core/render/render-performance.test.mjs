@@ -30,9 +30,15 @@ test('the executor calls each pass once, so its work grows linearly with the pas
     for (let i = 0; i < size; i++) {
       graph.add({
         name: `pass${i}`,
-        extract: () => { calls++ },
-        prepare: () => { calls++ },
-        execute: () => { calls++ }
+        extract: () => {
+          calls++
+        },
+        prepare: () => {
+          calls++
+        },
+        execute: () => {
+          calls++
+        }
       })
     }
     graph.run(null, null, 8, 8)
@@ -98,8 +104,12 @@ test('the kernel does the same per-frame work for one entity and for ten thousan
   for (let i = 0; i < 20; i++) {
     graph.add({
       name: `pass${i}`,
-      extract: () => { calls++ },
-      execute: () => { calls++ }
+      extract: () => {
+        calls++
+      },
+      execute: () => {
+        calls++
+      }
     })
   }
   graph.add({ name: 'present', reads: ['x'], execute: noop })
@@ -158,11 +168,21 @@ const EXPECTED_BUDGET = {
   cardDraws: 1,
   targets: 0,
   stats: {
-    drawCalls: 0, triangles: 0,
-    entities: 1, merged: 0, batches: 0,
-    keylines: 0, contactShadows: 0, groundRings: 0,
-    materials: 1, textures: 0, geometries: 0, programs: 0,
-    gpuMs: null, post: 'none', cpuMs: 0
+    drawCalls: 0,
+    triangles: 0,
+    entities: 1,
+    merged: 0,
+    batches: 0,
+    keylines: 0,
+    contactShadows: 0,
+    groundRings: 0,
+    materials: 1,
+    textures: 0,
+    geometries: 0,
+    programs: 0,
+    gpuMs: null,
+    post: 'none',
+    cpuMs: 0
   }
 }
 
@@ -201,5 +221,9 @@ test('the default frame hands a change a recorded budget to fail against', async
     lastFrameDraws = drawOnce()
     assert.equal(lastFrameDraws, 1, 'every frame makes one world draw')
   }
-  assert.deepEqual(readBudget(frame, lastFrameDraws), EXPECTED_BUDGET, 'the budget is unchanged after two hundred frames')
+  assert.deepEqual(
+    readBudget(frame, lastFrameDraws),
+    EXPECTED_BUDGET,
+    'the budget is unchanged after two hundred frames'
+  )
 })

@@ -26,7 +26,9 @@ export function makeFrameWiring({ world, loader, context }) {
      * @param {Error} e The error the step threw.
      * @returns {void}
      */
-    onError(e) { console.error('[timer]', e) },
+    onError(e) {
+      console.error('[timer]', e)
+    },
     /**
      * Record where every entity is before the step moves it.
      *
@@ -52,7 +54,11 @@ export function makeFrameWiring({ world, loader, context }) {
       world.simulated = true
       for (const s of loader.schedule.fixed) {
         if (!loader.plugins.get(s.plugin)?.enabled) continue
-        try { s.run(world, seconds, context) } catch (e) { loader.fail(s.plugin, e) }
+        try {
+          s.run(world, seconds, context)
+        } catch (e) {
+          loader.fail(s.plugin, e)
+        }
       }
       // world.hook runs the attached behaviours first, then the type's own
       // update — so a type always gets the last word on what it composed. An
@@ -72,7 +78,11 @@ export function makeFrameWiring({ world, loader, context }) {
     onFrame(seconds) {
       for (const s of loader.schedule.frame) {
         if (!loader.plugins.get(s.plugin)?.enabled) continue
-        try { s.run(world, seconds, context) } catch (e) { loader.fail(s.plugin, e) }
+        try {
+          s.run(world, seconds, context)
+        } catch (e) {
+          loader.fail(s.plugin, e)
+        }
       }
       // Optional on purpose: a world with no renderer runs the same systems in
       // the same order and simply draws nothing.

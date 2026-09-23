@@ -56,8 +56,8 @@ const append = (element, children) => {
 export function makeUI(state, redraw) {
   const bindable = (options, element, event, get) => {
     if (!options.bind && !options.onChange) return
-    element.addEventListener(event, event => {
-      const v = get(event.target)
+    element.addEventListener(event, domEvent => {
+      const v = get(domEvent.target)
       if (options.bind) state[options.bind] = v
       options.onChange?.(v)
       if (options.bind) redraw()
@@ -67,7 +67,7 @@ export function makeUI(state, redraw) {
   const ui = {
     // ---- layout ----
     stack: (children, o = {}) => append(h('div', 'u-stack' + (o.pad ? ' pad' : '')), children),
-    row:   (children, o = {}) => append(h('div', 'u-row' + (o.pad ? ' pad' : '')), children),
+    row: (children, o = {}) => append(h('div', 'u-row' + (o.pad ? ' pad' : '')), children),
     spacer: () => h('div', 'u-spacer'),
 
     section: (title, children) =>
@@ -94,7 +94,7 @@ export function makeUI(state, redraw) {
     scroll: children => append(h('div', 'u-scroll'), children),
 
     // ---- text ----
-    text:  (s, o = {}) => h('div', 'u-text' + (o.dim ? ' dim' : ''), { text: s }),
+    text: (s, o = {}) => h('div', 'u-text' + (o.dim ? ' dim' : ''), { text: s }),
     label: s => h('span', 'u-label', { text: s }),
     value: v => h('span', 'u-value', { text: String(v) }),
     empty: s => h('div', 'u-empty', { text: s }),
@@ -109,14 +109,18 @@ export function makeUI(state, redraw) {
     search(o = {}) {
       const element = h('div', 'u-search')
       const input = h('input', null, {
-        value: o.value ?? (o.bind ? state[o.bind] ?? '' : ''),
+        value: o.value ?? (o.bind ? (state[o.bind] ?? '') : ''),
         placeholder: o.placeholder || 'filter',
-        spellcheck: 'false', autocomplete: 'off'
+        spellcheck: 'false',
+        autocomplete: 'off'
       })
       bindable(o, input, 'input', t => t.value)
       append(element, [h('span', 'u-mag', { text: '/' }), input])
       if (o.count != null) append(element, [h('span', 'u-count', { text: String(o.count) })])
-      element._focus = () => { input.focus(); input.setSelectionRange(input.value.length, input.value.length) }
+      element._focus = () => {
+        input.focus()
+        input.setSelectionRange(input.value.length, input.value.length)
+      }
       return element
     },
 
@@ -125,8 +129,12 @@ export function makeUI(state, redraw) {
       append(element, [h('span', 'u-k', { text: o.k ?? '' })])
       if (o.onChange || o.bind) {
         const input = h('input', 'u-v', { value: String(o.v ?? ''), spellcheck: 'false' })
-        bindable({ ...o, bind: null, onChange: v => o.onChange?.(o.kind === 'number' ? Number(v) : v) },
-          input, 'change', t => t.value)
+        bindable(
+          { ...o, bind: null, onChange: v => o.onChange?.(o.kind === 'number' ? Number(v) : v) },
+          input,
+          'change',
+          t => t.value
+        )
         append(element, [input])
       } else {
         append(element, [h('span', 'u-v ro', { text: String(o.v ?? '') })])
@@ -156,7 +164,10 @@ export function makeUI(state, redraw) {
       const element = h('div', 'u-field')
       append(element, [h('span', 'u-k', { text: o.k ?? '' })])
       const input = h('input', 'u-slider', {
-        type: 'range', min: o.min ?? 0, max: o.max ?? 1, step: o.step ?? 0.01,
+        type: 'range',
+        min: o.min ?? 0,
+        max: o.max ?? 1,
+        step: o.step ?? 0.01,
         value: o.value ?? (o.bind ? state[o.bind] : 0)
       })
       bindable(o, input, 'input', t => Number(t.value))
@@ -170,7 +181,10 @@ export function makeUI(state, redraw) {
         const val = typeof opt === 'string' ? opt : opt.value
         const lab = typeof opt === 'string' ? opt : opt.label
         const b = h('button', 'u-pickone', { text: lab, 'aria-pressed': String(val === o.value) })
-        b.addEventListener('click', () => { o.onChange?.(val); redraw() })
+        b.addEventListener('click', () => {
+          o.onChange?.(val)
+          redraw()
+        })
         append(element, [b])
       }
       return element
@@ -183,8 +197,10 @@ export function makeUI(state, redraw) {
       if (!items.length) return append(element, [ui.empty(o.emptyText || 'nothing here')])
       items.forEach((it, i) => {
         const key = o.key ? o.key(it) : i
-        const row = h('div', 'u-lrow' + (o.selected === key ? ' on' : '') + (o.dim?.(it) ? ' dim' : ''),
-          { role: 'button', tabindex: '0' })
+        const row = h('div', 'u-lrow' + (o.selected === key ? ' on' : '') + (o.dim?.(it) ? ' dim' : ''), {
+          role: 'button',
+          tabindex: '0'
+        })
         append(row, o.row ? o.row(it) : [ui.label(String(it))])
 
         // Rows can be dragged out of a list and dropped somewhere that knows
@@ -208,7 +224,10 @@ export function makeUI(state, redraw) {
         row.addEventListener('click', event => o.onPick?.(it, event))
         row.addEventListener('contextmenu', event => o.onContext?.(it, event))
         row.addEventListener('keydown', event => {
-          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); o.onPick?.(it, event) }
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            o.onPick?.(it, event)
+          }
         })
         append(element, [row])
       })
@@ -235,12 +254,17 @@ export function makeUI(state, redraw) {
         for (const node of byParent.get(parent) || []) {
           const children = byParent.get(node.id) || []
           const row = h('div', 'u-trow' + (o.selected === node.id ? ' on' : ''), {
-            role: 'button', tabindex: '0', style: `--depth:${depth}`
+            role: 'button',
+            tabindex: '0',
+            style: `--depth:${depth}`
           })
           append(row, o.row ? o.row(node, children.length) : [ui.label(node.title || node.id)])
           row.addEventListener('click', event => o.onPick?.(node, event))
           row.addEventListener('keydown', event => {
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); o.onPick?.(node, event) }
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              o.onPick?.(node, event)
+            }
           })
           append(element, [row])
           draw(node.id, depth + 1)
@@ -260,7 +284,10 @@ export function makeUI(state, redraw) {
         append(cell, o.cell ? o.cell(it) : [ui.label(String(it))])
         cell.addEventListener('click', () => o.onPick?.(it))
         cell.addEventListener('keydown', event => {
-          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); o.onPick?.(it) }
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            o.onPick?.(it)
+          }
         })
         append(element, [cell])
       })

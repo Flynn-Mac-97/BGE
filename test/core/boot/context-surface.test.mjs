@@ -14,12 +14,43 @@ import { startWorldInNode } from '../../../engine/start-world-node.mjs'
 
 /** The kernel's keys. `input camera play audio hud` are contributed by plugins. */
 const KERNEL_KEYS = [
-  'world', 'loop', 'bus', 'files', 'editor', 'loader', 'view', 'viewport',
-  'device', 'host', 'startup', 'checkpoints', 'capture', 'restore', 'rewind',
-  'spawn', 'destroy', 'select', 'open', 'run', 'save', 'redraw',
-  'importProjectFile', 'assets', 'types', 'behaviours', 'levels', 'level',
-  'selection', 'time', 'random', 'drawing', 'after', 'every', 'cancel',
-  'projector', 'engine'
+  'world',
+  'loop',
+  'bus',
+  'files',
+  'editor',
+  'loader',
+  'view',
+  'viewport',
+  'device',
+  'host',
+  'startup',
+  'checkpoints',
+  'capture',
+  'restore',
+  'rewind',
+  'spawn',
+  'destroy',
+  'select',
+  'open',
+  'run',
+  'save',
+  'redraw',
+  'importProjectFile',
+  'assets',
+  'types',
+  'behaviours',
+  'levels',
+  'level',
+  'selection',
+  'time',
+  'random',
+  'drawing',
+  'after',
+  'every',
+  'cancel',
+  'projector',
+  'engine'
 ]
 
 test('every kernel key is on a world context', async () => {
@@ -51,7 +82,12 @@ test('time reads the clock at the moment it is asked, not the moment context was
 test('a plugin added after boot receives the same context object the world was built with', async () => {
   const { context, loader } = await startWorldInNode({ root: CHECKOUT, project: FIXTURE })
   let given = null
-  loader.add({ name: 'Context Probe', onLoad(value) { given = value } })
+  loader.add({
+    name: 'Context Probe',
+    onLoad(value) {
+      given = value
+    }
+  })
   assert.equal(given, context)
   assert.equal(context.engine.editor.context, context)
 })

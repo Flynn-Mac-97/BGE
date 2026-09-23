@@ -59,7 +59,10 @@ function topological(list, report) {
   function addEdge(from, to) {
     if (from === to) return
     let set = seen.get(from)
-    if (!set) { set = new Set(); seen.set(from, set) }
+    if (!set) {
+      set = new Set()
+      seen.set(from, set)
+    }
     if (set.has(to)) return
     set.add(to)
     out.get(from).push(to)
@@ -69,11 +72,17 @@ function topological(list, report) {
   for (const pass of list) {
     for (const label of pass.after) {
       if (byName.has(label)) addEdge(label, pass.name)
-      else report(`[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" after — the edge is ignored`)
+      else
+        report(
+          `[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" after — the edge is ignored`
+        )
     }
     for (const label of pass.before) {
       if (byName.has(label)) addEdge(pass.name, label)
-      else report(`[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" before — the edge is ignored`)
+      else
+        report(
+          `[render] graph: no pass called ${JSON.stringify(label)} to order "${pass.name}" before — the edge is ignored`
+        )
     }
   }
 
@@ -204,8 +213,12 @@ export function makePassGraph(options = {}) {
   // same two objects every frame, so nothing is allocated on the steady path.
   const frame = { camera: null, target: null, width: 0, height: 0 }
   const targets = {
-    get(name) { return resourceSlot.get(name)?.target ?? null },
-    has(name) { return resourceSlot.has(name) }
+    get(name) {
+      return resourceSlot.get(name)?.target ?? null
+    },
+    has(name) {
+      return resourceSlot.has(name)
+    }
   }
 
   // The sink `extract` writes its own GPU data through. The kernel stores the
@@ -214,10 +227,16 @@ export function makePassGraph(options = {}) {
   const sink = {
     attribute(name) {
       let entry = buffers.get(name)
-      if (!entry) { entry = { name, changed: false }; buffers.set(name, entry) }
+      if (!entry) {
+        entry = { name, changed: false }
+        buffers.set(name, entry)
+      }
       return entry
     },
-    markDirty(name) { const entry = buffers.get(name); if (entry) entry.changed = true }
+    markDirty(name) {
+      const entry = buffers.get(name)
+      if (entry) entry.changed = true
+    }
   }
 
   function rebuild() {
@@ -228,7 +247,9 @@ export function makePassGraph(options = {}) {
       if (!pass.enabled) return true
       const missing = pass.requires.filter(name => !hasFeature(name))
       if (!missing.length) return true
-      report(`[render] graph: "${pass.name}" needs ${missing.join(', ')}, which this device does not have — the pass is dropped`)
+      report(
+        `[render] graph: "${pass.name}" needs ${missing.join(', ')}, which this device does not have — the pass is dropped`
+      )
       return false
     })
     order = selectLive(topological(supported, report)).filter(pass => pass.enabled)
@@ -288,7 +309,9 @@ export function makePassGraph(options = {}) {
         return
       }
       if (typeof record?.execute !== 'function') {
-        report(`[render] graph.replace: needs an execute function for "${name}", got ${JSON.stringify(record?.execute)}`)
+        report(
+          `[render] graph.replace: needs an execute function for "${name}", got ${JSON.stringify(record?.execute)}`
+        )
         return
       }
       const next = normalise({ ...record, name })
@@ -299,15 +322,26 @@ export function makePassGraph(options = {}) {
     },
     disable(name) {
       const pass = records.get(name)
-      if (pass) { pass.enabled = false; dirty = true }
+      if (pass) {
+        pass.enabled = false
+        dirty = true
+      }
     },
     enable(name) {
       const pass = records.get(name)
-      if (pass) { pass.enabled = true; dirty = true }
+      if (pass) {
+        pass.enabled = true
+        dirty = true
+      }
     },
     /** The live passes in run order, rebuilt only when the pass set changed. */
-    get passes() { if (dirty) rebuild(); return order },
-    get rebuilds() { return rebuildCount },
+    get passes() {
+      if (dirty) rebuild()
+      return order
+    },
+    get rebuilds() {
+      return rebuildCount
+    },
     run,
     frame,
     targets,

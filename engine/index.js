@@ -31,7 +31,9 @@ async function openProject() {
   try {
     const body = await (await fetch('/api/project')).json()
     if (typeof body.project === 'string') return { name: body.project, untitled: body.untitled === true }
-  } catch { /* no dev server: the built page carries no name */ }
+  } catch {
+    /* no dev server: the built page carries no name */
+  }
   return { name: PROJECT_PREFIX, untitled: false }
 }
 
@@ -93,7 +95,10 @@ async function findPlugins(loader) {
     reportImportFailure(loader, `${PROJECT_PREFIX}/plugins/`, e)
   }
 
-  for (const file of listing.map(entry => entry.path).filter(f => PROJECT_PLUGIN.test(f)).sort()) {
+  for (const file of listing
+    .map(entry => entry.path)
+    .filter(f => PROJECT_PLUGIN.test(f))
+    .sort()) {
     const definition = await importPlugin({
       file: `${PROJECT_PREFIX}/${file}`,
       load: () => import(/* @vite-ignore */ `/${PROJECT_PREFIX}/${file}`),
@@ -135,9 +140,9 @@ async function boot() {
     // first and context.renderer is filled in immediately after. Both are put
     // on context rather than returned, because a world without a screen has
     // neither and every reader already treats them as optional.
-    async attachScreen(context) {
-      const shell = makeShell(root, context)
-      context.shell = shell
+    async attachScreen(worldContext) {
+      const shell = makeShell(root, worldContext)
+      worldContext.shell = shell
 
       // The renderer is handed the session's view and viewport rather than
       // owning them, so game code reaches the camera as context.view whether
@@ -186,9 +191,15 @@ async function boot() {
   let alive = true
 
   /** Keep asking for the next frame while the world is stopped. */
-  const idle = () => { if (!alive) return; paint(); requestAnimationFrame(idle) }
+  const idle = () => {
+    if (!alive) return
+    paint()
+    requestAnimationFrame(idle)
+  }
   idle()
-  const hiddenPaint = setInterval(() => { if (alive && document.hidden) paint() }, 100)
+  const hiddenPaint = setInterval(() => {
+    if (alive && document.hidden) paint()
+  }, 100)
 
   if (import.meta.hot) {
     import.meta.hot.on('vite:ws:disconnect', () => {
@@ -198,9 +209,9 @@ async function boot() {
       loop.stop()
       context.renderer.release()
       document.getElementById('app').innerHTML =
-        '<pre style="padding:24px;font:12px ui-monospace">the dev server is gone. '
-        + 'this page stopped drawing and gave back what it held. '
-        + 'start the server and reload to carry on.</pre>'
+        '<pre style="padding:24px;font:12px ui-monospace">the dev server is gone. ' +
+        'this page stopped drawing and gave back what it held. ' +
+        'start the server and reload to carry on.</pre>'
     })
   }
 

@@ -18,7 +18,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { findChrome } from './chrome-path.mjs'
-import { activatePage, findFreeDebuggingPort, openTabOnPort, pagesOnPort, readLaneBrowsers, recordLaneBrowser } from './lane-browsers.mjs'
+import {
+  activatePage,
+  findFreeDebuggingPort,
+  openTabOnPort,
+  pagesOnPort,
+  readLaneBrowsers,
+  recordLaneBrowser
+} from './lane-browsers.mjs'
 
 /**
  * Where a visible browser keeps its profile.
@@ -27,8 +34,7 @@ import { activatePage, findFreeDebuggingPort, openTabOnPort, pagesOnPort, readLa
  * profile holds window size and zoom, so a person gets the window back the way
  * they left it. Its tabs are removed before every fresh start.
  */
-export const profileDirectory = (checkout, name) =>
-  path.join(checkout, '.browsers', 'profiles', name)
+export const profileDirectory = (checkout, name) => path.join(checkout, '.browsers', 'profiles', name)
 
 /**
  * The session files Chrome restores at startup.
@@ -45,9 +51,17 @@ export function clearSessionState(profile) {
   // A browser still holding the profile locks these, and Windows answers EPERM.
   // Tidying the last session must never stop this one from opening.
   for (const name of SESSION_FILES) {
-    try { fs.rmSync(path.join(chromium, name), { force: true }) } catch { /* held by a live browser */ }
+    try {
+      fs.rmSync(path.join(chromium, name), { force: true })
+    } catch {
+      /* held by a live browser */
+    }
   }
-  try { fs.rmSync(path.join(chromium, 'Sessions'), { recursive: true, force: true }) } catch { /* held */ }
+  try {
+    fs.rmSync(path.join(chromium, 'Sessions'), { recursive: true, force: true })
+  } catch {
+    /* held */
+  }
   markProfileExitedCleanly(chromium)
 }
 
@@ -62,17 +76,27 @@ export function clearSessionState(profile) {
 export function markProfileExitedCleanly(chromium) {
   const file = path.join(chromium, 'Preferences')
   let preferences
-  try { preferences = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return false }
+  try {
+    preferences = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return false
+  }
   preferences.profile = { ...preferences.profile, exit_type: 'Normal', exited_cleanly: true }
   try {
     fs.writeFileSync(file, JSON.stringify(preferences))
     return true
-  } catch { return false }
+  } catch {
+    return false
+  }
 }
 
 /** One URL shape, so a trailing slash is not a different page. */
 function normalizedUrl(value) {
-  try { return new URL(value).href } catch { return String(value) }
+  try {
+    return new URL(value).href
+  } catch {
+    return String(value)
+  }
 }
 
 /** The page already on this url, or null. */
@@ -101,7 +125,12 @@ const stillStarting = pages => pages.length === 0 || pages.every(blankPage)
 
 /** Whether a pid still exists. */
 function processAlive(pid) {
-  try { process.kill(pid, 0); return true } catch { return false }
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -125,12 +154,15 @@ async function waitForPage(port, url, { milliseconds = FRESH_PAGE_MILLISECONDS, 
 /** What Chrome is told to open. Separate from the spawn so a test can read it. */
 export const openPageArguments = ({ profile, url, width, height, port }) => [
   `--user-data-dir=${profile}`,
-  '--no-first-run', '--no-default-browser-check',
+  '--no-first-run',
+  '--no-default-browser-check',
   // The window shows the engine and nothing else. The crash bubbles are off
   // because the profile is kept and the engine's browser is killed outright
   // when a server stops, which Chrome reports as a crash on the next open.
-  '--no-service-autorun', '--disable-features=Translate,MediaRouter',
-  '--disable-session-crashed-bubble', '--hide-crash-restore-bubble',
+  '--no-service-autorun',
+  '--disable-features=Translate,MediaRouter',
+  '--disable-session-crashed-bubble',
+  '--hide-crash-restore-bubble',
   // A window behind another one, and a tab that is not the front tab, are
   // marked hidden by Chrome: the page stops drawing and stops answering the
   // bridge. Several engines as tabs, and one window behind a terminal, are both
@@ -166,7 +198,11 @@ export const openPageArguments = ({ profile, url, width, height, port }) => [
  */
 export async function openPage(url, { checkout = process.cwd(), profile: name = 'editor', width, height } = {}) {
   let chrome
-  try { chrome = findChrome(checkout) } catch (error) { return { opened: false, problem: error.message } }
+  try {
+    chrome = findChrome(checkout)
+  } catch (error) {
+    return { opened: false, problem: error.message }
+  }
 
   const profile = profileDirectory(checkout, name)
 
@@ -181,13 +217,21 @@ export async function openPage(url, { checkout = process.cwd(), profile: name = 
   if (existing) {
     const pages = await pagesOnPort(existing.port)
     if (pages) {
-      const open = pageOnUrl(pages, url)
-        || (stillStarting(pages) ? await waitForPage(existing.port, url, { milliseconds: REUSE_PAGE_MILLISECONDS }) : null)
+      const open =
+        pageOnUrl(pages, url) ||
+        (stillStarting(pages) ? await waitForPage(existing.port, url, { milliseconds: REUSE_PAGE_MILLISECONDS }) : null)
       if (open) {
         await activatePage(existing.port, open.id)
         return {
-          opened: true, reused: true, activated: true, chrome, profile, url,
-          pid: existing.pid, port: existing.port, pageId: open.id
+          opened: true,
+          reused: true,
+          activated: true,
+          chrome,
+          profile,
+          url,
+          pid: existing.pid,
+          port: existing.port,
+          pageId: open.id
         }
       }
       // The running browser is asked for the tab, rather than Chrome being
@@ -197,21 +241,33 @@ export async function openPage(url, { checkout = process.cwd(), profile: name = 
       const pageId = await openTabOnPort(existing.port, url)
       if (pageId) {
         return {
-          opened: true, reused: true, activated: true, chrome, profile, url,
-          pid: existing.pid, port: existing.port, pageId
+          opened: true,
+          reused: true,
+          activated: true,
+          chrome,
+          profile,
+          url,
+          pid: existing.pid,
+          port: existing.port,
+          pageId
         }
       }
       return {
         opened: false,
-        problem: `the browser on port ${existing.port} would not open ${url} as a tab; stop it with `
-          + `\`node bin/engine.mjs lanes.stop ${name}\` and open again`
+        problem:
+          `the browser on port ${existing.port} would not open ${url} as a tab; stop it with ` +
+          `\`node bin/engine.mjs lanes.stop ${name}\` and open again`
       }
     }
   }
 
   let port = null
   let problem = null
-  try { port = await findFreeDebuggingPort(checkout) } catch (error) { problem = error.message }
+  try {
+    port = await findFreeDebuggingPort(checkout)
+  } catch (error) {
+    problem = error.message
+  }
 
   try {
     fs.mkdirSync(profile, { recursive: true })
@@ -224,19 +280,37 @@ export async function openPage(url, { checkout = process.cwd(), profile: name = 
     // window: the browser comes up, answers its debugging port and renders,
     // with nothing on screen. This is the one visible window the engine opens,
     // so it is the one spawn that must not hide.
-    const browser = spawn(chrome, openPageArguments({ profile, url, width, height, port }),
-      { stdio: 'ignore', detached: true, windowsHide: false })
+    const browser = spawn(chrome, openPageArguments({ profile, url, width, height, port }), {
+      stdio: 'ignore',
+      detached: true,
+      windowsHide: false
+    })
     browser.unref()
     const opened = {
-      opened: true, reused: false, activated: false, chrome, profile, url,
-      pid: browser.pid, port, pageId: null
+      opened: true,
+      reused: false,
+      activated: false,
+      chrome,
+      profile,
+      url,
+      pid: browser.pid,
+      port,
+      pageId: null
     }
     // No port means no way to prove the window later, so nothing is recorded.
     if (port === null) return { ...opened, problem }
     try {
       recordLaneBrowser(checkout, {
-        client: name, port, url, pid: browser.pid, profile, serves: checkout, chrome,
-        headless: false, startedBrowser: true, startedAt: new Date().toISOString()
+        client: name,
+        port,
+        url,
+        pid: browser.pid,
+        profile,
+        serves: checkout,
+        chrome,
+        headless: false,
+        startedBrowser: true,
+        startedAt: new Date().toISOString()
       })
     } catch (error) {
       opened.problem = `the window opened but could not be recorded: ${error.message}`

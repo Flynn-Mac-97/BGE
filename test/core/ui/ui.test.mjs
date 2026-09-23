@@ -56,15 +56,24 @@ class FakeElement extends FakeNode {
     }
   }
 
-  setAttribute(name, value) { this.attributes[name] = String(value) }
-  getAttribute(name) { return this.attributes[name] ?? null }
-  focus() { this.focused = true }
+  setAttribute(name, value) {
+    this.attributes[name] = String(value)
+  }
+  getAttribute(name) {
+    return this.attributes[name] ?? null
+  }
+  focus() {
+    this.focused = true
+  }
   setSelectionRange() {}
 }
 
 /** A text node. `ui.js` builds one for every string it appends. */
 class FakeText extends FakeNode {
-  constructor(text) { super(); this.textContent = String(text) }
+  constructor(text) {
+    super()
+    this.textContent = String(text)
+  }
 }
 
 const saved = { document: globalThis.document, Node: globalThis.Node }
@@ -88,7 +97,13 @@ const find = (node, predicate) => flatten(node).find(predicate)
 function vocabulary() {
   const state = {}
   const drawn = { count: 0 }
-  return { state, drawn, ui: makeUI(state, () => { drawn.count++ }) }
+  return {
+    state,
+    drawn,
+    ui: makeUI(state, () => {
+      drawn.count++
+    })
+  }
 }
 
 // Every primitive the file exposes, built with the smallest argument it takes.
@@ -167,9 +182,15 @@ test('a bound slider writes a number', () => {
 test('a field with onChange reports its value, a number when it says so', () => {
   const { ui } = vocabulary()
   const seen = []
-  const text = find(ui.field({ k: 'note', v: 'a', onChange: value => seen.push(value) }), node => node.tagName === 'INPUT')
+  const text = find(
+    ui.field({ k: 'note', v: 'a', onChange: value => seen.push(value) }),
+    node => node.tagName === 'INPUT'
+  )
   text.fire('change', { value: 'b' })
-  const number = find(ui.field({ k: 'x', v: 1, kind: 'number', onChange: value => seen.push(value) }), node => node.tagName === 'INPUT')
+  const number = find(
+    ui.field({ k: 'x', v: 1, kind: 'number', onChange: value => seen.push(value) }),
+    node => node.tagName === 'INPUT'
+  )
   number.fire('change', { value: '2.5' })
   assert.deepEqual(seen, ['b', 2.5])
 })
@@ -190,8 +211,15 @@ test('a list shows its empty text, marks the selection and reports a pick', () =
 
 test('a tree nests each node under the parent it names', () => {
   const { ui } = vocabulary()
-  const tree = ui.tree({ nodes: [{ id: 'a', title: 'A' }, { id: 'b', parent: 'a', title: 'B' }] })
-  const depths = flatten(tree).filter(node => node.className.startsWith('u-trow')).map(row => row.getAttribute('style'))
+  const tree = ui.tree({
+    nodes: [
+      { id: 'a', title: 'A' },
+      { id: 'b', parent: 'a', title: 'B' }
+    ]
+  })
+  const depths = flatten(tree)
+    .filter(node => node.className.startsWith('u-trow'))
+    .map(row => row.getAttribute('style'))
   assert.deepEqual(depths, ['--depth:0', '--depth:1'])
 })
 
@@ -208,6 +236,9 @@ test('a grid states its column count and reports a pick', () => {
 test('a thumb without a picture stands in with a glyph', () => {
   const { ui } = vocabulary()
   const stand = ui.thumb('player.obj')
-  assert.equal(find(stand, node => node.tagName === 'IMG'), undefined)
+  assert.equal(
+    find(stand, node => node.tagName === 'IMG'),
+    undefined
+  )
   assert.ok(find(stand, node => node.textContent === '·'))
 })

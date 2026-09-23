@@ -31,7 +31,7 @@ export function makeRegions(hosts) {
   function orderedFor(region) {
     return [...entries.values()]
       .filter(entry => entry.region === region)
-      .sort((a, b) => (a.order - b.order) || (a.sequence - b.sequence))
+      .sort((a, b) => a.order - b.order || a.sequence - b.sequence)
   }
 
   /** Put one entry where its order belongs, moving only that element. */
@@ -72,7 +72,9 @@ export function makeRegions(hosts) {
      */
     mount(region, element, { order = 50, plugin = null } = {}) {
       if (!hosts[region]) {
-        reportOnce(`[shell] regions.mount: no region called ${JSON.stringify(region)} — one of ${Object.keys(hosts).join(', ')}`)
+        reportOnce(
+          `[shell] regions.mount: no region called ${JSON.stringify(region)} — one of ${Object.keys(hosts).join(', ')}`
+        )
         return null
       }
       if (!element) {

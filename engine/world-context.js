@@ -30,9 +30,10 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
      * @param {string} [kind] Keep only assets of this kind.
      * @returns {object[]} One `{ name, ...entry }` per matching asset.
      */
-    assets: kind => Object.entries(editor.index.assets)
-      .filter(([, a]) => !kind || a.kind === kind)
-      .map(([name, a]) => ({ name, ...a })),
+    assets: kind =>
+      Object.entries(editor.index.assets)
+        .filter(([, a]) => !kind || a.kind === kind)
+        .map(([name, a]) => ({ name, ...a })),
     /**
      * The project's types, each with its name.
      *
@@ -67,14 +68,21 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
      * @param {object} [p] The placement.
      * @returns {object} The spawned entity.
      */
-    spawn: (t, p) => { const e = world.spawn(t, p); bus.emit('world:changed'); return e },
+    spawn: (t, p) => {
+      const e = world.spawn(t, p)
+      bus.emit('world:changed')
+      return e
+    },
     /**
      * Remove an entity from the world and announce it.
      *
      * @param {object} e The entity to remove.
      * @returns {void}
      */
-    destroy: e => { world.destroy(e); bus.emit('world:changed') },
+    destroy: e => {
+      world.destroy(e)
+      bus.emit('world:changed')
+    },
     run: (id, args) => context.engine.run(id, args),
     save: saveLevel,
     // One place that knows how to import a file out of the project, because the

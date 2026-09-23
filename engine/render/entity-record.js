@@ -36,14 +36,28 @@ export function makeEntityRecords(state) {
       outline: false,
       haveSignature: false,
       frames: 0,
-      sigX: 0, sigY: 0, sigZ: 0,
-      sigScale: 1, sigTurnX: 0, sigTurnY: 0, sigTurnZ: 0, sigLook: null,
-      turn: null, turnRotation: undefined, turnYaw: undefined,
-      turnObject: null, appliedTurnX: NaN, appliedTurnY: NaN, appliedTurnZ: NaN,
+      sigX: 0,
+      sigY: 0,
+      sigZ: 0,
+      sigScale: 1,
+      sigTurnX: 0,
+      sigTurnY: 0,
+      sigTurnZ: 0,
+      sigLook: null,
+      turn: null,
+      turnRotation: undefined,
+      turnYaw: undefined,
+      turnObject: null,
+      appliedTurnX: NaN,
+      appliedTurnY: NaN,
+      appliedTurnZ: NaN,
       // The plan and the declaration it was measured from, so the per-entity
       // lookup is four identity compares rather than a map keyed by a string.
-      plan: null, planMesh: undefined, planSprite: undefined,
-      planType: undefined, planCollider: undefined,
+      plan: null,
+      planMesh: undefined,
+      planSprite: undefined,
+      planType: undefined,
+      planCollider: undefined,
       // The look string the object was built with, so a frame that changed
       // nothing compares one record field instead of reaching into `userData`.
       drawnLook: null,
@@ -56,7 +70,9 @@ export function makeEntityRecords(state) {
       // The declaration, drawn shape and feet-anchor height the last full pass
       // used, so a moving entity that changed nothing else can be placed and
       // shadowed without measuring any of them again.
-      declared: null, shape: null, anchor: 0,
+      declared: null,
+      shape: null,
+      anchor: 0,
       // True when this entity is a simple mesh, out of every batch, whose only
       // per-frame input is its position. `scanMoving` then answers it.
       steady: false,
@@ -69,9 +85,15 @@ export function makeEntityRecords(state) {
       // re-multiplication on every draw. These nine compares keep a still
       // transform from claiming it changed.
       placedObject: null,
-      placedX: NaN, placedY: NaN, placedZ: NaN,
-      placedRotX: NaN, placedRotY: NaN, placedRotZ: NaN,
-      placedScaleX: NaN, placedScaleY: NaN, placedScaleZ: NaN
+      placedX: NaN,
+      placedY: NaN,
+      placedZ: NaN,
+      placedRotX: NaN,
+      placedRotY: NaN,
+      placedRotZ: NaN,
+      placedScaleX: NaN,
+      placedScaleY: NaN,
+      placedScaleZ: NaN
     }
     records.set(entity, record)
     return record
@@ -107,9 +129,13 @@ export function makeEntityRecords(state) {
    * a declaration actually changed.
    */
   function planFor(entity, record) {
-    if (record.plan !== null
-        && record.planMesh === entity.mesh && record.planSprite === entity.sprite
-        && record.planType === entity.type && record.planCollider === entity.collider) {
+    if (
+      record.plan !== null &&
+      record.planMesh === entity.mesh &&
+      record.planSprite === entity.sprite &&
+      record.planType === entity.type &&
+      record.planCollider === entity.collider
+    ) {
       return record.plan
     }
     const plan = entityPlan(entity)
@@ -129,8 +155,13 @@ export function makeEntityRecords(state) {
    * almost every entity, so the object is kept and handed back.
    */
   function turnFor(entity, record) {
-    if (record.turn && typeof entity.rotation !== 'object'
-        && record.turnRotation === entity.rotation && record.turnYaw === entity.yaw) return record.turn
+    if (
+      record.turn &&
+      typeof entity.rotation !== 'object' &&
+      record.turnRotation === entity.rotation &&
+      record.turnYaw === entity.yaw
+    )
+      return record.turn
     const turn = turnRadians(entity)
     record.turn = turn
     record.turnRotation = entity.rotation
@@ -140,19 +171,23 @@ export function makeEntityRecords(state) {
 
   /** Whether the record's stored position and rotation still match the object's. */
   function sameOrientation(record, object) {
-    return record.placedX === object.position.x
-      && record.placedY === object.position.y
-      && record.placedZ === object.position.z
-      && record.placedRotX === object.rotation.x
-      && record.placedRotY === object.rotation.y
-      && record.placedRotZ === object.rotation.z
+    return (
+      record.placedX === object.position.x &&
+      record.placedY === object.position.y &&
+      record.placedZ === object.position.z &&
+      record.placedRotX === object.rotation.x &&
+      record.placedRotY === object.rotation.y &&
+      record.placedRotZ === object.rotation.z
+    )
   }
 
   /** Whether the record's stored scale still matches the object's. */
   function sameScale(record, object) {
-    return record.placedScaleX === object.scale.x
-      && record.placedScaleY === object.scale.y
-      && record.placedScaleZ === object.scale.z
+    return (
+      record.placedScaleX === object.scale.x &&
+      record.placedScaleY === object.scale.y &&
+      record.placedScaleZ === object.scale.z
+    )
   }
 
   /** Whether the record last wrote exactly the transform the object carries now. */

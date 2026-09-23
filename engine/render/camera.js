@@ -54,8 +54,10 @@ export function makeCamera(state) {
     if (projection.mode === 'ortho') {
       const halfWidth = projection.width / 2 / projection.zoom
       const halfHeight = projection.height / 2 / projection.zoom
-      orthographic.left = -halfWidth; orthographic.right = halfWidth
-      orthographic.top = halfHeight;   orthographic.bottom = -halfHeight
+      orthographic.left = -halfWidth
+      orthographic.right = halfWidth
+      orthographic.top = halfHeight
+      orthographic.bottom = -halfHeight
       orthographic.position.x = projection.x
       orthographic.position.y = projection.y
       orthographic.updateProjectionMatrix()
@@ -87,10 +89,11 @@ export function makeCamera(state) {
   }
 
   /** A pixel in the viewport as normalized device coordinates, y upward. */
-  const toNDC = (px, py) => new THREE.Vector2(
-    (px / Math.max(1, state.viewport.width)) * 2 - 1,
-    1 - (py / Math.max(1, state.viewport.height)) * 2
-  )
+  const toNDC = (px, py) =>
+    new THREE.Vector2(
+      (px / Math.max(1, state.viewport.width)) * 2 - 1,
+      1 - (py / Math.max(1, state.viewport.height)) * 2
+    )
 
   state.flat = flat
   state.activeCamera = activeCamera

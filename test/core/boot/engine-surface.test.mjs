@@ -13,9 +13,25 @@ import { startWorldInNode } from '../../../engine/start-world-node.mjs'
 
 /** The names the kernel documents on `engine`. */
 const ENGINE_NAMES = [
-  'snapshot', 'entity', 'commands', 'run', 'select', 'play', 'stop', 'simulate',
-  'seed', 'log', 'errors', 'clearLog', 'marks', 'mark', 'stepBack', 'seek',
-  'renderStats', 'spawn', 'destroy'
+  'snapshot',
+  'entity',
+  'commands',
+  'run',
+  'select',
+  'play',
+  'stop',
+  'simulate',
+  'seed',
+  'log',
+  'errors',
+  'clearLog',
+  'marks',
+  'mark',
+  'stepBack',
+  'seek',
+  'renderStats',
+  'spawn',
+  'destroy'
 ]
 
 test('every documented engine name is a function on the surface', async () => {

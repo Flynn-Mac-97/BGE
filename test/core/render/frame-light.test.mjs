@@ -63,7 +63,11 @@ test('setAmbient stores an intensity and a colour, and an unreadable value leave
 test('setSun points the lamp against the travel direction, and stores intensity and colour', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
   const { sun } = lights(frame)
-  const cases = [[-0.4, -1, -0.3], [0, -1, 0], [1, -2, 3]]
+  const cases = [
+    [-0.4, -1, -0.3],
+    [0, -1, 0],
+    [1, -2, 3]
+  ]
   for (const direction of cases) {
     frame.setSun(direction, 1.1, '#ffe0c0')
     const length = Math.hypot(...direction)
@@ -83,7 +87,12 @@ test('an unreadable sun direction leaves the sun exactly where it was', async ()
   const { sun } = lights(frame)
   const before = sun.position.toArray()
 
-  const unreadable = [[0, 0, 0], [1, 2], ['x', 'y', 'z'], [NaN, 1, 2]]
+  const unreadable = [
+    [0, 0, 0],
+    [1, 2],
+    ['x', 'y', 'z'],
+    [NaN, 1, 2]
+  ]
   for (const direction of unreadable) {
     frame.setSun(direction, 1, '#ffffff')
     assert.deepEqual(sun.position.toArray(), before, JSON.stringify(direction))

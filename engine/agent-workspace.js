@@ -7,7 +7,10 @@ export const PROJECT_AGENT_MANIFEST = 'agents/manifest.json'
 export const AGENT_SETTINGS = 'agents/settings.json'
 
 /** A path in the one spelling the tree uses: forward slashes, no leading `./`. */
-const cleanPath = value => String(value || '').replaceAll('\\', '/').replace(/^\.\//, '')
+const cleanPath = value =>
+  String(value || '')
+    .replaceAll('\\', '/')
+    .replace(/^\.\//, '')
 
 /** Whether a file path matches one `*`/`**` glob pattern from the agent tree. */
 export function matchesAgentPattern(file, pattern) {
@@ -27,8 +30,14 @@ export function normaliseAgentRequest(value) {
   if (Array.isArray(value)) return { task: '', files: value.map(cleanPath), nodes: [], parallel: false }
   return {
     task: String(value.task || ''),
-    files: [].concat(value.files || []).map(cleanPath).filter(Boolean),
-    nodes: [].concat(value.nodes || value.skills || value.lanes || []).map(String).filter(Boolean),
+    files: []
+      .concat(value.files || [])
+      .map(cleanPath)
+      .filter(Boolean),
+    nodes: []
+      .concat(value.nodes || value.skills || value.lanes || [])
+      .map(String)
+      .filter(Boolean),
     parallel: value.parallel === true || value.mode === 'parallel'
   }
 }
@@ -36,6 +45,15 @@ export function normaliseAgentRequest(value) {
 /** Every structural problem in the node list: ids, kinds, files, and parent loops. */
 function validateGraph(nodes) {
   const problems = []
+  const ids = collectNodeIds(nodes, problems)
+  for (const node of nodes)
+    if (node.parent && !ids.has(node.parent)) problems.push(`node "${node.id}" has missing parent "${node.parent}"`)
+  for (const node of nodes) if (hasParentLoop(node, nodes)) problems.push(`node "${node.id}" has a parent loop`)
+  return problems
+}
+
+/** Report each node's id, kind, file and list problems, and return the ids that were declared. */
+function collectNodeIds(nodes, problems) {
   const ids = new Set()
   const kinds = new Set(['group', 'document', 'instruction', 'skill'])
   for (const node of nodes) {
@@ -43,26 +61,31 @@ function validateGraph(nodes) {
     else if (ids.has(node.id)) problems.push(`node id "${node.id}" is repeated`)
     else ids.add(node.id)
     if (!kinds.has(node?.kind)) problems.push(`node "${node?.id || '?'}" has a bad kind`)
-    if (['document', 'instruction', 'skill'].includes(node?.kind) && !node.file) problems.push(`node "${node.id}" needs a file`)
+    if (['document', 'instruction', 'skill'].includes(node?.kind) && !node.file)
+      problems.push(`node "${node.id}" needs a file`)
     if (node?.match != null && !Array.isArray(node.match)) problems.push(`node "${node.id}" match must be a list`)
     if (node?.tests != null && !Array.isArray(node.tests)) problems.push(`node "${node.id}" tests must be a list`)
   }
-  for (const node of nodes) if (node.parent && !ids.has(node.parent)) problems.push(`node "${node.id}" has missing parent "${node.parent}"`)
-  for (const node of nodes) {
-    const seen = new Set([node.id])
-    let parent = node.parent
-    while (parent) {
-      if (seen.has(parent)) { problems.push(`node "${node.id}" has a parent loop`); break }
-      seen.add(parent)
-      parent = nodes.find(item => item.id === parent)?.parent
-    }
+  return ids
+}
+
+/** Whether following parents from this node comes back to a node already seen. */
+function hasParentLoop(node, nodes) {
+  const seen = new Set([node.id])
+  let parent = node.parent
+  while (parent) {
+    if (seen.has(parent)) return true
+    seen.add(parent)
+    parent = nodes.find(item => item.id === parent)?.parent
   }
-  return problems
+  return false
 }
 
 /** Parse one workspace file, or the fallback when it is missing and a fallback was given. */
 async function readJSON(read, scope, file, fallback) {
-  try { return JSON.parse(await read(scope, file)) } catch (error) {
+  try {
+    return JSON.parse(await read(scope, file))
+  } catch (error) {
     if (fallback !== undefined) return fallback
     throw error
   }
@@ -80,9 +103,15 @@ function skillDetails(text) {
 // or a declared match). It is metadata for the tree, never instruction text, so
 // it must not reach a packet.
 /** The text without its leading metadata block. */
-const withoutFrontmatter = text => String(text).replace(/^---\s*\n[\s\S]*?\n---\s*/, '').trim()
+const withoutFrontmatter = text =>
+  String(text)
+    .replace(/^---\s*\n[\s\S]*?\n---\s*/, '')
+    .trim()
 /** The text without its leading `# title`, which the packet prints as a heading of its own. */
-const withoutFirstHeading = text => withoutFrontmatter(text).replace(/^# [^\n]+\n*/, '').trim()
+const withoutFirstHeading = text =>
+  withoutFrontmatter(text)
+    .replace(/^# [^\n]+\n*/, '')
+    .trim()
 
 /** Merge the engine and project manifests and the plugin guides into one node list with per-node enablement. */
 async function loadAgentGraph(read, pluginNodes = []) {
@@ -99,9 +128,9 @@ async function loadAgentGraph(read, pluginNodes = []) {
     ...pluginNodes
   ]
   const problems = validateGraph(nodes)
-  const engineOverrides = new Set(nodes
-    .filter(node => node.scope === 'engine' && node.override)
-    .map(node => node.override))
+  const engineOverrides = new Set(
+    nodes.filter(node => node.scope === 'engine' && node.override).map(node => node.override)
+  )
   for (const node of nodes) {
     if (node.scope === 'project' && node.override && !engineOverrides.has(node.override)) {
       problems.push(`project node "${node.id}" cannot override unknown rule "${node.override}"`)
@@ -129,11 +158,13 @@ export async function readAgentWorkspace(read, pluginNodes = []) {
       node.characters = text.length
       if (node.kind === 'skill') {
         const details = skillDetails(text)
-        if (!details?.name || !details?.description) workspace.problems.push(`skill "${node.id}" needs name and description fields`)
+        if (!details?.name || !details?.description)
+          workspace.problems.push(`skill "${node.id}" needs name and description fields`)
         else node.description = details.description
       }
+    } catch {
+      workspace.problems.push(`cannot read ${node.scope}:${node.file}`)
     }
-    catch { workspace.problems.push(`cannot read ${node.scope}:${node.file}`) }
   }
   return workspace
 }
@@ -217,6 +248,138 @@ function withheldReason(node, replaced) {
 }
 
 /**
+ * The ids a request selects, by file match, task word, or an always rule.
+ *
+ * The second set names the nodes whose plugin source the request touched, which
+ * is what decides whether the packet prints the plugin's interface block.
+ */
+function selectedNodeIds(nodes, request, matchable) {
+  const wanted = new Set(request.nodes)
+  const interfaceNamed = new Set(request.nodes)
+  const task = request.task.toLowerCase()
+  for (const node of nodes) {
+    if (!selectableKind(node)) continue
+    const byFile = (node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))
+    const byWord = (node.triggers || []).some(trigger => namesTrigger(task, trigger))
+    if (node.always || byFile || byWord) wanted.add(node.id)
+    if (matchable.some(file => namesPluginSource(node, file))) interfaceNamed.add(node.id)
+  }
+  return { wanted, interfaceNamed }
+}
+
+/**
+ * Ids an engine rule loses to a project override.
+ *
+ * An `always` rule is added to, never replaced. An override is scoped to its own
+ * files and eviction is scoped to the whole packet, so the two cannot be made to
+ * agree. The project's rule comes after, and later text wins.
+ */
+function replacedNodeIds(selected) {
+  const projectOverrides = new Set(
+    selected.filter(node => node.scope === 'project' && node.override).map(node => node.override)
+  )
+  const replaced = new Set(
+    selected
+      .filter(node => node.scope === 'engine' && node.override && !node.always && projectOverrides.has(node.override))
+      .map(node => node.id)
+  )
+  return { replaced, projectOverrides }
+}
+
+/**
+ * Read each selected node's guide, with the interface its plugin declares now.
+ *
+ * Read per selected node, not for every plugin in the tree: a packet holds four
+ * guides and parsing the other seventy-seven would cost more than the packet.
+ * Only a request that names the plugin's own source prints the block.
+ */
+async function readSelectedNodes(resolved, read, interfaceNamed, interfaceText) {
+  return Promise.all(
+    resolved.map(async node => {
+      const text = await read(node.scope, node.file)
+      let parsed = null
+      if (node.source && interfaceNamed.has(node.id)) {
+        try {
+          parsed = await interfaceText?.(node.scope, node.source)
+        } catch {
+          /* Report the missing interface below. */
+        }
+        parsed ||= `Interface unavailable. Read \`${node.source}\` for commands and arguments before calling this plugin.`
+        if (parsed) parsed = String(parsed).trimEnd()
+      }
+      return { ...node, text, interface: parsed }
+    })
+  )
+}
+
+/** The packet's prose: the heads, the always block, the named sections and the notices. */
+function packetText({ entries, withheld, withheldPluginGuides, skippedByFile, request, tests, textTests }) {
+  // The no-files notice goes in the text, not only in a field: most agents read
+  // the text and never parse the JSON, and this one says what to change. A
+  // request that named nodes already chose its rule sets by id, so the file
+  // route is not the one it missed.
+  const noFilesNotice =
+    request.files.length || request.nodes.length || !skippedByFile
+      ? null
+      : '# You named no files\n' + `${skippedByFile} rule sets.`
+  // Only the packets a check reads carry the withheld notice in text. The
+  // reply's `withheld` array names every missing rule set with its reason; this
+  // text is a second copy, and the copy no test reads drifts in silence. A
+  // first call that named neither files nor nodes is one such check, so it also
+  // spells the engine reason in the exact words the workspace test looks for.
+  const firstCall = !request.files.length && !request.nodes.length
+  const hasInterface = entries.some(node => node.interface)
+  const wantsWithheldNotice = firstCall || hasInterface || request.nodes.length
+  const engineEntry = firstCall ? withheld.find(node => node.id === 'engine') : null
+  const withheldNotice =
+    wantsWithheldNotice && (withheld.length || withheldPluginGuides)
+      ? ['# Not included', engineEntry ? `\`${engineEntry.id}\` — ${engineEntry.title} — ${engineEntry.reason}` : null]
+          .filter(Boolean)
+          .join('\n')
+      : null
+  // The always rules are the packet's preamble, so they print as one block. One
+  // heading over their four sentences reads the same as four, and it names each
+  // rule set, so a reader can still tell which sentence belongs to which.
+  const alwaysEntries = entries.filter(node => node.always)
+  // A section with no interface and no prose prints a title over nothing. The
+  // node stays in the reply, so a reader that parses ids still sees it.
+  const namedEntries = entries.filter(node => !node.always && (node.interface || withoutFirstHeading(node.text)))
+  // A packet that prints a plugin interface names the universal rule sets,
+  // because the interface check reads those names. The design rule is left out:
+  // its sentence is present, and no check reads its title.
+  const alwaysHeading = hasInterface
+    ? `# ${alwaysEntries
+        .map(node => node.title || node.id)
+        .filter(title => title !== 'Design')
+        .join(', ')}\n`
+    : ''
+  const alwaysSection = alwaysEntries.length
+    ? alwaysHeading + alwaysEntries.map(node => withoutFirstHeading(node.text)).join('\n')
+    : null
+  // A plugin guide keeps its title: the reply's nodes array names it, but the
+  // interface above it does not spell the plugin name. Every other rule set is
+  // its own sentence, and a heading over one sentence is labelled twice.
+  const section = node =>
+    (node.source ? `# ${node.title || node.id}\n` : '') +
+    [node.interface, withoutFirstHeading(node.text)].filter(Boolean).join('\n')
+  const parts = [
+    noFilesNotice,
+    alwaysSection,
+    ...namedEntries.map(section),
+    tests.length ? `${hasInterface ? '# Required checks\n' : ''}${textTests.join('\n')}` : null,
+    withheldNotice
+  ].filter(Boolean)
+  return parts.join('\n') + '\n'
+}
+
+/** Every missing rule set the packet lists by name, with the reason it was withheld. */
+function withheldNodes(missing, guideIds, replaced) {
+  return missing
+    .filter(node => !guideIds.has(node.id))
+    .map(node => ({ id: node.id, title: node.title || node.id, reason: withheldReason(node, replaced.has(node.id)) }))
+}
+
+/**
  * The smallest instruction packet for one task: the rules its files and words
  * select, plus what was withheld and why.
  *
@@ -233,7 +396,13 @@ function withheldReason(node, replaced) {
  * @param {string} projectPath The open project, as the tree spells it.
  * @param {Function} interfaceText `(scope, file)`, answering the parsed block.
  */
-export async function resolveAgentContext(read, requestValue = {}, pluginNodes = [], projectPath = PROJECT_PREFIX, interfaceText = null) {
+export async function resolveAgentContext(
+  read,
+  requestValue = {},
+  pluginNodes = [],
+  projectPath = PROJECT_PREFIX,
+  interfaceText = null
+) {
   const request = normaliseAgentRequest(requestValue)
   const workspace = await loadAgentGraph(read, pluginNodes)
   if (workspace.problems.length) throw new Error(`bad agent tree: ${workspace.problems.join('; ')}`)
@@ -242,30 +411,13 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // the real one, because that is the path the agent has to open.
   const matchable = request.files.map(file => asProjectPattern(file, projectPath))
 
-  const wanted = new Set(request.nodes)
-  const interfaceNamed = new Set(request.nodes)
-  const task = request.task.toLowerCase()
-  for (const node of workspace.nodes) {
-    if (!selectableKind(node)) continue
-    const byFile = (node.match || []).some(pattern => matchable.some(file => matchesAgentPattern(file, pattern)))
-    const byWord = (node.triggers || []).some(trigger => namesTrigger(task, trigger))
-    if (node.always || byFile || byWord) wanted.add(node.id)
-    if (matchable.some(file => namesPluginSource(node, file))) interfaceNamed.add(node.id)
-  }
+  const { wanted, interfaceNamed } = selectedNodeIds(workspace.nodes, request, matchable)
 
   const unknown = [...wanted].filter(id => !workspace.nodes.some(node => node.id === id))
   if (unknown.length) throw new Error(`unknown agent node: ${unknown.join(', ')}`)
 
   const selected = workspace.nodes.filter(node => wanted.has(node.id) && selectableKind(node) && node.enabled)
-  const projectOverrides = new Set(selected
-    .filter(node => node.scope === 'project' && node.override)
-    .map(node => node.override))
-  // An `always` rule is added to, never replaced. An override is scoped to its
-  // own files and eviction is scoped to the whole packet, so the two cannot be
-  // made to agree. The project's rule comes after, and later text wins.
-  const replaced = new Set(selected
-    .filter(node => node.scope === 'engine' && node.override && !node.always && projectOverrides.has(node.override))
-    .map(node => node.id))
+  const { replaced, projectOverrides } = replacedNodeIds(selected)
   const resolved = selected.filter(node => !replaced.has(node.id))
   // A guide arrives with the interface its plugin declares right now. Read per
   // selected node, not for every plugin in the tree: a packet holds four guides
@@ -275,108 +427,51 @@ export async function resolveAgentContext(read, requestValue = {}, pluginNodes =
   // in the task selects the same guide, and printing its command list there
   // spends a thousand characters on a lookup the guide's detail file already
   // holds.
-  const entries = await Promise.all(resolved.map(async node => {
-    const text = await read(node.scope, node.file)
-    let parsed = null
-    if (node.source && interfaceNamed.has(node.id)) {
-      try { parsed = await interfaceText?.(node.scope, node.source) } catch { /* Report the missing interface below. */ }
-      parsed ||= `Interface unavailable. Read \`${node.source}\` for commands and arguments before calling this plugin.`
-      if (parsed) parsed = String(parsed).trimEnd()
-    }
-    return { ...node, text, interface: parsed }
-  }))
+  const entries = await readSelectedNodes(resolved, read, interfaceNamed, interfaceText)
 
   const sent = new Set(resolved.map(node => node.id))
   const missing = workspace.nodes.filter(node => selectableKind(node) && !sent.has(node.id))
   // Plugin guides are counted, not listed: there are dozens, one reason covers
   // them all, and spelling each one out costs more than the rules themselves.
   const guideIds = new Set(pluginNodes.map(node => node.id))
-  const withheld = missing.filter(node => !guideIds.has(node.id))
-    .map(node => ({ id: node.id, title: node.title || node.id, reason: withheldReason(node, replaced.has(node.id)) }))
+  const withheld = withheldNodes(missing, guideIds, replaced)
   // A count, not the ids: seventy ids cost more than the rules they sit beside,
   // and the notice already says where a guide is found.
   const withheldPluginGuides = missing.filter(node => guideIds.has(node.id)).length
   // Rules the file list would have brought in. A request naming no files loses
   // every one of them, and that is what an agent has to be told.
-  const skippedByFile = missing.filter(node =>
-    !guideIds.has(node.id) && node.enabled && !replaced.has(node.id) && (node.match || []).length).length
+  const skippedByFile = missing.filter(
+    node => !guideIds.has(node.id) && node.enabled && !replaced.has(node.id) && (node.match || []).length
+  ).length
 
   // A check that names the default project would test somebody else's game. The
   // manifest writes `<project>` and the packet says which one, so the command a
   // lane is handed is the command that proves the lane's own work.
-  const tests = [...new Set(entries.flatMap(node => node.tests || []))]
-    .map(test => test.replaceAll('<project>', projectPath))
+  const tests = [...new Set(entries.flatMap(node => node.tests || []))].map(test =>
+    test.replaceAll('<project>', projectPath)
+  )
   // A game rule set names a project check and a game test command. The reply's
   // `tests` array carries both resolved; the text names only the game test
   // command, the check a reader acts on. The project check is the same run with
   // the project's path, which moves with the worktree, so printing it again
   // spends the longest string in the packet on a second copy of one command.
-  const textTests = tests.some(test => test.includes('run tests.run'))
-    ? ['run tests.run']
-    : tests
-  // The no-files notice goes in the text, not only in a field: most agents read
-  // the text and never parse the JSON, and this one says what to change. A
-  // request that named nodes already chose its rule sets by id, so the file
-  // route is not the one it missed.
-  const noFilesNotice = request.files.length || request.nodes.length || !skippedByFile ? null
-    : '# You named no files\n'
-      + `${skippedByFile} rule sets.`
-  // Only the packets a check reads carry the withheld notice in text. The
-  // reply's `withheld` array names every missing rule set with its reason; this
-  // text is a second copy, and the copy no test reads drifts in silence. A
-  // first call that named neither files nor nodes is one such check, so it also
-  // spells the engine reason in the exact words the workspace test looks for.
-  const firstCall = !request.files.length && !request.nodes.length
-  const hasInterface = entries.some(node => node.interface)
-  const wantsWithheldNotice = firstCall || hasInterface || request.nodes.length
-  const engineEntry = firstCall ? withheld.find(node => node.id === 'engine') : null
-  const withheldNotice = wantsWithheldNotice && (withheld.length || withheldPluginGuides)
-    ? [
-      '# Not included',
-      engineEntry ? `\`${engineEntry.id}\` — ${engineEntry.title} — ${engineEntry.reason}` : null
-    ].filter(Boolean).join('\n')
-    : null
-  // The always rules are the packet's preamble, so they print as one block. One
-  // heading over their four sentences reads the same as four, and it names each
-  // rule set, so a reader can still tell which sentence belongs to which.
-  const alwaysEntries = entries.filter(node => node.always)
-  // A section with no interface and no prose prints a title over nothing. The
-  // node stays in the reply, so a reader that parses ids still sees it.
-  const namedEntries = entries.filter(node => !node.always && (node.interface || withoutFirstHeading(node.text)))
-  // A packet that prints a plugin interface names the universal rule sets,
-  // because the interface check reads those names. The design rule is left out:
-  // its sentence is present, and no check reads its title.
-  const alwaysHeading = hasInterface
-    ? `# ${alwaysEntries
-      .map(node => node.title || node.id)
-      .filter(title => title !== 'Design')
-      .join(', ')}\n`
-    : ''
-  const alwaysSection = alwaysEntries.length
-    ? alwaysHeading + alwaysEntries.map(node => withoutFirstHeading(node.text)).join('\n')
-    : null
-  // A plugin guide keeps its title: the reply's nodes array names it, but the
-  // interface above it does not spell the plugin name. Every other rule set is
-  // its own sentence, and a heading over one sentence is labelled twice.
-  const section = node => (node.source ? `# ${node.title || node.id}\n` : '') + [
-    node.interface,
-    withoutFirstHeading(node.text)
-  ].filter(Boolean).join('\n')
-  const parts = [
-    noFilesNotice,
-    alwaysSection,
-    ...namedEntries.map(section),
-    tests.length ? `${hasInterface ? '# Required checks\n' : ''}${textTests.join('\n')}` : null,
-    withheldNotice
-  ].filter(Boolean)
-  const text = parts.join('\n') + '\n'
+  const textTests = tests.some(test => test.includes('run tests.run')) ? ['run tests.run'] : tests
+  const text = packetText({ entries, withheld, withheldPluginGuides, skippedByFile, request, tests, textTests })
 
   return {
     version: 2,
     task: request.task,
     files: request.files,
     parallel: request.parallel,
-    nodes: entries.map(({ text, characters, enabled, interface: parsed, ...node }) => node),
+    nodes: entries.map(
+      ({
+        text: omittedText,
+        characters: omittedCharacters,
+        enabled: omittedEnabled,
+        interface: omittedInterface,
+        ...node
+      }) => node
+    ),
     lanes: entries.map(node => ({ id: node.id, title: node.title, file: node.file, tests: node.tests || [] })),
     tests,
     overrides: [...projectOverrides],

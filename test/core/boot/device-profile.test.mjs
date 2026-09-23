@@ -22,9 +22,12 @@ import { FIXTURE, temporaryProject } from '../../fixture-project.mjs'
  * game, and what is under test is that a declaration is honoured — not what any
  * one game declares.
  */
-const PORTRAIT = await temporaryProject({
-  'game.json': { title: 'portrait', startLevel: 'main', device: { width: 540, height: 960 } }
-}, 'engine-device-')
+const PORTRAIT = await temporaryProject(
+  {
+    'game.json': { title: 'portrait', startLevel: 'main', device: { width: 540, height: 960 } }
+  },
+  'engine-device-'
+)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -62,9 +65,12 @@ test('a declared device sets the viewport and reaches context', async () => {
 test('a declared pixel ratio is not read, so a game declaring one is told', async () => {
   // No renderer draws at a declared ratio: the PNG is the viewport times the
   // page's own device pixel ratio, which see.capture measures into the sidecar.
-  const project = await temporaryProject({
-    'game.json': { title: 'ratio', startLevel: 'main', device: { width: 540, height: 960, pixelRatio: 3 } }
-  }, 'engine-device-ratio-')
+  const project = await temporaryProject(
+    {
+      'game.json': { title: 'ratio', startLevel: 'main', device: { width: 540, height: 960, pixelRatio: 3 } }
+    },
+    'engine-device-ratio-'
+  )
   const { context } = await startWorldInNode({ root: ROOT, project })
   assert.equal(context.device.pixelRatio, 3, 'it is carried')
   assert.equal(context.viewport.width, 540, 'and it does not scale the viewport')
@@ -81,7 +87,9 @@ test('a game that declares no device still gets a viewport', async () => {
 
 test('a measured screen beats the declaration', async () => {
   const { context } = await startWorldInNode({
-    root: ROOT, project: PORTRAIT, viewport: { width: 800, height: 600 }
+    root: ROOT,
+    project: PORTRAIT,
+    viewport: { width: 800, height: 600 }
   })
   assert.equal(context.viewport.width, 800)
   assert.equal(context.device.width, 540)
@@ -89,13 +97,18 @@ test('a measured screen beats the declaration', async () => {
 
 test('the frame is written at the declared screen, not at the agent window', async t => {
   const { engine, context } = await startWorldInNode({
-    root: ROOT, project: PORTRAIT, viewport: { width: 800, height: 600 }
+    root: ROOT,
+    project: PORTRAIT,
+    viewport: { width: 800, height: 600 }
   })
   const frame = await sketchFrame(t, engine)
   // 540x960 at the sketch's fixed quarter scale. The window would give 200x150,
   // and an ortho camera fitted to 800x600 shows world the phone never does.
-  assert.deepEqual(pngPixels(frame.png), [135, 240],
-    'the PNG must carry the declared screen, whatever window the agent has')
+  assert.deepEqual(
+    pngPixels(frame.png),
+    [135, 240],
+    'the PNG must carry the declared screen, whatever window the agent has'
+  )
   assert.equal(context.viewport.width, 800, 'the frame gives the window back')
   assert.equal(context.viewport.height, 600)
 })

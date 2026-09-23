@@ -30,16 +30,28 @@ function runProgram(command, args = [], { cwd, timeout = 600000, input } = {}) {
     try {
       child = spawn(command, args, { cwd, windowsHide: true })
     } catch (error) {
-      return resolve({ code: null, out: '', error: String(error?.message || error) })
+      resolve({ code: null, out: '', error: String(error?.message || error) })
+      return
     }
-    let out = '', error = ''
+    let out = '',
+      error = ''
     /** Append output, keeping only the last KEEP characters so a chatty tool cannot exhaust memory. */
     const keep = (text, into) => (into + text).slice(-KEEP)
-    child.stdout?.on('data', chunk => { out = keep(String(chunk), out) })
-    child.stderr?.on('data', chunk => { error = keep(String(chunk), error) })
-    if (input != null) { child.stdin?.write(input); child.stdin?.end() }
+    child.stdout?.on('data', chunk => {
+      out = keep(String(chunk), out)
+    })
+    child.stderr?.on('data', chunk => {
+      error = keep(String(chunk), error)
+    })
+    if (input != null) {
+      child.stdin?.write(input)
+      child.stdin?.end()
+    }
 
-    const timer = setTimeout(() => { child.kill(); error = keep(`\ntimed out after ${timeout} ms`, error) }, timeout)
+    const timer = setTimeout(() => {
+      child.kill()
+      error = keep(`\ntimed out after ${timeout} ms`, error)
+    }, timeout)
     child.on('error', failure => {
       clearTimeout(timer)
       resolve({ code: null, out, error: String(failure?.message || failure) })

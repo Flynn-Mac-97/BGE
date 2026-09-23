@@ -17,24 +17,36 @@
  */
 function nullCanvas(width = 1, height = 1) {
   /** A zeroed ImageData of one size, for a readback of a frame nothing drew. */
+  // eslint-disable-next-line id-denylist -- ImageData names this field data.
   const blankPixels = (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(Math.max(0, w * h * 4)) })
   const pen = {
-    fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1,
-    font: '', textAlign: 'left', textBaseline: 'top',
+    fillStyle: '#000000',
+    strokeStyle: '#000000',
+    lineWidth: 1,
+    font: '',
+    textAlign: 'left',
+    textBaseline: 'top',
     drawImage() {},
     fillRect() {},
     fillText() {},
     measureText: () => ({ width: 0 }),
-    beginPath() {}, lineTo() {}, closePath() {}, stroke() {},
-    save() {}, restore() {},
+    beginPath() {},
+    lineTo() {},
+    closePath() {},
+    stroke() {},
+    save() {},
+    restore() {},
     createImageData: (w, h) => blankPixels(w, h),
     putImageData() {},
     getImageData: (x, y, w, h) => blankPixels(w, h)
   }
   return {
-    width, height,
+    width,
+    height,
     getContext: () => pen,
-    toDataURL() { throw new Error('nothing drew this frame, so there is no image to encode') }
+    toDataURL() {
+      throw new Error('nothing drew this frame, so there is no image to encode')
+    }
   }
 }
 
@@ -48,12 +60,26 @@ function nullCanvas(width = 1, height = 1) {
 function makeNullGraph() {
   const records = new Map()
   return {
-    add(record) { if (record?.name) records.set(record.name, record) },
-    remove(name) { records.delete(name) },
-    replace(name, record) { records.set(name, { ...record, name }) },
-    disable(name) { const pass = records.get(name); if (pass) pass.enabled = false },
-    enable(name) { const pass = records.get(name); if (pass) pass.enabled = true },
-    get passes() { return [...records.values()].filter(pass => pass.enabled !== false) },
+    add(record) {
+      if (record?.name) records.set(record.name, record)
+    },
+    remove(name) {
+      records.delete(name)
+    },
+    replace(name, record) {
+      records.set(name, { ...record, name })
+    },
+    disable(name) {
+      const pass = records.get(name)
+      if (pass) pass.enabled = false
+    },
+    enable(name) {
+      const pass = records.get(name)
+      if (pass) pass.enabled = true
+    },
+    get passes() {
+      return [...records.values()].filter(pass => pass.enabled !== false)
+    },
     run() {}
   }
 }
@@ -108,8 +134,12 @@ export function nullRenderer(view, viewport, shape) {
     blank: true,
     view,
     scene,
-    get size() { return { w: viewport.width, h: viewport.height } },
-    get stats() { return { ...stats } },
+    get size() {
+      return { w: viewport.width, h: viewport.height }
+    },
+    get stats() {
+      return { ...stats }
+    },
     // No camera object, because nothing projects through one here. Headless
     // screen positions come from engine/camera-project.js and the view.
     camera: null,
@@ -119,7 +149,9 @@ export function nullRenderer(view, viewport, shape) {
     readability: { keyline: 0, contactShadow: false, groundRing: false },
     createCanvas: nullCanvas,
 
-    resize() { frameSize(shape.width, shape.height) },
+    resize() {
+      frameSize(shape.width, shape.height)
+    },
     frameSize,
 
     sync(world) {
@@ -142,7 +174,9 @@ export function nullRenderer(view, viewport, shape) {
       stats.entities = world.entities.length
     },
 
-    draw() { stats.frames++ },
+    draw() {
+      stats.frames++
+    },
 
     /** Every pixel unwritten, which is what a draw that draws nothing leaves. */
     drawInto(target, buffer) {
@@ -150,7 +184,13 @@ export function nullRenderer(view, viewport, shape) {
       stats.readbacks++
     },
 
-    materials: { register() {}, has: () => false, get names() { return [] } },
+    materials: {
+      register() {},
+      has: () => false,
+      get names() {
+        return []
+      }
+    },
 
     graph: makeNullGraph()
   }

@@ -74,36 +74,43 @@ function reloadFrom(capture) {
  * make the word worthless.
  */
 function restoredSentence(reload, restored) {
-  const was = `level "${restored.level}", ${restored.entities} ${restored.entities === 1 ? 'entity' : 'entities'}`
-      + `${restored.simulated ? ', simulated' : ''}${restored.playing ? ', playing' : ''}`
+  const was =
+    `level "${restored.level}", ${restored.entities} ${restored.entities === 1 ? 'entity' : 'entities'}` +
+    `${restored.simulated ? ', simulated' : ''}${restored.playing ? ', playing' : ''}`
   const opening = restored.lookOnly
     ? `${reload.trigger}${reload.when}; the world was put back to LOOK at, not to run on — ${was}, and time is held still. `
     : `${reload.trigger}${reload.when}; the world was put back as it was — ${was}. `
   const closing = restored.lookOnly
     ? 'engine.reloadNotice() repeats this.'
     : 'engine.reloadNotice() repeats this; engine.stop() goes back to the level as authored.'
-  return opening
-    + 'A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. '
-    + `NOT restored: ${restored.notRestored.join('; ')}. `
-    + closing
+  return (
+    opening +
+    'A restore is never bit-identical to a live simulation, so re-simulate if you need exactness. ' +
+    `NOT restored: ${restored.notRestored.join('; ')}. ` +
+    closing
+  )
 }
 
 /** The sentence for a world rebuilt from the level with nothing lost. */
 function unchangedSentence(reload, capture) {
-  return `${reload.trigger}${reload.when}; the world was rebuilt from level "${capture.level}" and nothing was lost — `
-    + 'it had not been simulated and held only what the level holds. engine.reloadNotice() repeats this.'
+  return (
+    `${reload.trigger}${reload.when}; the world was rebuilt from level "${capture.level}" and nothing was lost — ` +
+    'it had not been simulated and held only what the level holds. engine.reloadNotice() repeats this.'
+  )
 }
 
 /** The sentence for a world rebuilt from the level, with the simulated moment gone. */
 function resetSentence(reload, capture, from, outcome) {
   const moment = capture.level
-    ? `It was level "${capture.level}", ${from.entities} ${from.entities === 1 ? 'entity' : 'entities'} at ${capture.time ?? 0}s`
-      + `${capture.simulated ? ', simulated' : ''}. `
+    ? `It was level "${capture.level}", ${from.entities} ${from.entities === 1 ? 'entity' : 'entities'} at ${capture.time ?? 0}s` +
+      `${capture.simulated ? ', simulated' : ''}. `
     : ''
-  return `${reload.trigger}${reload.when}; the world was rebuilt from the level and your simulated moment is gone`
-    + `${outcome.why ? ` (${outcome.why})` : ''}. `
-    + moment
-    + 'Re-simulate before you look again. engine.reloadNotice() repeats this.'
+  return (
+    `${reload.trigger}${reload.when}; the world was rebuilt from the level and your simulated moment is gone` +
+    `${outcome.why ? ` (${outcome.why})` : ''}. ` +
+    moment +
+    'Re-simulate before you look again. engine.reloadNotice() repeats this.'
+  )
 }
 
 /**
@@ -250,34 +257,48 @@ function armCapture(parts, store) {
       // The moment is lost, but the reload must still be announced, so keep the
       // smallest thing that can announce it.
       try {
-        store.setItem(STORAGE_KEY, JSON.stringify({
-          version: CAPTURE_VERSION, cause, project: parts.editor.projectName,
-          level: parts.editor.levelName, entityCount: parts.world.entities.length,
-          simulated: !!parts.world.simulated,
-          time: round3(parts.loop.time), seed: parts.loop.random.seed,
-          entities: null, failed: String(error?.message || error)
-        }))
-      } catch { /* a tab that cannot write cannot be helped */ }
+        store.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            version: CAPTURE_VERSION,
+            cause,
+            project: parts.editor.projectName,
+            level: parts.editor.levelName,
+            entityCount: parts.world.entities.length,
+            simulated: !!parts.world.simulated,
+            time: round3(parts.loop.time),
+            seed: parts.loop.random.seed,
+            entities: null,
+            failed: String(error?.message || error)
+          })
+        )
+      } catch {
+        /* a tab that cannot write cannot be helped */
+      }
     }
   }
 
   const hot = import.meta.hot
   if (hot) {
-    hot.on('vite:beforeFullReload', payload => save({
-      kind: 'vite full reload',
-      file: shortenPath(payload?.triggeredBy || payload?.path),
-      at: new Date().toISOString()
-    }))
+    hot.on('vite:beforeFullReload', payload =>
+      save({
+        kind: 'vite full reload',
+        file: shortenPath(payload?.triggeredBy || payload?.path),
+        at: new Date().toISOString()
+      })
+    )
   }
 
   // The reload the editor asks for itself, named by whoever asked for it. Live
   // File Updates says this before it calls `location.reload()`, so the cause is
   // carried rather than inferred.
-  parts.bus?.on?.('reload:before', ({ file, why } = {}) => save({
-    kind: why || 'the editor reloaded the page',
-    file: shortenPath(file),
-    at: new Date().toISOString()
-  }))
+  parts.bus?.on?.('reload:before', ({ file, why } = {}) =>
+    save({
+      kind: why || 'the editor reloaded the page',
+      file: shortenPath(file),
+      at: new Date().toISOString()
+    })
+  )
 
   // Everything else that takes the page: a person pressing reload, a dev server
   // restarting, a tab being closed. There is no file to name and guessing one
@@ -287,12 +308,15 @@ function armCapture(parts, store) {
 
 /** Is the world the page just booted already the world that was captured? */
 function sameMoment(capture, fresh) {
-  return !capture.simulated && !capture.playing
-    && capture.level === fresh.level
-    && JSON.stringify(capture.entities) === JSON.stringify(fresh.entities)
-    && JSON.stringify(capture.state) === JSON.stringify(fresh.state)
-    && JSON.stringify(capture.selection) === JSON.stringify(fresh.selection)
-    && JSON.stringify(capture.view) === JSON.stringify(fresh.view)
+  return (
+    !capture.simulated &&
+    !capture.playing &&
+    capture.level === fresh.level &&
+    JSON.stringify(capture.entities) === JSON.stringify(fresh.entities) &&
+    JSON.stringify(capture.state) === JSON.stringify(fresh.state) &&
+    JSON.stringify(capture.selection) === JSON.stringify(fresh.selection) &&
+    JSON.stringify(capture.view) === JSON.stringify(fresh.view)
+  )
 }
 
 /**
@@ -304,11 +328,23 @@ function sameMoment(capture, fresh) {
  * `capture` is null when the text could not be parsed.
  */
 function takeCapture(store) {
-  let text = null
-  try { text = store.getItem(STORAGE_KEY) } catch { return { present: false, capture: null } }
+  let text
+  try {
+    text = store.getItem(STORAGE_KEY)
+  } catch {
+    return { present: false, capture: null }
+  }
   if (!text) return { present: false, capture: null }
-  try { store.removeItem(STORAGE_KEY) } catch { /* nothing to do about it */ }
-  try { return { present: true, capture: JSON.parse(text) } } catch { return { present: true, capture: null } }
+  try {
+    store.removeItem(STORAGE_KEY)
+  } catch {
+    /* nothing to do about it */
+  }
+  try {
+    return { present: true, capture: JSON.parse(text) }
+  } catch {
+    return { present: true, capture: null }
+  }
 }
 
 /**
@@ -318,9 +354,7 @@ function takeCapture(store) {
  * mentions is the whole problem this file exists to end.
  */
 function unreadableReason(capture) {
-  return capture
-    ? 'the moment was written by a different version of the engine'
-    : 'the moment could not be read back'
+  return capture ? 'the moment was written by a different version of the engine' : 'the moment could not be read back'
 }
 
 /** Why this page will not take a moment written for another project. */
@@ -343,7 +377,11 @@ async function restoreNotice(capture, parts) {
   } catch (error) {
     // A half-restored world is worse than a rebuilt one. Go back to the level
     // and report the reason rather than leaving something in between.
-    try { await parts.editor.loadLevel(parts.editor.levelName) } catch { /* the boot already tried */ }
+    try {
+      await parts.editor.loadLevel(parts.editor.levelName)
+    } catch {
+      /* the boot already tried */
+    }
     return describeReload(capture, { why: `putting it back failed — ${error?.message || error}` })
   }
 }

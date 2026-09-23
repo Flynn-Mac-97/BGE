@@ -44,14 +44,21 @@ export function makeRandom(seed) {
   // Counted in one place, so `range`, `int`, `pick` and `chance` are all counted
   // by being written in terms of it. A helper that reached past this would make
   // the count a lie exactly where the stream was used most.
-  const next = () => { drawn++; return generator() }
+  const next = () => {
+    drawn++
+    return generator()
+  }
 
   const random = () => next()
   random.range = (lo, hi) => lo + next() * (hi - lo)
   random.int = (lo, hi) => Math.floor(lo + next() * (hi - lo + 1))
   random.pick = list => list[Math.floor(next() * list.length)]
   random.chance = p => next() < p
-  random.reset = s => { current = s ?? current; drawn = 0; generator = mulberry32(current) }
+  random.reset = s => {
+    current = s ?? current
+    drawn = 0
+    generator = mulberry32(current)
+  }
 
   /**
    * Rejoin a stream where it had got to, rather than starting it again.

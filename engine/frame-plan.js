@@ -62,7 +62,7 @@ export function totalScale(entity) {
 
 /** Degrees off a declaration, in radians. A missing axis is zero, not a complaint. */
 export const degreesToRadians = (value, where) =>
-  value === undefined || value === null ? 0 : declaredNumber(value, 0, where) * Math.PI / 180
+  value === undefined || value === null ? 0 : (declaredNumber(value, 0, where) * Math.PI) / 180
 
 /**
  * How a body is turned, in radians about X, Y and Z.
@@ -76,10 +76,10 @@ export function turnRadians(entity) {
   const declared = entity.rotation
   const turn = Array.isArray(declared)
     ? {
-      x: degreesToRadians(declared[0], `${entity.type}.rotation[0]`),
-      y: degreesToRadians(declared[1], `${entity.type}.rotation[1]`),
-      z: degreesToRadians(declared[2], `${entity.type}.rotation[2]`)
-    }
+        x: degreesToRadians(declared[0], `${entity.type}.rotation[0]`),
+        y: degreesToRadians(declared[1], `${entity.type}.rotation[1]`),
+        z: degreesToRadians(declared[2], `${entity.type}.rotation[2]`)
+      }
     : { x: 0, y: degreesToRadians(declared, `${entity.type}.rotation`), z: 0 }
   if (Number.isFinite(entity.yaw)) turn.y = entity.yaw
   return turn
@@ -92,9 +92,10 @@ export function turnRadians(entity) {
  * where a solid body's is a yaw about Y. Same key, two planes, because a flat
  * game and a solid one mean different things by "turned".
  */
-export const spinRadians = entity => Array.isArray(entity.rotation)
-  ? degreesToRadians(entity.rotation[2], `${entity.type}.rotation[2]`)
-  : degreesToRadians(entity.rotation, `${entity.type}.rotation`)
+export const spinRadians = entity =>
+  Array.isArray(entity.rotation)
+    ? degreesToRadians(entity.rotation[2], `${entity.type}.rotation[2]`)
+    : degreesToRadians(entity.rotation, `${entity.type}.rotation`)
 
 const partsCache = new WeakMap()
 
@@ -207,8 +208,12 @@ function planKeyOf(entity, mesh, sprite) {
 
 /** Whether a cached plan was measured from the declaration this entity now has. */
 function planMatches(found, entity) {
-  return found.mesh === entity.mesh && found.sprite === entity.sprite
-    && found.type === entity.type && found.collider === entity.collider
+  return (
+    found.mesh === entity.mesh &&
+    found.sprite === entity.sprite &&
+    found.type === entity.type &&
+    found.collider === entity.collider
+  )
 }
 
 /**
@@ -253,8 +258,9 @@ function measurePlan(entity) {
     shape,
     described: {
       material,
-      look: ['mesh', shape.kind, shape.w, shape.h, shape.d,
-        declared.model || '', declared.scale ?? 1, material].join('|')
+      look: ['mesh', shape.kind, shape.w, shape.h, shape.d, declared.model || '', declared.scale ?? 1, material].join(
+        '|'
+      )
     }
   }
 }
@@ -314,15 +320,20 @@ function modelShape(entity, declared, collider) {
   return { kind: 'model', w: declaredNumber(stand[0]), h: declaredNumber(stand[1]), d: declaredNumber(stand[2]) }
 }
 
+/** A collider of three numbers, or null when it is not a box. */
+const colliderAsBox = collider => (collider.length >= 3 ? collider : null)
+
 /** A box, from its own numbers, the collider's, or a metre cube as the last resort. */
 function boxShape(entity, declared, collider) {
   const declaredBox = Array.isArray(declared.box)
-  const box = declaredBox ? declared.box : (collider.length >= 3 ? collider : null)
+  const box = declaredBox ? declared.box : colliderAsBox(collider)
   if (!box) {
     report(`[render] ${entity.type}.mesh: no box and no three-number collider — drawing a 1 m cube`)
     return { kind: 'box', w: 1, h: 1, d: 1 }
   }
-  const w = box[0], h = box[1], d = box[2]
+  const w = box[0],
+    h = box[1],
+    d = box[2]
   if (Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(d)) {
     return { kind: 'box', w, h, d, segments: subdivisionOf(declared, entity) }
   }
@@ -396,13 +407,11 @@ export const spriteSource = s => s?.sheet || s?.image || null
 function absoluteTiling(tiling, shape, where) {
   const width = shape.w || 1
   const height = shape.h || 1
-  const u = tiling[0], v = tiling[1]
+  const u = tiling[0],
+    v = tiling[1]
   if (Number.isFinite(u) && Number.isFinite(v)) return [u / width, v / height]
   const reference = index => (where ? `${where}[${index}]` : where)
-  return [
-    declaredNumber(u, 1, reference(0)) / width,
-    declaredNumber(v, 1, reference(1)) / height
-  ]
+  return [declaredNumber(u, 1, reference(0)) / width, declaredNumber(v, 1, reference(1)) / height]
 }
 
 /**
@@ -434,7 +443,13 @@ export function tilingOf(tiling, shape, where = null) {
 export function materialNameFor(declared) {
   const chosen = declared.material
   if (typeof chosen === 'string' && chosen.trim()) return chosen.trim()
-  if (chosen && typeof chosen === 'object' && !Array.isArray(chosen) && typeof chosen.name === 'string' && chosen.name.trim()) {
+  if (
+    chosen &&
+    typeof chosen === 'object' &&
+    !Array.isArray(chosen) &&
+    typeof chosen.name === 'string' &&
+    chosen.name.trim()
+  ) {
     return chosen.name.trim()
   }
   return declared.unlit ? 'basic' : 'lambert'
@@ -442,17 +457,33 @@ export function materialNameFor(declared) {
 
 /** Keys that describe the shape or choose the material, rather than tune it. */
 const SHAPE_KEYS = new Set([
-  'box', 'quad', 'sphere', 'segments', 'model', 'scale', 'material', 'unlit', 'tiling',
+  'box',
+  'quad',
+  'sphere',
+  'segments',
+  'model',
+  'scale',
+  'material',
+  'unlit',
+  'tiling',
   // A part says where it is and which way it is turned. Both describe shape,
   // and a key left out of this set is stringified into the material key on
   // every part of every frame — which would also give twelve identically
   // coloured boxes twelve materials, one per position.
-  'parts', 'at', 'rotation', 'name',
+  'parts',
+  'at',
+  'rotation',
+  'name',
   // Keys a mark owns. A mark draws beside the mesh in its own material, so none
   // of these changes what the surface is made of — leaving one in the key would
   // give two identical walls two materials.
-  'keyline', 'keylineColour', 'shadow', 'shadowStrength',
-  'ring', 'ringColour', 'ringStrength'
+  'keyline',
+  'keylineColour',
+  'shadow',
+  'shadowStrength',
+  'ring',
+  'ringColour',
+  'ringStrength'
 ])
 
 /**

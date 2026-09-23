@@ -72,17 +72,27 @@ export function makeTimers({ onError } = {}) {
     run,
 
     /** Forget every timer, leaving the id counter where it is. */
-    clear() { timers = [] },
+    clear() {
+      timers = []
+    },
 
     /** Move every pending timer with a clock that was put back or picked up. */
-    shiftBy(delta) { for (const t of timers) { t.start += delta; t.at += delta } },
+    shiftBy(delta) {
+      for (const t of timers) {
+        t.start += delta
+        t.at += delta
+      }
+    },
 
     /** How many timers are still pending, for a checkpoint that cannot carry a closure. */
-    count() { return timers.filter(t => !t.cancelled).length },
+    count() {
+      return timers.filter(t => !t.cancelled).length
+    },
 
     /** The pending timers as `{ id, in, every }`, `in` measured from `now`. */
     list(now) {
-      return timers.filter(t => !t.cancelled)
+      return timers
+        .filter(t => !t.cancelled)
         .map(t => ({ id: t.id, in: round3(t.at - now), every: t.every || undefined }))
     }
   }

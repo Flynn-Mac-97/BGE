@@ -26,8 +26,12 @@ export function note(reload, out) {
 
 /** A reply with room for one more key: a plain object, not a number or a list. */
 export function plainReply(value) {
-  return !!value && typeof value === 'object' && !Array.isArray(value) &&
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
     (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+  )
 }
 
 /**
@@ -68,7 +72,8 @@ export function wantedFields(asked, known) {
   const fields = (Array.isArray(asked) ? asked : String(asked).split(','))
     .map(field => String(field).trim())
     .filter(Boolean)
-  if (!fields.length) throw new Error(`name the fields to keep, separated by commas — this row carries ${known.join(', ')}`)
+  if (!fields.length)
+    throw new Error(`name the fields to keep, separated by commas — this row carries ${known.join(', ')}`)
   const wrong = fields.filter(field => !known.includes(field))
   if (wrong.length) throw new Error(`no field "${wrong.join('", "')}" — this row carries ${known.join(', ')}`)
   return fields
@@ -91,7 +96,8 @@ function describedFields(definition) {
 /** The fields every entity reply carries. */
 function entityBase(entity) {
   return {
-    id: entity.id, type: entity.type,
+    id: entity.id,
+    type: entity.type,
     at: [round3(entity.x), round3(entity.y), round3(entity.z)],
     ...(entity.rotation ? { rotation: round3(entity.rotation) } : {}),
     // Why this one is placed here. In a bulk list it is the only description
@@ -123,8 +129,9 @@ function fullView(entity, out) {
   out.properties = entity.properties
   if (entity.overrides.length) out.overrides = entity.overrides
   if (entity.behaviours.length) {
-    out.behaviours = Object.fromEntries(entity.behaviours.map(behaviour =>
-      [behaviour.name, behaviour.error ? { error: behaviour.error } : behaviour.bag]))
+    out.behaviours = Object.fromEntries(
+      entity.behaviours.map(behaviour => [behaviour.name, behaviour.error ? { error: behaviour.error } : behaviour.bag])
+    )
   }
   return out
 }
@@ -144,11 +151,13 @@ export function entityView(e, bulk = false) {
 
 /** Every plugin, by name where it has one and by file where it never loaded. */
 function pluginList(loader) {
-  return [...loader.plugins.entries()].map(([name, plugin]) => (plugin.file
-    // A file that never imported has no name to show. Say what it is
-    // instead of printing a path where a name belongs.
-    ? { file: plugin.file, loaded: false, builtin: plugin.builtin, error: plugin.error }
-    : { name, enabled: plugin.enabled, error: plugin.error }))
+  return [...loader.plugins.entries()].map(([name, plugin]) =>
+    plugin.file
+      ? // A file that never imported has no name to show. Say what it is
+        // instead of printing a path where a name belongs.
+        { file: plugin.file, loaded: false, builtin: plugin.builtin, error: plugin.error }
+      : { name, enabled: plugin.enabled, error: plugin.error }
+  )
 }
 
 /** The entity rows a caller asked for, as rows or as columns. */
@@ -179,7 +188,9 @@ export function projectSnapshot({ world, loader, loop, files, editor, view, log,
   // the flag parser keeps a bare flag boolean on purpose. Answering the compact
   // reply then reads as the projection having done nothing.
   if (typeof options !== 'object' || options === null) {
-    throw new Error(`snapshot takes an options object — for some fields as columns: snapshot '{"entities":["id","at"]}'`)
+    throw new Error(
+      `snapshot takes an options object — for some fields as columns: snapshot '{"entities":["id","at"]}'`
+    )
   }
   const types = [...world.types.keys()]
   const broken = loader.failures()
@@ -210,7 +221,7 @@ export function projectSnapshot({ world, loader, loop, files, editor, view, log,
       plugins: [...loader.plugins.values()].filter(p => p.enabled).length
     },
     selection: [...editor.selection],
-    byType: types.reduce((a, t) => (a[t] = world.all(t).length, a), {}),
+    byType: types.reduce((a, t) => ((a[t] = world.all(t).length), a), {}),
     errors: log.lines.filter(l => l.level === 'error').slice(-5),
     // Its own key, not a line in the error ring, because the ring keeps the
     // last five and a broken plugin must not be pushed out of the summary

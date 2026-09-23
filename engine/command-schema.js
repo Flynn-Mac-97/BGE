@@ -1,5 +1,16 @@
 /** The command schema subset supported by the engine's execution boundary. */
-const SUPPORTED_KEYWORDS = ['type', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'minimum', 'maximum', 'pattern', 'description']
+const SUPPORTED_KEYWORDS = [
+  'type',
+  'properties',
+  'required',
+  'additionalProperties',
+  'items',
+  'enum',
+  'minimum',
+  'maximum',
+  'pattern',
+  'description'
+]
 
 /** Whether a value is the named JSON type. `object` means a plain object, not an array or null. */
 const TYPE_MATCHES = {
@@ -29,9 +40,12 @@ function assertPattern(schema, value, path) {
   try {
     pattern = new RegExp(schema.pattern)
   } catch (error) {
-    throw new Error(`${path}: invalid schema pattern ${JSON.stringify(schema.pattern)} (${error.message})`)
+    throw new Error(`${path}: invalid schema pattern ${JSON.stringify(schema.pattern)} (${error.message})`, {
+      cause: error
+    })
   }
-  if (typeof value === 'string' && !pattern.test(value)) throw new Error(`${path}: does not match pattern ${schema.pattern}`)
+  if (typeof value === 'string' && !pattern.test(value))
+    throw new Error(`${path}: does not match pattern ${schema.pattern}`)
 }
 
 function assertRange(schema, value, path) {

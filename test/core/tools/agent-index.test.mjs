@@ -51,12 +51,33 @@ async function projectWithEverything() {
   }
   await fs.writeFile(path.join(directory, 'types/crate.js'), TYPE)
   await fs.writeFile(path.join(directory, 'behaviours/spin.js'), BEHAVIOUR)
-  await fs.writeFile(path.join(directory, 'levels/arena.json'), JSON.stringify({
-    entities: [{ id: 'one', type: 'crate', sprite: 'probe.png', behaviours: { spin: {} } }]
-  }))
+  await fs.writeFile(
+    path.join(directory, 'levels/arena.json'),
+    JSON.stringify({
+      entities: [{ id: 'one', type: 'crate', sprite: 'probe.png', behaviours: { spin: {} } }]
+    })
+  )
   await fs.writeFile(path.join(directory, 'tests/smoke.js'), TEST_FILE)
   await fs.writeFile(path.join(directory, 'assets/probe.png'), '')
   return directory
+}
+
+/** Every field of one record survives into the agent view, and no field it does not hold appears. */
+function assertAgentRecord(kind, name, record, written) {
+  for (const [field, value] of Object.entries(record)) {
+    if (EDITOR_ONLY[kind].includes(field)) {
+      assert.equal(written[field], undefined, `${kind} "${name}" writes editor-only ${field}`)
+      continue
+    }
+    if (value === undefined) continue
+    // An empty list is a fact only for the fields the index always writes.
+    if (Array.isArray(value) && !value.length && !['properties', 'hooks', 'types', 'behaviours'].includes(field))
+      continue
+    assert.deepEqual(written[field], JSON.parse(JSON.stringify(value)), `${kind} "${name}" drops ${field}`)
+  }
+  for (const field of Object.keys(written)) {
+    assert.ok(field in record, `${kind} "${name}" writes ${field}, which no entry declares`)
+  }
 }
 
 test('the agent view carries every entry field except the ones the editor alone acts on', async () => {
@@ -67,21 +88,10 @@ test('the agent view carries every entry field except the ones the editor alone 
     for (const kind of ['types', 'behaviours', 'levels', 'tests']) {
       assert.ok(Object.keys(index[kind]).length, `${kind} fixture holds nothing`)
       for (const [name, record] of Object.entries(index[kind])) {
-        const written = agent[kind][name]
-        for (const [field, value] of Object.entries(record)) {
-          if (EDITOR_ONLY[kind].includes(field)) {
-            assert.equal(written[field], undefined, `${kind} "${name}" writes editor-only ${field}`)
-            continue
-          }
-          if (value === undefined) continue
-          // An empty list is a fact only for the fields the index always writes.
-          if (Array.isArray(value) && !value.length && !['properties', 'hooks', 'types', 'behaviours'].includes(field)) continue
-          assert.deepEqual(written[field], JSON.parse(JSON.stringify(value)), `${kind} "${name}" drops ${field}`)
-        }
-        for (const field of Object.keys(written)) {
-          assert.ok(field in record, `${kind} "${name}" writes ${field}, which no entry declares`)
-        }
+        assertAgentRecord(kind, name, record, agent[kind][name])
       }
     }
-  } finally { await fs.rm(directory, { recursive: true, force: true }) }
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
 })

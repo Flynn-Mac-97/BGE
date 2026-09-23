@@ -6,9 +6,7 @@ import * as THREE from 'three/webgpu'
 import { declaredNumber, meshOf, meshParts, materialLook } from '../frame-plan.js'
 import { solidGeometry } from './geometry-cache.js'
 import { cachedModel, cloneModel } from './model-cache.js'
-import {
-  namedNodes, attachedModels, indexNodes, nodeNamed, applyAttachments
-} from './model-nodes.js'
+import { namedNodes, attachedModels, indexNodes, nodeNamed, applyAttachments } from './model-nodes.js'
 import { eachMaterial, setMaterialOpacity } from './material-vocabulary.js'
 import { reportOnce } from './report.js'
 
@@ -25,7 +23,9 @@ import { reportOnce } from './report.js'
  */
 function applyTurnArray(node, turn, name) {
   if (turn.length !== 4 && turn.length !== 7) {
-    reportOnce(`[render] pose.${name}: a rotation is 4 numbers x,y,z,w, or 7 with a local position after, got ${turn.length}`)
+    reportOnce(
+      `[render] pose.${name}: a rotation is 4 numbers x,y,z,w, or 7 with a local position after, got ${turn.length}`
+    )
     return false
   }
   // Normalised because a clip stores rounded numbers, and an unnormalised
@@ -78,7 +78,8 @@ export function makeObjectBuilder(state) {
 
     const object = new THREE.Mesh(
       state.geometryFor(entity),
-      entity.mesh ? state.meshMaterial(entity, described.material) : state.spriteMaterial(entity))
+      entity.mesh ? state.meshMaterial(entity, described.material) : state.spriteMaterial(entity)
+    )
     object.userData.entity = entity.id
     object.userData.look = described.look
     // A sprite's material belongs to it alone and is disposed with it; a mesh
@@ -107,7 +108,8 @@ export function makeObjectBuilder(state) {
       const key = materialLook(entity, part.declaration, part.shape)
       const piece = new THREE.Mesh(
         solidGeometry('box', part.shape.w, part.shape.h, part.shape.d),
-        state.meshMaterial(entity, key, part))
+        state.meshMaterial(entity, key, part)
+      )
       piece.position.set(part.at.x, part.at.y, part.at.z)
       piece.rotation.set(part.turn.x, part.turn.y, part.turn.z)
       // A named part is a part `pose` can move, exactly as a named node of a
@@ -136,25 +138,29 @@ export function makeObjectBuilder(state) {
     const waiting = new THREE.Mesh(state.geometryFor(entity), state.meshMaterial(entity, described.material))
     holder.add(waiting)
 
-    cachedModel(declared.model, loaded => {
-      // The entity may have changed its look, or gone, while this was in the
-      // air. The flag is what says so, not `holder.parent`: the second entity
-      // to want a model already in the cache is answered on the spot, before
-      // the caller has had a chance to add this holder to the scene at all.
-      if (holder.userData.stale) return
-      const instance = cloneModel(loaded)
-      indexNodes(holder, instance)
-      holder.remove(waiting)
-      release(waiting)
-      holder.add(instance)
-      // Whatever was asked for while the file was in flight. Without this an
-      // entity that declared its attachment once, before the body existed,
-      // would hold air until something happened to declare it again.
-      applyAttachments(holder, holder.userData.attachmentsWanted, release)
-      state.shadowDirty = true
-    }, () => {
-      // The box stays, and `cachedModel()` has already named the file on the console.
-    })
+    cachedModel(
+      declared.model,
+      loaded => {
+        // The entity may have changed its look, or gone, while this was in the
+        // air. The flag is what says so, not `holder.parent`: the second entity
+        // to want a model already in the cache is answered on the spot, before
+        // the caller has had a chance to add this holder to the scene at all.
+        if (holder.userData.stale) return
+        const instance = cloneModel(loaded)
+        indexNodes(holder, instance)
+        holder.remove(waiting)
+        release(waiting)
+        holder.add(instance)
+        // Whatever was asked for while the file was in flight. Without this an
+        // entity that declared its attachment once, before the body existed,
+        // would hold air until something happened to declare it again.
+        applyAttachments(holder, holder.userData.attachmentsWanted, release)
+        state.shadowDirty = true
+      },
+      () => {
+        // The box stays, and `cachedModel()` has already named the file on the console.
+      }
+    )
 
     return holder
   }
@@ -174,7 +180,6 @@ export function makeObjectBuilder(state) {
       if (state.compilesRunning > 0) state.releasedWhileCompiling.add(node)
     })
   }
-
 
   function releaseAgainAfterCompile() {
     for (const node of state.releasedWhileCompiling) node.dispose()
@@ -207,7 +212,10 @@ export function makeObjectBuilder(state) {
     // The record that stood for this object must stop answering with it, or the
     // fast path would hand back an object that is no longer in the scene.
     const record = object.userData.record
-    if (record) { record.object = null; record.drawnLook = null }
+    if (record) {
+      record.object = null
+      record.drawnLook = null
+    }
     if (!object.userData.privateMaterial) return
     object.traverse(node => eachMaterial(node, material => material.dispose()))
   }
@@ -268,9 +276,7 @@ export function makeObjectBuilder(state) {
     if (!object.userData.privateMaterial) {
       object.traverse(node => {
         if (!node.material) return
-        node.material = Array.isArray(node.material)
-          ? node.material.map(one => one.clone())
-          : node.material.clone()
+        node.material = Array.isArray(node.material) ? node.material.map(one => one.clone()) : node.material.clone()
       })
       object.userData.privateMaterial = true
     }

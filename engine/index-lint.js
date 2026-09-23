@@ -29,7 +29,7 @@ const BANNED = [
 export function lint(file, text) {
   const out = []
   text.split('\n').forEach((line, i) => {
-    if (/^\s*(\/\/|\*)/.test(line)) return          // a comment may name them
+    if (/^\s*(\/\/|\*)/.test(line)) return // a comment may name them
     for (const [re, why] of BANNED) {
       if (re.test(line)) out.push({ file, line: i + 1, why, code: line.trim().slice(0, 80) })
     }

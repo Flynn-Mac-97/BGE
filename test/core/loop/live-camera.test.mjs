@@ -62,12 +62,14 @@ test('on a high-refresh screen a steadily moving body is drawn moving every fram
     const drawn = []
     const loop = makeLoop({
       onStepStart: () => world.rememberPlaces(),
-      onFixed: seconds => { body.x += seconds },
+      onFixed: seconds => {
+        body.x += seconds
+      },
       onFrame: () => drawn.push(world.drawnPlace(body, loop.blend).x)
     })
 
     loop.start()
-    for (let frame = 1; frame <= 300; frame++) frames.shift()?.(frame * 1000 / 144)
+    for (let frame = 1; frame <= 300; frame++) frames.shift()?.((frame * 1000) / 144)
     loop.stop()
 
     const moves = drawn.slice(20).map((x, index) => x - drawn[19 + index])

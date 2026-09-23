@@ -21,8 +21,12 @@ const recorder = () => {
   const written = []
   return {
     written,
-    async write(path, text) { written.push({ path, text }) },
-    async writeAgent(scope, path, text) { written.push({ scope, path, text }) }
+    async write(path, text) {
+      written.push({ path, text })
+    },
+    async writeAgent(scope, path, text) {
+      written.push({ scope, path, text })
+    }
   }
 }
 
@@ -35,16 +39,26 @@ const inspector = () => {
   const transport = recorder()
   const files = makeFiles(bus, transport)
   const entity = {
-    id: 'wall-north-1', type: 'wall', x: 1, y: 2, z: 0,
-    properties: { height: 3 }, overrides: [], behaviours: []
+    id: 'wall-north-1',
+    type: 'wall',
+    x: 1,
+    y: 2,
+    z: 0,
+    properties: { height: 3 },
+    overrides: [],
+    behaviours: []
   }
   const world = {
-    entities: [entity], types: new Map([['wall', {}]]), behaviours: new Map(),
+    entities: [entity],
+    types: new Map([['wall', {}]]),
+    behaviours: new Map(),
     byId: id => (id === entity.id ? entity : null),
     all: () => [entity]
   }
   const editor = {
-    projectDirectory: 'project', levelName: 'meadow', selection: new Set(),
+    projectDirectory: 'project',
+    levelName: 'meadow',
+    selection: new Set(),
     saveLevel: () => files.writeJSON('levels/meadow.json', { entities: [entity] })
   }
   const engine = makeInspect({
@@ -67,11 +81,14 @@ test('a guarded write rejects, and the rejection carries the reason', async () =
   const { files, transport } = inspector()
   files.guardWrites(() => HELD)
 
-  await assert.rejects(() => files.write('levels/meadow.json', '{}'), error => {
-    assert.match(error.message, /levels\/meadow\.json/, 'says which file')
-    assert.match(error.message, /2 lanes are working: alpha, beta/, 'says why, naming the lanes')
-    return true
-  })
+  await assert.rejects(
+    () => files.write('levels/meadow.json', '{}'),
+    error => {
+      assert.match(error.message, /levels\/meadow\.json/, 'says which file')
+      assert.match(error.message, /2 lanes are working: alpha, beta/, 'says why, naming the lanes')
+      return true
+    }
+  )
 
   assert.deepEqual(transport.written, [], 'nothing reached disk')
   assert.equal(files.refused.path, 'levels/meadow.json')
@@ -86,9 +103,7 @@ test('the Inspector save path rejects instead of leaving an unhandled rejection'
   const watch = reason => unhandled.push(reason)
   process.on('unhandledRejection', watch)
   try {
-    await assert.rejects(
-      () => engine.set('wall-north-1', 'height', 9),
-      /2 lanes are working: alpha, beta/)
+    await assert.rejects(() => engine.set('wall-north-1', 'height', 9), /2 lanes are working: alpha, beta/)
     await settle()
   } finally {
     process.off('unhandledRejection', watch)
@@ -111,16 +126,24 @@ test('nothing announces a save for a write that was refused', async () => {
 
   const said = engine.log().map(line => `${line.level} ${line.source} ${line.message}`)
   assert.equal(said.filter(line => /^info files wrote/.test(line)).length, 0, 'no write was announced')
-  assert.equal(engine.errors().filter(line => line.source === 'rejection').length, 0,
-    'and the refusal is not an unhandled rejection')
-  assert.ok(engine.errors().some(line => /2 lanes are working/.test(line.message)),
-    'the log holds the refusal, with the reason')
+  assert.equal(
+    engine.errors().filter(line => line.source === 'rejection').length,
+    0,
+    'and the refusal is not an unhandled rejection'
+  )
+  assert.ok(
+    engine.errors().some(line => /2 lanes are working/.test(line.message)),
+    'the log holds the refusal, with the reason'
+  )
 })
 
 test('the reply names a save the editor skipped', async () => {
   const { engine } = inspector()
-  assert.equal((await engine.set('wall-north-1', 'height', 9)).notSaved, undefined,
-    'an ordinary save says nothing extra')
+  assert.equal(
+    (await engine.set('wall-north-1', 'height', 9)).notSaved,
+    undefined,
+    'an ordinary save says nothing extra'
+  )
 
   engine.editor.saveLevel = async () => ({ skipped: 'playing' })
   assert.equal((await engine.set('wall-north-1', 'height', 9)).notSaved, 'playing')
@@ -143,8 +166,12 @@ test('a write that lands clears the refusal', async () => {
 test('a write the server turns away is recorded as unsaved too', async () => {
   const bus = makeBus()
   const files = makeFiles(bus, {
-    async write() { throw new Error(HELD) },
-    async writeAgent() { throw new Error(HELD) }
+    async write() {
+      throw new Error(HELD)
+    },
+    async writeAgent() {
+      throw new Error(HELD)
+    }
   })
 
   await assert.rejects(() => files.write('levels/meadow.json', '{}'), /is held/)

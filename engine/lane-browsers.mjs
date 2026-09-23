@@ -46,14 +46,19 @@ const mainCheckouts = new Map()
 function mainCheckout(root) {
   if (!mainCheckouts.has(root)) {
     let main = root
-    try { main = mainWorktree(root) } catch { /* not a git worktree */ }
+    try {
+      main = mainWorktree(root)
+    } catch {
+      /* not a git worktree */
+    }
     mainCheckouts.set(root, main)
   }
   return mainCheckouts.get(root)
 }
 
 /** The lane browser registry's path in the main checkout. */
-const registryFile = root => path.join(process.env.ENGINE_STATE_ROOT || path.join(mainCheckout(root), '.engine'), 'lane-browsers.json')
+const registryFile = root =>
+  path.join(process.env.ENGINE_STATE_ROOT || path.join(mainCheckout(root), '.engine'), 'lane-browsers.json')
 
 /**
  * The recorded browsers for this checkout, or an empty list when the file is
@@ -67,7 +72,9 @@ export function readLaneBrowsers(root) {
     const value = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'))
     const browsers = Array.isArray(value.browsers) ? value.browsers : []
     return browsers.map(entry => ({ ...entry, headless: entry.headless !== false }))
-  } catch { return [] }
+  } catch {
+    return []
+  }
 }
 
 /** Replace the lane browser registry for this checkout. */
@@ -92,7 +99,10 @@ export function recordLaneBrowser(root, entry) {
 
 /** Remove one client's record from the registry. */
 export function forgetLaneBrowser(root, client) {
-  writeLaneBrowsers(root, readLaneBrowsers(root).filter(entry => entry.client !== client))
+  writeLaneBrowsers(
+    root,
+    readLaneBrowsers(root).filter(entry => entry.client !== client)
+  )
 }
 
 /** The record for one client name, or undefined. */
@@ -137,18 +147,30 @@ export function browserVersion(port) {
  */
 function debuggingPortGet(port, resource) {
   return new Promise(resolve => {
-    const request = http.get({
-      host: '127.0.0.1', port, path: resource, agent: false, timeout: 1500
-    }, response => {
-      let body = ''
-      response.setEncoding('utf8')
-      response.on('data', chunk => { body += chunk })
-      response.once('end', () => {
-        request.destroy()
-        resolve({ status: response.statusCode, text: body })
-      })
-    })
-    const fail = () => { request.destroy(); resolve(null) }
+    const request = http.get(
+      {
+        host: '127.0.0.1',
+        port,
+        path: resource,
+        agent: false,
+        timeout: 1500
+      },
+      response => {
+        let body = ''
+        response.setEncoding('utf8')
+        response.on('data', chunk => {
+          body += chunk
+        })
+        response.once('end', () => {
+          request.destroy()
+          resolve({ status: response.statusCode, text: body })
+        })
+      }
+    )
+    const fail = () => {
+      request.destroy()
+      resolve(null)
+    }
     request.once('error', fail)
     request.once('timeout', fail)
   })
@@ -158,7 +180,11 @@ function debuggingPortGet(port, resource) {
 async function ask(port, resource = '/json/version') {
   const answer = await debuggingPortGet(port, resource)
   if (!answer || answer.status !== 200) return null
-  try { return JSON.parse(answer.text) } catch { return null }
+  try {
+    return JSON.parse(answer.text)
+  } catch {
+    return null
+  }
 }
 
 /** Whether anything answers a debugging port at all. */
@@ -166,12 +192,21 @@ const answers = port => ask(port).then(said => said !== null)
 
 /** Whether a process id still exists. */
 const alive = pid => {
-  try { process.kill(pid, 0); return true } catch { return false }
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** The lane name a page URL carries, or null. */
 function clientOf(url) {
-  try { return new URL(url).searchParams.get('client') } catch { return null }
+  try {
+    return new URL(url).searchParams.get('client')
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -219,16 +254,26 @@ export async function browserCommand(port, method, parameters = {}, { timeoutMil
   try {
     return await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`${method} did not answer`)), timeoutMilliseconds)
-      const done = value => { clearTimeout(timer); resolve(value) }
+      const done = value => {
+        clearTimeout(timer)
+        resolve(value)
+      }
       socket.onopen = () => socket.send(JSON.stringify({ id: 1, method, params: parameters }))
-      socket.onerror = () => { clearTimeout(timer); reject(new Error(`cannot reach the browser on port ${port}`)) }
+      socket.onerror = () => {
+        clearTimeout(timer)
+        reject(new Error(`cannot reach the browser on port ${port}`))
+      }
       socket.onmessage = event => {
         const message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
         if (message.id === 1) done(message.error ? null : message.result)
       }
     })
   } finally {
-    try { socket.close() } catch { /* already closed */ }
+    try {
+      socket.close()
+    } catch {
+      /* already closed */
+    }
   }
 }
 
@@ -252,7 +297,9 @@ export async function openTabOnPort(port, url, { milliseconds = 8000 } = {}) {
   }
   const known = new Set(before.map(page => page.id))
   // A script opens a tab only for a user action, so the evaluation says it is one.
-  const opened = await evaluateOnPage(host, `String(!!window.open(${JSON.stringify(url)}, '_blank'))`, { userGesture: true })
+  const opened = await evaluateOnPage(host, `String(!!window.open(${JSON.stringify(url)}, '_blank'))`, {
+    userGesture: true
+  })
   if (opened !== 'true') return null
   return waitForNewPage(port, known, { milliseconds })
 }
@@ -273,11 +320,31 @@ async function waitForNewPage(port, known, { milliseconds }) {
 function evaluateOnPage(page, expression, { userGesture = false, timeoutMilliseconds = 5000, open } = {}) {
   const socket = (open ?? (url => new WebSocket(url)))(page.webSocketDebuggerUrl)
   return new Promise(resolve => {
-    const timer = setTimeout(() => { try { socket.close() } catch { /* already closed */ } resolve(null) }, timeoutMilliseconds)
-    const done = value => { clearTimeout(timer); try { socket.close() } catch { /* already closed */ } resolve(value) }
-    socket.onopen = () => socket.send(JSON.stringify({
-      id: 1, method: 'Runtime.evaluate', params: { expression, userGesture, returnByValue: true }
-    }))
+    const timer = setTimeout(() => {
+      try {
+        socket.close()
+      } catch {
+        /* already closed */
+      }
+      resolve(null)
+    }, timeoutMilliseconds)
+    const done = value => {
+      clearTimeout(timer)
+      try {
+        socket.close()
+      } catch {
+        /* already closed */
+      }
+      resolve(value)
+    }
+    socket.onopen = () =>
+      socket.send(
+        JSON.stringify({
+          id: 1,
+          method: 'Runtime.evaluate',
+          params: { expression, userGesture, returnByValue: true }
+        })
+      )
     socket.onerror = () => done(null)
     socket.onmessage = event => {
       const message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
@@ -301,10 +368,18 @@ export async function pageReports(port, pageId, expression, { timeoutMillisecond
   try {
     return await new Promise(resolve => {
       const timer = setTimeout(() => resolve(null), timeoutMilliseconds)
-      socket.onopen = () => socket.send(JSON.stringify({
-        id: 1, method: 'Runtime.evaluate', params: { expression, returnByValue: true }
-      }))
-      socket.onerror = () => { clearTimeout(timer); resolve(null) }
+      socket.onopen = () =>
+        socket.send(
+          JSON.stringify({
+            id: 1,
+            method: 'Runtime.evaluate',
+            params: { expression, returnByValue: true }
+          })
+        )
+      socket.onerror = () => {
+        clearTimeout(timer)
+        resolve(null)
+      }
       socket.onmessage = event => {
         const message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
         if (message.id !== 1) return
@@ -313,7 +388,11 @@ export async function pageReports(port, pageId, expression, { timeoutMillisecond
       }
     })
   } finally {
-    try { socket.close() } catch { /* already closed */ }
+    try {
+      socket.close()
+    } catch {
+      /* already closed */
+    }
   }
 }
 
@@ -374,7 +453,7 @@ function hostIsFree(port, host) {
  */
 async function portIsFree(port) {
   for (const host of ['127.0.0.1', '::1']) {
-    if (!await hostIsFree(port, host)) return false
+    if (!(await hostIsFree(port, host))) return false
   }
   return true
 }
@@ -393,15 +472,19 @@ export async function findFreeDebuggingPort(root, { from = 9400, tries = 200 } =
     if (taken.has(port)) continue
     if (await portIsFree(port)) return port
   }
-  throw new Error(`no free debugging port between ${from} and ${from + tries - 1}; `
-    + 'see what holds them with: node bin/engine.mjs supervisor, then stop browsers with: supervisor.stop all')
+  throw new Error(
+    `no free debugging port between ${from} and ${from + tries - 1}; ` +
+      'see what holds them with: node bin/engine.mjs supervisor, then stop browsers with: supervisor.stop all'
+  )
 }
 
 /** Why an entry is not proved alive, in the reader's terms. */
 function whyNotAlive(entry, running, clients) {
   if (clients) {
-    return `port ${entry.port} answers a browser without "${entry.client}"; it has `
-      + (clients.length ? clients.join(', ') : 'no named lane')
+    return (
+      `port ${entry.port} answers a browser without "${entry.client}"; it has ` +
+      (clients.length ? clients.join(', ') : 'no named lane')
+    )
   }
   return running ? `process ${entry.pid} does not answer on ${entry.port}` : `process ${entry.pid} is gone`
 }
@@ -415,19 +498,29 @@ function whyNotAlive(entry, running, clients) {
  * browser can answer a port; a visible window has no lane page, so a port that
  * answers at all is the proof.
  */
+/** What a recorded browser is doing, from what answered on its port. */
+function browserState(mine, clients, running) {
+  if (mine) return 'running'
+  if (clients) return 'wrong browser'
+  if (running) return 'not answering'
+  return 'gone'
+}
+
 export async function listLaneBrowsers(root) {
   const browsers = readLaneBrowsers(root)
-  return Promise.all(browsers.map(async entry => {
-    const running = alive(entry.pid)
-    const clients = running ? await clientsOnPort(entry.port) : null
-    const mine = entry.headless ? Boolean(clients?.includes(entry.client)) : clients !== null
-    return {
-      ...entry,
-      alive: mine,
-      state: mine ? 'running' : clients ? 'wrong browser' : running ? 'not answering' : 'gone',
-      ...(mine ? {} : { why: whyNotAlive(entry, running, clients) })
-    }
-  }))
+  return Promise.all(
+    browsers.map(async entry => {
+      const running = alive(entry.pid)
+      const clients = running ? await clientsOnPort(entry.port) : null
+      const mine = entry.headless ? Boolean(clients?.includes(entry.client)) : clients !== null
+      return {
+        ...entry,
+        alive: mine,
+        state: browserState(mine, clients, running),
+        ...(mine ? {} : { why: whyNotAlive(entry, running, clients) })
+      }
+    })
+  )
 }
 
 /**
@@ -444,19 +537,22 @@ export async function freeLaneName(root, client) {
   const found = recordFor(root, client)
   if (!found) return null
   if (alive(found.pid)) {
-    const port = await answers(found.port)
-      ? `answering on port ${found.port}`
-      : `not answering on port ${found.port}`
+    const port = (await answers(found.port)) ? `answering on port ${found.port}` : `not answering on port ${found.port}`
     throw new Error(
-      `a browser is already called "${client}": process ${found.pid}, ${port}`
-      + (found.startedAt ? `, started ${found.startedAt}` : '')
-      + `; stop it with: node bin/engine.mjs supervisor.stop <id> (list ids with: node bin/engine.mjs supervisor) or: node bin/engine.mjs lanes.stop ${client}, or open with another client name`)
+      `a browser is already called "${client}": process ${found.pid}, ${port}` +
+        (found.startedAt ? `, started ${found.startedAt}` : '') +
+        `; stop it with: node bin/engine.mjs supervisor.stop <id> (list ids with: node bin/engine.mjs supervisor) or: node bin/engine.mjs lanes.stop ${client}, or open with another client name`
+    )
   }
   forgetLaneBrowser(root, client)
   // A lane's profile is temporary. A visible window keeps its profile so window
   // size, zoom and open tabs return; a dead record does not discard it.
   if (found.headless !== false && found.profile) {
-    try { fs.rmSync(found.profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+    try {
+      fs.rmSync(found.profile, { recursive: true, force: true })
+    } catch {
+      /* held; harmless */
+    }
   }
   return found
 }
@@ -475,11 +571,12 @@ async function pickDebuggingPort(root, asked) {
   if (readLaneBrowsers(root).some(entry => Number(entry.port) === wanted)) {
     return findFreeDebuggingPort(root)
   }
-  if (!await portIsFree(wanted)) {
+  if (!(await portIsFree(wanted))) {
     throw new Error(
-      `port ${wanted} is already bound, so a browser started on it would have no debugging port. `
-      + `Stop the holder with: node bin/engine.mjs supervisor.stop <id> `
-      + `(node bin/engine.mjs supervisor lists ids), or leave the port unset to take a free one.`)
+      `port ${wanted} is already bound, so a browser started on it would have no debugging port. ` +
+        `Stop the holder with: node bin/engine.mjs supervisor.stop <id> ` +
+        `(node bin/engine.mjs supervisor lists ids), or leave the port unset to take a free one.`
+    )
   }
   return wanted
 }
@@ -492,7 +589,8 @@ export const laneBrowserArguments = ({ port, profile, width, height, page }) => 
   '--headless=new',
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${profile}`,
-  '--no-first-run', '--no-default-browser-check',
+  '--no-first-run',
+  '--no-default-browser-check',
   `--window-size=${width},${height}`,
   // One CSS pixel is one device pixel, so a frame's file dimensions are the
   // profile that was asked for. Without it a HiDPI host writes the same profile
@@ -534,9 +632,10 @@ async function waitForLanePage(debuggingPort, client, browser) {
  * `port` is optional and only a request; `pickDebuggingPort` decides. Ready
  * means this lane's own browser answered, not that the port answered.
  */
-export async function startLaneBrowser(root, {
-  client, url, port, width = 540, height = 960, chrome = findChrome(root)
-}) {
+export async function startLaneBrowser(
+  root,
+  { client, url, port, width = 540, height = 960, chrome = findChrome(root) }
+) {
   if (!client) throw new Error('a lane browser needs a client name')
   await freeLaneName(root, client)
   const debuggingPort = await pickDebuggingPort(root, port)
@@ -546,12 +645,20 @@ export async function startLaneBrowser(root, {
   // Detached with no pipes: the browser has to outlive the command that started
   // it, the way a dev server does. Inheriting stdio would end it when the
   // starting process exits and close the pipes.
-  const browser = spawn(chrome, laneBrowserArguments({ port: debuggingPort, profile, width, height, page }),
-    { stdio: 'ignore', detached: true, windowsHide: true })
+  const browser = spawn(chrome, laneBrowserArguments({ port: debuggingPort, profile, width, height, page }), {
+    stdio: 'ignore',
+    detached: true,
+    windowsHide: true
+  })
   browser.unref()
 
   const entry = {
-    client, port: debuggingPort, url: page, pid: browser.pid, profile, serves: root,
+    client,
+    port: debuggingPort,
+    url: page,
+    pid: browser.pid,
+    profile,
+    serves: root,
     // A lane has no window; only the visible editor is not headless.
     headless: true,
     // Which binary rendered. A lane that fell back to an installed Chrome is
@@ -559,7 +666,8 @@ export async function startLaneBrowser(root, {
     chrome,
     // What Chrome was told, not what any frame measures. `recordLaneViewport`
     // adds what the page reports, under its own name.
-    windowAsked: `${width}x${height}`, startedAt: new Date().toISOString()
+    windowAsked: `${width}x${height}`,
+    startedAt: new Date().toISOString()
   }
   // Written before the wait, so a browser that never comes up is still findable
   // and stoppable rather than an orphan nothing recorded.
@@ -568,21 +676,35 @@ export async function startLaneBrowser(root, {
   const outcome = await waitForLanePage(debuggingPort, client, browser)
   if (outcome.ready) return { ...recordLaneBrowser(root, { ...entry, version: outcome.version }), ready: true, browser }
 
-  try { browser.kill() } catch { /* already gone */ }
+  try {
+    browser.kill()
+  } catch {
+    /* already gone */
+  }
   forgetLaneBrowser(root, client)
   // Windows holds the profile until the process is gone; a start that failed
   // must not leave a directory nothing records.
   await new Promise(resolve => setTimeout(resolve, 500))
-  try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
-  throw new Error(outcome.answered
-    ? `port ${debuggingPort} answers a browser that never opened "${client}"; another browser holds it`
-    : `the lane browser for "${client}" never opened its debugging port ${debuggingPort}`)
+  try {
+    fs.rmSync(profile, { recursive: true, force: true })
+  } catch {
+    /* held; harmless */
+  }
+  throw new Error(
+    outcome.answered
+      ? `port ${debuggingPort} answers a browser that never opened "${client}"; another browser holds it`
+      : `the lane browser for "${client}" never opened its debugging port ${debuggingPort}`
+  )
 }
 
 /** Stop one recorded browser and forget it. */
 function stopLaneBrowser(root, entry) {
   const was = alive(entry.pid) ? 'running' : 'gone'
-  try { if (was === 'running') process.kill(entry.pid) } catch { /* raced us */ }
+  try {
+    if (was === 'running') process.kill(entry.pid)
+  } catch {
+    /* raced us */
+  }
   forgetLaneBrowser(root, entry.client)
   return { client: entry.client, port: entry.port, pid: entry.pid, was }
 }
@@ -590,7 +712,11 @@ function stopLaneBrowser(root, entry) {
 /** Remove a profile directory, once Windows has released it. */
 function removeLaneProfile(profile) {
   if (!profile) return
-  try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* held; harmless */ }
+  try {
+    fs.rmSync(profile, { recursive: true, force: true })
+  } catch {
+    /* held; harmless */
+  }
 }
 
 /** Mark every stopped entry whose port still answers. */
@@ -609,9 +735,10 @@ async function markStillAnswering(stopped) {
 function unansweredWarning(missed) {
   if (!missed.length) return {}
   return {
-    warning: `port ${missed.map(entry => entry.port).join(', ')} still answers after the stop. `
-      + `A browser is attached that this registry does not describe. `
-      + 'See every instance with: node bin/engine.mjs supervisor, then stop one with: supervisor.stop <id>.'
+    warning:
+      `port ${missed.map(entry => entry.port).join(', ')} still answers after the stop. ` +
+      `A browser is attached that this registry does not describe. ` +
+      'See every instance with: node bin/engine.mjs supervisor, then stop one with: supervisor.stop <id>.'
   }
 }
 
@@ -626,8 +753,9 @@ function unansweredWarning(missed) {
  * Windows holds the files while it runs.
  */
 export async function stopLaneBrowsers(root, client = null, { all = false } = {}) {
-  const wanted = readLaneBrowsers(root).filter(entry =>
-    all || (client === null ? entry.headless !== false : entry.client === client))
+  const wanted = readLaneBrowsers(root).filter(
+    entry => all || (client === null ? entry.headless !== false : entry.client === client)
+  )
   const stopped = wanted.map(entry => stopLaneBrowser(root, entry))
   // Give Windows a moment to release the profile before deleting it.
   if (stopped.length) await new Promise(resolve => setTimeout(resolve, 500))

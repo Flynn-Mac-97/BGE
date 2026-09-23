@@ -17,7 +17,12 @@ const VIEW = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
 const VIEWPORT = { width: 320, height: 180 }
 
 const meshEntity = (id, material) => ({
-  id, type: 'wall', x: 0, y: 0, z: 0, mesh: { box: [1, 1, 1], material }
+  id,
+  type: 'wall',
+  x: 0,
+  y: 0,
+  z: 0,
+  mesh: { box: [1, 1, 1], material }
 })
 
 const objectMaterial = (frame, id, material) => {

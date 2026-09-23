@@ -8,9 +8,7 @@
  */
 import * as THREE from 'three/webgpu'
 import { uv as uvAttribute } from 'three/tsl'
-import {
-  declaredNumber, meshOf, meshShape, tilingOf, materialNameFor, spriteSource
-} from '../frame-plan.js'
+import { declaredNumber, meshOf, meshShape, tilingOf, materialNameFor, spriteSource } from '../frame-plan.js'
 import { readColour } from './read-value.js'
 import { entityTint } from './entity-look.js'
 import { UNIT_PLANE, solidGeometry } from './geometry-cache.js'
@@ -52,15 +50,29 @@ export function makeMaterialRegistry(state) {
   const materialBuilders = new Map()
   const sharedMaterials = new Map()
 
-  materialBuilders.set('lambert', ({ texture: map, tint: colour }) =>
-    new THREE.MeshLambertMaterial({
-      map: map || null, color: colour, depthTest: true, depthWrite: true, side: THREE.FrontSide
-    }))
+  materialBuilders.set(
+    'lambert',
+    ({ texture: map, tint: colour }) =>
+      new THREE.MeshLambertMaterial({
+        map: map || null,
+        color: colour,
+        depthTest: true,
+        depthWrite: true,
+        side: THREE.FrontSide
+      })
+  )
 
-  materialBuilders.set('basic', ({ texture: map, tint: colour }) =>
-    new THREE.MeshBasicMaterial({
-      map: map || null, color: colour, depthTest: true, depthWrite: true, side: THREE.FrontSide
-    }))
+  materialBuilders.set(
+    'basic',
+    ({ texture: map, tint: colour }) =>
+      new THREE.MeshBasicMaterial({
+        map: map || null,
+        color: colour,
+        depthTest: true,
+        depthWrite: true,
+        side: THREE.FrontSide
+      })
+  )
 
   /**
    * Force every object to be rebuilt on the next sync.
@@ -121,7 +133,11 @@ export function makeMaterialRegistry(state) {
     const build = materialBuilders.get(name)
     if (!build) reportOnce(`[render] ${where}.material: no material named "${name}" is registered — using lambert`)
     const material = (build || materialBuilders.get('lambert'))({
-      mesh: declared, texture: map, tint: colour, view: state.view, uv: UV
+      mesh: declared,
+      texture: map,
+      tint: colour,
+      view: state.view,
+      uv: UV
     })
 
     applyLightmap(material, declared, where)
@@ -210,7 +226,9 @@ export function makeMaterialRegistry(state) {
       invalidateEverything()
     },
     has: name => materialBuilders.has(name),
-    get names() { return [...materialBuilders.keys()] }
+    get names() {
+      return [...materialBuilders.keys()]
+    }
   }
 
   state.invalidateEverything = invalidateEverything

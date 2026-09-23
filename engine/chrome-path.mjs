@@ -53,13 +53,21 @@ export function chromeForTesting(from = process.cwd()) {
   for (const directory of upwards(from)) {
     const root = path.join(directory, '.browsers', 'chrome')
     let builds
-    try { builds = fs.readdirSync(root).sort().reverse() } catch { continue }
+    try {
+      builds = fs.readdirSync(root).sort().reverse()
+    } catch {
+      continue
+    }
     for (const build of builds) {
       // `chrome-win64`, `chrome-mac-x64`, `chrome-linux64`: the unpacked
       // directory is named for the platform the build was downloaded for, so it
       // is found rather than guessed.
       let unpacked
-      try { unpacked = fs.readdirSync(path.join(root, build)) } catch { continue }
+      try {
+        unpacked = fs.readdirSync(path.join(root, build))
+      } catch {
+        continue
+      }
       for (const folder of unpacked) {
         const exe = path.join(root, build, folder, executable)
         if (fs.existsSync(exe)) return exe
@@ -90,10 +98,11 @@ export function findChrome(from = process.cwd()) {
   const found = named || chromeForTesting(from) || installedChrome()
   if (!found) {
     throw new Error(
-      `no Chrome found. Tried .browsers under ${path.resolve(from)} and above it, then:\n  `
-      + INSTALLED_CHROME_PLACES.join('\n  ')
-      + '\nInstall one with: npx @puppeteer/browsers install chrome@stable --path .browsers'
-      + '\nOr set CHROME_PATH to point at one.')
+      `no Chrome found. Tried .browsers under ${path.resolve(from)} and above it, then:\n  ` +
+        INSTALLED_CHROME_PLACES.join('\n  ') +
+        '\nInstall one with: npx @puppeteer/browsers install chrome@stable --path .browsers' +
+        '\nOr set CHROME_PATH to point at one.'
+    )
   }
   return found
 }

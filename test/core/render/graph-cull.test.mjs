@@ -13,7 +13,12 @@ const names = graph => graph.passes.map(pass => pass.name)
 test('a pass writing a resource nothing reads is culled', () => {
   const graph = makePassGraph({ report: noop })
   const ran = []
-  graph.add({ name: 'producer', writes: ['buffer'], target: { format: 'half-float' }, execute: () => ran.push('producer') })
+  graph.add({
+    name: 'producer',
+    writes: ['buffer'],
+    target: { format: 'half-float' },
+    execute: () => ran.push('producer')
+  })
   graph.add({ name: 'present', execute: () => ran.push('present') })
   graph.run(null, null, 8, 8)
   assert.deepEqual(names(graph), ['present'])
@@ -32,7 +37,12 @@ test('a pass with no declared resources always runs', () => {
 test('a screen pass that reads a resource keeps the pass that writes it', () => {
   const graph = makePassGraph({ report: noop })
   const ran = []
-  graph.add({ name: 'producer', writes: ['buffer'], target: { format: 'half-float' }, execute: () => ran.push('producer') })
+  graph.add({
+    name: 'producer',
+    writes: ['buffer'],
+    target: { format: 'half-float' },
+    execute: () => ran.push('producer')
+  })
   graph.add({ name: 'consumer', reads: ['buffer'], execute: () => ran.push('consumer') })
   graph.run(null, null, 8, 8)
   assert.deepEqual(ran, ['producer', 'consumer'], 'the reader makes its producer worth running')
@@ -42,7 +52,13 @@ test('a private dependency dies with the pass that needed it', () => {
   const graph = makePassGraph({ report: noop })
   const ran = []
   graph.add({ name: 'first', writes: ['a'], target: { format: 'half-float' }, execute: () => ran.push('first') })
-  graph.add({ name: 'second', writes: ['b'], reads: ['a'], target: { format: 'half-float' }, execute: () => ran.push('second') })
+  graph.add({
+    name: 'second',
+    writes: ['b'],
+    reads: ['a'],
+    target: { format: 'half-float' },
+    execute: () => ran.push('second')
+  })
   graph.add({ name: 'present', execute: () => ran.push('present') })
   graph.run(null, null, 8, 8)
   assert.deepEqual(ran, ['present'], 'nothing reads b, so second is dead and first dies with it')

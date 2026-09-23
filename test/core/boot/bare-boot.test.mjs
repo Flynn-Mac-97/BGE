@@ -60,7 +60,10 @@ function dependentsFirst(definitions) {
     depth.set(definition.name, value)
     return value
   }
-  return definitions.slice().sort((a, b) => depthOf(b) - depthOf(a)).map(definition => definition.name)
+  return definitions
+    .slice()
+    .sort((a, b) => depthOf(b) - depthOf(a))
+    .map(definition => definition.name)
 }
 
 test('the kernel boots and steps with every plugin disabled', async () => {

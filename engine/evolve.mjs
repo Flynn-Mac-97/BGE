@@ -10,23 +10,43 @@ export function evolutionBrief(painpoints, insights, query = '') {
   if (explicit) {
     const found = records.find(record => record.id === search)
     if (!found) throw new Error(`No ledger item ${search}`)
-    if (found.resolved || found.adopted) throw new Error(`${search} is already closed; verify its recorded outcome before proposing more work`)
+    if (found.resolved || found.adopted)
+      throw new Error(`${search} is already closed; verify its recorded outcome before proposing more work`)
   }
-  const matches = open.filter(record => {
-    if (explicit) return record.id === search
-    const text = [record.what, record.problem, record.where, record.fix, record.tool,
-      record.repro, record.expected, record.actual].filter(Boolean).join(' ').toLowerCase()
-    return search.split(/\s+/).every(word => text.includes(word))
-  }).sort((one, other) => String(other.at || '').localeCompare(String(one.at || '')) || one.id.localeCompare(other.id))
+  const matches = open
+    .filter(record => {
+      if (explicit) return record.id === search
+      const text = [
+        record.what,
+        record.problem,
+        record.where,
+        record.fix,
+        record.tool,
+        record.repro,
+        record.expected,
+        record.actual
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return search.split(/\s+/).every(word => text.includes(word))
+    })
+    .sort((one, other) => String(other.at || '').localeCompare(String(one.at || '')) || one.id.localeCompare(other.id))
   if (!matches.length) return { status: 'empty', query: search, matched: 0, item: null }
   const item = matches[0]
   return {
-    status: 'review', verified: false,
+    status: 'review',
+    verified: false,
     authority: {
-      direct: 'Small, compatible engine fixes and improvements needed by the game task, with regression checks and guide updates.',
+      direct:
+        'Small, compatible engine fixes and improvements needed by the game task, with regression checks and guide updates.',
       ask: 'Breaking changes, new dependencies, data migrations, broad redesigns, or destructive and external actions.'
     },
-    selection: { query: search, matched: matches.length, rule: explicit ? 'explicit id' : 'newest matching open record; not a priority score' },
+    selection: {
+      query: search,
+      matched: matches.length,
+      rule: explicit ? 'explicit id' : 'newest matching open record; not a priority score'
+    },
     item,
     guide: 'docs/evolution.md',
     review: [
@@ -36,8 +56,12 @@ export function evolutionBrief(painpoints, insights, query = '') {
       'Name the actual files in prepare.request and use agent.prepare. Use a separate worktree when another writer is active.'
     ],
     prepare: {
-      op: 'agent.prepare', id: `evolve-${item.id}`,
-      request: { task: `Resolve ${item.id}: ${item.what}. Reproduce first; change code, regression check and owning guide together; retry the original game task.`, files: [] }
+      op: 'agent.prepare',
+      id: `evolve-${item.id}`,
+      request: {
+        task: `Resolve ${item.id}: ${item.what}. Reproduce first; change code, regression check and owning guide together; retry the original game task.`,
+        files: []
+      }
     },
     acceptance: [
       'A reproduction and regression check that fails before and passes after, or a verified documentation example.',
@@ -45,7 +69,10 @@ export function evolutionBrief(painpoints, insights, query = '') {
       'Update the owning guide, regenerate derived instructions, and remove obsolete advice or workarounds.',
       'Release and merge through the existing workspace workflow. Close the item only after the change lands.'
     ],
-    close: { op: item.source === 'pain' ? 'pain.resolve' : 'insight.adopt', id: item.id,
-      noteRequired: 'Landed change, reproduction, check result, original task result, and guide path.' }
+    close: {
+      op: item.source === 'pain' ? 'pain.resolve' : 'insight.adopt',
+      id: item.id,
+      noteRequired: 'Landed change, reproduction, check result, original task result, and guide path.'
+    }
   }
 }

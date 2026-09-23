@@ -49,14 +49,19 @@ function drivenLoop({ hidden }) {
   let intervalCallback = null
   const errors = []
 
-  const set = (name, value) =>
-    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true })
+  const set = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true })
 
   set('performance', { now: () => wall })
   set('document', { hidden, addEventListener() {} })
-  set('requestAnimationFrame', callback => { frameCallback = callback; return 1 })
+  set('requestAnimationFrame', callback => {
+    frameCallback = callback
+    return 1
+  })
   set('cancelAnimationFrame', () => {})
-  set('setInterval', callback => { intervalCallback = callback; return 2 })
+  set('setInterval', callback => {
+    intervalCallback = callback
+    return 2
+  })
   set('clearInterval', () => {})
   console.error = line => errors.push(String(line))
 
@@ -68,11 +73,16 @@ function drivenLoop({ hidden }) {
     /** Move the wall clock on and let whichever driver is fitted have one tick. */
     tick(milliseconds) {
       wall += milliseconds
-      if (frameCallback) { const next = frameCallback; frameCallback = null; next(wall) }
-      else if (intervalCallback) intervalCallback()
+      if (frameCallback) {
+        const next = frameCallback
+        frameCallback = null
+        next(wall)
+      } else if (intervalCallback) intervalCallback()
     },
     /** Move the wall clock on and give the driver nothing. */
-    starve(milliseconds) { wall += milliseconds },
+    starve(milliseconds) {
+      wall += milliseconds
+    },
     restore() {
       for (const [name, value] of Object.entries(saved)) {
         if (name === 'error') console.error = value
@@ -86,7 +96,9 @@ test('a stopped loop says so and claims no rate', () => {
   const driven = drivenLoop({ hidden: false })
   try {
     assert.deepEqual(driven.loop.state, { driver: 'stopped' })
-  } finally { driven.restore() }
+  } finally {
+    driven.restore()
+  }
 })
 
 test('a visible tab reports requestAnimationFrame at real speed, and warns about nothing', () => {
@@ -102,7 +114,9 @@ test('a visible tab reports requestAnimationFrame at real speed, and warns about
     assert.ok(state.gameSpeed > 0.9 && state.gameSpeed < 1.1, `gameSpeed ${state.gameSpeed}`)
     assert.equal(state.warning, undefined)
     assert.deepEqual(driven.errors, [])
-  } finally { driven.restore() }
+  } finally {
+    driven.restore()
+  }
 })
 
 test('a hidden tab names the timer, measures the crawl, and reports it as an error', () => {
@@ -126,7 +140,9 @@ test('a hidden tab names the timer, measures the crawl, and reports it as an err
     assert.ok(driven.errors.length >= 1, 'the slow loop was never reported to console.error')
     assert.match(driven.errors[0], /^\[loop\]/)
     assert.match(driven.errors[0], /behind the wall/)
-  } finally { driven.restore() }
+  } finally {
+    driven.restore()
+  }
 })
 
 test('the clock really does fall behind, so the run is not just under-reported', () => {
@@ -135,7 +151,9 @@ test('the clock really does fall behind, so the run is not just under-reported',
     driven.loop.start()
     for (let index = 0; index < 4; index++) driven.tick(3000)
     assert.ok(driven.loop.time < 1, `engine clock reached ${driven.loop.time}s in 12 wall seconds`)
-  } finally { driven.restore() }
+  } finally {
+    driven.restore()
+  }
 })
 
 test('a driver that stops firing collapses the rate, not holds the speed it used to run at', () => {
@@ -152,7 +170,9 @@ test('a driver that stops firing collapses the rate, not holds the speed it used
     assert.ok(state.ticksPerSecond < 1, `ticksPerSecond ${state.ticksPerSecond}`)
     assert.ok(state.gameSpeed < 0.05, `gameSpeed ${state.gameSpeed}`)
     assert.match(state.warning, /real time/)
-  } finally { driven.restore() }
+  } finally {
+    driven.restore()
+  }
 })
 
 test('reset re-baselines the measurement instead of claiming the run is hours behind', () => {
@@ -161,9 +181,10 @@ test('reset re-baselines the measurement instead of claiming the run is hours be
     driven.loop.start()
     for (let index = 0; index < 120; index++) driven.tick(1000 / 60)
     driven.loop.reset()
-    assert.ok(driven.loop.state.behindSeconds < 0.001,
-      `behindSeconds ${driven.loop.state.behindSeconds} after reset`)
-  } finally { driven.restore() }
+    assert.ok(driven.loop.state.behindSeconds < 0.001, `behindSeconds ${driven.loop.state.behindSeconds} after reset`)
+  } finally {
+    driven.restore()
+  }
 })
 
 // ------------------------------------------------------ the tint lint
@@ -193,8 +214,7 @@ test('a placement that states its own tint is not reported', () => {
 
 test('a white tint on the type multiplies nothing and is not reported', () => {
   for (const white of ['#fff', '#FFFFFF', 'white', 0xffffff]) {
-    assert.deepEqual(tintProblems(indexWithTintedType(white), { arena: [textured] }), [],
-      `tint ${white} was reported`)
+    assert.deepEqual(tintProblems(indexWithTintedType(white), { arena: [textured] }), [], `tint ${white} was reported`)
   }
 })
 
@@ -230,8 +250,7 @@ test('a bare yaw still comes back as exactly the number it was', () => {
 })
 
 test('every axis of a rotation is rounded, not just carried through', () => {
-  assert.deepEqual(savedPlacement({ rotation: [10.00049, 20.5, 30.12349] }).rotation,
-    [10, 20.5, 30.123])
+  assert.deepEqual(savedPlacement({ rotation: [10.00049, 20.5, 30.12349] }).rotation, [10, 20.5, 30.123])
 })
 
 test('positions still round to three places', () => {
@@ -265,9 +284,7 @@ const PLAIN_TYPE = `export default {
 `
 
 test('buildIndex records the type tint and check reports the pair without failing', async () => {
-  const directory = await temporaryProject(TINTED_TYPE, [
-    { id: 'one', type: 'prop', mesh: { texture: 'probe.png' } }
-  ])
+  const directory = await temporaryProject(TINTED_TYPE, [{ id: 'one', type: 'prop', mesh: { texture: 'probe.png' } }])
   try {
     const index = await buildIndex(directory)
     assert.equal(index.types.prop.meshTint, '#7a3cff')
@@ -278,17 +295,19 @@ test('buildIndex records the type tint and check reports the pair without failin
     assert.equal(said.length, 1)
     // A tinted type may be deliberate, so it is reported and never fatal.
     assert.equal(fatal(problems).length, 0, JSON.stringify(fatal(problems)))
-  } finally { await fs.rm(directory, { recursive: true, force: true }) }
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
 })
 
 test('an untinted type over the same level says nothing, so a clean project stays clean', async () => {
-  const directory = await temporaryProject(PLAIN_TYPE, [
-    { id: 'one', type: 'prop', mesh: { texture: 'probe.png' } }
-  ])
+  const directory = await temporaryProject(PLAIN_TYPE, [{ id: 'one', type: 'prop', mesh: { texture: 'probe.png' } }])
   try {
     const index = await buildIndex(directory)
     assert.equal(index.types.prop.meshTint, undefined)
     assert.deepEqual(index.tintProblems, [])
     assert.equal(fatal(problemsIn(index)).length, 0)
-  } finally { await fs.rm(directory, { recursive: true, force: true }) }
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
 })

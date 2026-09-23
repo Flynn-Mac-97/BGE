@@ -116,7 +116,7 @@ function spawnLevelEntities(world, placements) {
   const seen = {}
   for (const placement of placements) {
     const entity = world.spawn(placement.type, placement)
-    if (!placement.id) entity.id = `${placement.type}-${seen[placement.type] = (seen[placement.type] ?? -1) + 1}`
+    if (!placement.id) entity.id = `${placement.type}-${(seen[placement.type] = (seen[placement.type] ?? -1) + 1)}`
   }
 }
 
@@ -178,10 +178,15 @@ export async function saveLevel({ world, loop, editor, view, files, levelFile },
   // drops them and nothing has to be undone. `project.saveAs` passes
   // `naming` to write them out as the project takes a name.
   if (editor.projectUntitled && !naming) {
-    return { skipped: 'untitled', why: 'edits are held until the project is named — run project.saveAs <name> to keep them' }
+    return {
+      skipped: 'untitled',
+      why: 'edits are held until the project is named — run project.saveAs <name> to keep them'
+    }
   }
   if (world.simulated) {
-    console.warn('[save] skipped — the world has been simulated, so it no longer holds start positions. Stop play mode (or engine.stop()) to reload the level first.')
+    console.warn(
+      '[save] skipped — the world has been simulated, so it no longer holds start positions. Stop play mode (or engine.stop()) to reload the level first.'
+    )
     return { skipped: 'simulated' }
   }
   // A run is not an edit. Between pressing play and the first step the world

@@ -69,7 +69,10 @@ export function makeTargetPool() {
     const entry = entries.find(one => one.target === target)
     if (!entry) return
     const list = free.get(entry.key)
-    if (!list) { free.set(entry.key, [target]); return }
+    if (!list) {
+      free.set(entry.key, [target])
+      return
+    }
     if (!list.includes(target)) list.push(target)
   }
 
@@ -96,6 +99,8 @@ export function makeTargetPool() {
     dispose,
     key: descriptorKey,
     /** How many targets the pool has made. A steady frame adds none. */
-    get created() { return created }
+    get created() {
+      return created
+    }
   }
 }

@@ -28,15 +28,37 @@ function makePluginLoader(definitions, { boot = true } = {}) {
 
 test('the loader collects exactly the seven contribution points', () => {
   const { loader } = makePluginLoader([])
-  assert.deepEqual(Object.keys(loader.contrib).sort(),
-    ['commands', 'fields', 'importers', 'menus', 'panels', 'systems', 'tools'])
+  assert.deepEqual(Object.keys(loader.contrib).sort(), [
+    'commands',
+    'fields',
+    'importers',
+    'menus',
+    'panels',
+    'systems',
+    'tools'
+  ])
 })
 
 test('a provider initializes before its consumer, whatever order they were registered', () => {
   const calls = []
   makePluginLoader([
-    { name: 'Consumer', lifecycle: 'scoped', requires: ['clock'], onLoad(context, scope) { calls.push(scope.require('clock').value) } },
-    { name: 'Provider', lifecycle: 'scoped', provides: ['clock'], onLoad(context, scope) { calls.push('provider'); scope.provide('clock', { value: 42 }) } }
+    {
+      name: 'Consumer',
+      lifecycle: 'scoped',
+      requires: ['clock'],
+      onLoad(context, scope) {
+        calls.push(scope.require('clock').value)
+      }
+    },
+    {
+      name: 'Provider',
+      lifecycle: 'scoped',
+      provides: ['clock'],
+      onLoad(context, scope) {
+        calls.push('provider')
+        scope.provide('clock', { value: 42 })
+      }
+    }
   ])
   assert.deepEqual(calls, ['provider', 42], 'the provider loaded first and the consumer reached it by name')
 })
@@ -47,9 +69,23 @@ test('a plugin reaches only the services it declared, and one that is missing is
   bus.on('plugin:error', payload => reported.push(payload))
   const loader = makeLoader(bus)
   for (const definition of [
-    { name: 'Provider', lifecycle: 'scoped', provides: ['clock'], onLoad(context, scope) { scope.provide('clock', { value: 1 }) } },
-    { name: 'Undeclared', lifecycle: 'scoped', onLoad(context, scope) { scope.require('clock') } }
-  ]) loader.add(definition)
+    {
+      name: 'Provider',
+      lifecycle: 'scoped',
+      provides: ['clock'],
+      onLoad(context, scope) {
+        scope.provide('clock', { value: 1 })
+      }
+    },
+    {
+      name: 'Undeclared',
+      lifecycle: 'scoped',
+      onLoad(context, scope) {
+        scope.require('clock')
+      }
+    }
+  ])
+    loader.add(definition)
   loader.boot({ bus, loader })
 
   assert.match(reported.map(row => row.error).join(' '), /Undeclared: undeclared requirement clock/)
@@ -63,10 +99,13 @@ test('a scope cleans up in reverse registration order, and a failing cleanup doe
   bus.on('plugin:error', payload => reported.push(payload.error))
   const loader = makeLoader(bus)
   loader.add({
-    name: 'Owned', lifecycle: 'scoped',
+    name: 'Owned',
+    lifecycle: 'scoped',
     onLoad(context, scope) {
       scope.defer(() => cleaned.push('first'))
-      scope.defer(() => { throw new Error('cleanup failure') })
+      scope.defer(() => {
+        throw new Error('cleanup failure')
+      })
       scope.defer(() => cleaned.push('last'))
     }
   })
@@ -82,12 +121,24 @@ test('disabling a provider disables its dependents first, and re-enabling goes p
   const loaded = []
   const { loader } = makePluginLoader([
     {
-      name: 'Provider', lifecycle: 'scoped', provides: ['clock'],
-      onLoad(context, scope) { loaded.push('provider'); scope.provide('clock', {}); scope.defer(() => disposed.push('provider')) }
+      name: 'Provider',
+      lifecycle: 'scoped',
+      provides: ['clock'],
+      onLoad(context, scope) {
+        loaded.push('provider')
+        scope.provide('clock', {})
+        scope.defer(() => disposed.push('provider'))
+      }
     },
     {
-      name: 'Consumer', lifecycle: 'scoped', requires: ['clock'],
-      onLoad(context, scope) { loaded.push('consumer'); scope.require('clock'); scope.defer(() => disposed.push('consumer')) }
+      name: 'Consumer',
+      lifecycle: 'scoped',
+      requires: ['clock'],
+      onLoad(context, scope) {
+        loaded.push('consumer')
+        scope.require('clock')
+        scope.defer(() => disposed.push('consumer'))
+      }
     }
   ])
 
@@ -106,8 +157,22 @@ test('the plugin graph is refused before anything loads when a name or an edge i
 
   assert.throws(() => loader.order([{ name: 'Missing', needs: ['Absent'] }]), /missing plugin dependency: Absent/)
   assert.throws(() => loader.order([{ name: 'Missing', requires: ['absent'] }]), /missing service provider: absent/)
-  assert.throws(() => loader.order([{ name: 'A', provides: ['x'] }, { name: 'B', provides: ['x'] }]), /declared by both/)
-  assert.throws(() => loader.order([{ name: 'A', needs: ['B'] }, { name: 'B', needs: ['A'] }]), /cycle/)
+  assert.throws(
+    () =>
+      loader.order([
+        { name: 'A', provides: ['x'] },
+        { name: 'B', provides: ['x'] }
+      ]),
+    /declared by both/
+  )
+  assert.throws(
+    () =>
+      loader.order([
+        { name: 'A', needs: ['B'] },
+        { name: 'B', needs: ['A'] }
+      ]),
+    /cycle/
+  )
   assert.throws(() => loader.order([{ name: 'A' }, { name: 'A' }]), /duplicate plugin/)
 
   loader.add({ name: 'One' })
@@ -115,11 +180,29 @@ test('the plugin graph is refused before anything loads when a name or an edge i
 })
 
 for (const [why, systems] of [
-  ['a repeated system id', [{ id: 'a', phase: 'fixed' }, { id: 'a', phase: 'frame' }]],
+  [
+    'a repeated system id',
+    [
+      { id: 'a', phase: 'fixed' },
+      { id: 'a', phase: 'frame' }
+    ]
+  ],
   ['a missing after target', [{ id: 'a', phase: 'fixed', after: ['missing'] }]],
   ['a missing before target', [{ id: 'a', phase: 'fixed', before: ['missing'] }]],
-  ['a cycle', [{ id: 'a', phase: 'fixed', after: ['b'] }, { id: 'b', phase: 'fixed', after: ['a'] }]],
-  ['a constraint across phases', [{ id: 'a', phase: 'fixed', after: ['b'] }, { id: 'b', phase: 'frame' }]],
+  [
+    'a cycle',
+    [
+      { id: 'a', phase: 'fixed', after: ['b'] },
+      { id: 'b', phase: 'fixed', after: ['a'] }
+    ]
+  ],
+  [
+    'a constraint across phases',
+    [
+      { id: 'a', phase: 'fixed', after: ['b'] },
+      { id: 'b', phase: 'frame' }
+    ]
+  ],
   ['an unknown phase', [{ id: 'a', phase: 'whenever' }]]
 ]) {
   test(`an invalid schedule fails closed and names the reason: ${why}`, () => {
@@ -149,8 +232,16 @@ test('a bad argument is refused at the engine.run boundary before the handler ru
   const probe = {
     id: 'probe.count',
     label: 'Probe',
-    inputSchema: { type: 'object', required: ['count'], properties: { count: { type: 'integer', minimum: 1 } }, additionalProperties: false },
-    run() { calls++; return { ok: true } }
+    inputSchema: {
+      type: 'object',
+      required: ['count'],
+      properties: { count: { type: 'integer', minimum: 1 } },
+      additionalProperties: false
+    },
+    run() {
+      calls++
+      return { ok: true }
+    }
   }
   const { bus, loader, context } = makePluginLoader([{ name: 'Probe', commands: [probe] }])
   const engine = makeInspect({ world: {}, loader, bus, editor: { context }, log: { lines: [], push() {} }, loop: {} })
@@ -165,7 +256,7 @@ test('a bad argument is refused at the engine.run boundary before the handler ru
 
 test('a fixed step runs its systems in dependency order, then the frame systems', async () => {
   const calls = []
-  const { context, loop, loader } = await startWorldInNode({ root: CHECKOUT, project: FIXTURE })
+  const { loop, loader } = await startWorldInNode({ root: CHECKOUT, project: FIXTURE })
   loader.add({
     name: 'Probe Systems',
     systems: [
@@ -187,8 +278,22 @@ test('a system that throws is contained, and its dependents are skipped in the s
   loader.add({
     name: 'Failing Systems',
     systems: [
-      { id: 'probe.fail', phase: 'fixed', run() { calls.push('first'); throw new Error('intentional test failure') } },
-      { id: 'probe.after', phase: 'fixed', after: ['probe.fail'], run() { calls.push('must not run') } }
+      {
+        id: 'probe.fail',
+        phase: 'fixed',
+        run() {
+          calls.push('first')
+          throw new Error('intentional test failure')
+        }
+      },
+      {
+        id: 'probe.after',
+        phase: 'fixed',
+        after: ['probe.fail'],
+        run() {
+          calls.push('must not run')
+        }
+      }
     ]
   })
 

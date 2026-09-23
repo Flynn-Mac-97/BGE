@@ -10,14 +10,15 @@ import { compileSchedule, makePluginScope } from './plugin-runtime.js'
 const POINTS = ['panels', 'tools', 'commands', 'fields', 'importers', 'systems', 'menus']
 const NOTHING = Object.freeze({ name: null, about: '' })
 /** An error as a reader wants it: the kind of failure, then what went wrong. */
-const describe = error => error?.name && error?.message ? `${error.name}: ${error.message}` : String(error?.message || error)
+const describe = error =>
+  error?.name && error?.message ? `${error.name}: ${error.message}` : String(error?.message || error)
 
 /** Every needs/provides/requires field is a list of names, or absent. */
 function assertNameFields(definition) {
   for (const field of ['needs', 'provides', 'requires']) {
     if (definition[field] === undefined) continue
-    const malformed = !Array.isArray(definition[field])
-      || definition[field].some(value => typeof value !== 'string' || !value)
+    const malformed =
+      !Array.isArray(definition[field]) || definition[field].some(value => typeof value !== 'string' || !value)
     if (malformed) throw new Error(`${definition.name}.${field} must be an array of names`)
   }
 }
@@ -25,7 +26,8 @@ function assertNameFields(definition) {
 /** One provider per service name; two plugins claiming one is refused. */
 function claimServices(definition, providers) {
   for (const key of definition.provides || []) {
-    if (providers.has(key)) throw new Error(`service ${key} declared by both ${providers.get(key)} and ${definition.name}`)
+    if (providers.has(key))
+      throw new Error(`service ${key} declared by both ${providers.get(key)} and ${definition.name}`)
     providers.set(key, definition.name)
   }
 }
@@ -56,12 +58,28 @@ function declareDefinitions(definitions) {
  * @returns {object} Registries, `order`, `add`, `enable`, `boot` and `contracts`.
  */
 export function makeLoader(bus) {
-  const plugins = new Map(), services = new Map()
+  const plugins = new Map(),
+    services = new Map()
   const contrib = Object.fromEntries(POINTS.map(point => [point, []]))
-  let context = null, schedule = { fixed: [], frame: [] }, scheduleError = null
+  let context = null,
+    schedule = { fixed: [], frame: [] },
+    scheduleError = null
   const diagnostics = []
-  const report = (name, error) => { bus.emit('plugin:error', { name, error }); diagnostics.push({ plugin: name, error }); if (diagnostics.length > 100) diagnostics.shift() }
-  const dependencies = definition => [...new Set([...(definition.needs || []), ...(definition.requires || []).map(key => [...plugins.values()].find(plugin => (plugin.definition.provides || []).includes(key))?.definition.name).filter(Boolean)])]
+  const report = (name, error) => {
+    bus.emit('plugin:error', { name, error })
+    diagnostics.push({ plugin: name, error })
+    if (diagnostics.length > 100) diagnostics.shift()
+  }
+  const dependencies = definition => [
+    ...new Set([
+      ...(definition.needs || []),
+      ...(definition.requires || [])
+        .map(
+          key => [...plugins.values()].find(plugin => (plugin.definition.provides || []).includes(key))?.definition.name
+        )
+        .filter(Boolean)
+    ])
+  ]
 
   /** Revoke a plugin's scope and leave it inactive, ready for a fresh scope on the next enable. */
   function cleanup(name, plugin) {
@@ -79,13 +97,17 @@ export function makeLoader(bus) {
     if (visited.has(name)) return
     visited.add(name)
     for (const [other, plugin] of plugins) {
-      if (plugin.enabled && dependencies(plugin.definition).includes(name)) deactivate(other, `dependency disabled: ${name}`, visited)
+      if (plugin.enabled && dependencies(plugin.definition).includes(name))
+        deactivate(other, `dependency disabled: ${name}`, visited)
     }
     const plugin = plugins.get(name)
     if (!plugin) return
     cleanup(name, plugin)
     plugin.enabled = false
-    if (reason) { plugin.error = reason; report(name, reason) }
+    if (reason) {
+      plugin.error = reason
+      report(name, reason)
+    }
   }
   /**
    * Rebuild the contribution lists and both schedules from the enabled plugins.
@@ -97,7 +119,8 @@ export function makeLoader(bus) {
     for (const point of POINTS) contrib[point] = []
     for (const { definition, enabled, builtin } of plugins.values()) {
       if (!enabled) continue
-      for (const point of POINTS) for (const item of definition[point] || []) contrib[point].push({ ...item, plugin: definition.name, builtin })
+      for (const point of POINTS)
+        for (const item of definition[point] || []) contrib[point].push({ ...item, plugin: definition.name, builtin })
     }
     try {
       schedule = compileSchedule(contrib.systems)
@@ -162,18 +185,29 @@ export function makeLoader(bus) {
     assertDependenciesReady(name, plugin)
     assertServicesAvailable(name, plugin)
     // Legacy registrations keep their original enable behaviour until migrated to scopes.
-    if (plugin.loaded && plugin.definition.lifecycle !== 'scoped') { plugin.active = true; return }
+    if (plugin.loaded && plugin.definition.lifecycle !== 'scoped') {
+      plugin.active = true
+      return
+    }
     const scope = makePluginScope(name, plugin.definition, bus, services)
     plugin.scope = scope
     try {
       runOnLoad(name, plugin, scope)
-      plugin.active = true; plugin.loaded = true; plugin.error = null
-    } catch (error) { cleanup(name, plugin); throw error }
+      plugin.active = true
+      plugin.loaded = true
+      plugin.error = null
+    } catch (error) {
+      cleanup(name, plugin)
+      throw error
+    }
   }
 
   const api = {
-    plugins, contrib,
-    get schedule() { return schedule },
+    plugins,
+    contrib,
+    get schedule() {
+      return schedule
+    },
     /**
      * Definitions in dependency order, needs before dependents.
      *
@@ -182,19 +216,25 @@ export function makeLoader(bus) {
      */
     order(definitions) {
       const { byName, providers } = declareDefinitions(definitions)
-      const seen = new Set(), out = []
+      const seen = new Set(),
+        out = []
       const visit = (definition, stack = []) => {
         if (seen.has(definition.name)) return
-        if (stack.includes(definition.name)) throw new Error(`plugin cycle: ${[...stack, definition.name].join(' -> ')}`)
-        const needs = [...(definition.needs || []), ...(definition.requires || []).map(key => {
-          if (!providers.has(key)) throw new Error(`${definition.name}: missing service provider: ${key}`)
-          return providers.get(key)
-        })]
+        if (stack.includes(definition.name))
+          throw new Error(`plugin cycle: ${[...stack, definition.name].join(' -> ')}`)
+        const needs = [
+          ...(definition.needs || []),
+          ...(definition.requires || []).map(key => {
+            if (!providers.has(key)) throw new Error(`${definition.name}: missing service provider: ${key}`)
+            return providers.get(key)
+          })
+        ]
         for (const need of needs) {
           if (!byName.has(need)) throw new Error(`${definition.name}: missing plugin dependency: ${need}`)
           visit(byName.get(need), [...stack, definition.name])
         }
-        seen.add(definition.name); out.push(definition)
+        seen.add(definition.name)
+        out.push(definition)
       }
       definitions.forEach(definition => visit(definition))
       return out
@@ -206,7 +246,13 @@ export function makeLoader(bus) {
       if (plugins.has(definition.name)) throw new Error(`duplicate plugin: ${definition.name}`)
       plugins.set(definition.name, { definition, enabled: true, error: null, builtin, active: false, loaded: false })
       if (context) {
-        try { activate(definition.name) } catch (error) { deactivate(definition.name, describe(error)); rebuild(); throw error }
+        try {
+          activate(definition.name)
+        } catch (error) {
+          deactivate(definition.name, describe(error))
+          rebuild()
+          throw error
+        }
         rebuild()
       }
     },
@@ -217,12 +263,23 @@ export function makeLoader(bus) {
       if (!on) deactivate(name)
       else {
         plugin.enabled = true
-        if (context) try { activate(name) } catch (error) { deactivate(name, describe(error)); rebuild(); throw error }
+        if (context)
+          try {
+            activate(name)
+          } catch (error) {
+            deactivate(name, describe(error))
+            rebuild()
+            throw error
+          }
       }
       rebuild()
     },
     /** Stop a plugin whose system threw mid-tick, and everything depending on it. */
-    fail(name, error) { if (!plugins.has(name)) return; deactivate(name, describe(error)); rebuild() },
+    fail(name, error) {
+      if (!plugins.has(name)) return
+      deactivate(name, describe(error))
+      rebuild()
+    },
     /**
      * Record a file that would not import under its path, disabled.
      *
@@ -237,7 +294,15 @@ export function makeLoader(bus) {
     },
     /** The failed plugins and failed imports, as the shell and an agent report them. */
     failures() {
-      return [...plugins.entries()].filter(([, plugin]) => plugin.error).map(([key, plugin]) => ({ name: plugin.file ? null : key, file: plugin.file || null, error: plugin.error, builtin: plugin.builtin === true, failedToImport: plugin.file != null }))
+      return [...plugins.entries()]
+        .filter(([, plugin]) => plugin.error)
+        .map(([key, plugin]) => ({
+          name: plugin.file ? null : key,
+          file: plugin.file || null,
+          error: plugin.error,
+          builtin: plugin.builtin === true,
+          failedToImport: plugin.file != null
+        }))
     },
     /**
      * Activate every enabled plugin in dependency order.
@@ -247,33 +312,78 @@ export function makeLoader(bus) {
      */
     boot(value) {
       context = value
-      const values = () => new Map(Object.keys(context).filter(key => !Object.getOwnPropertyDescriptor(context, key)?.get).map(key => [key, context[key]]))
+      const values = () =>
+        new Map(
+          Object.keys(context)
+            .filter(key => !Object.getOwnPropertyDescriptor(context, key)?.get)
+            .map(key => [key, context[key]])
+        )
       const owners = new Map([...values().keys()].map(key => [key, 'the kernel']))
-      const ordered = api.order([...plugins.values()].filter(plugin => plugin.definition.name).map(plugin => plugin.definition))
+      const ordered = api.order(
+        [...plugins.values()].filter(plugin => plugin.definition.name).map(plugin => plugin.definition)
+      )
       for (const definition of ordered) {
-        const name = definition.name, plugin = plugins.get(name)
+        const name = definition.name,
+          plugin = plugins.get(name)
         if (!plugin.enabled) continue
         const before = values()
-        try { activate(name) } catch (error) { deactivate(name, describe(error)) }
+        try {
+          activate(name)
+        } catch (error) {
+          deactivate(name, describe(error))
+        }
         for (const [key, current] of values()) {
-          if (!before.has(key)) { owners.set(key, name); continue }
+          if (!before.has(key)) {
+            owners.set(key, name)
+            continue
+          }
           if (before.get(key) === current) continue
           const error = `${name} replaced context.${key}, which belonged to ${owners.get(key) || 'another plugin'}`
-          diagnostics.push({ plugin: name, error }); console.error(`[loader] ${error}`)
-          bus.emit('context:replaced', { key, by: name, from: owners.get(key) || null }); owners.set(key, name)
+          diagnostics.push({ plugin: name, error })
+          console.error(`[loader] ${error}`)
+          bus.emit('context:replaced', { key, by: name, from: owners.get(key) || null })
+          owners.set(key, name)
         }
       }
       rebuild()
     },
     /** Deactivate every plugin in reverse registration order. */
-    dispose() { for (const name of [...plugins.keys()].reverse()) deactivate(name); rebuild() },
+    dispose() {
+      for (const name of [...plugins.keys()].reverse()) deactivate(name)
+      rebuild()
+    },
     /** The read-only report of plugins, services and the compiled schedule. */
     contracts() {
       return {
-        plugins: [...plugins.values()].filter(plugin => plugin.definition.name).map(plugin => ({ name: plugin.definition.name, enabled: plugin.enabled, active: plugin.active, lifecycle: plugin.definition.lifecycle || 'legacy', needs: plugin.definition.needs || [], provides: plugin.definition.provides || [], requires: plugin.definition.requires || [], error: plugin.error })),
+        plugins: [...plugins.values()]
+          .filter(plugin => plugin.definition.name)
+          .map(plugin => ({
+            name: plugin.definition.name,
+            enabled: plugin.enabled,
+            active: plugin.active,
+            lifecycle: plugin.definition.lifecycle || 'legacy',
+            needs: plugin.definition.needs || [],
+            provides: plugin.definition.provides || [],
+            requires: plugin.definition.requires || [],
+            error: plugin.error
+          })),
         services: [...services].map(([name, service]) => ({ name, owner: service.owner })),
-        schedule: Object.fromEntries(Object.entries(schedule).map(([phase, systems]) => [phase, systems.map(system => ({ id: system.id, plugin: system.plugin, before: system.before || [], after: system.after || [], reads: system.reads || [], writes: system.writes || [], dataContractDeclared: Array.isArray(system.reads) && Array.isArray(system.writes) }))])),
-        scheduleError, diagnostics: diagnostics.slice(-20)
+        schedule: Object.fromEntries(
+          Object.entries(schedule).map(([phase, systems]) => [
+            phase,
+            systems.map(system => ({
+              id: system.id,
+              plugin: system.plugin,
+              before: system.before || [],
+              after: system.after || [],
+              reads: system.reads || [],
+              writes: system.writes || [],
+              dataContractDeclared: Array.isArray(system.reads) && Array.isArray(system.writes)
+            }))
+          ])
+        ),
+        scheduleError,
+        diagnostics: diagnostics.slice(-20)
       }
     },
     rebuild

@@ -69,7 +69,15 @@ test('one extract and one execute per pass, whatever the world holds', () => {
 
 test('the executor never reads a field of what it is handed', () => {
   let reads = 0
-  const pluginData = new Proxy({}, { get() { reads++; return [] } })
+  const pluginData = new Proxy(
+    {},
+    {
+      get() {
+        reads++
+        return []
+      }
+    }
+  )
   const graph = makePassGraph({ report: noop })
   graph.add({ name: 'present', execute: noop })
   graph.run(pluginData, null, 8, 8)
@@ -92,7 +100,13 @@ test('the kernel runs a single screen pass and a many-pass chain the same way', 
   for (let i = 0; i < 40; i++) {
     const resource = `colour${i}`
     const reads = previous ? [previous] : []
-    rich.add({ name: `pass${i}`, reads, writes: [resource], target: { format: 'half-float' }, execute: () => richRan.push(`pass${i}`) })
+    rich.add({
+      name: `pass${i}`,
+      reads,
+      writes: [resource],
+      target: { format: 'half-float' },
+      execute: () => richRan.push(`pass${i}`)
+    })
     previous = resource
   }
   rich.add({ name: 'present', reads: [previous], execute: () => richRan.push('present') })

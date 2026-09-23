@@ -21,7 +21,11 @@
  * person's editor.
  */
 const clientName = () => {
-  try { return globalThis.sessionStorage?.getItem('engine:tab-id') || '' } catch { return '' }
+  try {
+    return globalThis.sessionStorage?.getItem('engine:tab-id') || ''
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -43,25 +47,41 @@ export function overHTTP() {
     index: () => j('/api/index'),
     tree: () => j('/api/tree'),
     agentPlugins: () => j('/api/agent-plugins'),
-    agentInterface: async (scope, file) => (await j('/api/agent-interface?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(file))).text,
+    agentInterface: async (scope, file) =>
+      (await j('/api/agent-interface?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(file))).text,
     read: async path => (await j('/api/file?path=' + encodeURIComponent(path))).text,
     sourceCatalog: (selection = 'core') => j('/api/systems/catalog?selection=' + encodeURIComponent(selection)),
     listDocuments: () => j('/api/systems/documents'),
     readDocument: (id, backup = false) => j('/api/systems/document?id=' + encodeURIComponent(id) + '&backup=' + backup),
-    writeDocument: (id, data, revision) => j('/api/systems/document', { method:'POST', headers:writeHeaders(), body:JSON.stringify({id,data,revision}) }),
-    writeSource: (scope, file, text, expectedHash) => j('/api/systems/source', { method:'POST', headers:writeHeaders(), body:JSON.stringify({scope,file,text,expectedHash}) }),
-    readSource: (scope, path) => j('/api/systems/source?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path)),
-    readAgent: async (scope, path) => (await j('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
-    write: (path, text) => j('/api/file', {
-      method: 'POST',
-      headers: writeHeaders(),
-      body: JSON.stringify({ path, text })
-    }),
-    writeAgent: (scope, path, text) => j('/api/agent-file', {
-      method: 'POST',
-      headers: writeHeaders(),
-      body: JSON.stringify({ scope, path, text })
-    })
+    writeDocument: (id, documentData, revision) =>
+      j('/api/systems/document', {
+        method: 'POST',
+        headers: writeHeaders(),
+        // eslint-disable-next-line id-denylist -- the wire message field is named data
+        body: JSON.stringify({ id, data: documentData, revision })
+      }),
+    writeSource: (scope, file, text, expectedHash) =>
+      j('/api/systems/source', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ scope, file, text, expectedHash })
+      }),
+    readSource: (scope, path) =>
+      j('/api/systems/source?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path)),
+    readAgent: async (scope, path) =>
+      (await j('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
+    write: (path, text) =>
+      j('/api/file', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ path, text })
+      }),
+    writeAgent: (scope, path, text) =>
+      j('/api/agent-file', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ scope, path, text })
+      })
   }
 }
 
@@ -129,7 +149,11 @@ export function makeFiles(bus, transport = overHTTP()) {
   const refusal = (path, scope) => {
     for (const guard of guards) {
       let why
-      try { why = guard(path, scope) } catch (error) { why = String(error?.message || error) }
+      try {
+        why = guard(path, scope)
+      } catch (error) {
+        why = String(error?.message || error)
+      }
       if (why) return String(why)
     }
     return null
@@ -147,20 +171,34 @@ export function makeFiles(bus, transport = overHTTP()) {
       guards.add(guard)
       return () => guards.delete(guard)
     },
-    async index() { return transport.index() },
-    async tree() { return transport.tree() },
-    async agentPlugins() { return transport.agentPlugins() },
-    async agentInterface(scope, file) { return transport.agentInterface(scope, file) },
-    async read(path) { return transport.read(path) },
+    async index() {
+      return transport.index()
+    },
+    async tree() {
+      return transport.tree()
+    },
+    async agentPlugins() {
+      return transport.agentPlugins()
+    },
+    async agentInterface(scope, file) {
+      return transport.agentInterface(scope, file)
+    },
+    async read(path) {
+      return transport.read(path)
+    },
     async sourceCatalog(selection = 'core') {
       if (!transport.sourceCatalog) throw new Error('source catalog unavailable in this transport')
       return transport.sourceCatalog(selection)
     },
-    async listDocuments() { return transport.listDocuments() },
-    async readDocument(id, backup = false) { return transport.readDocument(id, backup) },
-    async writeDocument(id, data, revision) {
+    async listDocuments() {
+      return transport.listDocuments()
+    },
+    async readDocument(id, backup = false) {
+      return transport.readDocument(id, backup)
+    },
+    async writeDocument(id, documentData, revision) {
       stopIfRefused('.engine/systems/' + id + '.json', 'project')
-      return transport.writeDocument(id, data, revision)
+      return transport.writeDocument(id, documentData, revision)
     },
     async writeSource(scope, file, text, expectedHash) {
       stopIfRefused(file, scope)
@@ -170,7 +208,9 @@ export function makeFiles(bus, transport = overHTTP()) {
       if (!transport.readSource) throw new Error('source inspection is unavailable in this transport')
       return transport.readSource(scope, path)
     },
-    async readAgent(scope, path) { return transport.readAgent(scope, path) },
+    async readAgent(scope, path) {
+      return transport.readAgent(scope, path)
+    },
 
     async write(path, text) {
       stopIfRefused(path, 'project')
@@ -194,7 +234,9 @@ export function makeFiles(bus, transport = overHTTP()) {
       }
     },
 
-    async writeJSON(path, value) { return this.write(path, JSON.stringify(value, null, 2)) },
+    async writeJSON(path, value) {
+      return this.write(path, JSON.stringify(value, null, 2))
+    },
 
     async writeAgent(scope, path, text) {
       stopIfRefused(path, scope)
@@ -213,9 +255,13 @@ export function makeFiles(bus, transport = overHTTP()) {
       }
     },
 
-    get pending() { return writing },
+    get pending() {
+      return writing
+    },
 
     /** The last write that did not land, or null once one does. */
-    get refused() { return refused }
+    get refused() {
+      return refused
+    }
   }
 }

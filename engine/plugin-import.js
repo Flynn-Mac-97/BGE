@@ -31,7 +31,7 @@ export function reportImportFailure(loader, file, error, builtin = false) {
 const sources = new WeakMap()
 
 /** The location `importPlugin` recorded for a definition, or null when it did not import it. */
-export const sourceOfPlugin = definition => definition ? sources.get(definition) || null : null
+export const sourceOfPlugin = definition => (definition ? sources.get(definition) || null : null)
 
 /**
  * Import one plugin file. Returns its definition, or null when there is none —
@@ -47,9 +47,12 @@ export async function importPlugin({ file, load, loader, builtin = false }) {
     const definition = (await load()).default || null
     if (definition && typeof definition === 'object') {
       const path = String(file).replaceAll('\\', '/')
-      sources.set(definition, builtin
-        ? { scope: 'engine', file: path.replace(/^\//, '') }
-        : { scope: 'project', file: 'plugins/' + path.split('/').pop() })
+      sources.set(
+        definition,
+        builtin
+          ? { scope: 'engine', file: path.replace(/^\//, '') }
+          : { scope: 'project', file: 'plugins/' + path.split('/').pop() }
+      )
     }
     return definition
   } catch (error) {

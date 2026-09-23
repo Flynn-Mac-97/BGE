@@ -38,10 +38,19 @@ test('an edge to a label that does not exist is ignored, and the frame still run
   const reported = []
   const graph = makePassGraph({ report: message => reported.push(message) })
   let ran = 0
-  graph.add({ name: 'probe', before: ['missing'], execute: () => { ran++ } })
+  graph.add({
+    name: 'probe',
+    before: ['missing'],
+    execute: () => {
+      ran++
+    }
+  })
   graph.run(null, null, 8, 8)
   assert.equal(ran, 1)
-  assert.ok(reported.some(message => message.includes('missing')), 'the dangling edge is named')
+  assert.ok(
+    reported.some(message => message.includes('missing')),
+    'the dangling edge is named'
+  )
 })
 
 test('a cycle is reported by name and its members keep registration order', () => {
@@ -51,7 +60,11 @@ test('a cycle is reported by name and its members keep registration order', () =
   graph.add({ name: 'b', after: ['a'], execute: noop })
   graph.add({ name: 'c', execute: noop })
   const ordered = names(graph)
-  assert.deepEqual(ordered.filter(name => name !== 'c'), ['a', 'b'], 'the cycle keeps arrival order')
+  assert.deepEqual(
+    ordered.filter(name => name !== 'c'),
+    ['a', 'b'],
+    'the cycle keeps arrival order'
+  )
   assert.ok(reported.some(message => message.includes('cycle') && message.includes('a') && message.includes('b')))
 })
 
@@ -67,7 +80,12 @@ test('remove takes one pass out and leaves the rest ordered', () => {
 test('disable takes a pass out of the run without dropping its record', () => {
   const graph = makePassGraph({ report: noop })
   let ran = 0
-  graph.add({ name: 'probe', execute: () => { ran++ } })
+  graph.add({
+    name: 'probe',
+    execute: () => {
+      ran++
+    }
+  })
   graph.disable('probe')
   assert.deepEqual(names(graph), [])
   graph.run(null, null, 8, 8)

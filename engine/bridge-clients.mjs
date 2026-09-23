@@ -145,11 +145,9 @@ export function chooseClient(entries, wanted) {
 
 /** One client on one line: enough to tell it from the others and target it. */
 export const describeClient = entry =>
-  `${entry.id} (${[
-    entry.hidden ? 'hidden' : null,
-    entry.viewport || null,
-    entry.headless ? 'headless' : null
-  ].filter(Boolean).join(', ')}) ${entry.url}`
+  `${entry.id} (${[entry.hidden ? 'hidden' : null, entry.viewport || null, entry.headless ? 'headless' : null]
+    .filter(Boolean)
+    .join(', ')}) ${entry.url}`
 
 /**
  * Why a call could not be sent, in words the caller can act on.
@@ -160,8 +158,10 @@ export const describeClient = entry =>
 export function explainClientError(error, { wanted, live, where, timeout, chosen } = {}) {
   const named = (live || []).map(describeClient).join('\n  ')
   if (error === 'no-client') {
-    return `no editor attached. Open ${where} and leave the tab open, `
-      + 'or start one through the supervisor: node bin/engine.mjs supervisor.open editor-browser'
+    return (
+      `no editor attached. Open ${where} and leave the tab open, ` +
+      'or start one through the supervisor: node bin/engine.mjs supervisor.open editor-browser'
+    )
   }
   if (error === 'unknown-client') {
     return `no attached client "${wanted}". Attached now:\n  ${named}`
@@ -170,18 +170,25 @@ export function explainClientError(error, { wanted, live, where, timeout, chosen
     return `more than one client calls itself "${wanted}":\n  ${named}`
   }
   if (error === 'name-taken') {
-    return `"${wanted}" is already attached and answering:\n  ${named}\n` +
-      `Open this page under another name with ?client=<id>, or stop the browser holding it: `
-      + 'node bin/engine.mjs supervisor lists ids, supervisor.stop <id> ends one.'
+    return (
+      `"${wanted}" is already attached and answering:\n  ${named}\n` +
+      `Open this page under another name with ?client=<id>, or stop the browser holding it: ` +
+      'node bin/engine.mjs supervisor lists ids, supervisor.stop <id> ends one.'
+    )
   }
   if (error === 'many-clients') {
-    return `${live.length} clients are attached and none was named, so this call has no one answer. ` +
+    return (
+      `${live.length} clients are attached and none was named, so this call has no one answer. ` +
       `Pick one with --client <id>:\n  ${named}`
+    )
   }
   if (error === 'no-reply') {
-    return `client ${chosen.id} did not answer in ${timeout} ms. ` + (chosen.hidden
-      ? 'It reports itself hidden, and a hidden tab stops drawing and stops answering.'
-      : `It is at ${chosen.url}.`)
+    return (
+      `client ${chosen.id} did not answer in ${timeout} ms. ` +
+      (chosen.hidden
+        ? 'It reports itself hidden, and a hidden tab stops drawing and stops answering.'
+        : `It is at ${chosen.url}.`)
+    )
   }
   return `could not reach a client: ${error}`
 }

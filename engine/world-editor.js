@@ -41,7 +41,10 @@ export function makeEditor({ projectDirectory, projectName, projectUntitled, bus
      * @returns {void}
      */
     select(ids, additive = false) {
-      const list = [].concat(ids ?? []).map(v => (typeof v === 'string' ? v : v?.id)).filter(Boolean)
+      const list = []
+        .concat(ids ?? [])
+        .map(v => (typeof v === 'string' ? v : v?.id))
+        .filter(Boolean)
       if (!additive) editor.selection.clear()
       for (const id of list) editor.selection.add(id)
       bus.emit('selection:changed', [...editor.selection])

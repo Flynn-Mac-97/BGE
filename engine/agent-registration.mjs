@@ -83,8 +83,7 @@ const DEFAULT_CATEGORY = 'core'
  * costs the optional skills, not every skill.
  */
 async function enabledCategories(root) {
-  const manifest = JSON.parse(
-    await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
+  const manifest = JSON.parse(await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
   const declared = manifest.skillCategories
   if (!declared || typeof declared !== 'object') return new Set([DEFAULT_CATEGORY])
   return new Set(CATEGORIES.filter(name => declared[name] === true))
@@ -202,7 +201,6 @@ const BOOTSTRAP = 'agents/bootstrap.md'
 /** The instruction tree, which also declares which skill categories register. */
 const MANIFEST = 'agents/manifest.json'
 
-
 /** The two places plugins are found, engine first, as the loader reads them. */
 const pluginPlaces = (root, projectPath) => [
   {
@@ -256,8 +254,12 @@ async function detailOf(directory, stem) {
   const names = await fs.readdir(detailDirectory).catch(() => [])
   // Together rather than one at a time: a guide may keep many detail files, and
   // waiting for each read before starting the next is time spent doing nothing.
-  const parts = await Promise.all(names.filter(name => name.endsWith('.md')).sort()
-    .map(name => fs.readFile(path.join(detailDirectory, name), 'utf8').catch(() => '')))
+  const parts = await Promise.all(
+    names
+      .filter(name => name.endsWith('.md'))
+      .sort()
+      .map(name => fs.readFile(path.join(detailDirectory, name), 'utf8').catch(() => ''))
+  )
   return parts.join('\n')
 }
 
@@ -269,12 +271,17 @@ async function detailOf(directory, stem) {
  */
 export async function pluginGuides(root, projectPath, { detail = true } = {}) {
   const game = JSON.parse(
-    await fs.readFile(path.join(path.resolve(root, projectPath), 'game.json'), 'utf8').catch(() => '{}'))
+    await fs.readFile(path.join(path.resolve(root, projectPath), 'game.json'), 'utf8').catch(() => '{}')
+  )
   const disabled = new Set(game.plugins?.disabled || [])
   const guides = []
   for (const place of pluginPlaces(root, projectPath)) {
-    let names = []
-    try { names = await fs.readdir(place.directory) } catch { continue }
+    let names
+    try {
+      names = await fs.readdir(place.directory)
+    } catch {
+      continue
+    }
     // A guide, its source and its detail files, read together. This is every
     // plugin in the checkout — guide, source and detail for each — and reading
     // them one at a time was most of what `check` spent its time on. The list is
@@ -286,40 +293,44 @@ export async function pluginGuides(root, projectPath, { detail = true } = {}) {
     // frontmatter. Reading eighty detail directories to throw the answer away
     // was most of one check's directory reads.
     const found = await Promise.all(
-      names.filter(name => name.endsWith('.agent.md')).sort().map(async name => {
-        const stem = name.slice(0, -'.agent.md'.length)
-        const sourceFile = path.join(place.directory, `${stem}.js`)
-        // The loader already read this file when `check` imported every plugin
-        // to find the ones that will not load. Reuse that text rather than read
-        // the same bytes a second time; a caller with no import behind it gets
-        // undefined here and the disk read below as before.
-        const [source, text, detailText] = await Promise.all([
-          loadedModuleSource(sourceFile) ?? fs.readFile(sourceFile, 'utf8').catch(() => null),
-          fs.readFile(path.join(place.directory, name), 'utf8').catch(() => null),
-          detail ? detailOf(place.directory, stem) : ''
-        ])
-        // Deleted between the listing and the read. A guide that is gone is not a
-        // problem to report, and throwing here would end the whole check.
-        if (text === null) return null
-        const pluginName = source?.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
-        return {
-          scope: place.scope,
-          stem,
-          file: `${place.prefix}/${name}`,
-          fileFromRoot: `${place.fromRoot}/${name}`,
-          sourceFromRoot: `${place.fromRoot}/${stem}.js`,
-          hasSource: source !== null,
-          plugin: pluginName,
-          enabled: !disabled.has(pluginName),
-          // The type names this plugin contributes, read from the same source
-          // the loader will run. The index reads the generated catalog built
-          // from these, and this is what holds the catalog to the sources.
-          registers: registeredTypeNames(source || ''),
-          frontmatter: frontmatterOf(text),
-          body: bodyOf(text),
-          detail: detailText
-        }
-      }))
+      names
+        .filter(name => name.endsWith('.agent.md'))
+        .sort()
+        .map(async name => {
+          const stem = name.slice(0, -'.agent.md'.length)
+          const sourceFile = path.join(place.directory, `${stem}.js`)
+          // The loader already read this file when `check` imported every plugin
+          // to find the ones that will not load. Reuse that text rather than read
+          // the same bytes a second time; a caller with no import behind it gets
+          // undefined here and the disk read below as before.
+          const [source, text, detailText] = await Promise.all([
+            loadedModuleSource(sourceFile) ?? fs.readFile(sourceFile, 'utf8').catch(() => null),
+            fs.readFile(path.join(place.directory, name), 'utf8').catch(() => null),
+            detail ? detailOf(place.directory, stem) : ''
+          ])
+          // Deleted between the listing and the read. A guide that is gone is not a
+          // problem to report, and throwing here would end the whole check.
+          if (text === null) return null
+          const pluginName = source?.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
+          return {
+            scope: place.scope,
+            stem,
+            file: `${place.prefix}/${name}`,
+            fileFromRoot: `${place.fromRoot}/${name}`,
+            sourceFromRoot: `${place.fromRoot}/${stem}.js`,
+            hasSource: source !== null,
+            plugin: pluginName,
+            enabled: !disabled.has(pluginName),
+            // The type names this plugin contributes, read from the same source
+            // the loader will run. The index reads the generated catalog built
+            // from these, and this is what holds the catalog to the sources.
+            registers: registeredTypeNames(source || ''),
+            frontmatter: frontmatterOf(text),
+            body: bodyOf(text),
+            detail: detailText
+          }
+        })
+    )
     guides.push(...found.filter(Boolean))
   }
   return guides
@@ -329,14 +340,26 @@ export async function pluginGuides(root, projectPath, { detail = true } = {}) {
 export async function pluginsWithoutGuide(root, projectPath) {
   const found = []
   for (const place of pluginPlaces(root, projectPath)) {
-    let names = []
-    try { names = await fs.readdir(place.directory) } catch { continue }
+    let names
+    try {
+      names = await fs.readdir(place.directory)
+    } catch {
+      continue
+    }
     // Asked together. This is one `fs.access` per plugin in the checkout, and
     // waiting for each answer before asking the next is the whole of its cost.
-    const missing = await Promise.all(names.filter(name => name.endsWith('.js')).sort().map(async name => {
-      const guide = path.join(place.directory, `${name.slice(0, -'.js'.length)}.agent.md`)
-      return await fs.access(guide).then(() => null, () => `${place.fromRoot}/${name}`)
-    }))
+    const missing = await Promise.all(
+      names
+        .filter(name => name.endsWith('.js'))
+        .sort()
+        .map(async name => {
+          const guide = path.join(place.directory, `${name.slice(0, -'.js'.length)}.agent.md`)
+          return await fs.access(guide).then(
+            () => null,
+            () => `${place.fromRoot}/${name}`
+          )
+        })
+    )
     found.push(...missing.filter(Boolean))
   }
   return found
@@ -357,11 +380,14 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
   // CLAUDE.md in the system prompt on every turn, which is the only carrier an
   // agent cannot skip — so the rules are inline in both, and `check` holds them
   // to the source byte for byte rather than trusting anyone to copy an edit.
-  const files = bootstrap === null ? [] : [
-    { path: 'AGENTS.md', source: BOOTSTRAP, text: bootstrap },
-    { path: 'CLAUDE.md', source: BOOTSTRAP, text: bootstrap }
-  ]
-  const known = guides || await pluginGuides(root, projectPath)
+  const files =
+    bootstrap === null
+      ? []
+      : [
+          { path: 'AGENTS.md', source: BOOTSTRAP, text: bootstrap },
+          { path: 'CLAUDE.md', source: BOOTSTRAP, text: bootstrap }
+        ]
+  const known = guides || (await pluginGuides(root, projectPath))
   const enabled = await enabledCategories(root)
   for (const guide of known) {
     // The listing belongs to the engine, not to whichever game is open. It is
@@ -383,10 +409,10 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     if (!description || !SKILL_NAME.test(skill)) continue
     // Keep one generated interface beside the guide and link it from skills.
     const where = guide.hasSource
-      ? `Read the generated interface in \`${guide.sourceFromRoot.replace(/\.js$/, '.agent/interface.generated.md')}\`.`
-        + ` Plugin edits refresh it while the server runs. This packet command also checks freshness:\n\n`
-        + '```sh\nnode bin/engine.mjs agent.context \'{"task":"…","files":["'
-        + `${guide.sourceFromRoot}"]}'\n\`\`\`\n\n`
+      ? `Read the generated interface in \`${guide.sourceFromRoot.replace(/\.js$/, '.agent/interface.generated.md')}\`.` +
+        ` Plugin edits refresh it while the server runs. This packet command also checks freshness:\n\n` +
+        '```sh\nnode bin/engine.mjs agent.context \'{"task":"…","files":["' +
+        `${guide.sourceFromRoot}"]}'\n\`\`\`\n\n`
       : ''
     files.push({
       path: `${SKILL_DIRECTORY}/${skill}/SKILL.md`,
@@ -404,10 +430,15 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
     source: 'plugins/builtin/*.js',
     text: registeredTypesText(known)
   })
-  files.push(...await manifestSkillFiles(root, new Set(files.map(file => file.path)), enabled))
-  files.push(...files.filter(file => file.path.startsWith(`${SKILL_DIRECTORY}/`)).map(file => ({
-    ...file, path: file.path.replace(SKILL_DIRECTORY, CODEX_SKILL_DIRECTORY)
-  })))
+  files.push(...(await manifestSkillFiles(root, new Set(files.map(file => file.path)), enabled)))
+  files.push(
+    ...files
+      .filter(file => file.path.startsWith(`${SKILL_DIRECTORY}/`))
+      .map(file => ({
+        ...file,
+        path: file.path.replace(SKILL_DIRECTORY, CODEX_SKILL_DIRECTORY)
+      }))
+  )
   return files
 }
 
@@ -418,9 +449,9 @@ export async function generatedAgentFiles(root, projectPath, guides = null) {
  * were read in and a check compares it byte for byte.
  */
 export function registeredTypesText(guides) {
-  const types = [...new Set(guides
-    .filter(guide => guide.scope === 'engine')
-    .flatMap(guide => guide.registers || []))].sort()
+  const types = [
+    ...new Set(guides.filter(guide => guide.scope === 'engine').flatMap(guide => guide.registers || []))
+  ].sort()
   return `${JSON.stringify({ source: 'plugins/builtin/*.js', types }, null, 2)}\n`
 }
 
@@ -433,8 +464,7 @@ export function registeredTypesText(guides) {
  * prefix as the rest, and read from the same file the manifest names.
  */
 async function manifestSkillFiles(root, taken = new Set(), enabled = new Set([DEFAULT_CATEGORY])) {
-  const manifest = JSON.parse(
-    await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
+  const manifest = JSON.parse(await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
   const files = []
   for (const node of manifest.nodes || []) {
     if (node.kind !== 'skill' || !node.file) continue
@@ -467,15 +497,20 @@ ${bodyOf(source)}`
 
 /** Generated skill files on disk, whatever guide they came from. */
 async function generatedSkillsOnDisk(root) {
-  const lists = await Promise.all([SKILL_DIRECTORY, CODEX_SKILL_DIRECTORY]
-    .map(directory => generatedSkillsInDirectory(root, directory)))
+  const lists = await Promise.all(
+    [SKILL_DIRECTORY, CODEX_SKILL_DIRECTORY].map(directory => generatedSkillsInDirectory(root, directory))
+  )
   return lists.flat()
 }
 
 async function generatedSkillsInDirectory(root, skillDirectory) {
   const directory = path.join(root, skillDirectory)
-  let names = []
-  try { names = await fs.readdir(directory) } catch { return [] }
+  let names
+  try {
+    names = await fs.readdir(directory)
+  } catch {
+    return []
+  }
   const found = []
   for (const name of names) {
     const file = `${skillDirectory}/${name}/SKILL.md`
@@ -510,7 +545,8 @@ export async function writeGeneratedAgentFiles(root, projectPath) {
     if (wanted.has(skill.path)) continue
     const directory = path.resolve(root, path.dirname(skill.path))
     const relative = path.relative(path.resolve(root), directory)
-    if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Skill directory is outside the checkout')
+    if (relative.startsWith('..') || path.isAbsolute(relative))
+      throw new Error('Skill directory is outside the checkout')
     await fs.rm(directory, { recursive: true, force: true })
   }
   return files.map(file => file.path)
@@ -542,13 +578,14 @@ export async function generatedFileProblems(root, projectPath, guides = null, sk
     if (onDisk === null && file.path === BUILTIN_REGISTERED_TYPES) continue
     problems.push({
       file: file.path,
-      why: onDisk === null
-        ? `${file.path} is generated from ${file.source} and is not on disk. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
-        : `${file.path} does not match ${file.source} it is generated from. Every agent reads the stale copy. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
+      why:
+        onDisk === null
+          ? `${file.path} is generated from ${file.source} and is not on disk. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
+          : `${file.path} does not match ${file.source} it is generated from. Every agent reads the stale copy. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
     })
   }
   const wanted = new Set(files.map(file => file.path))
-  for (const skill of skillsOnDisk || await generatedSkillsOnDisk(root)) {
+  for (const skill of skillsOnDisk || (await generatedSkillsOnDisk(root))) {
     if (wanted.has(skill.path)) continue
     problems.push({
       file: skill.path,
@@ -570,83 +607,9 @@ export async function generatedFileProblems(root, projectPath, guides = null, sk
 export async function skillRegistrationProblems(root, projectPath, guides = null, skillsOnDisk = null) {
   const problems = []
   const enabled = await enabledCategories(root)
-  for (const guide of guides || await pluginGuides(root, projectPath)) {
-    const { skill, category, description, triggers, match } = guide.frontmatter
-
-    // A category the engine does not define registers nothing, and the listing
-    // shows no sign of why: the guide is on disk and correct in every other way.
-    if (category && !CATEGORIES.includes(category)) {
-      problems.push({
-        file: guide.fileFromRoot,
-        why: `declares category ${JSON.stringify(category)}, which is not one of ${CATEGORIES.join(', ')}, so no skill is registered for it. Use one of them`
-      })
-    }
-
-    // This is the set every agent of every session pays for, so a guide that
-    // lands in it by omission is worth one line when it is written.
-    if (listedForAgents(guide) && !category) {
-      problems.push({
-        warning: true,
-        file: guide.fileFromRoot,
-        why: `declares no category, so it registers as \`${DEFAULT_CATEGORY}\` and every agent of every session reads its listing. Add a category line`
-      })
-    }
-
-    // An opt-out is a decision, not a broken declaration: the guide still
-    // arrives in a packet when the task names the plugin.
-    if (!listedForAgents(guide)) continue
-    // So is a category this checkout keeps out of the listing. The rest of these
-    // checks are about a registered listing, and this guide is not in one.
-    if (!enabled.has(categoryOf(guide))) continue
-    // The listing is the engine's and does not change with the open project, so
-    // a game that switches a builtin off is listing a command it does not have.
-    if (guide.scope === 'engine' && !guide.enabled) {
-      problems.push({
-        warning: true,
-        file: guide.fileFromRoot,
-        why: `is listed as \`${skillNameFor(guide)}\` and ${projectName(projectPath)} switches it off, so this game lists a tool whose commands it does not have. Enable it, or expect an agent to try a command that is not there`
-      })
-      continue
-    }
-    if (!guide.enabled) continue
-
-    if (skill && !SKILL_NAME.test(skill)) {
-      problems.push({
-        file: guide.fileFromRoot,
-        why: `skill name ${JSON.stringify(skill)} is not a directory name, so no skill is registered. Use lower-case letters, digits and hyphens`
-      })
-    }
-
-    // A guide is registered under its own stem unless it says `skill: none`, so
-    // a description or a trigger word on one that opted out is dead text.
-    if (!listedForAgents(guide) && (description || triggers)) {
-      problems.push({
-        warning: true,
-        file: guide.fileFromRoot,
-        why: `declares ${description ? 'a description' : 'trigger words'} and \`skill: none\`, so it is in no listing and the words reach nothing. Drop one of the two`
-      })
-    }
-
-    // The description is the only thing that decides whether a skill is found,
-    // and a derived one can only say what the plugin is. A guide worth reaching
-    // for says when to reach for it, in its own words.
-    if (listedForAgents(guide) && !description) {
-      problems.push({
-        warning: true,
-        file: guide.fileFromRoot,
-        why: 'declares no description, so its listing is derived from the guide body and says what the plugin is but never when to use it. Add a description line saying what it does and when to reach for it'
-      })
-    }
-
-    // A guide matches its own plugin source by default. No source and no
-    // declared match leaves it matching a file that is not there.
-    if (!guide.hasSource && !match) {
-      problems.push({
-        warning: true,
-        file: guide.fileFromRoot,
-        why: `has no plugin at ${guide.sourceFromRoot} and declares no match, so no task ever pulls it in. Add a match line, or the plugin`
-      })
-    }
+  const context = { enabled, projectPath }
+  for (const guide of guides || (await pluginGuides(root, projectPath))) {
+    problems.push(...guideProblems(guide, context))
   }
 
   for (const source of await pluginsWithoutGuide(root, projectPath)) {
@@ -657,7 +620,90 @@ export async function skillRegistrationProblems(root, projectPath, guides = null
     })
   }
 
-  problems.push(...await manifestSkillProblems(root, skillsOnDisk))
+  problems.push(...(await manifestSkillProblems(root, skillsOnDisk)))
+  return problems
+}
+
+/** Every listing problem one guide declares, in the order the checks read. */
+function guideProblems(guide, { enabled, projectPath }) {
+  const problems = []
+  const { skill, category, description, triggers, match } = guide.frontmatter
+
+  // A category the engine does not define registers nothing, and the listing
+  // shows no sign of why: the guide is on disk and correct in every other way.
+  if (category && !CATEGORIES.includes(category)) {
+    problems.push({
+      file: guide.fileFromRoot,
+      why: `declares category ${JSON.stringify(category)}, which is not one of ${CATEGORIES.join(', ')}, so no skill is registered for it. Use one of them`
+    })
+  }
+
+  // This is the set every agent of every session pays for, so a guide that
+  // lands in it by omission is worth one line when it is written.
+  if (listedForAgents(guide) && !category) {
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: `declares no category, so it registers as \`${DEFAULT_CATEGORY}\` and every agent of every session reads its listing. Add a category line`
+    })
+  }
+
+  // An opt-out is a decision, not a broken declaration: the guide still
+  // arrives in a packet when the task names the plugin.
+  if (!listedForAgents(guide)) return problems
+  // So is a category this checkout keeps out of the listing. The rest of these
+  // checks are about a registered listing, and this guide is not in one.
+  if (!enabled.has(categoryOf(guide))) return problems
+  // The listing is the engine's and does not change with the open project, so
+  // a game that switches a builtin off is listing a command it does not have.
+  if (guide.scope === 'engine' && !guide.enabled) {
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: `is listed as \`${skillNameFor(guide)}\` and ${projectName(projectPath)} switches it off, so this game lists a tool whose commands it does not have. Enable it, or expect an agent to try a command that is not there`
+    })
+    return problems
+  }
+  if (!guide.enabled) return problems
+
+  if (skill && !SKILL_NAME.test(skill)) {
+    problems.push({
+      file: guide.fileFromRoot,
+      why: `skill name ${JSON.stringify(skill)} is not a directory name, so no skill is registered. Use lower-case letters, digits and hyphens`
+    })
+  }
+
+  // A guide is registered under its own stem unless it says `skill: none`, so
+  // a description or a trigger word on one that opted out is dead text.
+  if (!listedForAgents(guide) && (description || triggers)) {
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: `declares ${description ? 'a description' : 'trigger words'} and \`skill: none\`, so it is in no listing and the words reach nothing. Drop one of the two`
+    })
+  }
+
+  // The description is the only thing that decides whether a skill is found,
+  // and a derived one can only say what the plugin is. A guide worth reaching
+  // for says when to reach for it, in its own words.
+  if (listedForAgents(guide) && !description) {
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: 'declares no description, so its listing is derived from the guide body and says what the plugin is but never when to use it. Add a description line saying what it does and when to reach for it'
+    })
+  }
+
+  // A guide matches its own plugin source by default. No source and no
+  // declared match leaves it matching a file that is not there.
+  if (!guide.hasSource && !match) {
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: `has no plugin at ${guide.sourceFromRoot} and declares no match, so no task ever pulls it in. Add a match line, or the plugin`
+    })
+  }
+
   return problems
 }
 
@@ -669,10 +715,9 @@ export async function skillRegistrationProblems(root, projectPath, guides = null
  * into the session listing, so a manifest skill is a skill in name only.
  */
 async function manifestSkillProblems(root, skillsOnDisk = null) {
-  const manifest = JSON.parse(
-    await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
+  const manifest = JSON.parse(await fs.readFile(path.join(root, MANIFEST), 'utf8').catch(() => '{"nodes":[]}'))
   const enabled = await enabledCategories(root)
-  const registered = new Set((skillsOnDisk || await generatedSkillsOnDisk(root)).map(skill => skill.name))
+  const registered = new Set((skillsOnDisk || (await generatedSkillsOnDisk(root))).map(skill => skill.name))
   return (manifest.nodes || [])
     .filter(node => node.kind === 'skill' && enabled.has(node.category || DEFAULT_CATEGORY))
     .filter(node => !registered.has(`${ENGINE}-${node.id}`))
@@ -681,27 +726,6 @@ async function manifestSkillProblems(root, skillsOnDisk = null) {
       file: node.file || 'agents/manifest.json',
       why: `manifest node "${node.id}" is kind "skill" but is not in ${SKILL_DIRECTORY}, so no session lists it. Only an agent that ran agent.context with a matching word finds it`
     }))
-}
-
-/**
- * The ids in a plugin's `commands` array, and nothing else.
- *
- * Panels, menus and fields carry ids of the same shape, so a plain search over
- * the file names things no agent would ever call. The array is read by
- * bracket depth from `commands:` to its close; a plugin that builds its
- * commands somewhere else answers nothing rather than a guess.
- */
-function commandIds(source) {
-  const start = source.search(/\bcommands:\s*\[/)
-  if (start < 0) return []
-  let depth = 0
-  let index = source.indexOf('[', start)
-  const from = index
-  for (; index < source.length; index++) {
-    if (source[index] === '[') depth++
-    else if (source[index] === ']' && --depth === 0) break
-  }
-  return [...source.slice(from, index).matchAll(/id:\s*'([a-z][\w-]*\.[\w.-]+)'/g)].map(match => match[1])
 }
 
 /** Everything this module reports, for one call from `check`. */
@@ -721,7 +745,7 @@ export async function agentRegistrationProblems(root, projectPath) {
   // SKILL.md to find out.
   const skillsOnDisk = await generatedSkillsOnDisk(root)
   return [
-    ...await generatedFileProblems(root, projectPath, guides, skillsOnDisk),
-    ...await skillRegistrationProblems(root, projectPath, guides, skillsOnDisk)
+    ...(await generatedFileProblems(root, projectPath, guides, skillsOnDisk)),
+    ...(await skillRegistrationProblems(root, projectPath, guides, skillsOnDisk))
   ]
 }

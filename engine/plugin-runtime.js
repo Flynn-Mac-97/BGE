@@ -67,7 +67,10 @@ function orderPhase(nodes, phase, byId) {
  *   ordering constraints form a cycle.
  */
 export function compileSchedule(systems) {
-  const nodes = systems.map((system, index) => ({ ...system, id: system.id || `${system.plugin}:${system.phase}:${index}` }))
+  const nodes = systems.map((system, index) => ({
+    ...system,
+    id: system.id || `${system.plugin}:${system.phase}:${index}`
+  }))
   const byId = indexSystemsById(nodes)
   const result = { fixed: [], frame: [] }
   for (const phase of ['fixed', 'frame']) result[phase] = orderPhase(nodes, phase, byId)
@@ -87,12 +90,21 @@ export function compileSchedule(systems) {
 export function makePluginScope(name, definition, bus, services) {
   const cleanups = []
   let closed = false
-  const check = () => { if (closed) throw new Error(`plugin scope closed: ${name}`) }
+  const check = () => {
+    if (closed) throw new Error(`plugin scope closed: ${name}`)
+  }
   const scope = {
-    defer(dispose) { check(); if (typeof dispose !== 'function') throw new Error('cleanup must be a function'); cleanups.push(dispose); return dispose },
+    defer(dispose) {
+      check()
+      if (typeof dispose !== 'function') throw new Error('cleanup must be a function')
+      cleanups.push(dispose)
+      return dispose
+    },
     on(event, listener) {
       check()
-      const off = bus.on(event, (...args) => { if (!closed) listener(...args) })
+      const off = bus.on(event, (...args) => {
+        if (!closed) listener(...args)
+      })
       scope.defer(off)
       return off
     },
@@ -101,7 +113,9 @@ export function makePluginScope(name, definition, bus, services) {
       if (!(definition.provides || []).includes(key)) throw new Error(`${name}: undeclared service ${key}`)
       if (services.has(key)) throw new Error(`service ${key} already owned by ${services.get(key).owner}`)
       services.set(key, { owner: name, value })
-      scope.defer(() => { if (services.get(key)?.owner === name) services.delete(key) })
+      scope.defer(() => {
+        if (services.get(key)?.owner === name) services.delete(key)
+      })
       return value
     },
     require(key) {
@@ -115,7 +129,13 @@ export function makePluginScope(name, definition, bus, services) {
       if (closed) return []
       closed = true
       const errors = []
-      for (const cleanup of cleanups.reverse()) { try { cleanup() } catch (error) { errors.push(error.message) } }
+      for (const cleanup of cleanups.reverse()) {
+        try {
+          cleanup()
+        } catch (error) {
+          errors.push(error.message)
+        }
+      }
       cleanups.length = 0
       return errors
     }

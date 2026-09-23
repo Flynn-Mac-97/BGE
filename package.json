@@ -20,6 +20,11 @@
     "test:offline": "node --test \"test/*.test.mjs\" \"test/core/**/*.test.mjs\"",
     "test:core": "node --test \"test/core/**/*.test.mjs\"",
     "test:agent": "node --test test/agent-workspace.test.mjs",
+    "lint": "eslint engine test/core eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs",
+    "format": "prettier --write \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json package.json",
+    "format:check": "prettier --check \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json package.json",
+    "check:structure": "node scripts/check-structure.mjs",
+    "check": "npm run format:check && npm run lint && npm run test:core && npm run check:structure",
     "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine",
     "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit ."
   },
@@ -42,7 +47,11 @@
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",
+    "@eslint/js": "^10.0.1",
     "electron": "^44.4.3",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
     "vite": "^5.4.0"
   }
 }

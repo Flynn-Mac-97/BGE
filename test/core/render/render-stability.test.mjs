@@ -104,7 +104,13 @@ test('a pass that throws leaves the graph able to run the next frame', () => {
   const ran = []
   let broken = true
   graph.add({ name: 'before', execute: () => ran.push('before') })
-  graph.add({ name: 'broken', execute: () => { if (broken) throw new Error('a broken pass'); ran.push('broken') } })
+  graph.add({
+    name: 'broken',
+    execute: () => {
+      if (broken) throw new Error('a broken pass')
+      ran.push('broken')
+    }
+  })
   graph.add({ name: 'after', execute: () => ran.push('after') })
 
   const order = graph.passes
@@ -226,8 +232,12 @@ function withImageDocument(run) {
       complete: false,
       addEventListener() {},
       removeEventListener() {},
-      set src(value) { this._src = value },
-      get src() { return this._src }
+      set src(value) {
+        this._src = value
+      },
+      get src() {
+        return this._src
+      }
     })
   }
   try {

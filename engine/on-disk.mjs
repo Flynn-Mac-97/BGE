@@ -23,9 +23,14 @@ import { pluginInterfaceReader } from './plugin-interface.mjs'
 
 /** The engine's own instruction files an agent packet may name. */
 function isEngineAgentFile(clean) {
-  return clean === 'AGENTS.md' || clean === 'ENGINE-BASE.md' || clean === 'ARCHITECTURE.md'
-    || clean.startsWith('agents/') || clean.startsWith('docs/')
-    || /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+  return (
+    clean === 'AGENTS.md' ||
+    clean === 'ENGINE-BASE.md' ||
+    clean === 'ARCHITECTURE.md' ||
+    clean.startsWith('agents/') ||
+    clean.startsWith('docs/') ||
+    /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
+  )
 }
 
 /** A project's own instruction files: its agents folder and its plugin guides. */
@@ -87,7 +92,9 @@ export function onDisk(projectDirectory, checkout = ROOT) {
   /** Resolve one agent file, from the fixed sets each scope is allowed to read. */
   const insideAgent = (scope, rel) => {
     const base = agentScopeBase(scope, root, projectDirectory)
-    const clean = String(rel || '').replaceAll('\\', '/').replace(/^\.\//, '')
+    const clean = String(rel || '')
+      .replaceAll('\\', '/')
+      .replace(/^\.\//, '')
     if (!base || !agentFileAllowed(scope, clean)) throw new Error(`bad agent file path: ${scope}:${rel}`)
     const abs = path.resolve(base, clean)
     if (!abs.startsWith(base + path.sep)) throw new Error(`bad agent file path: ${scope}:${rel}`)
@@ -99,16 +106,15 @@ export function onDisk(projectDirectory, checkout = ROOT) {
 
   return {
     index: () => buildIndex(projectDirectory, root),
-    tree: async () => (await walk(projectDirectory))
-      .filter(f => !f.startsWith('.engine'))
-      .map(f => ({ path: f })),
+    tree: async () => (await walk(projectDirectory)).filter(f => !f.startsWith('.engine')).map(f => ({ path: f })),
     agentPlugins: pluginSidecars,
     agentInterface,
     sourceCatalog: selection => sourceCatalog(root, projectDirectory, selection),
     listDocuments: () => listDocuments(projectDirectory),
     readDocument: (id, backup) => readDocument(projectDirectory, id, backup),
-    writeDocument: (id, data, revision) => writeDocument(projectDirectory, id, data, revision),
-    writeSource: (scope, file, text, expectedHash) => writeSource(root, projectDirectory, scope, file, text, expectedHash),
+    writeDocument: (id, documentData, revision) => writeDocument(projectDirectory, id, documentData, revision),
+    writeSource: (scope, file, text, expectedHash) =>
+      writeSource(root, projectDirectory, scope, file, text, expectedHash),
     readSource: (scope, file) => readSource(root, projectDirectory, scope, file),
     read: rel => fs.readFile(inside(rel), 'utf8'),
     readAgent: (scope, rel) => fs.readFile(insideAgent(scope, rel), 'utf8'),

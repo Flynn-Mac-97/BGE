@@ -52,12 +52,10 @@ const STRIDE = 60
  * @param {object} [options]
  * @param {number} [options.depth] Marks held before the oldest is dropped.
  * @param {number} [options.stride] Steps between automatic marks.
- * @param {object} [options.bus] Where a world being replaced is announced. The ring
- *   listens for the two events that mean its marks describe a world that is gone.
  * @returns {object} `mark`, `marks`, `to`, `back`, `clear`, `observe`, `stride`,
  *   `depth` and `length`.
  */
-export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, stride = STRIDE }) {
+export function makeRewind({ world, loop, checkpoints, depth = DEPTH, stride = STRIDE }) {
   const parts = { world, loop, checkpoints }
 
   /** Oldest first. Each is `{ steps, moment }`, and every one is a whole moment. */
@@ -83,14 +81,17 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
   /** The requested step count, or the reply saying it is not a count at all. */
   function targetStep(steps, from) {
     const wanted = Number(steps)
-    if (!Number.isFinite(wanted)) return { error: { from, to: steps, reached: false, why: `${steps} is not a step count` } }
+    if (!Number.isFinite(wanted))
+      return { error: { from, to: steps, reached: false, why: `${steps} is not a step count` } }
     return { target: Math.max(0, Math.round(wanted)) }
   }
 
   /** Why the ring cannot reach the requested step. */
   function noMarkReply(from, target) {
     return {
-      from, to: target, reached: false,
+      from,
+      to: target,
+      reached: false,
       why: marks.length
         ? `the ring reaches back to step ${marks[0].steps} and no further`
         : 'this run has no marks — nothing has stepped since the level opened'
@@ -104,17 +105,17 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
    * tick landing mid-replay would advance a world being rebuilt. Starting it again
    * afterwards is the caller's loop, not a second kind of play.
    */
-  function replayMoment(mark, replayed, parts, loop) {
-    const wasRunning = loop.running
-    if (wasRunning) loop.stop()
+  function replayMoment(markToRestore, replayed, momentParts, activeLoop) {
+    const wasRunning = activeLoop.running
+    if (wasRunning) activeLoop.stop()
     try {
       // The timeline, not the mark's copy of it: the keys pressed after the mark
       // are what the segment being replayed did with its keyboard.
-      const back = restoreMoment(mark.moment, parts, { input: loop.input.events })
-      if (replayed > 0) loop.step(replayed)
+      const back = restoreMoment(markToRestore.moment, momentParts, { input: activeLoop.input.events })
+      if (replayed > 0) activeLoop.step(replayed)
       return back
     } finally {
-      if (wasRunning) loop.start()
+      if (wasRunning) activeLoop.start()
     }
   }
 
@@ -123,17 +124,22 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
    * is on has been rewritten. The stride counts from the newest mark left, so marks
    * go on being taken where the clock now is.
    */
-  function rewindMarks(mark) {
-    marks = marks.filter(one => one.steps <= mark.steps)
+  function rewindMarks(targetMark) {
+    marks = marks.filter(one => one.steps <= targetMark.steps)
     newest = marks.length ? marks[marks.length - 1].steps : null
   }
 
   /** The reply for a rewind, naming what was refused, lost, or holding the clock. */
-  function rewindReply(from, target, mark, replayed, back) {
+  function rewindReply(from, target, markAt, replayed, back) {
     const at = loop.steps
     const reached = at === target
     return {
-      from, to: target, reached, mark: mark.steps, replayed, at,
+      from,
+      to: target,
+      reached,
+      mark: markAt.steps,
+      replayed,
+      at,
       // Named, because a solver that would not go back leaves a world that reads
       // as rewound and runs as the later one.
       ...(back.refused.length ? { refused: back.refused } : {}),
@@ -165,23 +171,30 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
     const { target, error } = targetStep(steps, from)
     if (error) return error
     if (target > from) {
-      return { from, to: target, reached: false, why: `step ${target} has not happened — the clock is at ${from}. Step forward with simulate instead of seeking to it.` }
+      return {
+        from,
+        to: target,
+        reached: false,
+        why: `step ${target} has not happened — the clock is at ${from}. Step forward with simulate instead of seeking to it.`
+      }
     }
     if (target === from) return { from, to: target, reached: true, replayed: 0, at: from }
 
-    const mark = newestAtOrBefore(target)
-    if (!mark) return noMarkReply(from, target)
+    const markAt = newestAtOrBefore(target)
+    if (!markAt) return noMarkReply(from, target)
 
-    const replayed = target - mark.steps
-    const back = replayMoment(mark, replayed, parts, loop)
-    rewindMarks(mark)
-    return rewindReply(from, target, mark, replayed, back)
+    const replayed = target - markAt.steps
+    const back = replayMoment(markAt, replayed, parts, loop)
+    rewindMarks(markAt)
+    return rewindReply(from, target, markAt, replayed, back)
   }
 
   return {
     stride,
     depth,
-    get length() { return marks.length },
+    get length() {
+      return marks.length
+    },
 
     /**
      * Every mark held, oldest first.
@@ -189,10 +202,14 @@ export function makeRewind({ world, loop, checkpoints, bus, depth = DEPTH, strid
      * The counts and nothing else: a moment is hundreds of kilobytes, and a reader
      * asking what it can go back to wants the counts.
      */
-    get marks() { return marks.map(one => ({ steps: one.steps })) },
+    get marks() {
+      return marks.map(one => ({ steps: one.steps }))
+    },
 
     /** The oldest count the ring can reach, or null when it holds nothing. */
-    get oldest() { return marks.length ? marks[0].steps : null },
+    get oldest() {
+      return marks.length ? marks[0].steps : null
+    },
 
     mark,
 

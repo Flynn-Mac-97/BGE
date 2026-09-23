@@ -37,8 +37,18 @@ function pluginNameIn(source, stem) {
  */
 function guideFrontmatter(guide) {
   const declared = guide.match(/^---\s*\n([\s\S]*?)\n---/)?.[1]
-  const extra = declared?.match(/^match:\s*(.+)$/m)?.[1]?.trim().split(/\s+/).filter(Boolean) || []
-  const saidTriggers = declared?.match(/^triggers:\s*(.+)$/m)?.[1]?.split(',').map(word => word.trim().toLowerCase()).filter(Boolean) || []
+  const extra =
+    declared
+      ?.match(/^match:\s*(.+)$/m)?.[1]
+      ?.trim()
+      .split(/\s+/)
+      .filter(Boolean) || []
+  const saidTriggers =
+    declared
+      ?.match(/^triggers:\s*(.+)$/m)?.[1]
+      ?.split(',')
+      .map(word => word.trim().toLowerCase())
+      .filter(Boolean) || []
   return { extra, saidTriggers }
 }
 
@@ -70,14 +80,19 @@ async function readGuide(place, name, disabled) {
   const guide = await fs.readFile(path.join(place.directory, name), 'utf8').catch(() => '')
   const { extra, saidTriggers } = guideFrontmatter(guide)
   return {
-    id: `plugin-${place.scope}-${stem}`, title: plugin, kind: 'instruction', parent: 'plugins',
-    scope: place.scope, file: `${place.prefix}/${name}`,
+    id: `plugin-${place.scope}-${stem}`,
+    title: plugin,
+    kind: 'instruction',
+    parent: 'plugins',
+    scope: place.scope,
+    file: `${place.prefix}/${name}`,
     // The plugin the guide documents. A packet parses it so the interface
     // an agent reads is the code now, not a list somebody kept in step.
     source: source ? `${place.prefix}/${stem}.js` : null,
     match: guideMatch(place, stem, extra),
     triggers: guideTriggers(saidTriggers, stem, plugin),
-    enabled: !disabled.has(plugin), plugin
+    enabled: !disabled.has(plugin),
+    plugin
   }
 }
 
@@ -90,8 +105,7 @@ async function readGuide(place, name, disabled) {
 export async function pluginGuides(root, projectDirectory) {
   // Optional: a new project has no game.json, and refusing to list the plugin
   // guides would leave the first agent in it with no packet.
-  const game = JSON.parse(
-    await fs.readFile(path.join(projectDirectory, 'game.json'), 'utf8').catch(() => '{}'))
+  const game = JSON.parse(await fs.readFile(path.join(projectDirectory, 'game.json'), 'utf8').catch(() => '{}'))
   const disabled = new Set(game.plugins?.disabled || [])
   const places = [
     { scope: 'engine', directory: path.join(root, 'plugins/builtin'), prefix: 'plugins/builtin' },

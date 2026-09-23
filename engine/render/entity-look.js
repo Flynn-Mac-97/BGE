@@ -48,7 +48,9 @@ export function anchorOffset(entity) {
   if (!ANCHORS.has(anchor)) {
     // Silence is the enemy: a misspelt anchor would otherwise be a model that
     // is subtly in the wrong place, which nobody ever traces back to a typo.
-    console.error(`[render] ${entity.type}.mesh.anchor is "${anchor}" — expected one of ${[...ANCHORS].join(', ')}. Treating it as centre.`)
+    console.error(
+      `[render] ${entity.type}.mesh.anchor is "${anchor}" — expected one of ${[...ANCHORS].join(', ')}. Treating it as centre.`
+    )
     return 0
   }
   if (anchor !== 'feet') return 0
@@ -71,7 +73,7 @@ export function frameWindow(sprite, frame, image) {
   return {
     repeat: [cw / image.width, ch / image.height],
     // Three's V axis runs bottom-up while a sheet reads top-down.
-    offset: [(n % cols) * cw / image.width, 1 - ch / image.height - Math.floor(n / cols) * ch / image.height]
+    offset: [((n % cols) * cw) / image.width, 1 - ch / image.height - (Math.floor(n / cols) * ch) / image.height]
   }
 }
 

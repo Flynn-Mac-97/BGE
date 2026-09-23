@@ -6,23 +6,31 @@ import { resolveAgentContext } from './agent-workspace.js'
 import { onDisk } from './start-world-node.mjs'
 
 /** A path in the one spelling the tree uses: forward slashes, no leading `./`. */
-const normal = value => String(value || '').replaceAll('\\', '/').replace(/^\.\//, '')
+const normal = value =>
+  String(value || '')
+    .replaceAll('\\', '/')
+    .replace(/^\.\//, '')
 
 /** Run git in a checkout and return its trimmed output; a failure throws with git's own message. */
-const git = (root, args) => execFileSync('git', ['-C', root, ...args], {
-  encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
-}).trim()
+const git = (root, args) =>
+  execFileSync('git', ['-C', root, ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true
+  }).trim()
 
 /** The main worktree's absolute path, so lane records survive a worktree being deleted. */
 export function mainWorktree(root) {
   const line = git(root, ['worktree', 'list', '--porcelain'])
-    .split(/\r?\n/).find(value => value.startsWith('worktree '))
+    .split(/\r?\n/)
+    .find(value => value.startsWith('worktree '))
   if (!line) throw new Error('git did not report a main worktree')
   return path.resolve(line.slice('worktree '.length))
 }
 
 /** The run registry's path in the main worktree. */
-const registryFile = root => path.join(process.env.ENGINE_STATE_ROOT || path.join(mainWorktree(root), '.engine'), 'agents.json')
+const registryFile = root =>
+  path.join(process.env.ENGINE_STATE_ROOT || path.join(mainWorktree(root), '.engine'), 'agents.json')
 
 /** A registry edit is one read and one rename; a lock older than this is a corpse. */
 const STALE_LOCK_MILLISECONDS = 60_000
@@ -32,7 +40,9 @@ export function readAgentRegistry(root) {
   try {
     const value = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'))
     return { version: 1, runs: Array.isArray(value.runs) ? value.runs : [] }
-  } catch { return { version: 1, runs: [] } }
+  } catch {
+    return { version: 1, runs: [] }
+  }
 }
 
 /** Read, change and rename the run registry under a lock, breaking a lock older than a minute. */
@@ -66,7 +76,11 @@ function editRegistry(root, change) {
     return next
   } finally {
     if (handle != null) fs.closeSync(handle)
-    try { fs.unlinkSync(lock) } catch { /* already gone */ }
+    try {
+      fs.unlinkSync(lock)
+    } catch {
+      /* already gone */
+    }
   }
 }
 
@@ -78,9 +92,11 @@ function staticPrefix(pattern) {
 
 /** Whether two claimed paths are the same or one is inside the other. */
 export function claimsOverlap(left, right) {
-  const a = normal(left), b = normal(right)
+  const a = normal(left),
+    b = normal(right)
   if (a === b) return true
-  const ap = staticPrefix(a), bp = staticPrefix(b)
+  const ap = staticPrefix(a),
+    bp = staticPrefix(b)
   if (!ap || !bp) return true
   return ap.startsWith(bp + '/') || bp.startsWith(ap + '/')
 }
@@ -131,11 +147,13 @@ function assertAvailable(root, runs, id, files, parallel) {
     const taken = new Set(runs.map(run => run.id))
     throw new Error(
       `agent task "${id}" already exists and is not merged (status: ${unfinished[unfinished.length - 1].status}). ` +
-      `Land it with agent.merge ${id}, or use a different id such as "${freeId(taken, id)}".`)
+        `Land it with agent.merge ${id}, or use a different id such as "${freeId(taken, id)}".`
+    )
   }
 
   const conflicts = active.filter(run =>
-    files.some(file => (run.files || []).some(claimed => claimsCollide(root, file, claimed))))
+    files.some(file => (run.files || []).some(claimed => claimsCollide(root, file, claimed)))
+  )
   if (conflicts.length) {
     const detail = conflicts.map(run => `${run.id}: ${(run.files || []).join(', ')}`).join('; ')
     throw new Error(`file claim overlaps active work: ${detail}`)
@@ -175,14 +193,14 @@ async function loadJev() {
  * The read refuses any path that leaves the scope it named, so a request cannot
  * pull in a file outside the engine or the project.
  *
- * @param {string} root The checkout.
+ * @param {string} checkout The checkout.
  * @param {object} request The task, files and nodes asked for.
  * @param {string} projectPath The open project, as the tree spells it.
  * @param {Function} interfaceText `(scope, file)`, answering a plugin's parsed
  * interface. Optional: without it a packet carries guide prose alone.
  */
-export async function contextFromDisk(root, request, projectPath = 'project', interfaceText = null) {
-  root = path.resolve(root)
+export async function contextFromDisk(checkout, request, projectPath = 'project', interfaceText = null) {
+  const root = path.resolve(checkout)
   const project = path.resolve(root, projectPath)
   const read = (scope, file) => {
     const base = scope === 'engine' ? root : project
@@ -198,7 +216,12 @@ export async function contextFromDisk(root, request, projectPath = 'project', in
   // path from there. The absolute path is longer and moves with the worktree.
   const projectLabel = normal(path.relative(root, project)) || '.'
   const packet = await resolveAgentContext(
-    read, request, pluginNodes, projectLabel, interfaceText || transport.agentInterface)
+    read,
+    request,
+    pluginNodes,
+    projectLabel,
+    interfaceText || transport.agentInterface
+  )
   // A request that names no files has given the agent nothing to point at. The
   // file tree in the packet answers that, so finding a path costs no second
   // engine process (`tree`). A request that names files needs no tree.
@@ -235,7 +258,10 @@ export async function contextFromDisk(root, request, projectPath = 'project', in
 export async function prepareAgent(root, id, request = {}, projectPath = 'project', interfaceText = null) {
   validateId(id)
   const main = mainWorktree(root)
-  const files = [].concat(request.files || []).map(normal).filter(Boolean)
+  const files = []
+    .concat(request.files || [])
+    .map(normal)
+    .filter(Boolean)
   const parallel = request.parallel === true || request.mode === 'parallel'
   if (parallel && !files.length) throw new Error('parallel tasks must claim at least one file')
 
@@ -253,16 +279,19 @@ export async function prepareAgent(root, id, request = {}, projectPath = 'projec
     if (fs.existsSync(workspace)) {
       throw new Error(
         `worktree path already exists: ${workspace}\n` +
-        `A released lane keeps its worktree until it is merged. Land it with\n` +
-        `  node bin/engine.mjs agent.merge ${id}\n` +
-        `or throw the work away with\n` +
-        `  git worktree remove --force ${path.join('.agent-worktrees', id)} && git branch -D agent/${id}`)
+          `A released lane keeps its worktree until it is merged. Land it with\n` +
+          `  node bin/engine.mjs agent.merge ${id}\n` +
+          `or throw the work away with\n` +
+          `  git worktree remove --force ${path.join('.agent-worktrees', id)} && git branch -D agent/${id}`
+      )
     }
     branch = `agent/${id}`
     try {
       git(main, ['worktree', 'add', '-b', branch, workspace, 'HEAD'])
     } catch (error) {
-      throw new Error(`could not create worktree "${branch}" — ${String(error.stderr || error.message).trim()}`)
+      throw new Error(`could not create worktree "${branch}" — ${String(error.stderr || error.message).trim()}`, {
+        cause: error
+      })
     }
   }
 
@@ -288,8 +317,16 @@ export async function prepareAgent(root, id, request = {}, projectPath = 'projec
     })
   } catch (error) {
     if (parallel) {
-      try { git(main, ['worktree', 'remove', '--force', workspace]) } catch { /* report original failure */ }
-      try { git(main, ['branch', '-D', branch]) } catch { /* report original failure */ }
+      try {
+        git(main, ['worktree', 'remove', '--force', workspace])
+      } catch {
+        /* report original failure */
+      }
+      try {
+        git(main, ['branch', '-D', branch])
+      } catch {
+        /* report original failure */
+      }
     }
     throw error
   }
@@ -336,8 +373,12 @@ function runCheck(cwd, command) {
       command,
       ok: false,
       exitCode: error.status ?? null,
-      output: String(error.stdout || '').trim().slice(-2000),
-      error: String(error.stderr || error.message).trim().slice(-2000)
+      output: String(error.stdout || '')
+        .trim()
+        .slice(-2000),
+      error: String(error.stderr || error.message)
+        .trim()
+        .slice(-2000)
     }
   }
 }
@@ -422,9 +463,11 @@ export function mergeAgent(root, id) {
     git(main, ['merge', '--no-ff', '-m', `Merge agent lane ${id}`, run.branch])
   } catch (error) {
     const conflicts = git(main, ['diff', '--name-only', '--diff-filter=U']).split(/\r?\n/).filter(Boolean)
-    const failure = new Error(conflicts.length
-      ? `merging "${id}" conflicts in: ${conflicts.join(', ')}. Resolve them, commit, then run agent.merge ${id} again`
-      : `could not merge "${id}" — ${String(error.stderr || error.message).trim()}`)
+    const failure = new Error(
+      conflicts.length
+        ? `merging "${id}" conflicts in: ${conflicts.join(', ')}. Resolve them, commit, then run agent.merge ${id} again`
+        : `could not merge "${id}" — ${String(error.stderr || error.message).trim()}`
+    )
     failure.conflicts = conflicts
     throw failure
   }
@@ -459,7 +502,9 @@ export function mergeAgent(root, id) {
   })
 
   const problems = [
-    ...(broke.length ? [`${broke.length} deferred check(s) failed here: ${broke.map(check => check.command).join(', ')}`] : []),
+    ...(broke.length
+      ? [`${broke.length} deferred check(s) failed here: ${broke.map(check => check.command).join(', ')}`]
+      : []),
     ...(cleanup.ok ? [] : [cleanup.why])
   ]
   return {
@@ -482,12 +527,22 @@ function gitWorktrees(main) {
 
 /** Whether a branch ref exists in the checkout. */
 const branchExists = (main, branch) => {
-  try { git(main, ['rev-parse', '--verify', '--quiet', branch]); return true } catch { return false }
+  try {
+    git(main, ['rev-parse', '--verify', '--quiet', branch])
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Whether a branch's commits are already in HEAD. */
 const inHead = (main, branch) => {
-  try { git(main, ['merge-base', '--is-ancestor', branch, 'HEAD']); return true } catch { return false }
+  try {
+    git(main, ['merge-base', '--is-ancestor', branch, 'HEAD'])
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -545,10 +600,21 @@ export function sweepAgents(root, { dryRun = false, days } = {}) {
   const main = mainWorktree(root)
   const home = path.join(main, '.agent-worktrees')
   const worktrees = new Set(gitWorktrees(main))
-  const states = new Map(agentState(root)
-    .filter(state => state.workspace)
-    .map(state => [path.resolve(state.workspace), state]))
+  const states = new Map(
+    agentState(root)
+      .filter(state => state.workspace)
+      .map(state => [path.resolve(state.workspace), state])
+  )
 
+  const { removed, kept } = sweepWorktrees(main, home, worktrees, states, dryRun)
+  pruneWorktrees(main)
+  const branches = sweepBranches(main, root, dryRun)
+  const runs = sweepRuns(root, { days, dryRun })
+  return { removed, branches, kept, runs, ok: kept.length === 0 }
+}
+
+/** Remove the worktree directories that are landed or unrecorded, keeping the rest. */
+function sweepWorktrees(main, home, worktrees, states, dryRun) {
   const removed = []
   const kept = []
   for (const name of fs.existsSync(home) ? fs.readdirSync(home) : []) {
@@ -558,40 +624,78 @@ export function sweepAgents(root, { dryRun = false, days } = {}) {
     const state = states.get(path.resolve(directory))
 
     if (listed && !(state && state.landed)) {
-      kept.push({ directory, why: state ? 'its work is not in HEAD yet' : 'git lists it and no run record explains it' })
+      kept.push({
+        directory,
+        why: state ? 'its work is not in HEAD yet' : 'git lists it and no run record explains it'
+      })
       continue
     }
 
-    if (dryRun) { removed.push({ directory, listed, would: true }); continue }
+    if (dryRun) {
+      removed.push({ directory, listed, would: true })
+      continue
+    }
     try {
-      if (listed) git(main, ['worktree', 'remove', '--force', directory])
-      else fs.rmSync(directory, { recursive: true, force: true })
+      removeSweptWorktree(main, directory, listed)
       removed.push({ directory, listed })
-      const branch = state?.branch
-      if (branch && branchExists(main, branch) && inHead(main, branch)) {
-        try { git(main, ['branch', '-d', branch]) } catch { /* a branch left behind is not a failure to sweep */ }
-      }
+      deleteLandedBranch(main, state?.branch)
     } catch (error) {
       kept.push({ directory, why: String(error.stderr || error.message).trim() })
     }
   }
+  return { removed, kept }
+}
 
-  // A worktree git lists whose directory a failed removal already deleted keeps
-  // answering `git worktree list` until this runs.
-  try { git(main, ['worktree', 'prune']) } catch { /* prune is advisory */ }
+/** Remove one swept worktree, by git when git lists it and by hand when it does not. */
+function removeSweptWorktree(main, directory, listed) {
+  if (listed) git(main, ['worktree', 'remove', '--force', directory])
+  else fs.rmSync(directory, { recursive: true, force: true })
+}
 
-  // A lane branch outlives its worktree when removal succeeded and the branch
-  // delete did not, and it is what keeps a landed run reading as unmerged.
+/** Delete a landed lane branch, if it exists and its commits are in HEAD. */
+function deleteLandedBranch(main, branch) {
+  if (!branch || !branchExists(main, branch) || !inHead(main, branch)) return
+  try {
+    git(main, ['branch', '-d', branch])
+  } catch {
+    /* a branch left behind is not a failure to sweep */
+  }
+}
+
+/**
+ * A worktree git lists whose directory a failed removal already deleted keeps
+ * answering `git worktree list` until this runs.
+ */
+function pruneWorktrees(main) {
+  try {
+    git(main, ['worktree', 'prune'])
+  } catch {
+    /* prune is advisory */
+  }
+}
+
+/**
+ * A lane branch outlives its worktree when removal succeeded and the branch
+ * delete did not, and it is what keeps a landed run reading as unmerged.
+ */
+function sweepBranches(main, root, dryRun) {
   const branches = []
   const live = new Set(gitWorktrees(main))
   for (const state of agentState(root)) {
     if (!state.branch || !state.branchExists || !state.landed) continue
     if (state.workspace && live.has(path.resolve(state.workspace))) continue
-    if (dryRun) { branches.push({ branch: state.branch, would: true }); continue }
-    try { git(main, ['branch', '-d', state.branch]); branches.push({ branch: state.branch }) } catch { /* keep going */ }
+    if (dryRun) {
+      branches.push({ branch: state.branch, would: true })
+      continue
+    }
+    try {
+      git(main, ['branch', '-d', state.branch])
+      branches.push({ branch: state.branch })
+    } catch {
+      /* keep going */
+    }
   }
-  const runs = sweepRuns(root, { days, dryRun })
-  return { removed, branches, kept, runs, ok: kept.length === 0 }
+  return branches
 }
 
 /**
@@ -627,8 +731,14 @@ export function sweepRuns(root, { days = RUN_DAYS, dryRun = false } = {}) {
     if (KEEP_IN_RUNS.has(name)) continue
     const entry = path.join(home, name)
     const changed = fs.statSync(entry).mtimeMs
-    if (changed > oldest) { kept.push({ entry: `agent-runs/${name}`, why: 'newer than the age limit' }); continue }
-    if (dryRun) { removed.push({ entry: `agent-runs/${name}`, would: true }); continue }
+    if (changed > oldest) {
+      kept.push({ entry: `agent-runs/${name}`, why: 'newer than the age limit' })
+      continue
+    }
+    if (dryRun) {
+      removed.push({ entry: `agent-runs/${name}`, would: true })
+      continue
+    }
     try {
       fs.rmSync(entry, { recursive: true, force: true })
       removed.push({ entry: `agent-runs/${name}` })
@@ -645,8 +755,7 @@ export function sweepRuns(root, { days = RUN_DAYS, dryRun = false } = {}) {
  * An id is reused across sessions, so matching on id alone stamps the oldest
  * record with the newest outcome.
  */
-const sameRun = (runs, run) =>
-  runs.find(entry => entry.id === run.id && entry.startedAt === run.startedAt)
+const sameRun = (runs, run) => runs.find(entry => entry.id === run.id && entry.startedAt === run.startedAt)
 
 /**
  * Take a merged lane's worktree and branch away, and say so if it could not.
@@ -662,14 +771,18 @@ function removeWorktree(main, run) {
   } catch (error) {
     return {
       ok: false,
-      why: `could not remove the worktree at ${run.workspace} — ${String(error.stderr || error.message).trim()}. ` +
+      why:
+        `could not remove the worktree at ${run.workspace} — ${String(error.stderr || error.message).trim()}. ` +
         `Stop anything running inside it, then run: node bin/engine.mjs agent.sweep`
     }
   }
   try {
     git(main, ['branch', '-d', run.branch])
   } catch (error) {
-    return { ok: false, why: `worktree removed, but branch ${run.branch} remains — ${String(error.stderr || error.message).trim()}` }
+    return {
+      ok: false,
+      why: `worktree removed, but branch ${run.branch} remains — ${String(error.stderr || error.message).trim()}`
+    }
   }
   return { ok: true }
 }

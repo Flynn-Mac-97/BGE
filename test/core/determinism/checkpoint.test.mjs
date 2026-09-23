@@ -44,7 +44,12 @@ const PROJECT = {
 /** A project whose type is held by the scoped plugin added in the test. */
 const PLUGIN_PROJECT = {
   'game.json': { title: 'checkpoint-plugin', startLevel: 'main' },
-  'levels/main.json': { entities: [{ type: 'drone', at: [0, 3, 0] }, { type: 'drone', at: [1, 3, 0] }] },
+  'levels/main.json': {
+    entities: [
+      { type: 'drone', at: [0, 3, 0] },
+      { type: 'drone', at: [1, 3, 0] }
+    ]
+  },
   'types/drone.js': 'export default { properties: { held: true } }\n'
 }
 
@@ -254,7 +259,11 @@ test('a checkpoint of a simulated world carries a scoped plugin too', async () =
     const back = context.restore(mark)
 
     // Contained, not equal: the engine plugins this world still has are asked too.
-    assert.equal(back.plugins.includes('Step Counter'), true, 'the plugin put its state in the moment, and took it back')
+    assert.equal(
+      back.plugins.includes('Step Counter'),
+      true,
+      'the plugin put its state in the moment, and took it back'
+    )
 
     const afterRewind = stateHash(world)
     const countAfterRewind = context.stepCounter.steps
