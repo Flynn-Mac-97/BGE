@@ -2,7 +2,7 @@
  * The Agent Contracts plugin: the paginated report of what the loader holds.
  *
  * This is the plugin's own test. The kernel's `engine.run` argument boundary is
- * covered in `test/core/plugin-contracts.test.mjs`; here the claim is the
+ * covered in `test/core/plugin/plugin-contracts.test.mjs`; here the claim is the
  * plugin's — a page has a total, an offset and a next offset, and the contracts
  * report names the scoped plugin that owns a service.
  */

@@ -17,8 +17,8 @@
     "desktop:package": "npm run desktop:build && node tools/package-desktop.mjs",
     "test:desktop": "node tools/test-desktop.mjs",
     "test": "npm run test:offline && node test/cli.bridge.mjs",
-    "test:offline": "node --test \"test/*.test.mjs\" \"test/core/*.test.mjs\"",
-    "test:core": "node --test \"test/core/*.test.mjs\"",
+    "test:offline": "node --test \"test/*.test.mjs\" \"test/core/**/*.test.mjs\"",
+    "test:core": "node --test \"test/core/**/*.test.mjs\"",
     "test:agent": "node --test test/agent-workspace.test.mjs",
     "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine",
     "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit ."

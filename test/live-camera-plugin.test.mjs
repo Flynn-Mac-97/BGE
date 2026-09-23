@@ -3,7 +3,7 @@
  * drawn frame, following a body where it is drawn.
  *
  * This is the plugin's own test. The draw-time blend it reads is the kernel's
- * and is covered in `test/core/live-camera.test.mjs`; here the claim is the
+ * and is covered in `test/core/loop/live-camera.test.mjs`; here the claim is the
  * plugin's — priority, activation, and the mouse turn reaching the view on the
  * frame it arrives.
  */
