@@ -20,13 +20,11 @@
  * animation is assignment — a hook can say what a body IS holding without
  * tracking what it WAS holding.
  *
- * Two things are drawn beside an entity rather than by it, because neither can
- * be a material: a KEYLINE, a dark line of constant screen-space width round
- * the silhouette, and a CONTACT SHADOW, one soft ellipse on the ground under
- * everything that moves. A material builder returns one material and cannot add
- * a second mesh, and a loaded model draws with its file's own materials and can
- * be given none at all — so both are geometry this file builds. Defaults are in
- * `readability`; `mesh.keyline` and `mesh.shadow` override them.
+ * A visual drawn beside one entity — a keyline, a contact shadow, a ground
+ * ring — is a mark, and a mark belongs to a plugin. The `marks` registry is the
+ * door: the Readability plugin registers all three through it, and so may any
+ * other. This file holds the registry and the one place the sync writes a mark,
+ * and it never learns what a keyline is.
  *
  * The draw order is two passes: the world, then the viewmodel against a cleared
  * depth buffer through a narrower camera of its own. That second pass is the
@@ -63,14 +61,12 @@ import * as THREE from 'three/webgpu'
 import { entityDrawSize } from './frame-plan.js'
 import { setMaxAnisotropy, forgetTextures } from './render/texture-cache.js'
 import { modelCache, forgetModel } from './render/model-cache.js'
-import { forgetHull } from './render/keyline-hull.js'
 import { clearReported } from './render/report.js'
 import { makeCamera } from './render/camera.js'
 import { makeLighting } from './render/lighting.js'
 import { makeMaterialRegistry } from './render/material-registry.js'
 import { makeObjectBuilder } from './render/object-builder.js'
 import { makeBatching } from './render/batching.js'
-import { makeReadability, makeReadabilityMarks } from './render/readability-marks.js'
 import { makeMarkRegistry } from './render/mark-registry.js'
 import { makeEntitySync } from './render/entity-sync.js'
 import { makeViewmodel } from './render/viewmodel.js'
@@ -244,10 +240,10 @@ export async function makeRenderer(canvas, view, viewport) {
   makeMaterialRegistry(state)
   makeObjectBuilder(state)
   makeBatching(state)
-  // The marks registry exists before the readability marks register into it.
+  // The marks registry is empty until a plugin registers into it. The
+  // Readability plugin fills this object in place with its own defaults.
   makeMarkRegistry(state)
-  state.readability = makeReadability()
-  makeReadabilityMarks(state)
+  state.readability = {}
   makeEntitySync(state)
   makePostChain(state)
   makePicking(state)
@@ -274,6 +270,13 @@ export async function makeRenderer(canvas, view, viewport) {
      * traverse `renderer.scene` looking for `userData.entity`.
      */
     objectFor: entity => state.meshes.get(entity?.id) ?? null,
+
+    /**
+     * Release one object the scene owns: dispose it and its children, and drop
+     * three's records for them. A plugin that adds a scene object releases it
+     * here rather than leaving a draw record behind.
+     */
+    dispose: state.release,
 
     // Both are the session's objects, re-exposed so existing plugins that reach
     // for renderer.view keep working.
@@ -315,8 +318,8 @@ export async function makeRenderer(canvas, view, viewport) {
     get threeRenderer() { return renderer },
 
     /**
-     * Keyline width, contact shadow and ground ring, for everything that does
-     * not say.
+     * The defaults the Readability plugin's marks fall back to, filled by that
+     * plugin when it loads. Empty when it is absent.
      *
      * Written to, not replaced: `renderer.readability.keyline = 3`. A colour
      * changed here reaches the next keyline built, not the ones already drawn.
@@ -349,8 +352,10 @@ export async function makeRenderer(canvas, view, viewport) {
      * The per-entity marks: a visual drawn beside one entity, by name.
      *
      * `register(name, { draw })` and `remove(name)`. `draw(entity, object,
-     * place, declared, record)` runs once per mesh entity the sync visits, from
-     * the same place the keyline and the two floor marks are drawn.
+     * place, declared, record)` runs once per mesh entity the sync visits. A
+     * mark may also carry optional frame hooks — `begin`, `grow`, `move`,
+     * `place`, `count`, `holds`, `holdsMoving`, `heldId`, `changed`,
+     * `blocksMerge`, `forget` — so the core drives it without knowing its name.
      */
     marks: state.marks,
     /** The ordered post-processing passes; an empty list means none at all. */
@@ -400,7 +405,7 @@ export async function makeRenderer(canvas, view, viewport) {
     forget(file) {
       forgetTextures(file)
       forgetModel(file)
-      forgetHull(file)
+      state.forgetMarks(file)
       clearReported()
       state.invalidateEverything()
     }

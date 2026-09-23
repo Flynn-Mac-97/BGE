@@ -25,17 +25,6 @@ export function makeEntitySync(state) {
   let frameCounter = 0
 
 
-  /**
-   * The keyline colour the drawn outlines were built with.
-   *
-   * An idling entity keeps the outline it already has, so a colour changed on
-   * `readability` has to force one full pass to rebuild them.
-   */
-  let drawnKeylineColour
-
-  /** The default keyline width the drawn outlines were built with. */
-  let drawnKeylineWidth
-
   /** Where this frame draws one entity: itself at blend 1, its interpolated place otherwise. */
   function placeFor(entity, blend, settledFrame, drawInto, drawPlace) {
     if (settledFrame) return entity
@@ -66,19 +55,20 @@ export function makeEntitySync(state) {
   }
 
   /** Whether the entity is still and declares no mark, so the quiet scan can skip it. */
-  function isIdleMesh(declared, simple) {
-    return simple && declared.shadow === undefined && declared.ring === undefined
+  function isIdleMesh(entity, declared, simple) {
+    return simple && !state.holdsMark(entity, declared)
   }
 
   /**
    * Whether the moving scan can place this entity without measuring it again.
    *
-   * Only a simple mesh that is in no batch and whose outline is already drawn —
-   * a ring or a pose is a mark or a transform that scan does not write.
+   * Only a simple mesh that is in no batch, whose marks are settled, and that
+   * declares nothing a mark must see on the full pass — a pose is a transform
+   * that scan does not write.
    */
   function isSteady(entity, declared, record) {
-    return record.simple && record.batchKey === null && record.keylineReady
-      && declared.ring === undefined && entity.pose === undefined
+    return record.simple && record.batchKey === null && record.markReady !== false
+      && !state.holdsMovingMark(entity, declared) && entity.pose === undefined
   }
 
   /** Draw one entity from its mesh. Returns 1 when it draws an outline, 0 when it does not. */
@@ -108,17 +98,16 @@ export function makeEntitySync(state) {
     // Depth decides what covers what, so there is nothing to order.
     object.renderOrder = 0
     record.simple = isSimpleMesh(declared)
-    record.idle = isIdleMesh(declared, record.simple)
-    state.considerForMerging(entity, object, described, opacity, !record.simple, turn, record)
-    // Marks run after merging, which is where "has this ever moved" is answered
-    // — the keyline reads it from `record.moved` and the floor marks follow the
-    // place. The keyline mark owns `record.keyline`, so it is cleared first.
-    record.keyline = false
+    record.idle = isIdleMesh(entity, declared, record.simple)
+    state.considerForMerging(entity, object, described, declared, opacity, !record.simple, turn, record)
+    // Marks run after merging, which is where "has this ever moved" is answered.
+    // A mark that draws a persistent outline sets `record.outline`; clear it first.
+    record.outline = false
     state.drawMarks(entity, object, place, declared, record)
     record.steady = isSteady(entity, declared, record)
     placeMatrix(object, record)
     saveSlot(i, entity, object, record)
-    return record.keyline ? 1 : 0
+    return record.outline ? 1 : 0
   }
 
   /** A tiled sprite repeats once per world unit unless told otherwise. */
@@ -202,25 +191,6 @@ export function makeEntitySync(state) {
     return keylines
   }
 
-  /** The outline colour and width the drawn outlines were built with, updated to now. */
-  function takeMarkChange() {
-    const changed = state.readability.keylineColour !== drawnKeylineColour
-      || state.readability.keyline !== drawnKeylineWidth
-    drawnKeylineColour = state.readability.keylineColour
-    drawnKeylineWidth = state.readability.keyline
-    return changed
-  }
-
-  /**
-   * The one entity named by the ring rule. Everything else that is never moved
-   * and declares no mark can be left exactly as it was last frame.
-   */
-  function ringedIdForView() {
-    const ringRule = state.readability.ring
-    if (ringRule === 'followed') return state.view.mode === 'first-person' ? null : state.view.follows ?? null
-    return typeof ringRule === 'string' ? ringRule : null
-  }
-
   /**
    * What the frame's scans need before they run.
    *
@@ -277,11 +247,10 @@ export function makeEntitySync(state) {
   function writeFrameStats(entities, keylines) {
     state.stats.entities = entities.length
     state.stats.keylines = keylines
+    // A mark writes its own counters, so the core does not learn their names.
+    state.writeMarkStats(state.stats)
     // Counted after the rebuild, from the batches that actually drew; see
     // `batchStats` for why a batch with no merged geometry does not count.
-    const marks = state.markCounts()
-    state.stats.contactShadows = marks.contactShadows
-    state.stats.groundRings = marks.groundRings
     const counted = state.batchStats()
     state.stats.merged = counted.merged
     state.stats.batches = counted.batches
@@ -293,17 +262,16 @@ export function makeEntitySync(state) {
     const frame = ++frameCounter
     state.beginMarks()
 
-    // A changed default outline colour or width has to reach the outlines
-    // already drawn, and nothing else on `readability` applies to an entity
-    // that has never moved and declares no mark.
-    const marksChanged = takeMarkChange()
-    const ringedId = ringedIdForView()
+    // A mark's own default may have changed, which has to reach what is already
+    // drawn. It says so through the registry, and the frame takes a full pass.
+    const marksChanged = state.marksChanged()
+    const ringedId = state.markHeldId(state.view)
     const { entities, settledFrame, drawInto, drawPlace, sweep } = preparePass(world, blend)
     state.objectsGrew = false
     // A shorter list means entities went; drop their slots so nothing is held.
     trimSlots(entities.length)
     growDrawnPlaces(entities.length)
-    state.growShadowData(entities.length)
+    state.growMarks(entities.length)
 
     // A still frame changes nothing, so the quiet scan answers it in a function
     // of its own and the full pass runs only for what the scan could not answer.
@@ -318,8 +286,7 @@ export function makeEntitySync(state) {
 
     dropGoneObjects(entities, frame, sweep)
     state.rebuildBatches()
-    state.placeContactShadows()
-    state.placeGroundRings()
+    state.placeMarks()
     writeFrameStats(entities, keylines)
   }
 

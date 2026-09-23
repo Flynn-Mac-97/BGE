@@ -234,7 +234,6 @@ function measurePlan(entity) {
       shape: null,
       described: {
         material: null,
-        keyline: 0,
         look: picture
           ? `${picture}|${entity.sprite.tile ?? 0}|${entity.sprite.sheet ? 'sheet' : 'one'}`
           : `tint:${entity.type}`
@@ -247,14 +246,13 @@ function measurePlan(entity) {
   if (parts) {
     // Every part carries its own material, so the entity has no single one —
     // and nothing to be merged into. The signature says when the shape changed.
-    return { shape, described: { material: null, keyline: 0, look: `parts|${parts.signature}` } }
+    return { shape, described: { material: null, look: `parts|${parts.signature}` } }
   }
   const material = materialLook(entity, declared, shape)
   return {
     shape,
     described: {
       material,
-      keyline: Number(declared.keyline) > 0 ? Number(declared.keyline) : 0,
       look: ['mesh', shape.kind, shape.w, shape.h, shape.d,
         declared.model || '', declared.scale ?? 1, material].join('|')
     }
@@ -450,8 +448,9 @@ const SHAPE_KEYS = new Set([
   // every part of every frame — which would also give twelve identically
   // coloured boxes twelve materials, one per position.
   'parts', 'at', 'rotation', 'name',
-  // The keyline, the contact shadow and the ground ring are drawn BESIDE the
-  // mesh, in their own materials. None changes what the surface is made of.
+  // Keys a mark owns. A mark draws beside the mesh in its own material, so none
+  // of these changes what the surface is made of — leaving one in the key would
+  // give two identical walls two materials.
   'keyline', 'keylineColour', 'shadow', 'shadowStrength',
   'ring', 'ringColour', 'ringStrength'
 ])
@@ -481,13 +480,13 @@ export function materialLook(entity, declared, shape) {
 // ----------------------------------------------------------------- the plan
 
 /**
- * What one entity looks like this frame: its material key, its keyline and the
- * stillness signature that says whether its look changed.
+ * What one entity looks like this frame: its material key and the stillness
+ * signature that says whether its look changed.
  *
  * The signature is what `objectFor` compares to decide a rebuild, and what
  * `considerForMerging` compares to decide a move. It is kept OUT of any
- * decision about the keyline: a change to `look` counts as a move, and outlining
- * a thing must not hand it a contact shadow.
+ * decision about a mark: a change to `look` counts as a move, and switching a
+ * mark on must not hand the entity a contact shadow.
  */
 export function describeEntity(entity) {
   return entityPlan(entity).described

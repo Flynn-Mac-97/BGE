@@ -40,7 +40,7 @@ export function makeEntityScans(state, records) {
   const SLOT_HIDDEN = 10
   const SLOT_OPACITY = 11
   const SLOT_FLAGS = 12
-  // What the moving scan needs to place an entity and its contact shadow,
+  // What the moving scan needs to place an entity and let the marks follow,
   // copied here so that scan never touches the entity's record: the record is a
   // second heap object per entity and a cache miss the flat array does not pay.
   const SLOT_ANCHOR = 13
@@ -48,7 +48,7 @@ export function makeEntityScans(state, records) {
   const SLOT_SHAPE = 15
   /** What the quiet test needs set, and the marks the scan reports. */
   const SLOT_QUIET = 1
-  const SLOT_KEYLINE = 2
+  const SLOT_OUTLINE = 2
   const SLOT_STEADY = 4
 
   const snapshot = []
@@ -115,7 +115,7 @@ export function makeEntityScans(state, records) {
     // already resolved, so a frame that only moved it needs to write a place.
     snapshot[at + SLOT_FLAGS] =
       (record.settled && record.idle && !record.moved ? SLOT_QUIET : 0)
-      | (record.keyline ? SLOT_KEYLINE : 0)
+      | (record.outline ? SLOT_OUTLINE : 0)
       | (record.steady ? SLOT_STEADY : 0)
   }
 
@@ -194,7 +194,7 @@ export function makeEntityScans(state, records) {
       const at = i * SLOT_STRIDE
       if (isQuiet(entity, at, ringedId)) {
         if (sweep) snapshot[at + SLOT_OBJECT].userData.seen = frame
-        if (snapshot[at + SLOT_FLAGS] & SLOT_KEYLINE) keylines++
+        if (snapshot[at + SLOT_FLAGS] & SLOT_OUTLINE) keylines++
         continue
       }
       dirtyIndices.push(i)
@@ -215,7 +215,7 @@ export function makeEntityScans(state, records) {
     return sameApartFromPlace(entity, at, ringedId)
   }
 
-  /** Move an entity's object to its blended place, and its ground mark with it. */
+  /** Move an entity's object to its blended place, and let the marks follow it. */
   function placeMoving(entity, object, at, blend, drawInto) {
     const place = drawInto(drawnPlaceScratch, entity, blend)
     object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
@@ -226,7 +226,7 @@ export function makeEntityScans(state, records) {
     // The keyline hangs off the object and moves with it, so only the ground mark
     // has to be written again.
     if (!entity.hidden) {
-      state.noteContactShadow(entity, snapshot[at + SLOT_DECLARED], snapshot[at + SLOT_SHAPE], true, place)
+      state.moveMarks(entity, snapshot[at + SLOT_DECLARED], snapshot[at + SLOT_SHAPE], place)
     }
   }
 
@@ -252,7 +252,7 @@ export function makeEntityScans(state, records) {
       // A level in play is mostly things that never move. Their place before
       // the step is their place now, so they are drawn as the last pass left them.
       if (isQuiet(entity, at, ringedId)) {
-        if (flags & SLOT_KEYLINE) keylines++
+        if (flags & SLOT_OUTLINE) keylines++
         continue
       }
       if (isPlaceable(entity, at, drawn, flags, ringedId)) {
@@ -260,7 +260,7 @@ export function makeEntityScans(state, records) {
         drawnPlaces[drawn] = entity.x
         drawnPlaces[drawn + 1] = entity.y
         drawnPlaces[drawn + 2] = entity.z
-        if (flags & SLOT_KEYLINE) keylines++
+        if (flags & SLOT_OUTLINE) keylines++
         continue
       }
       dirtyIndices.push(i)

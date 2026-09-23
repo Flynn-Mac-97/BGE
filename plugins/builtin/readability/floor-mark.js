@@ -1,5 +1,5 @@
 /**
- * Kernel: the shape both floor marks share — the instanced unit quad their
+ * Readability: the shape both floor marks share — the instanced unit quad their
  * places are written into.
  *
  * A contact shadow and a ground ring are the same kind of thing: a flat disc on

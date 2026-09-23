@@ -229,7 +229,6 @@ export function makeObjectBuilder(state) {
         record.object = object
         record.drawnLook = described.look
         object.userData.record = record
-        record.keylineMesh = object.userData.keylineMesh ?? null
         return object
       }
       // Changing a texture — or a box size — in the inspector has to show up
@@ -252,10 +251,6 @@ export function makeObjectBuilder(state) {
     record.object = object
     record.drawnLook = described.look
     object.userData.record = record
-    // The new object carries no keyline yet, whatever the old one had.
-    record.keylineMesh = null
-    record.keylineWidth = -1
-    record.keylineColour = null
     // An id that had nothing before may mean an old object is now dead.
     if (!known) state.objectsGrew = true
     return object

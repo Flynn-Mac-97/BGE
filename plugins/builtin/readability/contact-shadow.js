@@ -1,19 +1,21 @@
 /**
- * Kernel: the contact shadow — a soft ellipse under a moving thing, all of them
- * in one draw call.
+ * Readability: the contact shadow — a soft ellipse under a moving thing, all of
+ * them in one draw call.
  *
- * It is drawn beside an entity rather than by it: the ellipse is geometry the
- * renderer builds, so a model's own materials are never touched to make room
- * for it.
+ * It is drawn beside an entity rather than by it: the ellipse is geometry this
+ * plugin builds, so a model's own materials are never touched to make room for
+ * it.
  */
 import * as THREE from 'three/webgpu'
 import { attribute, oneMinus, smoothstep } from 'three/tsl'
-import { readColour } from './read-value.js'
+import { readColour } from '../../../engine/render/read-value.js'
+import { DRAWN } from '../../../engine/render/scene-layers.js'
 import { groundReach } from './ground-band.js'
 import { seedInstanceMatrices } from './floor-mark.js'
-import { DRAWN } from './scene-layers.js'
 
-export function makeContactShadows(state) {
+export function makeContactShadows(host) {
+  const { scene, readability } = host
+
   /**
    * Every contact shadow in the frame, in one draw call.
    *
@@ -49,7 +51,7 @@ export function makeContactShadows(state) {
   /** The one instanced material every contact shadow in the frame shares. */
   function contactShadowMaterial() {
     const material = new THREE.MeshBasicNodeMaterial({
-      color: readColour(state.readability.shadowColour, 'readability.shadowColour') || new THREE.Color('#000000'),
+      color: readColour(readability.shadowColour, 'readability.shadowColour') || new THREE.Color('#000000'),
       transparent: true, depthWrite: false, fog: false
     })
     // Per instance, so one draw call carries every shadow at its own weight.
@@ -68,7 +70,7 @@ export function makeContactShadows(state) {
     if (contactShadows && contactShadows.instanceMatrix.count >= wanted) return
     const room = Math.max(64, 2 ** Math.ceil(Math.log2(wanted)))
     if (contactShadows) {
-      state.scene.remove(contactShadows)
+      scene.remove(contactShadows)
       contactShadows.dispose()
     }
     contactStrengths = new THREE.InstancedBufferAttribute(new Float32Array(room), 1)
@@ -79,7 +81,7 @@ export function makeContactShadows(state) {
     // from them is a frame out of date and would cull live shadows.
     contactShadows.frustumCulled = false
     contactShadows.layers.set(DRAWN)
-    state.scene.add(contactShadows)
+    scene.add(contactShadows)
   }
 
   /**
@@ -89,14 +91,14 @@ export function makeContactShadows(state) {
    * a bird is flying and a rat is walking.
    */
   function noteContactShadow(entity, declared, shape, moved, place) {
-    const asked = declared.shadow ?? (moved && state.readability.shadow)
+    const asked = declared.shadow ?? (moved && readability.shadow)
     if (!asked || !shape) return
     const scale = entity.scale ?? 1
     const across = Math.max(shape.w, shape.d) * scale
     const stated = typeof asked === 'number' ? asked : across * 0.55
     if (!(stated > 0)) return
 
-    const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - state.readability.groundY) / state.readability.shadowRange))
+    const lift = Math.min(1, Math.max(0, (entity.y - shape.h * scale / 2 - readability.groundY) / readability.shadowRange))
     const at = shadowCount++ * SHADOW_STRIDE
     shadowData[at] = place.x
     shadowData[at + 1] = place.z || 0
@@ -105,7 +107,7 @@ export function makeContactShadows(state) {
     // exponent is constant and the base is never negative, so the square root
     // is the same number for a hardware instruction.
     const fade = 1 - lift
-    shadowData[at + 3] = (declared.shadowStrength ?? state.readability.shadowStrength) * fade * Math.sqrt(fade)
+    shadowData[at + 3] = (declared.shadowStrength ?? readability.shadowStrength) * fade * Math.sqrt(fade)
   }
 
   /**
@@ -124,7 +126,7 @@ export function makeContactShadows(state) {
     const matrix = contactShadows.instanceMatrix.array
     const strengths = contactStrengths.array
     // Just clear of the floor, or the two surfaces fight for the same pixels.
-    const height = state.readability.groundY + 0.015
+    const height = readability.groundY + 0.015
     for (let i = 0; i < shadowCount; i++) {
       const at = i * SHADOW_STRIDE
       const base = i * 16
@@ -141,15 +143,23 @@ export function makeContactShadows(state) {
     contactStrengths.needsUpdate = true
   }
 
+  /** The contact shadow of one entity. A hidden entity draws no floor mark. */
+  function draw(entity, object, place, declared, record) {
+    if (entity.hidden) return
+    noteContactShadow(entity, declared, record.shape, record.moved, place)
+  }
+
   /** Start a frame with no shadow noted yet. */
-  function beginMarks() {
-    shadowCount = 0
-  }
+  function begin() { shadowCount = 0 }
 
-  /** How many contact shadows this frame noted, for `stats`. */
-  function count() {
-    return shadowCount
-  }
+  /** The fast path a moved entity takes: same note, one less measurement. */
+  const move = (entity, declared, shape, place) => noteContactShadow(entity, declared, shape, true, place)
 
-  return { growShadowData, noteContactShadow, placeContactShadows, beginMarks, count }
+  /** How many shadows this frame noted, for `stats`. */
+  const count = stats => { stats.contactShadows = shadowCount }
+
+  /** A declared shadow forces the full pass, which is where the note is written. */
+  const holds = (entity, declared) => declared.shadow !== undefined
+
+  return { draw, begin, grow: growShadowData, move, place: placeContactShadows, count, holds }
 }

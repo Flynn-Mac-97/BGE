@@ -107,13 +107,13 @@ export function makeBatching(state) {
   }
 
   /** Whether this entity is standing still enough, and plainly enough, to merge. */
-  function canMergeNow(entity, described, opacity, isModel) {
+  function canMergeNow(entity, described, declared, opacity, isModel) {
     // A model is a scene graph rather than one box, so there is nothing here to
     // merge; a dimmed entity has its own material and would take the whole batch
-    // with it; a hidden one has to be able to disappear on its own. An outlined
-    // one keeps its own mesh because the keyline hangs off it, and a merged
-    // entity draws on a layer the camera ignores — the outline would go with it.
-    return !isModel && opacity >= 1 && !entity.hidden && !(described.keyline > 0)
+    // with it; a hidden one has to be able to disappear on its own. An entity a
+    // mark owns keeps its own mesh — a keyline hangs off it — and a merged entity
+    // draws on a layer the camera ignores, which would take the mark with it.
+    return !isModel && opacity >= 1 && !entity.hidden && !state.markBlocksMerge(declared)
   }
 
   /**
@@ -182,8 +182,8 @@ export function makeBatching(state) {
     if (!wanted && record.batchKey !== null) leaveBatch(entity.id, record)
   }
 
-  function considerForMerging(entity, object, described, opacity, isModel, turn, record) {
-    const canMerge = canMergeNow(entity, described, opacity, isModel)
+  function considerForMerging(entity, object, described, declared, opacity, isModel, turn, record) {
+    const canMerge = canMergeNow(entity, described, declared, opacity, isModel)
     if (hasMoved(entity, described, turn, record)) {
       recordMove(entity, described, turn, canMerge, record)
       return

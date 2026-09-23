@@ -1,23 +1,25 @@
 /**
- * Kernel: the ground ring — a coloured band on the floor under the one actor a
- * rule names.
+ * Readability: the ground ring — a coloured band on the floor under the one
+ * actor a rule names.
  *
  * It answers "which one is mine" in a crowd where a silhouette cannot, and a
  * hundred of them mark nothing, so the ring is handed out differently from the
  * keyline and the shadow: one actor, named by the rule.
  *
- * It is drawn beside an entity rather than by it: the band is geometry the
- * renderer builds, so a model's own materials are never touched to make room
- * for it.
+ * It is drawn beside an entity rather than by it: the band is geometry this
+ * plugin builds, so a model's own materials are never touched to make room for
+ * it.
  */
 import * as THREE from 'three/webgpu'
 import { attribute } from 'three/tsl'
-import { readColour } from './read-value.js'
+import { readColour } from '../../../engine/render/read-value.js'
+import { DRAWN } from '../../../engine/render/scene-layers.js'
 import { groundRingBand } from './ground-band.js'
 import { placeList, placeMarks, seedInstanceMatrices } from './floor-mark.js'
-import { DRAWN } from './scene-layers.js'
 
-export function makeGroundRings(state) {
+export function makeGroundRings(host) {
+  const { scene, view, readability } = host
+
   /**
    * Every ground ring in the frame, in one draw call.
    *
@@ -64,7 +66,7 @@ export function makeGroundRings(state) {
     if (groundRings && groundRings.instanceMatrix.count >= wanted) return
     const room = Math.max(8, 2 ** Math.ceil(Math.log2(wanted)))
     if (groundRings) {
-      state.scene.remove(groundRings)
+      scene.remove(groundRings)
       groundRings.dispose()
     }
     ringTints = new THREE.InstancedBufferAttribute(new Float32Array(room * 3), 3)
@@ -79,17 +81,17 @@ export function makeGroundRings(state) {
     // floor under the same actor.
     groundRings.renderOrder = 1
     groundRings.layers.set(DRAWN)
-    state.scene.add(groundRings)
+    scene.add(groundRings)
   }
 
   /** True when the ring rule names this entity. */
   function ringNames(entity) {
-    const rule = state.readability.ring
+    const rule = readability.ring
     if (rule === 'followed') {
       // A first-person body wears the camera, so its ring would be drawn under
       // the eye and mark nothing.
-      if (state.view.mode === 'first-person') return false
-      return state.view.follows != null && entity.id === state.view.follows
+      if (view.mode === 'first-person') return false
+      return view.follows != null && entity.id === view.follows
     }
     return typeof rule === 'string' && (entity.id === rule || entity.type === rule)
   }
@@ -116,8 +118,8 @@ export function makeGroundRings(state) {
     ringPlaces.x[at] = place.x
     ringPlaces.z[at] = place.z || 0
     ringPlaces.radius[at] = stated
-    ringPlaces.colour[at] = declared.ringColour ?? state.readability.ringColour
-    ringPlaces.strength[at] = declared.ringStrength ?? state.readability.ringStrength
+    ringPlaces.colour[at] = declared.ringColour ?? readability.ringColour
+    ringPlaces.strength[at] = declared.ringStrength ?? readability.ringStrength
   }
 
   /** Write the frame's rings into the instanced mesh. Called once per sync. */
@@ -125,7 +127,7 @@ export function makeGroundRings(state) {
     placeMarks(ringPlaces, {
       meshOf: () => groundRings,
       // Above the contact shadow's 0.015, so the colour wins where they meet.
-      height: state.readability.groundY + 0.02,
+      height: readability.groundY + 0.02,
       grow: growGroundRings,
       attributesOf: () => [ringTints, ringStrengths],
       write: (places, i) => {
@@ -136,15 +138,31 @@ export function makeGroundRings(state) {
     })
   }
 
+  /** The ground ring of one entity, when the ring rule or `mesh.ring` names it. */
+  function draw(entity, object, place, declared, record) {
+    if (entity.hidden) return
+    noteGroundRing(entity, declared, record.shape, place)
+  }
+
   /** Start a frame with no ring noted yet. */
-  function beginMarks() {
-    ringPlaces.count = 0
+  function begin() { ringPlaces.count = 0 }
+
+  /** How many rings this frame noted, for `stats`. */
+  const count = stats => { stats.groundRings = ringPlaces.count }
+
+  /**
+   * The one entity named by the ring rule. Everything else that is never moved
+   * and declares no mark can be left exactly as it was last frame.
+   */
+  function heldId(seen) {
+    const rule = readability.ring
+    if (rule === 'followed') return seen.mode === 'first-person' ? null : seen.follows ?? null
+    return typeof rule === 'string' ? rule : null
   }
 
-  /** How many ground rings this frame noted, for `stats`. */
-  function count() {
-    return ringPlaces.count
-  }
+  /** A declared ring needs the full pass on a still frame and on a moved one. */
+  const holds = (entity, declared) => declared.ring !== undefined
+  const holdsMoving = (entity, declared) => declared.ring !== undefined
 
-  return { ringNames, noteGroundRing, placeGroundRings, beginMarks, count }
+  return { draw, begin, place: placeGroundRings, count, heldId, holds, holdsMoving }
 }

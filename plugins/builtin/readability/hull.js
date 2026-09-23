@@ -1,5 +1,5 @@
 /**
- * Kernel: the geometry a keyline is drawn from, and the vertex node that grows
+ * Readability: the geometry a keyline is drawn from, and the vertex node that grows
  * it by a fixed number of screen pixels.
  */
 import * as THREE from 'three/webgpu'

@@ -33,7 +33,7 @@ export function makeEntityRecords(state) {
       moved: false,
       simple: false,
       idle: false,
-      keyline: false,
+      outline: false,
       haveSignature: false,
       frames: 0,
       sigX: 0, sigY: 0, sigZ: 0,
@@ -47,10 +47,9 @@ export function makeEntityRecords(state) {
       // The look string the object was built with, so a frame that changed
       // nothing compares one record field instead of reaching into `userData`.
       drawnLook: null,
-      // The keyline already hanging off this entity's object, and the width and
-      // colour it was built with. Read here rather than off `userData`, whose
-      // shape grows a new property for every feature the renderer gains.
-      keylineMesh: null, keylineWidth: -1, keylineColour: null, keylineReady: false,
+      // A mark that hangs geometry off this entity keeps its own fields here, beside
+      // the object it stands for. The core adds none of its own, so the record does
+      // not grow a property for every feature the renderer gains.
       // The batch this entity is in, or null. Mirrors `userData.batch` so the
       // moving path does not have to reach into the object to find out.
       batchKey: null,

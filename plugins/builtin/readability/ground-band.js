@@ -1,5 +1,5 @@
 /**
- * Kernel: the TSL of a flat mark on the floor — how far a point on one of the
+ * Readability: the TSL of a flat mark on the floor — how far a point on one of the
  * ground quads is from its middle, and the feathered band a ring draws.
  */
 import { oneMinus, positionGeometry, smoothstep } from 'three/tsl'

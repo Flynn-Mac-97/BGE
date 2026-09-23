@@ -8,6 +8,9 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { makeRenderer } from '../../engine/render.js'
 
 const VIEW = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
@@ -15,9 +18,9 @@ const VIEWPORT = { width: 320, height: 180 }
 
 const box = (id, x = 0) => ({ id, type: 'wall', x, y: 0, z: 0, mesh: { box: [1, 1, 1] } })
 
-test('the three built-in marks register through the same door a plugin uses', async () => {
+test('the registry starts empty: a mark is a plugin, not the kernel', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
-  assert.deepEqual(frame.marks.names, ['keyline', 'contactShadow', 'groundRing'])
+  assert.deepEqual(frame.marks.names, [])
 })
 
 test('a mark draws once per matching entity, and removing it stops the draw', async () => {
@@ -71,4 +74,16 @@ test('passes.add leaves the chain alone and remove takes only its own name', asy
 
   frame.passes.remove('extra')
   assert.deepEqual(frame.passes.list.map(one => one.name), ['front', 'base'], 'the rest of the chain is untouched')
+})
+
+test('engine/ no longer imports the readability modules the plugin owns', () => {
+  const engine = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'engine')
+  const moved = /(readability-marks|keyline-marks|keyline-hull|contact-shadows|ground-rings|floor-mark|ground-band)\.js/
+  const found = []
+  for (const entry of fs.readdirSync(engine, { recursive: true })) {
+    const file = path.join(engine, entry)
+    if (!file.endsWith('.js')) continue
+    if (moved.test(fs.readFileSync(file, 'utf8'))) found.push(entry)
+  }
+  assert.deepEqual(found, [], 'nothing under engine/ may import the moved modules')
 })

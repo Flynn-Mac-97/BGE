@@ -33,11 +33,10 @@ test('a different tint is a different material', () => {
   assert.notEqual(red.material, blue.material)
 })
 
-test('outlining a mesh does not change its look, so the keyline never reads as a move', () => {
+test('a declared mark does not change the look, so it never reads as a move', () => {
   const plain = describeEntity(wall({ texture: 'brick.png' }))
-  const outlined = describeEntity(wall({ texture: 'brick.png', keyline: 3 }))
-  assert.equal(outlined.look, plain.look)
-  assert.equal(outlined.keyline, 3, 'and the outline is still reported')
+  const marked = describeEntity(wall({ texture: 'brick.png', keyline: 3, shadow: 1.2, ring: 2 }))
+  assert.equal(marked.look, plain.look)
 })
 
 test('a part-built body has one look for the whole part list and no single material', () => {
