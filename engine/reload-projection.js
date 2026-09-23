@@ -171,8 +171,8 @@ export function captureSessionWorld({ world, loop, editor, view }, cause = {}) {
         const copy = project(entity[key], live, dropped, `${entity.id}.${key}`)
         if (copy !== LOST) fields[key] = copy
       }
-      const take = (value, where) => {
-        const copy = project(value, live, dropped, `${entity.id}.${where}`)
+      const take = (value, fieldPath) => {
+        const copy = project(value, live, dropped, `${entity.id}.${fieldPath}`)
         return copy === LOST ? null : copy
       }
       return {
@@ -207,16 +207,16 @@ export function captureSessionWorld({ world, loop, editor, view }, cause = {}) {
 
 /** Every captured entity placed back into the cleared world, live values on top. */
 function spawnCapturedEntities(capture, world, missing, notRestored) {
-  for (const held of capture.entities) {
-    const entity = world.spawn(held.type, placementOf(held))
-    applyLiveValues(entity, held, world, missing)
-    for (const bag of held.behaviours) {
+  for (const capturedEntity of capture.entities) {
+    const entity = world.spawn(capturedEntity.type, placementOf(capturedEntity))
+    applyLiveValues(entity, capturedEntity, world, missing)
+    for (const bag of capturedEntity.behaviours) {
       const record = entity.behaviours.find(behaviour => behaviour.name === bag.name)
       if (!record) {
-        notRestored.push(`"${held.id}" lost its "${bag.name}" behaviour`)
+        notRestored.push(`"${capturedEntity.id}" lost its "${bag.name}" behaviour`)
         continue
       }
-      Object.assign(record.bag, readField(bag.bag, world, missing, `${held.id}.${bag.name}`))
+      Object.assign(record.bag, readField(bag.bag, world, missing, `${capturedEntity.id}.${bag.name}`))
     }
   }
 }
@@ -329,28 +329,28 @@ export async function restoreSessionWorld(capture, { world, loop, editor, view, 
 }
 
 /** A rotation, included only when the entity had a nonzero one. */
-function rotationPlacement(held) {
-  return held.rotation ? { rotation: held.rotation } : {}
+function rotationPlacement(capturedEntity) {
+  return capturedEntity.rotation ? { rotation: capturedEntity.rotation } : {}
 }
 
 /** A scale, included only when the entity had a non-default one. */
-function scalePlacement(held) {
-  return held.scale !== 1 ? { scale: held.scale } : {}
+function scalePlacement(capturedEntity) {
+  return capturedEntity.scale !== 1 ? { scale: capturedEntity.scale } : {}
 }
 
 /** A sprite, included only when the placement itself set it. */
-function spritePlacement(held) {
-  return held.setByPlacement?.sprite && held.sprite ? { sprite: held.sprite } : {}
+function spritePlacement(capturedEntity) {
+  return capturedEntity.setByPlacement?.sprite && capturedEntity.sprite ? { sprite: capturedEntity.sprite } : {}
 }
 
 /** A marker for a mesh the placement itself set; the live values write the mesh. */
-function meshPlacement(held) {
-  return held.setByPlacement?.mesh && held.mesh ? { mesh: {} } : {}
+function meshPlacement(capturedEntity) {
+  return capturedEntity.setByPlacement?.mesh && capturedEntity.mesh ? { mesh: {} } : {}
 }
 
 /** A collider, included only when the placement itself set it. */
-function colliderPlacement(held) {
-  return held.setByPlacement?.collider && held.collider ? { collider: held.collider } : {}
+function colliderPlacement(capturedEntity) {
+  return capturedEntity.setByPlacement?.collider && capturedEntity.collider ? { collider: capturedEntity.collider } : {}
 }
 
 /**
@@ -360,19 +360,19 @@ function colliderPlacement(held) {
  * so they are restored as flags and the live values are written over the top
  * afterwards.
  */
-function placementOf(held) {
-  const attached = placementBehaviours(held.behaviours, held.detached || [])
+function placementOf(capturedEntity) {
+  const attached = placementBehaviours(capturedEntity.behaviours, capturedEntity.detached || [])
   return {
-    id: held.id,
-    at: held.at,
-    ...rotationPlacement(held),
-    ...scalePlacement(held),
-    ...spritePlacement(held),
-    ...meshPlacement(held),
-    ...colliderPlacement(held),
-    properties: overriddenProperties(held.overrides, held.properties, { keepUndefined: false }),
+    id: capturedEntity.id,
+    at: capturedEntity.at,
+    ...rotationPlacement(capturedEntity),
+    ...scalePlacement(capturedEntity),
+    ...spritePlacement(capturedEntity),
+    ...meshPlacement(capturedEntity),
+    ...colliderPlacement(capturedEntity),
+    properties: overriddenProperties(capturedEntity.overrides, capturedEntity.properties, { keepUndefined: false }),
     ...(attached ? { behaviours: attached } : {}),
-    ...held.extra
+    ...capturedEntity.extra
   }
 }
 
@@ -381,14 +381,14 @@ function placementOf(held) {
  * holds. The name says where the reference was, so a missing one is found
  * rather than guessed at.
  */
-function readField(value, world, missing, where) {
+function readField(value, world, missing, fieldPath) {
   return resolve(
     value,
     id => world.byId(id),
     (at, id) => {
       missing.push(`${at} pointed at "${id}", which is not in the restored world`)
     },
-    where
+    fieldPath
   )
 }
 
@@ -402,20 +402,23 @@ function readField(value, world, missing, where) {
  * rather than replacing them, so a value that could not be captured keeps the
  * file's answer instead of vanishing.
  */
-function applyLiveValues(entity, held, world, missing) {
-  entity.x = held.at[0]
-  entity.y = held.at[1]
-  entity.z = held.at[2]
-  entity.rotation = held.rotation
-  entity.scale = held.scale
-  entity.hidden = held.hidden
-  entity._extraKeys = { ...held.extra }
-  if (held.sprite) entity.sprite = held.sprite
-  if (held.mesh) entity.mesh = held.mesh
-  if (held.collider) entity.collider = held.collider
-  Object.assign(entity.properties, readField(held.properties, world, missing, `${held.id}.properties`))
-  for (const [key, value] of Object.entries(held.fields)) {
-    entity[key] = readField(value, world, missing, `${held.id}.${key}`)
+function applyLiveValues(entity, capturedEntity, world, missing) {
+  entity.x = capturedEntity.at[0]
+  entity.y = capturedEntity.at[1]
+  entity.z = capturedEntity.at[2]
+  entity.rotation = capturedEntity.rotation
+  entity.scale = capturedEntity.scale
+  entity.hidden = capturedEntity.hidden
+  entity._extraKeys = { ...capturedEntity.extra }
+  if (capturedEntity.sprite) entity.sprite = capturedEntity.sprite
+  if (capturedEntity.mesh) entity.mesh = capturedEntity.mesh
+  if (capturedEntity.collider) entity.collider = capturedEntity.collider
+  Object.assign(
+    entity.properties,
+    readField(capturedEntity.properties, world, missing, `${capturedEntity.id}.properties`)
+  )
+  for (const [key, value] of Object.entries(capturedEntity.fields)) {
+    entity[key] = readField(value, world, missing, `${capturedEntity.id}.${key}`)
   }
 }
 
@@ -492,7 +495,7 @@ function restoreLosses(capture, { world, loop, missing, fromLevel }) {
     if (loss) losses.push(loss)
   }
 
-  const madeInTheRun = capture.entities.filter(held => !fromLevel.has(held.id)).length
+  const madeInTheRun = capture.entities.filter(capturedEntity => !fromLevel.has(capturedEntity.id)).length
   if (madeInTheRun) losses.push(pluginListLoss(madeInTheRun, capture.entities.length))
   else losses.push('anything a plugin holds outside the world, which was rebuilt from boot')
   return { losses, hold: madeInTheRun > 0 }

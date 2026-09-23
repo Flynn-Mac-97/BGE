@@ -25,7 +25,7 @@ export { assetURL }
 const IMAGE = /\.(png|jpg|jpeg|webp|gif|svg)$/i
 
 /** Build one element. `on` takes listeners by event name; `text` sets the text content. */
-function h(tag, className, attributes = {}) {
+function makeElement(tag, className, attributes = {}) {
   const element = document.createElement(tag)
   if (className) element.className = className
   for (const [k, v] of Object.entries(attributes)) {
@@ -66,12 +66,15 @@ export function makeUI(state, redraw) {
 
   const ui = {
     // ---- layout ----
-    stack: (children, o = {}) => append(h('div', 'u-stack' + (o.pad ? ' pad' : '')), children),
-    row: (children, o = {}) => append(h('div', 'u-row' + (o.pad ? ' pad' : '')), children),
-    spacer: () => h('div', 'u-spacer'),
+    stack: (children, o = {}) => append(makeElement('div', 'u-stack' + (o.pad ? ' pad' : '')), children),
+    row: (children, o = {}) => append(makeElement('div', 'u-row' + (o.pad ? ' pad' : '')), children),
+    spacer: () => makeElement('div', 'u-spacer'),
 
     section: (title, children) =>
-      append(h('div', 'u-section'), [h('div', 'u-cap', { text: title }), ...[].concat(children || [])]),
+      append(makeElement('div', 'u-section'), [
+        makeElement('div', 'u-cap', { text: title }),
+        ...[].concat(children || [])
+      ]),
 
     /**
      * Collapsible group. Closed until the reader opens it, so many folds cost
@@ -79,44 +82,44 @@ export function makeUI(state, redraw) {
      * `o.open` starts it open.
      */
     fold(title, children, o = {}) {
-      const element = h('details', 'u-fold')
+      const element = makeElement('details', 'u-fold')
       if (o.open) element.open = true
-      const summary = h('summary', 'u-fsum')
-      append(summary, [h('span', 'u-flabel', { text: title })])
-      if (o.meta != null) append(summary, [h('span', 'u-meta', { text: String(o.meta) })])
+      const summary = makeElement('summary', 'u-fsum')
+      append(summary, [makeElement('span', 'u-flabel', { text: title })])
+      if (o.meta != null) append(summary, [makeElement('span', 'u-meta', { text: String(o.meta) })])
       append(element, [summary])
       return append(element, children)
     },
 
     /** Even columns of picture cells. Layout only — `grid` is for picking. */
-    gallery: children => append(h('div', 'u-gallery'), children),
+    gallery: children => append(makeElement('div', 'u-gallery'), children),
 
-    scroll: children => append(h('div', 'u-scroll'), children),
+    scroll: children => append(makeElement('div', 'u-scroll'), children),
 
     // ---- text ----
-    text: (s, o = {}) => h('div', 'u-text' + (o.dim ? ' dim' : ''), { text: s }),
-    label: s => h('span', 'u-label', { text: s }),
-    value: v => h('span', 'u-value', { text: String(v) }),
-    empty: s => h('div', 'u-empty', { text: s }),
+    text: (s, o = {}) => makeElement('div', 'u-text' + (o.dim ? ' dim' : ''), { text: s }),
+    label: s => makeElement('span', 'u-label', { text: s }),
+    value: v => makeElement('span', 'u-value', { text: String(v) }),
+    empty: s => makeElement('div', 'u-empty', { text: s }),
 
     /** Machine-side detail on a row: a count, a reason, a duration. Never the subject. */
-    meta: s => h('span', 'u-meta', { text: s ?? '' }),
+    meta: s => makeElement('span', 'u-meta', { text: s ?? '' }),
 
     /** A single status character that holds its column: · ✓ ✗ */
-    glyph: (s, o = {}) => h('span', 'u-glyph-m' + (o.strong ? ' strong' : ''), { text: s ?? '·' }),
+    glyph: (s, o = {}) => makeElement('span', 'u-glyph-m' + (o.strong ? ' strong' : ''), { text: s ?? '·' }),
 
     // ---- inputs ----
     search(o = {}) {
-      const element = h('div', 'u-search')
-      const input = h('input', null, {
+      const element = makeElement('div', 'u-search')
+      const input = makeElement('input', null, {
         value: o.value ?? (o.bind ? (state[o.bind] ?? '') : ''),
         placeholder: o.placeholder || 'filter',
         spellcheck: 'false',
         autocomplete: 'off'
       })
       bindable(o, input, 'input', t => t.value)
-      append(element, [h('span', 'u-mag', { text: '/' }), input])
-      if (o.count != null) append(element, [h('span', 'u-count', { text: String(o.count) })])
+      append(element, [makeElement('span', 'u-mag', { text: '/' }), input])
+      if (o.count != null) append(element, [makeElement('span', 'u-count', { text: String(o.count) })])
       element._focus = () => {
         input.focus()
         input.setSelectionRange(input.value.length, input.value.length)
@@ -125,10 +128,10 @@ export function makeUI(state, redraw) {
     },
 
     field(o = {}) {
-      const element = h('div', 'u-field' + (o.marked ? ' marked' : ''))
-      append(element, [h('span', 'u-k', { text: o.k ?? '' })])
+      const element = makeElement('div', 'u-field' + (o.marked ? ' marked' : ''))
+      append(element, [makeElement('span', 'u-k', { text: o.k ?? '' })])
       if (o.onChange || o.bind) {
-        const input = h('input', 'u-v', { value: String(o.v ?? ''), spellcheck: 'false' })
+        const input = makeElement('input', 'u-v', { value: String(o.v ?? ''), spellcheck: 'false' })
         bindable(
           { ...o, bind: null, onChange: v => o.onChange?.(o.kind === 'number' ? Number(v) : v) },
           input,
@@ -137,19 +140,19 @@ export function makeUI(state, redraw) {
         )
         append(element, [input])
       } else {
-        append(element, [h('span', 'u-v ro', { text: String(o.v ?? '') })])
+        append(element, [makeElement('span', 'u-v ro', { text: String(o.v ?? '') })])
       }
-      if (o.note) append(element, [h('span', 'u-note', { text: o.note })])
+      if (o.note) append(element, [makeElement('span', 'u-note', { text: o.note })])
       return element
     },
 
     button: (label, onClick, o = {}) =>
-      h('button', 'u-btn' + (o.primary ? ' primary' : ''), { text: label, on: { click: onClick } }),
+      makeElement('button', 'u-btn' + (o.primary ? ' primary' : ''), { text: label, on: { click: onClick } }),
 
     toggle(o = {}) {
       const on = o.value ?? (o.bind ? !!state[o.bind] : false)
-      const element = h('button', 'u-toggle', { 'aria-pressed': String(on) })
-      append(element, [h('span', 'u-box'), h('span', null, { text: o.label || '' })])
+      const element = makeElement('button', 'u-toggle', { 'aria-pressed': String(on) })
+      append(element, [makeElement('span', 'u-box'), makeElement('span', null, { text: o.label || '' })])
       element.addEventListener('click', event => {
         if (o.stop) event.stopPropagation()
         const v = !on
@@ -161,9 +164,9 @@ export function makeUI(state, redraw) {
     },
 
     slider(o = {}) {
-      const element = h('div', 'u-field')
-      append(element, [h('span', 'u-k', { text: o.k ?? '' })])
-      const input = h('input', 'u-slider', {
+      const element = makeElement('div', 'u-field')
+      append(element, [makeElement('span', 'u-k', { text: o.k ?? '' })])
+      const input = makeElement('input', 'u-slider', {
         type: 'range',
         min: o.min ?? 0,
         max: o.max ?? 1,
@@ -171,16 +174,16 @@ export function makeUI(state, redraw) {
         value: o.value ?? (o.bind ? state[o.bind] : 0)
       })
       bindable(o, input, 'input', t => Number(t.value))
-      append(element, [input, h('span', 'u-v ro', { text: String(o.value ?? '') })])
+      append(element, [input, makeElement('span', 'u-v ro', { text: String(o.value ?? '') })])
       return element
     },
 
     pick(o = {}) {
-      const element = h('div', 'u-pick')
+      const element = makeElement('div', 'u-pick')
       for (const opt of o.options || []) {
         const val = typeof opt === 'string' ? opt : opt.value
         const lab = typeof opt === 'string' ? opt : opt.label
-        const b = h('button', 'u-pickone', { text: lab, 'aria-pressed': String(val === o.value) })
+        const b = makeElement('button', 'u-pickone', { text: lab, 'aria-pressed': String(val === o.value) })
         b.addEventListener('click', () => {
           o.onChange?.(val)
           redraw()
@@ -192,12 +195,12 @@ export function makeUI(state, redraw) {
 
     // ---- collections ----
     list(o = {}) {
-      const element = h('div', 'u-list')
+      const element = makeElement('div', 'u-list')
       const items = o.items || []
       if (!items.length) return append(element, [ui.empty(o.emptyText || 'nothing here')])
       items.forEach((it, i) => {
         const key = o.key ? o.key(it) : i
-        const row = h('div', 'u-lrow' + (o.selected === key ? ' on' : '') + (o.dim?.(it) ? ' dim' : ''), {
+        const row = makeElement('div', 'u-lrow' + (o.selected === key ? ' on' : '') + (o.dim?.(it) ? ' dim' : ''), {
           role: 'button',
           tabindex: '0'
         })
@@ -235,14 +238,14 @@ export function makeUI(state, redraw) {
     },
 
     textarea(o = {}) {
-      const element = h('textarea', 'u-textarea', { spellcheck: 'false', placeholder: o.placeholder || '' })
+      const element = makeElement('textarea', 'u-textarea', { spellcheck: 'false', placeholder: o.placeholder || '' })
       element.value = String(o.value ?? '')
       bindable(o, element, 'input', target => target.value)
       return element
     },
 
     tree(o = {}) {
-      const element = h('div', 'u-tree')
+      const element = makeElement('div', 'u-tree')
       const nodes = o.nodes || []
       if (!nodes.length) return append(element, [ui.empty(o.emptyText || 'nothing here')])
       const byParent = new Map()
@@ -253,7 +256,7 @@ export function makeUI(state, redraw) {
       const draw = (parent, depth) => {
         for (const node of byParent.get(parent) || []) {
           const children = byParent.get(node.id) || []
-          const row = h('div', 'u-trow' + (o.selected === node.id ? ' on' : ''), {
+          const row = makeElement('div', 'u-trow' + (o.selected === node.id ? ' on' : ''), {
             role: 'button',
             tabindex: '0',
             style: `--depth:${depth}`
@@ -276,11 +279,11 @@ export function makeUI(state, redraw) {
 
     grid(o = {}) {
       const items = o.items || []
-      const element = h('div', 'u-grid', { style: `--cols:${o.cols || 3}` })
-      if (!items.length) return append(h('div'), [ui.empty(o.emptyText || 'nothing here')])
+      const element = makeElement('div', 'u-grid', { style: `--cols:${o.cols || 3}` })
+      if (!items.length) return append(makeElement('div'), [ui.empty(o.emptyText || 'nothing here')])
       items.forEach(it => {
         const key = o.key ? o.key(it) : it
-        const cell = h('div', 'u-cell' + (o.selected === key ? ' on' : ''), { role: 'button', tabindex: '0' })
+        const cell = makeElement('div', 'u-cell' + (o.selected === key ? ' on' : ''), { role: 'button', tabindex: '0' })
         append(cell, o.cell ? o.cell(it) : [ui.label(String(it))])
         cell.addEventListener('click', () => o.onPick?.(it))
         cell.addEventListener('keydown', event => {
@@ -296,27 +299,27 @@ export function makeUI(state, redraw) {
 
     // ---- assets ----
     thumb(item, o = {}) {
-      const element = h('div', 'u-thumb')
-      const art = h('div', 'u-art')
+      const element = makeElement('div', 'u-thumb')
+      const art = makeElement('div', 'u-art')
       const src = typeof item === 'string' ? item : item.src || item.file
       if (src && IMAGE.test(src)) {
-        append(art, [h('img', null, { src: assetURL(src), alt: '' })])
+        append(art, [makeElement('img', null, { src: assetURL(src), alt: '' })])
       } else {
-        append(art, [h('span', 'u-glyph', { text: o.glyph || '·' })])
+        append(art, [makeElement('span', 'u-glyph', { text: o.glyph || '·' })])
       }
       append(element, [art])
-      if (o.label) append(element, [h('span', 'u-tlabel', { text: o.label })])
-      if (o.sub) append(element, [h('span', 'u-tsub', { text: o.sub })])
+      if (o.label) append(element, [makeElement('span', 'u-tlabel', { text: o.label })])
+      if (o.sub) append(element, [makeElement('span', 'u-tsub', { text: o.sub })])
       return element
     },
 
     preview(item, o = {}) {
-      const element = h('div', 'u-preview')
+      const element = makeElement('div', 'u-preview')
       const src = typeof item === 'string' ? item : item?.file
       if (src && IMAGE.test(src)) {
-        append(element, [h('img', null, { src: assetURL(src), alt: '' })])
+        append(element, [makeElement('img', null, { src: assetURL(src), alt: '' })])
       } else {
-        append(element, [h('span', 'u-glyph', { text: o.glyph || '—' })])
+        append(element, [makeElement('span', 'u-glyph', { text: o.glyph || '—' })])
       }
       return element
     },
@@ -327,10 +330,10 @@ export function makeUI(state, redraw) {
      * `stamp` busts the browser cache when the same path holds a new picture.
      */
     picture(src, o = {}) {
-      const element = h('figure', 'u-picture')
+      const element = makeElement('figure', 'u-picture')
       const url = src.startsWith('data:') ? src : `/${src}${o.stamp ? `?run=${o.stamp}` : ''}`
-      append(element, [h('img', null, { src: url, alt: o.label || '' })])
-      if (o.label) append(element, [h('figcaption', 'u-tsub', { text: o.label })])
+      append(element, [makeElement('img', null, { src: url, alt: o.label || '' })])
+      if (o.label) append(element, [makeElement('figcaption', 'u-tsub', { text: o.label })])
       return element
     },
 

@@ -208,13 +208,13 @@ export async function startWorld({
    * These were closures over the locals above. As module functions they take
    * what they read and write in one object, named once, here.
    */
-  const parts = { world, loop, bus, editor, view, files, importProjectFile, context, levelFile }
-  editor.saveLevel = options => saveLevel(parts, options)
-  editor.loadLevel = name => loadLevel(parts, name)
-  editor.loadTypes = () => loadTypes(parts)
-  editor.reloadType = name => reloadType(parts, name)
-  editor.reloadBehaviour = name => reloadBehaviour(parts, name)
-  editor.togglePlay = () => togglePlay(parts)
+  const projectParts = { world, loop, bus, editor, view, files, importProjectFile, context, levelFile }
+  editor.saveLevel = options => saveLevel(projectParts, options)
+  editor.loadLevel = name => loadLevel(projectParts, name)
+  editor.loadTypes = () => loadTypes(projectParts)
+  editor.reloadType = name => reloadType(projectParts, name)
+  editor.reloadBehaviour = name => reloadBehaviour(projectParts, name)
+  editor.togglePlay = () => togglePlay(projectParts)
 
   attachWorldSurface(context, { world, bus, editor, loop, importProjectFile, saveLevel: editor.saveLevel })
 
@@ -230,7 +230,7 @@ export async function startWorld({
   await attachScreen(context)
 
   editor.index = await files.index()
-  await loadTypes(parts)
+  await loadTypes(projectParts)
 
   // game.json says which level opens. Falling back to "whichever sorts first"
   // means adding a level can silently change which one you land in — and the
@@ -243,7 +243,7 @@ export async function startWorld({
   if (game.startLevel && start !== game.startLevel) {
     console.error(`[project] game.json startLevel "${game.startLevel}" does not exist — opening "${start}"`)
   }
-  if (start) await loadLevel(parts, start)
+  if (start) await loadLevel(projectParts, start)
 
   // A world is handed out ready to be stepped. A plugin that has to fetch
   // something declares it in `onLoad`, and a caller that stepped before it

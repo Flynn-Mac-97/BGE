@@ -63,7 +63,7 @@ const inspector = () => {
   }
   const engine = makeInspect({
     world,
-    loader: { failures: () => [], plugins: new Map(), contrib: { commands: [], menus: [] } },
+    loader: { failures: () => [], plugins: new Map(), contributions: { commands: [], menus: [] } },
     loop: { running: false, time: 0, paused: false, holds: [], random: { seed: 1 } },
     files,
     bus,

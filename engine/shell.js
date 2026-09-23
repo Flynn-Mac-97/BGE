@@ -107,7 +107,7 @@ export function makeShell(root, context) {
    * what it is for — the kernel holds the rule, the plugin holds the policy.
    */
   function panelsFor(dock) {
-    return loader.contrib.panels
+    return loader.contributions.panels
       .filter(p => p.dock === dock)
       .filter(p => !p.whenTool || p.whenTool === editor.tool)
       .filter(p => !p.when || p.when(context))
@@ -221,7 +221,7 @@ export function makeShell(root, context) {
 
   /** The tool rail, drawn only once something contributes a second tool. */
   function drawToolRail(bar, shellContext) {
-    const tools = loader.contrib.tools
+    const tools = loader.contributions.tools
     if (tools.length <= 1) return
     const rail = document.createElement('span')
     rail.className = 'rail'
@@ -236,7 +236,7 @@ export function makeShell(root, context) {
    * screen, without a plugin needing to touch the toolbar itself.
    */
   function drawMenus(bar, shellContext) {
-    for (const menu of loader.contrib.menus) {
+    for (const menu of loader.contributions.menus) {
       const button = document.createElement('button')
       button.className = 'menu' + (menu.on?.(shellContext) ? ' on' : '')
       button.textContent = menu.label

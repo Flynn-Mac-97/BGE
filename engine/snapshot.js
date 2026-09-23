@@ -171,7 +171,7 @@ function detailFields(out, options, { loader, loop, log }) {
   if (options.plugins) out.plugins = pluginList(loader)
   if (options.log) out.log = log.lines.slice(-40)
   if (options.timers) out.timers = loop.timers
-  if (options.commands) out.commands = loader.contrib.commands.map(command => command.id)
+  if (options.commands) out.commands = loader.contributions.commands.map(command => command.id)
 }
 
 /**

@@ -63,7 +63,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
  *
  * @param {string} projectDirectory The project's real directory on disk.
  * @param {string} [checkout] The repository the engine's files are read from.
- * @returns {object} The transport: index, tree, read, write and agent files.
+ * @returns {import('./files.js').FileTransport} The transport: index, tree, read, write and agent files.
  */
 export function onDisk(projectDirectory, checkout = ROOT) {
   // The checkout is passed in, not taken from the project's parent: the project

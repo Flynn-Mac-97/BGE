@@ -5,11 +5,11 @@
  * once. A write that a guard or the server refuses is recorded in `refused` and
  * announced as `files:refused`, so a reader states "saved" only when one is.
  *
- * The four things it does — index, tree, read, write — are handed in as a
- * transport, because the browser reaches disk over HTTP and node reaches it
- * directly. Everything above this line stays the same either way: the counting
- * of pending writes, the events, the guards asked before every write, and the
- * refusal to have a save button.
+ * It reads and writes through a transport — `FileTransport`, below — because
+ * the browser reaches disk over HTTP and node reaches it directly. Everything
+ * above this line stays the same either way: the counting of pending writes,
+ * the events, the guards asked before every write, and the refusal to have a
+ * save button.
  */
 
 /**
@@ -29,55 +29,84 @@ const clientName = () => {
 }
 
 /**
+ * The methods `makeFiles` needs from a transport.
+ *
+ * `overHTTP` in the browser and `onDisk` in node implement this one interface.
+ * A transport that omits a method is incomplete, and `makeFiles` does not test
+ * for one — a contract kept in one place is what replaces those tests.
+ *
+ * Every method returns a promise. A transport reports only what storage did;
+ * the guards and the refusal bookkeeping belong to `makeFiles`.
+ *
+ * @typedef {object} FileTransport
+ * @property {() => Promise<object>} index The rebuilt project index.
+ * @property {() => Promise<Array<{path: string}>>} tree Every project file, project-relative.
+ * @property {() => Promise<Array>} agentPlugins The `.agent.md` guides beside each plugin.
+ * @property {(scope: string, file: string) => Promise<string|null>} agentInterface One plugin file's interface block, or null when no reader exists.
+ * @property {(path: string) => Promise<string>} read One project file's text.
+ * @property {(selection?: string) => Promise<object>} sourceCatalog The engine and project sources for one selection.
+ * @property {() => Promise<Array>} listDocuments Every saved system document.
+ * @property {(id: string, backup?: boolean) => Promise<object>} readDocument One saved document, or its backup.
+ * @property {(id: string, documentData: object, revision: number) => Promise<object>} writeDocument Save one document at the revision it was read from.
+ * @property {(scope: string, file: string, text: string, expectedHash: string) => Promise<object>} writeSource Write one source file, refusing when its hash moved.
+ * @property {(scope: string, path: string) => Promise<{scope: string, file: string, text: string, hash: string}>} readSource One source file and its hash.
+ * @property {(scope: string, path: string) => Promise<string>} readAgent One agent instruction file's text.
+ * @property {(path: string, text: string) => Promise<object>} write Write one project file's text; the answer carries the rebuilt index where the transport builds one.
+ * @property {(scope: string, path: string, text: string) => Promise<void>} writeAgent Write one agent instruction file.
+ */
+
+/**
  * Talk to the dev server. The transport the editor uses.
  *
- * @returns {object} The transport `makeFiles` reads and writes through.
+ * @returns {FileTransport} The transport `makeFiles` reads and writes through.
  */
 export function overHTTP() {
-  const j = async (url, options) => {
-    const r = await fetch(url, options)
-    const body = await r.json()
-    if (!r.ok || body.error) throw new Error(body.error || r.statusText)
+  const request = async (url, options) => {
+    const response = await fetch(url, options)
+    const body = await response.json()
+    if (!response.ok || body.error) throw new Error(body.error || response.statusText)
     return body
   }
 
   const writeHeaders = () => ({ 'content-type': 'application/json', 'x-engine-client': clientName() })
 
   return {
-    index: () => j('/api/index'),
-    tree: () => j('/api/tree'),
-    agentPlugins: () => j('/api/agent-plugins'),
+    index: () => request('/api/index'),
+    tree: () => request('/api/tree'),
+    agentPlugins: () => request('/api/agent-plugins'),
     agentInterface: async (scope, file) =>
-      (await j('/api/agent-interface?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(file))).text,
-    read: async path => (await j('/api/file?path=' + encodeURIComponent(path))).text,
-    sourceCatalog: (selection = 'core') => j('/api/systems/catalog?selection=' + encodeURIComponent(selection)),
-    listDocuments: () => j('/api/systems/documents'),
-    readDocument: (id, backup = false) => j('/api/systems/document?id=' + encodeURIComponent(id) + '&backup=' + backup),
+      (await request('/api/agent-interface?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(file)))
+        .text,
+    read: async path => (await request('/api/file?path=' + encodeURIComponent(path))).text,
+    sourceCatalog: (selection = 'core') => request('/api/systems/catalog?selection=' + encodeURIComponent(selection)),
+    listDocuments: () => request('/api/systems/documents'),
+    readDocument: (id, backup = false) =>
+      request('/api/systems/document?id=' + encodeURIComponent(id) + '&backup=' + backup),
     writeDocument: (id, documentData, revision) =>
-      j('/api/systems/document', {
+      request('/api/systems/document', {
         method: 'POST',
         headers: writeHeaders(),
         // eslint-disable-next-line id-denylist -- the wire message field is named data
         body: JSON.stringify({ id, data: documentData, revision })
       }),
     writeSource: (scope, file, text, expectedHash) =>
-      j('/api/systems/source', {
+      request('/api/systems/source', {
         method: 'POST',
         headers: writeHeaders(),
         body: JSON.stringify({ scope, file, text, expectedHash })
       }),
     readSource: (scope, path) =>
-      j('/api/systems/source?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path)),
+      request('/api/systems/source?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path)),
     readAgent: async (scope, path) =>
-      (await j('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
+      (await request('/api/agent-file?scope=' + encodeURIComponent(scope) + '&path=' + encodeURIComponent(path))).text,
     write: (path, text) =>
-      j('/api/file', {
+      request('/api/file', {
         method: 'POST',
         headers: writeHeaders(),
         body: JSON.stringify({ path, text })
       }),
     writeAgent: (scope, path, text) =>
-      j('/api/agent-file', {
+      request('/api/agent-file', {
         method: 'POST',
         headers: writeHeaders(),
         body: JSON.stringify({ scope, path, text })
@@ -109,7 +138,7 @@ const laneRenderPageGuard = () => {
  * in flight both leave `pending` at zero — only `refused` tells them apart.
  *
  * @param {object} bus The bus writes and refusals are announced on.
- * @param {object} [transport] Where bytes land; the dev server by default.
+ * @param {FileTransport} [transport] Where bytes land; the dev server by default.
  * @returns {object} The file surface: read, write, guards and their state.
  */
 export function makeFiles(bus, transport = overHTTP()) {
@@ -187,7 +216,6 @@ export function makeFiles(bus, transport = overHTTP()) {
       return transport.read(path)
     },
     async sourceCatalog(selection = 'core') {
-      if (!transport.sourceCatalog) throw new Error('source catalog unavailable in this transport')
       return transport.sourceCatalog(selection)
     },
     async listDocuments() {
@@ -205,7 +233,6 @@ export function makeFiles(bus, transport = overHTTP()) {
       return transport.writeSource(scope, file, text, expectedHash)
     },
     async readSource(scope, path) {
-      if (!transport.readSource) throw new Error('source inspection is unavailable in this transport')
       return transport.readSource(scope, path)
     },
     async readAgent(scope, path) {

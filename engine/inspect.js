@@ -53,8 +53,8 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      */
     commands({ fields } = {}) {
       const rows = [
-        ...loader.contrib.commands.map(c => ({ id: c.id, label: c.label, plugin: c.plugin })),
-        ...loader.contrib.menus.map(m => ({ id: m.id, label: m.label, plugin: m.plugin, toolbar: true }))
+        ...loader.contributions.commands.map(c => ({ id: c.id, label: c.label, plugin: c.plugin })),
+        ...loader.contributions.menus.map(m => ({ id: m.id, label: m.label, plugin: m.plugin, toolbar: true }))
       ]
       if (fields === undefined) return rows
       if (fields === true) throw new Error(`commands takes the fields as a value — commands '{"fields":["id"]}'`)
@@ -65,7 +65,8 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     // bridge — await the answer, so an async command reports what it measured
     // instead of a pending promise.
     async run(id, args) {
-      const command = loader.contrib.commands.find(c => c.id === id) || loader.contrib.menus.find(m => m.id === id)
+      const command =
+        loader.contributions.commands.find(c => c.id === id) || loader.contributions.menus.find(m => m.id === id)
       if (!command) throw new Error(missingCommand(id, loader.failures()))
       validateCommandInput(
         command.inputSchema,
@@ -74,7 +75,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       const out = await command.run(editor.context, args)
       // A toolbar entry changes what is on screen, so redraw for it — a person
       // pressing the button gets that from the shell.
-      if (command.toolbar !== false && loader.contrib.menus.includes(command)) editor.context.redraw()
+      if (command.toolbar !== false && loader.contributions.menus.includes(command)) editor.context.redraw()
       // A waiting note rides on a reply the agent is already reading, but only
       // on a plain object. A command answering with a number or a list answers
       // with exactly that; the note waits for the next reply that can hold it.

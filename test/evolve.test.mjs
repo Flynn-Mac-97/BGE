@@ -86,7 +86,7 @@ test('missing ledgers stay absent and evidence flags require text', context => {
 
 test('evolve is discoverable in CLI help and the offline surface', context => {
   assert.match(fixture(context).run('help').stdout, /evolve \[<id>\|<words>\]/)
-  const inventory = surface.commands[0].run({ loader: { contrib: { commands: [], menus: [] } } })
+  const inventory = surface.commands[0].run({ loader: { contributions: { commands: [], menus: [] } } })
   assert.ok(inventory.offline.some(entry => entry.op.startsWith('evolve ')))
   assert.ok(inventory.flags.some(entry => entry.op.includes('--repro')))
 })

@@ -28,7 +28,7 @@ function makePluginLoader(definitions, { boot = true } = {}) {
 
 test('the loader collects exactly the seven contribution points', () => {
   const { loader } = makePluginLoader([])
-  assert.deepEqual(Object.keys(loader.contrib).sort(), [
+  assert.deepEqual(Object.keys(loader.contributions).sort(), [
     'commands',
     'fields',
     'importers',

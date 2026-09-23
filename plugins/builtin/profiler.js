@@ -182,7 +182,9 @@ function timeSystems(systems) {
     const run = system.run
     system.run = (world, seconds, context) => {
       const at = performance.now()
-      try { return run(world, seconds, context) } finally {
+      try {
+        return run(world, seconds, context)
+      } finally {
         const took = performance.now() - at
         const list = times.get(key)
         if (list) list.push(took)
@@ -192,7 +194,11 @@ function timeSystems(systems) {
   }
   return {
     times,
-    restore() { systems.forEach((system, index) => { system.run = original[index] }) }
+    restore() {
+      systems.forEach((system, index) => {
+        system.run = original[index]
+      })
+    }
   }
 }
 
@@ -212,7 +218,7 @@ function measureSteps(context, options = {}) {
 
   const steps = Math.min(20000, Math.max(1, Math.round(Number(options.steps) || STEPS)))
   const warm = Math.min(steps, Math.max(0, Math.round(Number(options.warm ?? STEP_WARM))))
-  const systems = context.loader.contrib.systems
+  const systems = context.loader.contributions.systems
   const timed = timeSystems(systems)
 
   const whole = []
@@ -228,13 +234,15 @@ function measureSteps(context, options = {}) {
     timed.restore()
   }
 
-  const each = [...timed.times].map(([system, list]) => ({
-    system,
-    ranPerStep: round(list.length / steps),
-    meanMs: round(total(list) / steps),
-    worst20Ms: spread(list).worst20,
-    mostMs: spread(list).most
-  })).sort((first, second) => second.meanMs - first.meanMs)
+  const each = [...timed.times]
+    .map(([system, list]) => ({
+      system,
+      ranPerStep: round(list.length / steps),
+      meanMs: round(total(list) / steps),
+      worst20Ms: spread(list).worst20,
+      mostMs: spread(list).most
+    }))
+    .sort((first, second) => second.meanMs - first.meanMs)
 
   const step = spread(whole)
   return {
@@ -349,39 +357,47 @@ export default {
     if (scope) {
       const service = context.profiler
       scope.provide('profiler', service)
-      scope.defer(() => { if (context.profiler === service) delete context.profiler })
+      scope.defer(() => {
+        if (context.profiler === service) delete context.profiler
+      })
     }
   },
 
-  commands: [{
-    id: 'profile.frames',
-    label: 'Cost frames',
-    // run profile.frames
-    // run profile.frames '{"frames": 400, "warm": 30}'
-    run: (context, options) => measure(context, options || {})
-  }, {
-    id: 'profile.fill',
-    label: 'Cost quad pixels',
-    // run profile.fill '{"material": "hologram"}'
-    // run profile.fill '{"material": "hologram", "layers": 24, "frames": 300}'
-    run: (context, options) => measureFill(context, options || {})
-  }, {
-    id: 'profile.steps',
-    label: 'Cost per system',
-    // run profile.steps
-    // run profile.steps '{"steps": 1200, "warm": 120}'
-    run: (context, options) => measureSteps(context, options || {})
-  }, {
-    id: 'profile.plan',
-    label: 'Cost per-entity description',
-    // run profile.plan
-    // run profile.plan '{"samples": 50}'
-    run: (context, options) => measurePlan(context, options || {})
-  }, {
-    id: 'profile.sync',
-    label: 'Cost per-entity sync',
-    // run profile.sync
-    // run profile.sync '{"samples": 60}'
-    run: (context, options) => measureSync(context, options || {})
-  }]
+  commands: [
+    {
+      id: 'profile.frames',
+      label: 'Cost frames',
+      // run profile.frames
+      // run profile.frames '{"frames": 400, "warm": 30}'
+      run: (context, options) => measure(context, options || {})
+    },
+    {
+      id: 'profile.fill',
+      label: 'Cost quad pixels',
+      // run profile.fill '{"material": "hologram"}'
+      // run profile.fill '{"material": "hologram", "layers": 24, "frames": 300}'
+      run: (context, options) => measureFill(context, options || {})
+    },
+    {
+      id: 'profile.steps',
+      label: 'Cost per system',
+      // run profile.steps
+      // run profile.steps '{"steps": 1200, "warm": 120}'
+      run: (context, options) => measureSteps(context, options || {})
+    },
+    {
+      id: 'profile.plan',
+      label: 'Cost per-entity description',
+      // run profile.plan
+      // run profile.plan '{"samples": 50}'
+      run: (context, options) => measurePlan(context, options || {})
+    },
+    {
+      id: 'profile.sync',
+      label: 'Cost per-entity sync',
+      // run profile.sync
+      // run profile.sync '{"samples": 60}'
+      run: (context, options) => measureSync(context, options || {})
+    }
+  ]
 }

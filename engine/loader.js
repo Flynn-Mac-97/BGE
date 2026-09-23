@@ -60,7 +60,7 @@ function declareDefinitions(definitions) {
 export function makeLoader(bus) {
   const plugins = new Map(),
     services = new Map()
-  const contrib = Object.fromEntries(POINTS.map(point => [point, []]))
+  const contributions = Object.fromEntries(POINTS.map(point => [point, []]))
   let context = null,
     schedule = { fixed: [], frame: [] },
     scheduleError = null
@@ -116,21 +116,22 @@ export function makeLoader(bus) {
    * place: a stale order would run a plugin that is no longer registered.
    */
   function rebuild() {
-    for (const point of POINTS) contrib[point] = []
+    for (const point of POINTS) contributions[point] = []
     for (const { definition, enabled, builtin } of plugins.values()) {
       if (!enabled) continue
       for (const point of POINTS)
-        for (const item of definition[point] || []) contrib[point].push({ ...item, plugin: definition.name, builtin })
+        for (const item of definition[point] || [])
+          contributions[point].push({ ...item, plugin: definition.name, builtin })
     }
     try {
-      schedule = compileSchedule(contrib.systems)
-      contrib.systems = [...schedule.fixed, ...schedule.frame]
+      schedule = compileSchedule(contributions.systems)
+      contributions.systems = [...schedule.fixed, ...schedule.frame]
       scheduleError = null
     } catch (error) {
       if (scheduleError !== error.message) report('System Schedule', error.message)
       scheduleError = error.message
       schedule = { fixed: [], frame: [] }
-      contrib.systems = []
+      contributions.systems = []
     }
     bus.emit('plugins:changed')
   }
@@ -204,7 +205,7 @@ export function makeLoader(bus) {
 
   const api = {
     plugins,
-    contrib,
+    contributions,
     get schedule() {
       return schedule
     },
@@ -309,9 +310,11 @@ export function makeLoader(bus) {
      *
      * A plugin that replaces a context key it did not own is recorded and does
      * not stop the boot.
+     *
+     * @param {object} bootContext The context every plugin reads and may add to.
      */
-    boot(value) {
-      context = value
+    boot(bootContext) {
+      context = bootContext
       const values = () =>
         new Map(
           Object.keys(context)

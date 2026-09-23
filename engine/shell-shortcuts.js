@@ -18,12 +18,12 @@ const MODIFIERS = ['ctrl', 'shift', 'alt']
  * tried would get it wrong on the other one.
  */
 export function shortcutFromEvent(event) {
-  const parts = []
-  if (event.ctrlKey || event.metaKey) parts.push('ctrl')
-  if (event.shiftKey) parts.push('shift')
-  if (event.altKey) parts.push('alt')
-  parts.push(String(event.key ?? '').toLowerCase())
-  return parts.join('+')
+  const keyParts = []
+  if (event.ctrlKey || event.metaKey) keyParts.push('ctrl')
+  if (event.shiftKey) keyParts.push('shift')
+  if (event.altKey) keyParts.push('alt')
+  keyParts.push(String(event.key ?? '').toLowerCase())
+  return keyParts.join('+')
 }
 
 /**
@@ -36,14 +36,14 @@ export function shortcutFromEvent(event) {
  */
 export function readShortcut(declaration) {
   if (typeof declaration !== 'string' || declaration === '') return null
-  const parts = declaration.toLowerCase().split('+')
-  const key = parts.pop()
+  const keyParts = declaration.toLowerCase().split('+')
+  const key = keyParts.pop()
   if (!key) return null
-  if (parts.some(part => !MODIFIERS.includes(part))) return null
+  if (keyParts.some(part => !MODIFIERS.includes(part))) return null
   // ' ' is what the space bar reports and 'space' is what an author writes.
   // Both mean the space bar, and a declaration that reads well but never fires
   // is found by pressing it and getting nothing.
-  return [...MODIFIERS.filter(m => parts.includes(m)), key === 'space' ? ' ' : key].join('+')
+  return [...MODIFIERS.filter(m => keyParts.includes(m)), key === 'space' ? ' ' : key].join('+')
 }
 
 /** The input types that swallow a character, so a shortcut must stay out of them. */
@@ -128,14 +128,14 @@ export function makeShortcuts(context, draw) {
 
   const declaredShortcuts = () =>
     [
-      ...loader.contrib.commands.map(command => ({
+      ...loader.contributions.commands.map(command => ({
         key: command.key,
         what: 'command',
         name: command.id,
         plugin: command.plugin,
         run: () => context.run(command.id)
       })),
-      ...loader.contrib.tools.map(tool => ({
+      ...loader.contributions.tools.map(tool => ({
         key: tool.key,
         what: 'tool',
         name: tool.id,
