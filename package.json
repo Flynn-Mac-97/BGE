@@ -24,6 +24,9 @@
     "format": "prettier --write \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
     "format:check": "prettier --check \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
     "check:structure": "node scripts/check-structure.mjs",
+    "bench:render": "node scripts/render-benchmark.mjs",
+    "bench:baseline": "node scripts/render-benchmark.mjs --write-baseline",
+    "bench:check": "node scripts/check-render-benchmark.mjs",
     "check": "npm run format:check && npm run lint && npm run test:core && npm run check:structure",
     "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine --config scripts/kernel-trellis.yaml",
     "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit ."

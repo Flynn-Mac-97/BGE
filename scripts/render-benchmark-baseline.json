@@ -1,0 +1,30 @@
+{
+  "measuredAt": "2026-09-23T16:36:27.965Z",
+  "budgets": {
+    "scenes": {
+      "retro-2d": {
+        "kernelShare": 0.2,
+        "kernelShareTolerance": 0.35
+      },
+      "mid": {
+        "kernelShare": 0.6,
+        "kernelShareTolerance": 0.35
+      },
+      "aaa": {
+        "kernelShare": 0.039,
+        "kernelShareTolerance": 0.35
+      }
+    },
+    "entityCurve": {
+      "syncMsAt10000": 1,
+      "tolerance": 0.75,
+      "floorMs": 0.5,
+      "syncGrowthRatio": 10
+    },
+    "passCurve": {
+      "executorOverheadMsAt50": 0.1,
+      "tolerance": 1,
+      "floorMs": 0.25
+    }
+  }
+}
