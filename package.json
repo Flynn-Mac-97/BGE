@@ -19,7 +19,9 @@
     "test": "npm run test:offline && node test/cli.bridge.mjs",
     "test:offline": "node --test \"test/*.test.mjs\" \"test/core/*.test.mjs\"",
     "test:core": "node --test \"test/core/*.test.mjs\"",
-    "test:agent": "node --test test/agent-workspace.test.mjs"
+    "test:agent": "node --test test/agent-workspace.test.mjs",
+    "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine",
+    "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit ."
   },
   "dependencies": {
     "@dimforge/rapier2d-deterministic-compat": "^0.20.0",
