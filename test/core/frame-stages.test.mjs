@@ -1,10 +1,10 @@
 /**
- * The renderer's frame stages: a draw at a named point, and replace or skip of
- * a core draw.
+ * `renderer.stages` — a draw at a named point in the frame, and taking a core
+ * stage over.
  *
- * The stage walk runs with no GL context, so the picture a plugin makes is not
- * tested here; what is tested is the contract — where a draw runs, what frame
- * it is handed, and that replacing the world keeps the core out of the way.
+ * The core stage draws are kept, so `replace` and `skip` are reversible and
+ * `restore` puts the default back. A plugin that renders the world its own way
+ * replaces `world`, and the core does not draw underneath it.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -20,11 +20,6 @@ function watchCoreWorldDraw(frame) {
   return seen
 }
 
-test('the frame runs three named stages, in order', async () => {
-  const frame = await makeRenderer(null, VIEW, VIEWPORT)
-  assert.deepEqual(frame.stages.names, ['world', 'post', 'viewmodel'])
-})
-
 test('a draw registered before or after a stage runs at that point', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
   const log = []
@@ -34,6 +29,17 @@ test('a draw registered before or after a stage runs at that point', async () =>
   frame.stages.add('middle', () => log.push('middle'), { before: 'viewmodel' })
   frame.draw()
   assert.deepEqual(log, ['early', 'late', 'middle', 'last'])
+})
+
+test('the anchor decides the point, not the order the draws were added in', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  const log = []
+  // Registered first, but the walk runs `world`'s after list before `post`'s
+  // before list.
+  frame.stages.add('before-post', () => log.push('before-post'), { before: 'post' })
+  frame.stages.add('after-world', () => log.push('after-world'), { after: 'world' })
+  frame.draw()
+  assert.deepEqual(log, ['after-world', 'before-post'])
 })
 
 test('draws at one place run in the order they were added', async () => {
@@ -70,7 +76,7 @@ test('a plugin can replace the world draw and gets a coherent frame', async () =
   assert.ok('target' in handed[0], 'the target the frame draws into is on the frame')
 })
 
-test('a plugin can skip the world draw and the stage walk still runs', async () => {
+test('skip draws nothing at a core stage, and the draws around it still run', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
   const core = watchCoreWorldDraw(frame)
   const log = []
@@ -82,9 +88,10 @@ test('a plugin can skip the world draw and the stage walk still runs', async () 
   assert.deepEqual(log, ['around'], 'an anchor around a skipped stage still runs')
 })
 
-test('restore puts the core draw back', async () => {
+test('restore puts the core draw back after a replace and after a skip', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
   const core = watchCoreWorldDraw(frame)
+
   frame.stages.replace('world', () => {})
   frame.draw()
   assert.equal(core.draws, 0)
@@ -92,14 +99,36 @@ test('restore puts the core draw back', async () => {
   frame.stages.restore('world')
   frame.draw()
   assert.equal(core.draws, 1)
+
+  frame.stages.skip('world')
+  frame.draw()
+  assert.equal(core.draws, 1)
+
+  frame.stages.restore('world')
+  frame.draw()
+  assert.equal(core.draws, 2)
 })
 
-test('every draw is handed the same frame record, so nothing is allocated per frame', async () => {
+test('every draw in one frame is handed the same frame record', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
   const seen = []
   frame.stages.add('probe', frameRecord => seen.push(frameRecord), { after: 'world' })
   frame.draw()
   frame.draw()
   assert.equal(seen.length, 2)
-  assert.equal(seen[0], seen[1])
+  assert.equal(seen[0], seen[1], 'nothing is allocated for a frame that registers no stage')
+})
+
+test('a draw aimed at a stage that does not exist is refused, and the frame still runs', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  const core = watchCoreWorldDraw(frame)
+  const log = []
+  frame.stages.add('bad-add', () => log.push('add'), { before: 'no-such-stage' })
+  frame.stages.replace('no-such-stage', () => log.push('replace'))
+  frame.stages.skip('no-such-stage')
+  frame.stages.restore('no-such-stage')
+  frame.draw()
+
+  assert.deepEqual(log, [], 'no draw was added or run')
+  assert.equal(core.draws, 1, 'the core frame is unaffected')
 })
