@@ -2,10 +2,13 @@
  * Kernel: reach a project directly, on disk.
  *
  * A node world needs no dev server, no port and no browser tab, so it reads and
- * writes the project's files itself. This module is that transport and the one
- * guard on its writes. It is the twin of the server's file routes: the same
- * project-relative paths, the same refusal to leave the project, and the same
- * index rebuild after a write.
+ * writes the project's files itself. This module is that transport and the
+ * guard that keeps every path inside the project. It is the twin of the
+ * server's file routes: the same project-relative paths, the same refusal to
+ * leave the project, and the same index rebuild after a write.
+ *
+ * Which `.agent.md` files a scope may name is policy, not transport, and lives
+ * in `agent-files.mjs`.
  *
  * Node only. The browser reaches the open project through the dev server and
  * never learns where it is on disk.
@@ -14,41 +17,13 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
+import { resolveAgentFile } from './agent-files.mjs'
 import { listDocuments, readDocument, writeDocument } from './document-store.mjs'
 import { readSource, sourceCatalog, writeSource } from './source-files.mjs'
 import { buildIndex, walk } from './project-index.mjs'
 import { workLock } from './work-lock.mjs'
 import { pluginGuides } from './plugin-guides.mjs'
 import { pluginInterfaceReader } from './plugin-interface.mjs'
-
-/** The engine's own instruction files an agent packet may name. */
-function isEngineAgentFile(clean) {
-  return (
-    clean === 'AGENTS.md' ||
-    clean === 'ENGINE-BASE.md' ||
-    clean === 'ARCHITECTURE.md' ||
-    clean.startsWith('agents/') ||
-    clean.startsWith('docs/') ||
-    /^plugins\/builtin\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-  )
-}
-
-/** A project's own instruction files: its agents folder and its plugin guides. */
-function isProjectAgentFile(clean) {
-  return clean.startsWith('agents/') || /^plugins\/[^/]+\.agent(?:\.md|\/[^/]+\.md)$/.test(clean)
-}
-
-/** The directory a scope's agent files are read from, or null when the scope is unknown. */
-function agentScopeBase(scope, root, projectDirectory) {
-  if (scope === 'engine') return root
-  if (scope === 'project') return projectDirectory
-  return null
-}
-
-/** Whether a scope may name this file at all. */
-function agentFileAllowed(scope, clean) {
-  return scope === 'engine' ? isEngineAgentFile(clean) : isProjectAgentFile(clean)
-}
 
 /** The repository, found from this file, so a world starts the same from any directory. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -89,18 +64,6 @@ export function onDisk(projectDirectory, checkout = ROOT) {
     return abs
   }
 
-  /** Resolve one agent file, from the fixed sets each scope is allowed to read. */
-  const insideAgent = (scope, rel) => {
-    const base = agentScopeBase(scope, root, projectDirectory)
-    const clean = String(rel || '')
-      .replaceAll('\\', '/')
-      .replace(/^\.\//, '')
-    if (!base || !agentFileAllowed(scope, clean)) throw new Error(`bad agent file path: ${scope}:${rel}`)
-    const abs = path.resolve(base, clean)
-    if (!abs.startsWith(base + path.sep)) throw new Error(`bad agent file path: ${scope}:${rel}`)
-    return abs
-  }
-
   /** The `.agent.md` guides beside every plugin, in the shape the agent-context builder reads. */
   const pluginSidecars = () => pluginGuides(root, projectDirectory)
 
@@ -117,7 +80,7 @@ export function onDisk(projectDirectory, checkout = ROOT) {
       writeSource(root, projectDirectory, scope, file, text, expectedHash),
     readSource: (scope, file) => readSource(root, projectDirectory, scope, file),
     read: rel => fs.readFile(inside(rel), 'utf8'),
-    readAgent: (scope, rel) => fs.readFile(insideAgent(scope, rel), 'utf8'),
+    readAgent: (scope, rel) => fs.readFile(resolveAgentFile(scope, rel, root, projectDirectory), 'utf8'),
     async write(rel, text) {
       const abs = inside(rel)
       await fs.mkdir(path.dirname(abs), { recursive: true })
@@ -127,7 +90,7 @@ export function onDisk(projectDirectory, checkout = ROOT) {
       return buildIndex(projectDirectory, root)
     },
     async writeAgent(scope, rel, text) {
-      const abs = insideAgent(scope, rel)
+      const abs = resolveAgentFile(scope, rel, root, projectDirectory)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, text, 'utf8')
       if (scope === 'project') await buildIndex(projectDirectory, root)
