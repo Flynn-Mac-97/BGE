@@ -94,6 +94,7 @@ in `ARCHITECTURE.md`.
 | `render/entity-sync.js` | turning the entity list into scene objects | the world's rules |
 | `render/floor-mark.js` | the shape both floor marks share: the instanced unit quad | what either mark draws |
 | `render/frame-draw.js` | one frame out of the card, and what the last one cost | what is drawn |
+| `render/frame-stages.js` | the named stages one frame runs, and where a plugin draws in it | what a stage draws |
 | `render/geometry-cache.js` | solid geometry cached by its dimensions, and the one merge | materials |
 | `render/ground-band.js` | the TSL of a flat mark on the floor | the ring that uses it |
 | `render/ground-rings.js` | the ground ring, one actor named by a rule | a model's own materials |

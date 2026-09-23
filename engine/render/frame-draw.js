@@ -1,7 +1,12 @@
 /**
  * Kernel: one frame out of the card, and what the last one cost.
+ *
+ * The frame is three named stages — the world, the post chain, the viewmodel —
+ * and `frame-stages.js` owns that order. This file supplies the core draw at
+ * each stage and runs the walk.
  */
 import * as THREE from 'three/webgpu'
+import { makeFrameStages } from './frame-stages.js'
 
 export function makeFrameDraw(state) {
   /**
@@ -27,6 +32,36 @@ export function makeFrameDraw(state) {
     // Milliseconds spent describing the last frame, on this thread.
     cpuMs: 0
   }
+
+  /**
+   * The core draw at the world stage.
+   *
+   * A built post chain draws the scene itself, so the two stages must not both
+   * draw: the chain owns the scene pass and this stage stands down. That keeps
+   * exactly one world draw in a default frame.
+   */
+  function drawWorldStage(frame) {
+    if (state.postChainActive()) return
+    state.renderer.clear()
+    state.renderer.render(state.scene, frame.camera)
+  }
+
+  /** The core draw at the post stage: the chain when one is active, nothing otherwise. */
+  function drawPostStage(frame) {
+    if (!state.postChainActive()) return
+    state.postDrawWorld(frame.camera)
+  }
+
+  makeFrameStages(state, [
+    { name: 'world', draw: drawWorldStage },
+    { name: 'post', draw: drawPostStage },
+    { name: 'viewmodel', draw: () => state.viewmodelDraw() }
+  ])
+
+  // One frame record, rewritten each frame. A stage draw gets the camera, the
+  // render target it draws into and the viewport size, and nothing is allocated
+  // for a frame that registers no stage.
+  const frame = { camera: null, target: null, width: 0, height: 0 }
 
   /**
    * How long the card took on the last frame, in milliseconds.
@@ -81,10 +116,8 @@ export function makeFrameDraw(state) {
     return false
   }
 
-  /** Draw one frame: the world, then the post chain, then the viewmodel in its own pass. */
+  /** Draw one frame: the named stages in order, then the counters. */
   function draw() {
-    // A headless frame has no card to draw into; `sync` is what it measures.
-    if (state.headless) return
     const startedAt = performance.now()
     const camera = state.readyCamera()
     // One world-matrix update for every pass this frame. The renderer would
@@ -93,10 +126,17 @@ export function makeFrameDraw(state) {
     state.updateShadows()
     state.renderer.info.reset()
 
-    state.postDrawWorld(camera)
-    state.viewmodelDraw()
+    frame.camera = camera
+    frame.target = state.renderer.getRenderTarget()
+    frame.width = state.viewport.width
+    frame.height = state.viewport.height
+    state.runStages(frame)
 
     stats.post = state.postStatus()
+    // A headless frame has no card to draw into. The stages still run, so a
+    // plugin's draw and the frame handed to it can be exercised with no GL, but
+    // nothing is submitted and no card time is reported.
+    if (state.headless) return
     stats.cpuMs = performance.now() - startedAt
     stats.drawCalls = state.renderer.info.render.drawCalls
     stats.triangles = state.renderer.info.render.triangles

@@ -33,12 +33,13 @@
  * only correct answer to a first-person weapon clipping into a wall, and it is
  * why "one draw order" is a decision this file owns rather than a fact about it.
  *
- * There are three hook points and no more: `materials` for what a surface is
- * made of, `marks` for a visual drawn beside one entity, and `passes` for what
- * happens to the finished picture. All are deliberately dumb. A renderer that
- * holds the list of materials a game uses, the marks it draws, or the effects it
- * wants, has started to know what the game is — and in this engine that
- * knowledge lives in a plugin. This file owns one GL context and one draw
+ * There are four hook points and no more: `materials` for what a surface is
+ * made of, `marks` for a visual drawn beside one entity, `passes` for the effect
+ * chain over the finished picture, and `stages` for a draw at a named point in
+ * the frame. All are deliberately dumb. A renderer that holds the list of
+ * materials a game uses, the marks it draws, the effects it wants, or the way it
+ * draws the world, has started to know what the game is — and in this engine
+ * that knowledge lives in a plugin. This file owns one GL context and one draw
  * order, and it must never learn what bloom is.
  *
  * What it does know about is cost. Several hundred walls that never move are
@@ -342,7 +343,7 @@ export async function makeRenderer(canvas, view, viewport) {
     /** One draw of the world scene into a caller-owned render target, its pixels read back into `buffer`. */
     drawInto: state.drawInto,
 
-    // ---- the three hook points ----
+    // ---- the four hook points ----
     materials: state.materials,
     /**
      * The per-entity marks: a visual drawn beside one entity, by name.
@@ -354,6 +355,18 @@ export async function makeRenderer(canvas, view, viewport) {
     marks: state.marks,
     /** The ordered post-processing passes; an empty list means none at all. */
     passes: state.passes,
+    /**
+     * The named, ordered stages one frame runs through: `world`, `post`, then
+     * `viewmodel`.
+     *
+     * `add(name, draw, { before|after })` draws at a named point in the frame;
+     * `replace(stage, draw)` and `skip(stage)` take a core stage over, and
+     * `restore(stage)` puts the core draw back. A stage draw is called as
+     * `draw(frame)`, where `frame` is the camera, the render target the frame
+     * draws into, and the viewport size. A plugin that renders the frame its
+     * own way replaces `world`, so the core never draws underneath it.
+     */
+    stages: state.stages,
 
     /** The weapon in first person, in its own pass with its own depth buffer. */
     viewmodel: state.viewmodel,

@@ -299,5 +299,9 @@ export function makePostChain(state) {
 
   state.passes = passes
   state.postDrawWorld = postDrawWorld
+  // Whether a post chain will draw the world scene itself. The frame's
+  // `world` stage draws the scene directly only when no chain owns it, so
+  // the two never both draw and the default picture is unchanged.
+  state.postChainActive = () => passList.length > 0
   state.postStatus = postStatus
 }
