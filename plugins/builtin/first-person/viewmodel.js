@@ -1,22 +1,29 @@
 /**
- * Kernel: the weapon in first person, drawn in its own pass over a cleared
- * depth buffer through a narrower camera of its own.
+ * First Person: the weapon in first person, drawn in its own pass over a
+ * cleared depth buffer through a narrower camera of its own.
  *
  * A weapon sits about half a metre from the eye, so in one shared depth buffer
  * it pushes into every wall; there is no fix in the world pass. Its scene is in
  * view space, so nothing has to track where the player is.
  */
 import * as THREE from 'three/webgpu'
-import { declaredNumber } from '../frame-plan.js'
-import { cachedModel, cloneModel } from './model-cache.js'
+import { declaredNumber } from '../../../engine/frame-plan.js'
+import { cachedModel, cloneModel } from '../../../engine/render/model-cache.js'
 import {
   namedNodes, attachedModels, indexNodes, applyAttachments
-} from './model-nodes.js'
-import { eachMaterial } from './material-vocabulary.js'
-import { readVector } from './read-value.js'
-import { entityTint } from './entity-look.js'
+} from '../../../engine/render/model-nodes.js'
+import { eachMaterial } from '../../../engine/render/material-vocabulary.js'
+import { readVector } from '../../../engine/render/read-value.js'
+import { entityTint } from '../../../engine/render/entity-look.js'
 
-export function makeViewmodel(state) {
+/**
+ * Build the viewmodel scene, camera and API.
+ *
+ * `host` is the drawing half: `renderer` is three's renderer, and `release`
+ * gives back one scene object the renderer owns. `null` renderer and no-op
+ * release are valid, so a world with no card still holds and moves a weapon.
+ */
+export function makeViewmodel(host) {
   /**
    * The weapon in your hands, drawn in its own pass.
    *
@@ -52,7 +59,7 @@ export function makeViewmodel(state) {
   function clearViewmodel() {
     if (!viewmodelHeld) return
     viewmodelRoot.remove(viewmodelHeld)
-    state.release(viewmodelHeld)
+    host.release(viewmodelHeld)
     // Anything still in flight for this pair of hands — the hands themselves, or
     // the weapon hanging off them — checks this before it does its work.
     viewmodelHeld.userData.stale = true
@@ -103,8 +110,6 @@ export function makeViewmodel(state) {
    * a silencer, a torch or a shield needs nothing new here.
    */
   const viewmodel = {
-    scene: viewmodelScene,
-
     set(spec) {
       if (!spec || !spec.model) { clearViewmodel(); return }
 
@@ -118,7 +123,7 @@ export function makeViewmodel(state) {
       // stutter nobody could explain from the game code.
       if (viewmodelHeld?.userData.model === spec.model) {
         placeViewmodel()
-        applyAttachments(viewmodelHeld, spec.attachments, state.release)
+        applyAttachments(viewmodelHeld, spec.attachments, host.release)
         return
       }
 
@@ -144,7 +149,7 @@ export function makeViewmodel(state) {
         indexNodes(held, instance)
         // The weapon was asked for while the hands were still loading, which
         // is the normal case on the first frame of a round.
-        applyAttachments(held, held.userData.attachmentsWanted, state.release)
+        applyAttachments(held, held.userData.attachmentsWanted, host.release)
       }, () => {
         if (viewmodelHeld !== held) return
         // The same rule as everywhere else: a thing that failed to load is a
@@ -156,7 +161,7 @@ export function makeViewmodel(state) {
         held.add(block)
       })
       placeViewmodel()
-      applyAttachments(held, spec.attachments, state.release)
+      applyAttachments(held, spec.attachments, host.release)
     },
 
     /** Per-frame bob, sway and kick, added on top of whatever `set` declared. */
@@ -168,19 +173,21 @@ export function makeViewmodel(state) {
   }
 
   /**
-   * Draw the weapon in its own pass.
+   * Draw the weapon for one frame, or nothing when it is put away.
    *
    * The whole point of the second pass: the weapon is measured against an empty
-   * depth buffer, so no wall can ever be in front of it.
+   * depth buffer, so no wall can ever be in front of it. The depth buffer is
+   * cleared by the pass, not here. `frame.camera` is the world camera, so its
+   * shape says whether the session draws the flat orthographic view.
    */
-  function viewmodelDraw() {
-    if (!viewmodelHeld || state.flat()) return
+  function draw(frame) {
+    if (!viewmodelHeld || !host.renderer) return
+    if (!frame.camera.isPerspectiveCamera) return
+    viewmodelCamera.aspect = frame.width / frame.height
+    viewmodelCamera.updateProjectionMatrix()
     placeViewmodel()
-    state.renderer.clearDepth()
-    state.renderer.render(viewmodelScene, state.viewmodelCamera)
+    host.renderer.render(viewmodelScene, viewmodelCamera)
   }
 
-  state.viewmodelCamera = viewmodelCamera
-  state.viewmodel = viewmodel
-  state.viewmodelDraw = viewmodelDraw
+  return { camera: viewmodelCamera, model: viewmodel, scene: viewmodelScene, draw }
 }

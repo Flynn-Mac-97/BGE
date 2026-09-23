@@ -35,7 +35,6 @@ function cameraStateFor(view) {
   const state = {
     view,
     viewport: { ...VIEWPORT },
-    viewmodelCamera: new THREE.PerspectiveCamera(54, 1, 0.01, 20),
     canvas: { getBoundingClientRect: () => ({ ...VIEWPORT }) },
     renderer: { setSize() {} }
   }

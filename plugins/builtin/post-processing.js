@@ -347,8 +347,12 @@ function chainFor(context, post) {
 function addPostPass(context, post) {
   if (post.postPassAdded || !chainFor(context, post)) return
   const graph = context.renderer.graph
+  // A chain grades the world, so it runs before anything drawn over the world.
+  // First Person's viewmodel pass is one; order against it only when it is
+  // loaded, so a game without that plugin leaves no edge waiting for it.
+  const overTheWorld = graph.passes.some(pass => pass.name === 'viewmodel') ? ['viewmodel'] : ['ui']
   graph.add({
-    name: 'post', after: ['scene'], before: ['viewmodel'],
+    name: 'post', after: ['scene'], before: overTheWorld,
     execute: frame => post.chain.draw(frame.camera)
   })
   // The chain renders the scene through three's pipeline, so the kernel draws

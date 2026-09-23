@@ -1,8 +1,8 @@
 /**
  * Kernel: the two ways this renderer touches a material.
  *
- * Both are used by the object builder, the viewmodel and the material registry,
- * so the rule for each lives in one place.
+ * Both are used by the object builder, the material registry and any pass that
+ * owns a model, so the rule for each lives in one place.
  */
 
 /** Call `fn` with every material on one node, whether it has one or an array. */

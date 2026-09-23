@@ -1,14 +1,13 @@
 /**
  * Kernel: one frame out of the card, and what the last one cost.
  *
- * The frame is the default graph — `frame`, `clear`, `scene`, `viewmodel`, `ui`,
- * `present` — registered through the same door a plugin uses. `frame` updates
- * world matrices and shadow flags before any draw; `clear` clears the canvas;
- * `scene` draws the world; `viewmodel` draws the weapon against a cleared depth
- * buffer. A post chain is a plugin pass: it registers through `graph.add` and
- * disables `clear` and `scene` while its own pass draws the frame, so no effect
- * list reaches this file. The graph executor runs the passes, so this file
- * supplies the draws and the counters, not the order.
+ * The frame is the default graph — `frame`, `clear`, `scene`, `ui`, `present`
+ * — registered through the same door a plugin uses. `frame` updates world
+ * matrices and shadow flags before any draw; `clear` clears the canvas; `scene`
+ * draws the world. A post chain is a plugin pass: it registers through
+ * `graph.add` and disables `clear` and `scene` while its own pass draws the
+ * frame, so no effect list reaches this file. The graph executor runs the
+ * passes, so this file supplies the draws and the counters, not the order.
  */
 import * as THREE from 'three/webgpu'
 import { makePassGraph } from './graph.js'
@@ -38,7 +37,9 @@ export function makeFrameDraw(state) {
     cpuMs: 0
   }
 
-  const graph = makePassGraph()
+  // A pass that declares `depth: 'clear'` empties the depth buffer before it
+  // draws. The graph holds no renderer, so the one call is supplied here.
+  const graph = makePassGraph({ clearDepth: () => state.renderer.clearDepth() })
   state.graph = graph
 
   /** The core world draw: the scene straight to the frame. */
@@ -46,25 +47,19 @@ export function makeFrameDraw(state) {
     state.renderer.render(state.scene, frame.camera)
   }
 
-  /** The viewmodel draw, in its own pass over a cleared depth buffer. */
-  function drawViewmodel() {
-    state.viewmodelDraw()
-  }
-
-  // The default graph, ordered by label. `frame`, `clear`, `scene`, `viewmodel`,
-  // `ui` and `present` are the kernel's labels; a plugin orders against them and
-  // replaces or disables the draw it owns. `frame` runs even while a plugin owns
-  // the scene, because world matrices and shadow flags are frame setup, not a
-  // draw, and every draw reads them.
+  // The default graph, ordered by label. `frame`, `clear`, `scene`, `ui` and
+  // `present` are the kernel's labels; a plugin orders against them and adds
+  // its own passes between. `frame` runs even while a plugin owns the scene,
+  // because world matrices and shadow flags are frame setup, not a draw, and
+  // every draw reads them.
   graph.add({
     name: 'frame', before: ['clear'],
     prepare: () => { state.scene.updateMatrixWorld(); state.updateShadows() },
     execute: () => {}
   })
   graph.add({ name: 'clear', after: ['frame'], before: ['scene'], execute: () => state.renderer.clear() })
-  graph.add({ name: 'scene', after: ['clear'], before: ['viewmodel'], execute: drawScene })
-  graph.add({ name: 'viewmodel', after: ['scene'], before: ['ui'], execute: drawViewmodel })
-  graph.add({ name: 'ui', after: ['viewmodel'], before: ['present'], execute: () => {} })
+  graph.add({ name: 'scene', after: ['clear'], before: ['ui'], execute: drawScene })
+  graph.add({ name: 'ui', after: ['scene'], before: ['present'], execute: () => {} })
   graph.add({ name: 'present', after: ['ui'], execute: () => {} })
 
   /**

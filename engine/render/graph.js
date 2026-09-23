@@ -26,6 +26,9 @@ function normalise(record) {
     reads: record.reads ?? EMPTY,
     writes: record.writes ?? EMPTY,
     target: record.target ?? null,
+    // "clear" empties the depth buffer before this pass runs, so an overlay
+    // measured against it cannot be clipped by the world drawn underneath.
+    depth: record.depth ?? null,
     requires: record.requires ?? EMPTY,
     always: record.always === true,
     enabled: true,
@@ -183,6 +186,9 @@ export function makePassGraph(options = {}) {
   const report = options.report ?? reportOnce
   const pool = options.pool ?? makeTargetPool()
   const hasFeature = options.hasFeature ?? (() => true)
+  // The graph holds no renderer, so clearing a pass depth is a call the frame
+  // supplies. A pass that does not ask for it never reaches this.
+  const clearDepth = options.clearDepth ?? (() => {})
   const records = new Map()
 
   let order = []
@@ -255,7 +261,10 @@ export function makePassGraph(options = {}) {
     frame.height = height
     for (let i = 0; i < order.length; i++) if (order[i].extract) order[i].extract(frame, sink)
     for (let i = 0; i < order.length; i++) if (order[i].prepare) order[i].prepare(frame)
-    for (let i = 0; i < order.length; i++) order[i].execute(frame, targets)
+    for (let i = 0; i < order.length; i++) {
+      if (order[i].depth === 'clear') clearDepth()
+      order[i].execute(frame, targets)
+    }
   }
 
   return {

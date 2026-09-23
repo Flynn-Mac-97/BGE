@@ -14,10 +14,12 @@ draws through an orthographic camera while editing and a perspective one while
 playing, and only the renderer knows which, so the chain is rebuilt when that
 camera is swapped.
 
-The `post` pass sits between `scene` and `viewmodel`. While it is registered the
-kernel's `clear` and `scene` passes are disabled, because the chain renders the
-scene itself; they are enabled again when the chain empties. **Nothing closes
-the chain.** Three's `PostProcessing` tone-maps and encodes its own output,
+The `post` pass sits between `scene` and whatever draws over the world — First
+Person's `viewmodel` pass when that plugin is loaded, the kernel's `ui` pass
+otherwise. While it is registered the kernel's `clear` and `scene` passes are
+disabled, because the chain renders the scene itself; they are enabled again when
+the chain empties. **Nothing closes the chain.** Three's `PostProcessing`
+tone-maps and encodes its own output,
 which is what the old `OutputPass` was for.
 
 `context.post.hold()` and `context.post.release()` disable and restore the pass

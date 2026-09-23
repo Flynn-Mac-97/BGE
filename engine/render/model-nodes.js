@@ -293,9 +293,10 @@ function loadAttachment(holder, group, file) {
     // are the only honest test.
     if (group.userData.stale || holder.userData.stale) return
     const instance = cloneModel(loaded)
-    // A viewmodel is in front of the eye by construction, so culling it against
-    // a frustum it is always inside costs a test per frame and can only ever be
-    // wrong. A weapon in somebody else's hands is culled like anything else.
+    // A holder marked `neverCull` is in front of the eye by construction, so
+    // culling it against a frustum it is always inside costs a test per frame
+    // and can only ever be wrong. A model in somebody else's hands is culled
+    // like anything else.
     if (holder.userData.neverCull) instance.traverse(node => { node.frustumCulled = false })
     group.add(instance)
   }, () => {

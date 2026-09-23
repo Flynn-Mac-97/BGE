@@ -26,10 +26,10 @@
  * other. This file holds the registry and the one place the sync writes a mark,
  * and it never learns what a keyline is.
  *
- * The draw order is two passes: the world, then the viewmodel against a cleared
- * depth buffer through a narrower camera of its own. That second pass is the
- * only correct answer to a first-person weapon clipping into a wall, and it is
- * why "one draw order" is a decision this file owns rather than a fact about it.
+ * The draw order is the pass graph's: the kernel registers `frame`, `clear`,
+ * `scene`, `ui` and `present`, and a plugin adds its own pass between the
+ * labels. A first-person weapon, a post chain and a screen effect are all
+ * passes, so this file never learns what any of them is.
  *
  * There are three doors into a frame and no more: `graph` is the pass graph, the
  * one place a pass is registered and ordered; `materials` is what a surface is
@@ -69,7 +69,6 @@ import { makeObjectBuilder } from './render/object-builder.js'
 import { makeBatching } from './render/batching.js'
 import { makeMarkRegistry } from './render/mark-registry.js'
 import { makeEntitySync } from './render/entity-sync.js'
-import { makeViewmodel } from './render/viewmodel.js'
 import { makePicking } from './render/picking.js'
 import { makeFrameDraw } from './render/frame-draw.js'
 
@@ -175,9 +174,9 @@ export async function makeRenderer(canvas, view, viewport) {
     await renderer.init()
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
     setMaxAnisotropy(renderer.getMaxAnisotropy())
-    // The world and the viewmodel are two passes over one frame, so clearing is
-    // this file's job rather than three's — and the counters have to survive
-    // both renders to be worth reading.
+    // The frame is several passes over one target, so clearing is this file's
+    // job rather than three's — and the counters have to survive every pass to
+    // be worth reading.
     renderer.autoClear = false
     renderer.info.autoReset = false
 
@@ -231,9 +230,6 @@ export async function makeRenderer(canvas, view, viewport) {
     releasedWhileCompiling: new Set()
   }
 
-  // The viewmodel builds its own camera, which `updateCamera` also drives, so
-  // it is built before the two world cameras.
-  makeViewmodel(state)
   makeCamera(state)
   makeLighting(state)
   makeMaterialRegistry(state)
@@ -353,7 +349,7 @@ export async function makeRenderer(canvas, view, viewport) {
     gpuTime: state.gpuTime,
     /** Wait until the card has finished everything submitted so far. */
     waitForGPU: state.waitForGPU,
-    /** Draw one frame: the world, then the post chain, then the viewmodel in its own pass. */
+    /** Draw one frame: the graph's passes in order, then the counters. */
     draw: state.draw,
     /** One draw of the world scene into a caller-owned render target, its pixels read back into `buffer`. */
     drawInto: state.drawInto,
@@ -379,8 +375,6 @@ export async function makeRenderer(canvas, view, viewport) {
      * kernel draw never runs underneath it.
      */
     graph: state.graph,
-    /** The weapon in first person, in its own pass with its own depth buffer. */
-    viewmodel: state.viewmodel,
 
     // ---- what the level says about light, fog and sky ----
     /** A flat background colour, or null to leave the page showing through. */

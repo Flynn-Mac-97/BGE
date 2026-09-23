@@ -1,6 +1,5 @@
 /**
- * Kernel: the two world cameras, the second one for the viewmodel, and the
- * viewport they are built from.
+ * Kernel: the two world cameras and the viewport they are built from.
  *
  * The world camera's numbers come from `cameraProjection` in
  * `camera-project.js`, the same reading the headless projector uses, so the two
@@ -69,9 +68,6 @@ export function makeCamera(state) {
     perspective.fov = projection.fov
     perspective.aspect = projection.aspect
     perspective.updateProjectionMatrix()
-
-    state.viewmodelCamera.aspect = projection.aspect
-    state.viewmodelCamera.updateProjectionMatrix()
   }
 
   /**

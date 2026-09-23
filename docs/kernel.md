@@ -115,7 +115,6 @@ in `ARCHITECTURE.md`.
 | `render/scene-layers.js` | the two layers the scene draws on | what is on them |
 | `render/target-pool.js` | render targets reused across passes and frames, keyed by descriptor | what a pass writes |
 | `render/texture-cache.js` | one texture, cached, in three readings of the same file | what it is drawn on |
-| `render/viewmodel.js` | the weapon in first person, in its own pass | where the player is |
 
 The rows after `work-lock.mjs` are the newer, smaller kernel modules: the
 pieces the largest files were split into, plus the two helpers those splits
