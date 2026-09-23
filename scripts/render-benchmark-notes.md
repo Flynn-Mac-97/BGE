@@ -51,12 +51,13 @@ smaller its share.
   each write a half-resolution transient create exactly one `RenderTarget`: the
   table's `targets` column is 1 for the 50-pass scene and 1 for the AAA scene.
   The aliasing by live span is doing its job.
-- **The Lights plugin costs more than the whole kernel on the AAA frame**: 6.3 ms
-  of 12.5 ms, against the kernel's 0.4 ms. `syncLights` calls
-  `markShadowSurfaces` every frame, and that walks every scene child and calls
-  `world.byId` on each — a linear scan of the entity list per child. It is not
-  kernel-side, but it is the largest single per-frame cost measured here, it
-  grows with the entity count, and it deserves its own look.
+- **The Lights plugin's lookup was the largest single per-frame cost, and is now
+  O(1).** `syncLights` calls `markShadowSurfaces` every frame, and that walks
+  every scene child and calls `world.byId` on each — which was a scan of the
+  entity list, so the walk grew with the square of the world. The world keeps an
+  id index now: the same walk measured 0.3 ms against 7.1 ms before, and
+  `test/core/world/lookup.test.mjs` proves each lookup makes one index probe, at
+  eight and at four thousand entities.
 - **The page's clock is coarse.** Chrome clamps `performance.now()` to 0.1 ms on
   a page that is not cross-origin isolated; the harness measures the quantum and
   the environment table states it. The retro and mid rows are a handful of

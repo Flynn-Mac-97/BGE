@@ -452,14 +452,14 @@ async function go(context, index) {
 /**
  * Clear the world and spawn the snapshot back into it.
  *
- * The id is written after the spawn rather than passed in, exactly as
- * `loadLevel` does it, so an entity keeps the id it had — an agent that noted
- * `crate-3` an hour ago still means the same crate after an undo.
+ * The id is set through the world after the spawn, exactly as `loadLevel`
+ * does it, so an entity keeps the id it had — an agent that noted `crate-3` an
+ * hour ago still means the same crate after an undo.
  */
 function putBack(context, entities) {
   context.world.clear()
   for (const { id, placement } of entities) {
-    context.world.spawn(placement.type, placement).id = id
+    context.world.setId(context.world.spawn(placement.type, placement), id)
   }
 }
 

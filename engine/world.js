@@ -162,6 +162,42 @@ export function stateHash(world) {
 }
 
 /**
+ * Where a body was before the last step, kept on the body itself.
+ *
+ * A non-enumerable symbol, so `Object.keys`, a save, a checkpoint copy and a
+ * spread all pass over it — a place between steps is runtime state and
+ * nothing serialises it. It used to be a `WeakMap`, and a probe plus a write
+ * for every entity every step was a third of the step at fifty thousand
+ * entities.
+ */
+const beforePlace = Symbol('before place')
+
+/**
+ * Write the place between two steps into `target` rather than a new object.
+ *
+ * A body with no earlier place, or a blend of one, is drawn where it is.
+ */
+function drawnPlaceInto(target, entity, blend) {
+  const before = entity[beforePlace]
+  const z = entity.z || 0
+  if (!before || blend >= 1) {
+    target.x = entity.x
+    target.y = entity.y
+    target.z = z
+    target.yaw = entity.yaw
+    return target
+  }
+  target.x = before.x + (entity.x - before.x) * blend
+  target.y = before.y + (entity.y - before.y) * blend
+  target.z = before.z + (z - before.z) * blend
+  target.yaw =
+    Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
+      ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
+      : entity.yaw
+  return target
+}
+
+/**
  * The entity store, the type and behaviour registries, and the hooks that run
  * them.
  *
@@ -177,6 +213,16 @@ export function makeWorld(bus) {
   let entities = []
   const types = new Map()
   const behaviours = new Map()
+  // The reverse of `entities`: the one live entity each id names, so `byId` is
+  // one probe rather than a scan. `entities` stays the ordered list everything
+  // else reads; only the world touches this.
+  const byIdIndex = new Map()
+
+  /** Build the index from the list, in the list's order. Used when the list is replaced whole. */
+  function rebuildIdIndex() {
+    byIdIndex.clear()
+    for (const entity of entities) byIdIndex.set(entity.id, entity)
+  }
 
   /** The id a placement asks for, or the next generated one for its type. */
   function entityIdFor(typeName, placement) {
@@ -376,42 +422,6 @@ export function makeWorld(bus) {
     } catch (err) {
       console.error(`[${e.type}] ${which}`, err)
     }
-  }
-
-  /**
-   * Where a body was before the last step, kept on the body itself.
-   *
-   * A non-enumerable symbol, so `Object.keys`, a save, a checkpoint copy and a
-   * spread all pass over it — a place between steps is runtime state and
-   * nothing serialises it. It used to be a `WeakMap`, and a probe plus a write
-   * for every entity every step was a third of the step at fifty thousand
-   * entities.
-   */
-  const beforePlace = Symbol('before place')
-
-  /**
-   * Write the place between two steps into `target` rather than a new object.
-   *
-   * A body with no earlier place, or a blend of one, is drawn where it is.
-   */
-  function drawnPlaceInto(target, entity, blend) {
-    const before = entity[beforePlace]
-    const z = entity.z || 0
-    if (!before || blend >= 1) {
-      target.x = entity.x
-      target.y = entity.y
-      target.z = z
-      target.yaw = entity.yaw
-      return target
-    }
-    target.x = before.x + (entity.x - before.x) * blend
-    target.y = before.y + (entity.y - before.y) * blend
-    target.z = before.z + (z - before.z) * blend
-    target.yaw =
-      Number.isFinite(before.yaw) && Number.isFinite(entity.yaw)
-        ? before.yaw + Math.atan2(Math.sin(entity.yaw - before.yaw), Math.cos(entity.yaw - before.yaw)) * blend
-        : entity.yaw
-    return target
   }
 
   const world = {
@@ -624,8 +634,9 @@ export function makeWorld(bus) {
       const e = makeEntity(typeName, placement)
       // A generated id must not land on one a level already used, and level ids
       // are stable across reloads, so check rather than trust the counter.
-      while (!placement?.id && entities.some(o => o.id === e.id)) e.id = `${typeName}-${nextId++}`
+      while (!placement?.id && byIdIndex.has(e.id)) e.id = `${typeName}-${nextId++}`
       entities.push(e)
+      byIdIndex.set(e.id, e)
       bus.emit('entity:added', e)
       return e
     },
@@ -635,8 +646,23 @@ export function makeWorld(bus) {
       const i = entities.indexOf(e)
       if (i < 0) return
       entities.splice(i, 1)
+      // Clear only the entry that names this entity; a shared id may point elsewhere.
+      if (byIdIndex.get(e.id) === e) byIdIndex.delete(e.id)
       hook(e, 'onDestroy', world.context)
       bus.emit('entity:removed', e)
+    },
+
+    /**
+     * Give one entity a different id.
+     *
+     * A level's ids are position-in-file, so the loader renames an entity after
+     * it is made. The index is keyed by id, so the entry has to move with it or
+     * `byId` reads a key no live entity has.
+     */
+    setId(e, id) {
+      if (byIdIndex.get(e.id) === e) byIdIndex.delete(e.id)
+      e.id = id
+      byIdIndex.set(id, e)
     },
 
     /** The first entity of a type. */
@@ -647,9 +673,14 @@ export function makeWorld(bus) {
     all(typeName) {
       return entities.filter(e => e.type === typeName)
     },
-    /** One entity by its level id. */
+    /**
+     * One entity by its level id.
+     *
+     * The world keeps one live entity per id, so the index answers with the same
+     * object a scan would, and `undefined` for an id no live entity has.
+     */
     byId(id) {
-      return entities.find(e => e.id === id)
+      return byIdIndex.get(id)
     },
 
     /** Everything about this world a checkpoint has to carry. Built in `world-state.js`. */
@@ -661,6 +692,9 @@ export function makeWorld(bus) {
     restore(capture) {
       const restored = restoreCheckpoint(world, capture, makeEntity)
       entities = restored.entities
+      // The checkpoint made or kept the entities; the list is what is true, so
+      // the index is built from it rather than tracked through the restore.
+      rebuildIdIndex()
       bus.emit('world:changed')
       return { entities: entities.length, lost: restored.lost }
     },
@@ -668,6 +702,9 @@ export function makeWorld(bus) {
     /** Empty the world and mark it unsimulated, as loading a level does first. */
     clear() {
       entities = []
+      // A level load clears first and then spawns; the index must not keep the
+      // entities the load threw away.
+      rebuildIdIndex()
       world.simulated = false
       bus.emit('world:cleared')
     },

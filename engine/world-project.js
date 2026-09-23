@@ -116,7 +116,10 @@ function spawnLevelEntities(world, placements) {
   const seen = {}
   for (const placement of placements) {
     const entity = world.spawn(placement.type, placement)
-    if (!placement.id) entity.id = `${placement.type}-${(seen[placement.type] = (seen[placement.type] ?? -1) + 1)}`
+    // The id is renamed through the world, because the world keys its lookup
+    // index on the id and a bare `entity.id =` would leave a stale entry.
+    if (!placement.id)
+      world.setId(entity, `${placement.type}-${(seen[placement.type] = (seen[placement.type] ?? -1) + 1)}`)
   }
 }
 
