@@ -21,11 +21,11 @@
     "test:core": "node --test \"test/core/**/*.test.mjs\"",
     "test:agent": "node --test test/agent-workspace.test.mjs",
     "lint": "eslint engine test/core eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs",
-    "format": "prettier --write \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json package.json",
-    "format:check": "prettier --check \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json package.json",
+    "format": "prettier --write \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
+    "format:check": "prettier --check \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
     "check:structure": "node scripts/check-structure.mjs",
     "check": "npm run format:check && npm run lint && npm run test:core && npm run check:structure",
-    "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine",
+    "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine --config scripts/kernel-trellis.yaml",
     "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit ."
   },
   "dependencies": {

@@ -435,15 +435,6 @@ function applyLiveValues(entity, held, world, missing) {
   }
 }
 
-/**
- * What the restore could not carry, and whether the world may run on.
- *
- * Read once the world is built, because every claim is about what came back: a
- * type whose file is gone, a clock or stream that did not land where the capture
- * left it, and the entities a plugin made, whose driving list came back empty.
- * Apart from the restore so the report is a value the caller acts on, and the
- * hold stays with the caller that owns the loop.
- */
 /** The loss for types whose files the project no longer has, or null. */
 function lostTypeLoss(capture, world) {
   const lostTypes = (capture.types || []).filter(name => !world.types.has(name))

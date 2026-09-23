@@ -71,17 +71,6 @@ const LIST = 0x9e3779b9
  */
 const DEPTH = 5
 
-/**
- * Fold one value in, whatever shape it is.
- *
- * Lists have to be walked rather than converted. `Number([16, 1, 1])` is `NaN`,
- * so a scale or a rotation written as a vector folded to one constant and the
- * hash was blind to it — two worlds differing only in a rotated body hashed the
- * same, which is the worst way for a check to fail.
- *
- * Records are folded by sorted key, so the order a plugin happened to set them
- * does not change the answer.
- */
 /** Fold a list, walking every item so a vector is not one constant. */
 const foldList = (hash, list, depth) => {
   let out = fold(hash, LIST ^ list.length)
@@ -189,12 +178,6 @@ export function makeWorld(bus) {
   const types = new Map()
   const behaviours = new Map()
 
-  /**
-   * Build one entity from a placement, filling in the type's defaults.
-   *
-   * The type is read once here and kept as `_definition`, so a later edit can
-   * find every entity still running the old one — see `retype`.
-   */
   /** The id a placement asks for, or the next generated one for its type. */
   function entityIdFor(typeName, placement) {
     return placement.id || `${typeName}-${nextId++}`

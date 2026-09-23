@@ -1,0 +1,26 @@
+# Kernel closure for `npm run check:structure` and `npm run audit`.
+#
+# The audit runs over engine/**, but the peripheral tooling tree below is not the
+# kernel: no kernel file imports any of it, it depends on the kernel one way, and
+# its complexity dominates the raw engine/ audit. Excluding it by name keeps the
+# budget a measure of the kernel. A new file is measured unless it is added here,
+# so the scope cannot grow without a visible edit. The closure is 77 files: 53
+# kernel + 22 render + render.js + frame-plan.js.
+source:
+  exclude:
+    - supervisor.mjs
+    - supervisor-watch.mjs
+    - supervisor-transport.mjs
+    - agent-workspace-node.mjs
+    - agent-workspace.js
+    - agent-registration.mjs
+    - server-config.mjs
+    - open-page.mjs
+    - project-problems.mjs
+    - desktop-server.mjs
+    - lane-browsers.mjs
+    - bridge-clients.mjs
+    - chrome-path.mjs
+    - project-servers.mjs
+    - evolve.mjs
+    - transport.js

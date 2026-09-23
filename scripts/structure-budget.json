@@ -1,5 +1,6 @@
 {
-  "sloppinessIndex": 45,
-  "erodedCount": 23,
-  "duplicationGroups": 1
+  "comment": "Scope is the kernel closure: engine/** minus the peripheral tooling named in kernel-trellis.yaml. sloppinessIndex is not budgeted: 20 of its points are the audit's unresolved-import floor, produced by the dynamic imports hot reload and plugin discovery need, so the number does not move when the kernel's shape improves. erodedCount 2 is both in render/graph.js; importCycleGroups 0 fails on any new cycle.",
+  "erodedCount": 2,
+  "duplicationGroups": 0,
+  "importCycleGroups": 0
 }
