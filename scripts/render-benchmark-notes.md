@@ -15,19 +15,23 @@ what the passes contain.
 
 **The kernel is the bottleneck on a frame that draws almost nothing.** Three
 thousand lambert meshes merge into 3 batches and 6 draw calls, so the scene draws
-in 0.2 ms — and the fixed kernel work is then most of the frame: sync 0.4 ms,
-setup 0.1 ms, executor 0.1 ms and the draw's tail, 0.6 ms of 1.0 ms (60%). Better
-batching makes the kernel's share larger, because batching removes the passes'
-cost and leaves the sync's. That is the engine's own `stats` reporting the merge
-working (`merged: 3000, batches: 3`), not a measurement artifact.
+in 0.2 ms — and the fixed kernel work is then most of the frame: setup 0.1 ms,
+executor 0.1 ms and the draw's tail, against the walk's 0.4 ms, 0.6 ms of 1.0 ms
+(60%) when the walk is counted with the kernel. The walk is now the scene pass's
+`extract`, so it belongs to the pass table, and the kernel's share is only the
+fixed stages. Better batching makes that fixed share larger, because batching
+removes the passes' cost and leaves the walk's. That is the engine's own `stats`
+reporting the merge working (`merged: 3000, batches: 3`), not a measurement
+artifact.
 
-**The entity sync is the largest kernel stage, and it is linear.** At 10,000
+**The entity walk is the largest per-frame stage, and it is linear.** At 10,000
 entities the world merges to about a dozen batches, the frame is 1.8 ms, and the
-sync is 1.1 ms of it — 77.8%. Its per-entity cost is flat, about 0.1 µs at both
-1,000 and 10,000 entities, so ten times the world costs about ten times the sync,
-never a hundred. This is exactly the cost the render-graph design moves out of
-the kernel into the scene pass's `extract`, and it is the one kernel number worth
-watching.
+scene pass's `extract` is 1.1 ms of it — the single largest stage once the walk is
+counted as pass work rather than kernel work. Its per-entity cost is flat, about
+0.1 µs at both 1,000 and 10,000 entities, so ten times the world costs about ten
+times the walk, never a hundred. This is the cost the render-graph design moved
+out of the kernel: a plugin that replaces the scene pass does not pay it, and the
+kernel's fixed stages are the pass count instead.
 
 **A kernel share that falls with pass count.** 22.2% on a 0.9 ms retro frame, 60%
 on the batched mid frame, 3.2% on the 12.5 ms AAA frame, 1.7% on the 50-pass
@@ -36,13 +40,13 @@ smaller its share.
 
 ### What the numbers showed beyond the expectation
 
-- **Batching turns the kernel into the bottleneck.** The engine's batching is
-  good enough that a 3,000-entity frame draws in 6 calls. The sync that feeds
-  those batches does not get cheaper with the batch count, so it becomes the
-  largest stage. The fix is not the kernel's loop shape — it is already one
-  visit per entity, proved headless by
-  `test/core/render/entity-sync-cost.test.mjs` — but whether the kernel should
-  walk entities at all, which is what the graph design already proposes.
+- **Batching turns the frame into the walk.** The engine's batching is good
+  enough that a 3,000-entity frame draws in 6 calls. The walk that feeds those
+  batches does not get cheaper with the batch count, so it becomes the largest
+  stage. The fix was not the loop shape — it is already one visit per entity,
+  proved headless by `test/core/render/entity-sync-cost.test.mjs` — but moving
+  the walk into the scene pass's `extract`, which is what this round did: the
+  kernel no longer walks, and a plugin that replaces the scene pass skips it.
 - **The target pool costs nothing to add passes to.** Fifty added passes that
   each write a half-resolution transient create exactly one `RenderTarget`: the
   table's `targets` column is 1 for the 50-pass scene and 1 for the AAA scene.

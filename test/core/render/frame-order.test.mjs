@@ -37,15 +37,14 @@ test('a post pass takes the world draw, so the kernel clear and scene pass stand
   const frame = await makeRenderer(null, ORTHO, VIEWPORT)
   const draws = watchCardDraws(frame)
   const log = []
-  frame.sync({ entities: [box('a')] })
-  frame.draw()
+  frame.draw({ entities: [box('a')] })
   assert.deepEqual(draws, ['world'], 'no post pass draws the world once')
 
   draws.length = 0
   frame.graph.add({ name: 'post', after: ['scene'], before: ['ui'], execute: () => log.push('post') })
   frame.graph.disable('scene')
   frame.graph.disable('clear')
-  frame.draw()
+  frame.draw({ entities: [box('a')] })
   assert.deepEqual(draws, [], 'the chain owns the scene, so the kernel scene pass does not draw underneath it')
   assert.deepEqual(log, ['post'], 'the chain pass ran in its place')
 
@@ -53,6 +52,6 @@ test('a post pass takes the world draw, so the kernel clear and scene pass stand
   frame.graph.enable('scene')
   frame.graph.enable('clear')
   draws.length = 0
-  frame.draw()
+  frame.draw({ entities: [box('a')] })
   assert.deepEqual(draws, ['world'], 'removing the chain gives the world draw back')
 })

@@ -178,8 +178,7 @@ async function boot() {
    */
   const paint = () => {
     if (loop.running) return
-    context.renderer.sync(world)
-    context.renderer.draw()
+    context.renderer.draw(world)
     context.bus.emit('frame:painted')
   }
   /**

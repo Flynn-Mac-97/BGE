@@ -343,6 +343,28 @@ function chainFor(context, post) {
   return post.chain
 }
 
+/**
+ * Take the kernel's world draw down while the chain runs.
+ *
+ * The chain renders the scene through three's pipeline, so the kernel's draw
+ * stands down. The scene pass keeps its `extract` — the entity walk — because
+ * the chain draws the objects that walk built; only the draw changes. Disabling
+ * the pass would drop the walk with it and leave the scene graph stale.
+ */
+function takeSceneDrawDown(graph, post) {
+  const scene = graph.passes.find(pass => pass.name === 'scene')
+  if (!scene) return
+  post.sceneExtract = scene.extract
+  post.sceneExecute = scene.execute
+  graph.replace('scene', { extract: scene.extract, execute: () => {} })
+}
+
+/** Give the kernel's world draw back. */
+function giveSceneDrawBack(graph, post) {
+  if (typeof post.sceneExecute !== 'function') return
+  graph.replace('scene', { extract: post.sceneExtract, execute: post.sceneExecute })
+}
+
 /** Add the `post` pass and stand the kernel's clear and scene draw down. */
 function addPostPass(context, post) {
   if (post.postPassAdded || !chainFor(context, post)) return
@@ -355,9 +377,7 @@ function addPostPass(context, post) {
     name: 'post', after: ['scene'], before: overTheWorld,
     execute: frame => post.chain.draw(frame.camera)
   })
-  // The chain renders the scene through three's pipeline, so the kernel draws
-  // nothing underneath it.
-  graph.disable('scene')
+  takeSceneDrawDown(graph, post)
   graph.disable('clear')
   post.postPassAdded = true
 }
@@ -367,7 +387,7 @@ function removePostPass(context, post) {
   if (!post.postPassAdded) return
   const graph = context.renderer.graph
   graph.remove('post')
-  graph.enable('scene')
+  giveSceneDrawBack(graph, post)
   graph.enable('clear')
   post.postPassAdded = false
 }
@@ -377,7 +397,7 @@ function holdPostPass(context, post) {
   if (!post.postPassAdded) return
   const graph = context.renderer.graph
   graph.disable('post')
-  graph.enable('scene')
+  giveSceneDrawBack(graph, post)
   graph.enable('clear')
 }
 
@@ -386,7 +406,11 @@ function releasePostPass(context, post) {
   if (!post.postPassAdded) return
   const graph = context.renderer.graph
   graph.enable('post')
-  graph.disable('scene')
+  // Reuse the draw captured when the chain was added; a release need not
+  // capture the no-op it replaces.
+  if (typeof post.sceneExecute === 'function') {
+    graph.replace('scene', { extract: post.sceneExtract, execute: () => {} })
+  }
   graph.disable('clear')
 }
 

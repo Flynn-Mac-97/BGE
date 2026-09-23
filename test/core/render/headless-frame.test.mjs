@@ -24,8 +24,7 @@ test('a frame built with no canvas syncs a world and reports what it holds', asy
 
 test('a headless frame never draws, because there is no card to draw into', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
-  frame.sync({ entities: [box('a')] })
-  frame.draw()
+  frame.draw({ entities: [box('a')] })
   // Nothing threw and nothing was submitted: the CPU time the drawing half
   // would have written stays at zero.
   assert.equal(frame.stats.cpuMs, 0)

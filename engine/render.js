@@ -47,7 +47,8 @@
  *
  * The implementation is one concern per module under `engine/render/`. This file
  * owns the GL context, the state every part of the renderer shares, and the
- * surface a caller sees; `sync` and `draw` are the two calls that drive it.
+ * surface a caller sees; `draw` drives a frame, and `sync` runs the graph's
+ * extract phase for a caller that wants the scene built without drawing it.
  *
  * The renderer is handed `view` and `viewport` and may know nothing else: no
  * level, no project file, no context. Everything a level wants to say about
@@ -381,19 +382,25 @@ export async function makeRenderer(canvas, view, viewport) {
     },
 
     /**
-     * Push entity state into the scene graph. Called every frame.
+     * Build the scene graph without drawing it.
      *
-     * `blend` is `loop.blend`: bodies are drawn that far between their last two
-     * fixed steps, so motion is smooth on a screen faster than the step rate.
+     * Runs the graph's extract phase, so the scene pass walks the entities and
+     * every other pass's extract runs too. The walk belongs to the scene pass,
+     * not the kernel: a plugin that replaces that pass replaces the walk. A
+     * `draw` that follows reuses that extract, so the pair walks once; the play
+     * loop calls `draw(world, blend)` alone.
      */
     sync(world, blend = 1) {
-      state.sync(world, blend)
+      const graph = state.graph
+      graph.frame.world = world
+      graph.frame.blend = blend
+      graph.extract()
     },
     /** How long the card took on the last frame, in milliseconds. */
     gpuTime: state.gpuTime,
     /** Wait until the card has finished everything submitted so far. */
     waitForGPU: state.waitForGPU,
-    /** Draw one frame: the graph's passes in order, then the counters. */
+    /** Draw one frame from a world: the graph's passes in order, then the counters. */
     draw: state.draw,
     /** One draw of the world scene into a caller-owned render target, its pixels read back into `buffer`. */
     drawInto: state.drawInto,

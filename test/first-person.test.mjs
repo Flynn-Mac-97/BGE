@@ -75,9 +75,8 @@ test('the viewmodel pass sits between the world and the UI', async () => {
 test('a held viewmodel draws after the world, over a cleared depth', async () => {
   const { frame, context } = await start(PERSPECTIVE)
   const calls = recordCardCalls(frame)
-  frame.sync({ entities: [box('a')] })
   context.viewmodel.set({ model: 'weapon.glb' })
-  frame.draw()
+  frame.draw({ entities: [box('a')] })
   assert.deepEqual(calls, ['world', 'clear-depth', 'viewmodel'],
     'one world draw, then the depth clear and the viewmodel draw')
 })
@@ -85,9 +84,8 @@ test('a held viewmodel draws after the world, over a cleared depth', async () =>
 test('a flat view draws no viewmodel even when one is held', async () => {
   const { frame, context } = await start(ORTHO)
   const calls = recordCardCalls(frame)
-  frame.sync({ entities: [box('a')] })
   context.viewmodel.set({ model: 'weapon.glb' })
-  frame.draw()
+  frame.draw({ entities: [box('a')] })
   assert.ok(!calls.includes('viewmodel'), 'a 2D frame never draws the weapon')
 })
 
@@ -96,7 +94,7 @@ test('the weapon has a key light of its own and follows the declared pose and sw
   const captured = captureViewmodel(frame)
   context.viewmodel.set({ model: 'weapon.glb', position: { x: 1, y: 0, z: 0 } })
   context.viewmodel.offset({ x: 0.5, y: 0, z: 0 }, { x: 0, y: 0, z: 0 })
-  frame.draw()
+  frame.draw({ entities: [] })
 
   const scene = captured()
   assert.ok(scene, 'the viewmodel scene drew')

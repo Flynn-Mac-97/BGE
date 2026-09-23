@@ -85,9 +85,9 @@ export function makeFrameWiring({ world, loader, context }) {
         }
       }
       // Optional on purpose: a world with no renderer runs the same systems in
-      // the same order and simply draws nothing.
-      context.renderer?.sync(world, context.loop.blend)
-      context.renderer?.draw()
+      // the same order and simply draws nothing. The world and blend reach the
+      // scene pass's extract through the frame record.
+      context.renderer?.draw(world, context.loop.blend)
     }
   }
 }

@@ -2,8 +2,8 @@
  * Measure what one real frame costs, stage by stage, in a real browser.
  *
  * The headline question is whether anything on the kernel side is a render
- * bottleneck. The kernel is the pass graph's executor, the entity sync, and the
- * frame's setup; a pass is everything a draw does. This starts a dev server and
+ * bottleneck. The kernel is the pass graph's executor and the frame's setup; a
+ * pass is everything a draw does, and the entity walk is one of them. This starts a dev server and
  * a hidden Chrome with a real GPU, builds three scenes through the engine's own
  * world surface, wraps the live pass records with timers, drives fixed frames on
  * a stopped clock, and writes the numbers to `agent-runs/benchmark-results.json`
@@ -172,10 +172,10 @@ function budgetsFrom(results) {
       results.scenes.map(scene => [scene.name, { kernelShare: scene.kernelShare, kernelShareTolerance: 0.35 }])
     ),
     entityCurve: {
-      syncMsAt10000: atEntity(10000)?.syncMs ?? null,
+      walkMsAt10000: atEntity(10000)?.walkMs ?? null,
       tolerance: 0.75,
       floorMs: 0.5,
-      syncGrowthRatio: atEntity(1000)?.syncMs ? (atEntity(10000)?.syncMs ?? 0) / atEntity(1000).syncMs : null
+      walkGrowthRatio: atEntity(1000)?.walkMs ? (atEntity(10000)?.walkMs ?? 0) / atEntity(1000).walkMs : null
     },
     passCurve: {
       executorOverheadMsAt50: atPass(50)?.executorOverheadMs ?? null,
@@ -350,7 +350,7 @@ console.log(`render-benchmark: backend ${results.environment.backend?.name}, gpu
 for (const scene of results.scenes) {
   console.log(
     `  ${scene.name.padEnd(9)} entities ${String(scene.entities).padStart(5)}  frame ${scene.stepMs} ms  ` +
-      `sync ${scene.syncMs} ms  setup ${scene.kernelSetupMs} ms  executor ${scene.executorMs} ms  ` +
+      `walk ${scene.walkMs} ms  setup ${scene.kernelSetupMs} ms  executor ${scene.executorMs} ms  ` +
       `kernel share ${(scene.kernelShare * 100).toFixed(1)}%`
   )
 }

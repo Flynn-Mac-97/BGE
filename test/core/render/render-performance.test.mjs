@@ -204,21 +204,19 @@ test('the default frame hands a change a recorded budget to fail against', async
     cardDraws++
     return render.call(frame.threeRenderer, scene, camera)
   }
-  function drawOnce() {
+  function drawOnce(world) {
     const before = cardDraws
-    frame.draw()
+    frame.draw(world)
     return cardDraws - before
   }
 
   const world = { entities: [box('a')] }
-  frame.sync(world)
-  const recorded = readBudget(frame, drawOnce())
+  const recorded = readBudget(frame, drawOnce(world))
   assert.deepEqual(recorded, EXPECTED_BUDGET)
 
   let lastFrameDraws = 0
   for (let i = 0; i < 200; i++) {
-    frame.sync(world)
-    lastFrameDraws = drawOnce()
+    lastFrameDraws = drawOnce(world)
     assert.equal(lastFrameDraws, 1, 'every frame makes one world draw')
   }
   assert.deepEqual(

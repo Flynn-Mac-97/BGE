@@ -92,7 +92,7 @@ in `ARCHITECTURE.md`.
 | `render/entity-look.js` | what one thing is: its turn, origin, sheet cell and fallback colour | how it is built |
 | `render/entity-record.js` | what a frame already knows about one entity, kept beside it | the entity's own fields |
 | `render/entity-scan.js` | the quiet snapshot and the two scans over it | building scene objects |
-| `render/entity-sync.js` | turning the entity list into scene objects | the world's rules |
+| `render/entity-sync.js` | turning the entity list into scene objects, run by the scene pass's `extract` | the world's rules |
 | `render/floor-mark.js` | the shape both floor marks share: the instanced unit quad | what either mark draws |
 | `render/frame-draw.js` | one frame out of the card, and what the last one cost | what is drawn |
 | `render/geometry-cache.js` | solid geometry cached by its dimensions, and the one merge | materials |
@@ -232,8 +232,10 @@ fixed step (exactly 1/60, never wall time)
 
 frame
   ├─ systems with phase:'frame'     Live Camera, input bookkeeping, hud
-  ├─ renderer.sync(world, blend)    copy places into Three.js meshes
-  └─ renderer.draw()
+  └─ renderer.draw(world, blend)    the graph's passes. The scene pass's extract
+                                    copies places into Three.js meshes; its
+                                    execute draws them. Replace the pass and
+                                    the walk goes with it.
 ```
 
 `loop.blend` is how far the wall clock is past the last step, as a fraction of
@@ -242,7 +244,7 @@ between its place before the step and its place now, so motion is smooth at any
 refresh rate. `step()` sets it to 1: a stepped world is drawn as it is. Game code
 reads `x`, `y`, `z` and never the drawn place; a camera reads the drawn place.
 
-In edit mode the fixed step never runs — just sync and draw. That is the entire
+In edit mode the fixed step never runs — just the draw. That is the entire
 difference between editing and playing.
 
 `loop.holdFor(seconds)` is the one thing that can skip a step: hit stop, the

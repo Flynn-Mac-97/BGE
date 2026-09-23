@@ -255,6 +255,9 @@ export function makePassGraph(options = {}) {
   let slots = []
   let resourceSlot = new Map()
   let dirty = true
+  // Whether `extract` already ran for the frame a following `run` will finish.
+  // A caller that syncs and then draws must not walk the world twice.
+  let extracted = false
   let rebuildCount = 0
   let targetsReady = false
   let targetWidth = 0
@@ -309,6 +312,7 @@ export function makePassGraph(options = {}) {
     resourceSlot = plan.resourceSlot
     targetsReady = false
     dirty = false
+    extracted = false
     rebuildCount++
   }
 
@@ -323,15 +327,35 @@ export function makePassGraph(options = {}) {
     targetsReady = true
   }
 
+  /** Rebuild the sorted order when the pass set changed. */
+  function ensureBuilt() {
+    if (dirty) rebuild()
+  }
+
+  /**
+   * Run every live pass's extract, in order.
+   *
+   * The renderer sets the frame's world and calls this so the scene pass can
+   * walk its entities; a caller that wants the whole frame calls `run`.
+   */
+  function extract() {
+    ensureBuilt()
+    for (let i = 0; i < order.length; i++) if (order[i].extract) order[i].extract(frame, sink)
+    extracted = true
+  }
+
   /** Run one frame: extract every pass, prepare every pass, then execute. */
   function run(camera, target, width, height) {
-    if (dirty) rebuild()
+    ensureBuilt()
     ensureTargets(width, height)
     frame.camera = camera
     frame.target = target
     frame.width = width
     frame.height = height
-    for (let i = 0; i < order.length; i++) if (order[i].extract) order[i].extract(frame, sink)
+    // `sync` already ran the extract for this frame; reuse it rather than walk
+    // the world again.
+    if (!extracted) extract()
+    extracted = false
     for (let i = 0; i < order.length; i++) if (order[i].prepare) order[i].prepare(frame)
     for (let i = 0; i < order.length; i++) {
       if (order[i].depth === 'clear') clearDepth()
@@ -394,6 +418,7 @@ export function makePassGraph(options = {}) {
       return rebuildCount
     },
     run,
+    extract,
     frame,
     targets,
     pool,

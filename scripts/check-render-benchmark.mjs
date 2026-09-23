@@ -53,7 +53,7 @@ for (const [name, sceneBaseline] of Object.entries(baseline.budgets.scenes || {}
 }
 const entity = baseline.budgets.entityCurve
 checks.push(
-  budget('entityCurve.syncMsAt10000', atEntity(10000)?.syncMs, entity.syncMsAt10000 * (1 + entity.tolerance) + entity.floorMs)
+  budget('entityCurve.walkMsAt10000', atEntity(10000)?.walkMs, entity.walkMsAt10000 * (1 + entity.tolerance) + entity.floorMs)
 )
 const passes = baseline.budgets.passCurve
 checks.push(

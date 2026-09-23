@@ -4,10 +4,11 @@
  * The frame is the default graph — `frame`, `clear`, `scene`, `ui`, `present`
  * — registered through the same door a plugin uses. `frame` updates world
  * matrices and shadow flags before any draw; `clear` clears the canvas; `scene`
- * draws the world. A post chain is a plugin pass: it registers through
- * `graph.add` and disables `clear` and `scene` while its own pass draws the
- * frame, so no effect list reaches this file. The graph executor runs the
- * passes, so this file supplies the draws and the counters, not the order.
+ * walks the entities into scene objects in its `extract` and draws them in its
+ * `execute`. A post chain is a plugin pass: it registers through `graph.add`
+ * and disables `clear` and `scene` while its own pass draws the frame, so no
+ * effect list reaches this file. The graph executor runs the passes, so this
+ * file supplies the draws and the counters, not the order.
  */
 import * as THREE from 'three/webgpu'
 import { makePassGraph } from './graph.js'
@@ -70,7 +71,15 @@ export function makeFrameDraw(state) {
     execute: () => {}
   })
   graph.add({ name: 'clear', after: ['frame'], before: ['scene'], execute: () => state.renderer.clear() })
-  graph.add({ name: 'scene', after: ['clear'], before: ['ui'], execute: drawScene })
+  // The entity walk is this pass's extract, not the kernel's. Replacing or
+  // disabling the scene pass removes the walk with the draw it feeds.
+  graph.add({
+    name: 'scene',
+    after: ['clear'],
+    before: ['ui'],
+    extract: frame => state.sync(frame.world, frame.blend),
+    execute: drawScene
+  })
   graph.add({ name: 'ui', after: ['scene'], before: ['present'], execute: () => {} })
   graph.add({ name: 'present', after: ['ui'], execute: () => {} })
 
@@ -127,11 +136,20 @@ export function makeFrameDraw(state) {
     return false
   }
 
-  /** Draw one frame: the graph's passes in order, then the counters. */
-  function draw() {
+  /**
+   * Draw one frame from a world: the graph's passes in order, then the counters.
+   *
+   * A call with no world reuses the one the last `sync` stored, and that sync
+   * already ran the extract, so a sync-then-draw pair walks the world once.
+   */
+  function draw(world = graph.frame.world, blend = graph.frame.blend ?? 1) {
     const startedAt = performance.now()
     const camera = state.readyCamera()
     state.renderer.info.reset()
+    // The scene pass's extract reads these. A pass set with no scene extract
+    // never reaches the walk; the fields cost one store either way.
+    graph.frame.world = world
+    graph.frame.blend = blend
 
     graph.run(camera, state.renderer.getRenderTarget(), state.viewport.width, state.viewport.height)
 

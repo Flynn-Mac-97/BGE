@@ -23,14 +23,14 @@ function heaviestPass(scene) {
 
 function sceneTable(scenes) {
   const rows = [
-    '| scene | entities | draw calls | merged | batches | targets | heap MB | frame ms | sync ms | setup ms | executor ms | executor overhead ms | pass work ms | kernel share |',
+    '| scene | entities | draw calls | merged | batches | targets | heap MB | frame ms | walk ms | setup ms | executor ms | executor overhead ms | pass work ms | kernel share |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'
   ]
   for (const scene of scenes) {
     rows.push(
       `| ${scene.name} | ${scene.entities} | ${scene.stats.drawCalls} | ${scene.stats.merged} | ` +
         `${scene.stats.batches} | ${scene.targetsCreated} | ${scene.heapMB} | ${number(scene.stepMs)} | ` +
-        `${number(scene.syncMs)} | ${number(scene.kernelSetupMs)} | ${number(scene.executorMs)} | ` +
+        `${number(scene.walkMs)} | ${number(scene.kernelSetupMs)} | ${number(scene.executorMs)} | ` +
         `${number(scene.executorOverheadMs)} | ${number(scene.passWorkMs)} | ${percent(scene.kernelShare)} |`
     )
   }
@@ -53,14 +53,14 @@ function frameSystemTable(scene) {
 
 function entityTable(curve) {
   const rows = [
-    '| entities | step ms | sync ms | setup ms | executor overhead ms | frame systems ms | kernel share | sync µs/entity | heap MB |',
+    '| entities | step ms | walk ms | setup ms | executor overhead ms | frame systems ms | kernel share | walk µs/entity | heap MB |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- |'
   ]
   for (const entry of curve) {
     rows.push(
-      `| ${entry.entities} | ${number(entry.stepMs)} | ${number(entry.syncMs)} | ${number(entry.kernelSetupMs)} | ` +
+      `| ${entry.entities} | ${number(entry.stepMs)} | ${number(entry.walkMs)} | ${number(entry.kernelSetupMs)} | ` +
         `${number(entry.executorOverheadMs)} | ${number(entry.frameSystemsMs)} | ${percent(entry.kernelShare)} | ` +
-        `${perEntity(entry.syncMs, entry.entities)} | ${entry.heapMB} |`
+        `${perEntity(entry.walkMs, entry.entities)} | ${entry.heapMB} |`
     )
   }
   return rows.join('\n')
@@ -92,7 +92,7 @@ function findings(results) {
     lines.push(
       `- **${scene.name}**: the frame takes ${number(scene.stepMs)} ms. The heaviest draw is \`${name}\` at ` +
         `${number((heaviest?.pass?.executeMs ?? 0) + (heaviest?.pass?.prepareMs ?? 0))} ms. Kernel stages total ` +
-        `${number(kernel)} ms (${percent(scene.kernelShare)}): sync ${number(scene.syncMs)} ms, setup ` +
+        `${number(kernel)} ms (${percent(scene.kernelShare)}): walk ${number(scene.walkMs)} ms, setup ` +
         `${number(scene.kernelSetupMs)} ms, executor overhead ${number(scene.executorOverheadMs)} ms. ` +
         `Plugin frame systems cost ${number(scene.frameSystemsMs)} ms` +
         (heaviestSystem ? `, most of it \`${heaviestSystem.plugin}\` at ${number(heaviestSystem.ms)} ms` : '') +
@@ -100,21 +100,21 @@ function findings(results) {
     )
   }
 
-  // Rows whose sync is below the clock's quantum cannot be divided by, so the
+  // Rows whose walk is below the clock's quantum cannot be divided by, so the
   // growth sentence uses the two largest counts that measured above it.
   const curve = results.entityCurve.filter(entry => entry.entities > 0)
-  const aboveQuantum = curve.filter(entry => (entry.syncMs ?? 0) > 0)
+  const aboveQuantum = curve.filter(entry => (entry.walkMs ?? 0) > 0)
   if (curve.length) {
     const first = aboveQuantum[0] ?? curve[0]
     const last = curve[curve.length - 1]
-    const firstPer = (first.syncMs ?? 0) / first.entities
-    const lastPer = (last.syncMs ?? 0) / last.entities
+    const firstPer = (first.walkMs ?? 0) / first.entities
+    const lastPer = (last.walkMs ?? 0) / last.entities
     const growth = firstPer > 0 ? lastPer / firstPer : null
     lines.push(
-      `- **Entity curve**: sync costs ${perEntity(first.syncMs, first.entities)} µs per entity at ${first.entities} ` +
-        `and ${perEntity(last.syncMs, last.entities)} µs per entity at ${last.entities}. ` +
+      `- **Entity curve**: the scene pass's extract costs ${perEntity(first.walkMs, first.entities)} µs per entity at ${first.entities} ` +
+        `and ${perEntity(last.walkMs, last.entities)} µs per entity at ${last.entities}. ` +
         `The per-entity cost ${growth !== null && growth > 2 ? `grew ${growth.toFixed(1)}×` : 'stayed flat'} as the ` +
-        `world grew, so the sync is ${growth !== null && growth > 2 ? 'super-linear' : 'linear'}.`
+        `world grew, so the walk is ${growth !== null && growth > 2 ? 'super-linear' : 'linear'}.`
     )
     lines.push(
       `- **Entity curve, the executor**: overhead at ${last.entities} entities is ${number(last.executorOverheadMs)} ms, ` +
@@ -165,10 +165,12 @@ clock, so every frame is a settled still frame.
 ## What is measured
 
 - **Total frame**: \`loop.step(0)\`, which is the plugin frame systems, then
-  \`renderer.sync\`, then \`renderer.draw\`.
-- **Kernel stages**: the entity sync, the frame pass's \`prepare\` (world matrices
-  and shadow flags), the graph executor's own bookkeeping (\`graph.run\` minus
-  every pass callback), and the draw's tail after \`graph.run\`.
+  \`renderer.draw(world, blend)\`. The draw runs the graph's extract, prepare and
+  execute.
+- **Kernel stages**: the frame pass's \`prepare\` (world matrices and shadow
+  flags), the graph executor's own bookkeeping (\`graph.run\` minus every pass
+  callback), and the draw's tail after \`graph.run\`. The entity walk is the scene
+  pass's \`extract\`, so it is reported per pass rather than as kernel work.
 - **Per-pass work**: each pass's \`extract\`, \`prepare\` and \`execute\`, attributed
   by pass name.
 - \`stats\` (draw calls, triangles, merged, batches, materials), the target pool's
@@ -222,7 +224,7 @@ ${results.scenes.map(scene => `#### ${scene.name}\n\n${passTable(scene)}\n\nPlug
 ## Entity-count curve
 
 A grid of lambert meshes, no post chain, no shadow-casting light, so the curve is
-the kernel's own work: 1 → 100 → 1,000 → 10,000 entities.
+the scene pass's own work: 1 → 100 → 1,000 → 10,000 entities.
 
 ${entityTable(results.entityCurve)}
 

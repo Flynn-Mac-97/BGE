@@ -37,7 +37,7 @@ async config => {
   // while `measuring` is true, so warmup frames cost nothing and add nothing.
   let measuring = false
   let frameCallbackMilliseconds = 0
-  const samples = { step: [], sync: [], draw: [], executor: [], callback: [] }
+  const samples = { step: [], draw: [], executor: [], callback: [] }
   const perPass = new Map()
   const perPlugin = new Map()
 
@@ -130,20 +130,6 @@ async config => {
       wrapped.instrumented = true
       graph.run = wrapped
     }
-    if (!renderer.sync.instrumented) {
-      const original = renderer.sync
-      const wrapped = (whichWorld, blend) => {
-        if (!measuring) return original(whichWorld, blend)
-        const started = now()
-        try {
-          return original(whichWorld, blend)
-        } finally {
-          samples.sync.push(now() - started)
-        }
-      }
-      wrapped.instrumented = true
-      renderer.sync = wrapped
-    }
     if (!renderer.draw.instrumented) {
       const original = renderer.draw
       const wrapped = (...args) => {
@@ -160,7 +146,7 @@ async config => {
     }
   }
 
-  /** One settled frame: frame systems, then sync and draw, on a stopped clock. */
+  /** One settled frame: frame systems, then the draw, on a stopped clock. */
   function runFrame() {
     if (!measuring) return engine.loop.step(0)
     const started = now()
@@ -198,13 +184,12 @@ async config => {
   /** Turn one measured phase into the numbers the report prints. */
   function summarise() {
     const stepMs = median(samples.step)
-    const syncMs = median(samples.sync)
     const drawMs = median(samples.draw)
     const executorMs = median(samples.executor)
     const drawTailMs = medianOfDifferences(samples.draw, samples.executor)
     const callbackMs = median(samples.callback)
     const overheadMs = medianOfDifferences(samples.executor, samples.callback)
-    const frameSystemsMs = median(samples.step.map((value, at) => value - (samples.sync[at] ?? 0) - (samples.draw[at] ?? 0)))
+    const frameSystemsMs = median(samples.step.map((value, at) => value - (samples.draw[at] ?? 0)))
 
     const passes = []
     for (const [name, bucket] of perPass) {
@@ -222,14 +207,16 @@ async config => {
     for (const [plugin, times] of perPlugin) frameSystems.push({ plugin, ms: round(median(times)) })
     frameSystems.sort((first, second) => (second.ms ?? 0) - (first.ms ?? 0))
 
+    // The entity walk is the scene pass's extract now, so it is attributed to
+    // the pass and not counted as kernel work.
+    const walkMs = round(median(perPass.get('scene')?.extract ?? []))
     const setupMs = passes.find(pass => pass.name === 'frame')?.prepareMs ?? 0
-    const callbacksTotalMs = passes.reduce((total, pass) => total + (pass.extractMs ?? 0) + (pass.prepareMs ?? 0) + (pass.executeMs ?? 0), 0)
-    const kernelTotalMs = (syncMs ?? 0) + setupMs + (overheadMs ?? 0) + (drawTailMs ?? 0)
+    const kernelTotalMs = setupMs + (overheadMs ?? 0) + (drawTailMs ?? 0)
 
     return {
       frames: samples.step.length,
       stepMs: round(stepMs),
-      syncMs: round(syncMs),
+      walkMs,
       drawMs: round(drawMs),
       frameSystemsMs: round(frameSystemsMs),
       executorMs: round(executorMs),
@@ -429,8 +416,7 @@ async config => {
     const durations = []
     for (let at = 0; at < 4; at++) {
       const started = now()
-      renderer.sync(world)
-      renderer.draw()
+      renderer.draw(world)
       const reached = await renderer.waitForGPU()
       if (!reached) return null
       durations.push(now() - started)
