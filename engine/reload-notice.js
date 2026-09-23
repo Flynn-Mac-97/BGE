@@ -27,5 +27,5 @@
  * This file is the seam: it re-exports both halves, so a caller or a test imports
  * one path and nothing else has to know the split.
  */
-export { captureWorld, restoreWorld } from './reload-projection.js'
+export { captureSessionWorld, restoreSessionWorld } from './reload-projection.js'
 export { describeReload, takeReloadNote, lastReloadNotice, carryWorldThroughReload } from './reload-notice-writer.js'

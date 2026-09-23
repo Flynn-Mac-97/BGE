@@ -21,7 +21,7 @@
  * both.
  */
 import { round3 } from './round3.js'
-import { captureWorld, restoreWorld, CAPTURE_VERSION } from './reload-projection.js'
+import { captureSessionWorld, restoreSessionWorld, CAPTURE_VERSION } from './reload-projection.js'
 
 /** One key, so a stale capture can never accumulate. Read once, then removed. */
 const STORAGE_KEY = 'engine:reload-capture'
@@ -247,7 +247,7 @@ function armCapture(parts, store) {
     if (saved) return
     saved = true
     try {
-      const capture = captureWorld(parts, cause)
+      const capture = captureSessionWorld(parts, cause)
       let text = JSON.stringify(capture)
       if (text.length > STORAGE_LIMIT) {
         text = JSON.stringify({ ...capture, entities: null, tooLarge: text.length })
@@ -371,9 +371,10 @@ function lostReason(capture) {
 /** Put the entities back, or say why they could not be. */
 async function restoreNotice(capture, parts) {
   if (!capture.entities) return describeReload(capture, { why: lostReason(capture) })
-  if (sameMoment(capture, captureWorld(parts, capture.cause))) return describeReload(capture, { unchanged: true })
+  if (sameMoment(capture, captureSessionWorld(parts, capture.cause)))
+    return describeReload(capture, { unchanged: true })
   try {
-    return describeReload(capture, { restored: await restoreWorld(capture, parts) })
+    return describeReload(capture, { restored: await restoreSessionWorld(capture, parts) })
   } catch (error) {
     // A half-restored world is worse than a rebuilt one. Go back to the level
     // and report the reason rather than leaving something in between.

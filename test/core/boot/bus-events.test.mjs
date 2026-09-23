@@ -12,7 +12,7 @@ import assert from 'node:assert/strict'
 import { makeBus } from '../../../engine/bus.js'
 import { makeLoader } from '../../../engine/loader.js'
 import { makeFiles } from '../../../engine/files.js'
-import { captureWorld, restoreWorld } from '../../../engine/reload-projection.js'
+import { captureSessionWorld, restoreSessionWorld } from '../../../engine/reload-projection.js'
 import { CHECKOUT, FIXTURE } from '../../fixture-project.mjs'
 import { startWorldInNode } from '../../../engine/start-world-node.mjs'
 
@@ -97,8 +97,13 @@ test('a level load and a restore are announced', async () => {
 
 test('a world put back from a reload capture is announced as restored, not merely changed', async () => {
   const { context, seen } = await worldWithRecorder()
-  const capture = captureWorld({ world: context.world, loop: context.loop, editor: context.editor, view: context.view })
-  await restoreWorld(capture, {
+  const capture = captureSessionWorld({
+    world: context.world,
+    loop: context.loop,
+    editor: context.editor,
+    view: context.view
+  })
+  await restoreSessionWorld(capture, {
     world: context.world,
     loop: context.loop,
     editor: context.editor,

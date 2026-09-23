@@ -16,7 +16,7 @@
  * `world-state.js`.
  */
 import { HANDLED, RESERVED, asAttached, expand, mergeLook, lookDiff } from './world-look.js'
-import { captureWorld, restoreWorld, levelFromWorld } from './world-state.js'
+import { captureCheckpoint, restoreCheckpoint, levelFromWorld } from './world-state.js'
 
 let nextId = 1
 
@@ -654,12 +654,12 @@ export function makeWorld(bus) {
 
     /** Everything about this world a checkpoint has to carry. Built in `world-state.js`. */
     capture() {
-      return captureWorld(world)
+      return captureCheckpoint(world)
     },
 
     /** Put this world back to a checkpoint. Built in `world-state.js`. */
     restore(capture) {
-      const restored = restoreWorld(world, capture, makeEntity)
+      const restored = restoreCheckpoint(world, capture, makeEntity)
       entities = restored.entities
       bus.emit('world:changed')
       return { entities: entities.length, lost: restored.lost }

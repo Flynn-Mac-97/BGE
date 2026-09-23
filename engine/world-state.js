@@ -1,7 +1,7 @@
 /**
  * Kernel: the checkpoint projection and the level shape.
  *
- * A world is written down in two directions. `captureWorld` and `restoreWorld`
+ * A world is written down in two directions. `captureCheckpoint` and `restoreCheckpoint`
  * turn live entities into plain data and back, so the world can be rewound to a
  * moment; `levelFromWorld` writes the level shape, so a save keeps every decision
  * the level file can hold.
@@ -14,6 +14,7 @@
  * and do not own them. `world.js` owns the store and puts the entities back.
  */
 import { makeValueProjection } from './value-projection.js'
+import { placementBehaviours, overriddenProperties } from './placement-projection.js'
 import { round3 } from './round3.js'
 import { expand, sameLook, lookDiff } from './world-look.js'
 
@@ -67,7 +68,7 @@ const { project, resolve } = makeValueProjection({
  * @returns {object} The checkpoint: version, the simulated flag, the shared
  *   state, and one entry per entity.
  */
-export function captureWorld(world) {
+export function captureCheckpoint(world) {
   const lost = []
   const entities = world.entities
   const live = new Set(entities)
@@ -118,11 +119,11 @@ export function captureWorld(world) {
  * and would lose any entity the world had destroyed since.
  *
  * @param {object} world The world to write into.
- * @param {object} capture From `captureWorld`.
+ * @param {object} capture From `captureCheckpoint`.
  * @param {Function} makeEntity Builds an entity the checkpoint created.
  * @returns {object} The entities for the store, and how much was lost.
  */
-export function restoreWorld(world, capture, makeEntity) {
+export function restoreCheckpoint(world, capture, makeEntity) {
   if (capture?.version !== CHECKPOINT_VERSION)
     throw new Error(`checkpoint version ${capture?.version} is not ${CHECKPOINT_VERSION}`)
   const byId = new Map(world.entities.map(entity => [entity.id, entity]))
@@ -181,23 +182,17 @@ function lookOverrides(entity) {
   return out
 }
 
-/** The overridden properties a placement disagrees with its type about. */
-function overrideProperties(entity) {
-  if (!entity.overrides.length) return {}
-  const properties = {}
-  for (const key of entity.overrides) properties[key] = entity.properties[key]
-  return { properties }
-}
-
 /** One entity as the level-shaped placement a save must not narrow. */
 function placementFromEntity(entity) {
-  const attached = behaviourPlacement(entity)
+  const attached = placementBehaviours(entity.behaviours, entity._detached)
   return {
     ...entity._extraKeys,
     ...placementFields(entity),
     ...lookOverrides(entity),
     ...(attached ? { behaviours: attached } : {}),
-    ...overrideProperties(entity)
+    ...(entity.overrides.length
+      ? { properties: overriddenProperties(entity.overrides, entity.properties, { keepUndefined: true }) }
+      : {})
   }
 }
 
@@ -217,26 +212,6 @@ export function levelFromWorld(world, camera) {
     camera,
     entities: world.entities.map(placementFromEntity)
   }
-}
-
-/**
- * What this PLACEMENT has to say about behaviours — never what its type says.
- *
- * Only what it added, changed, or took off, so a level diff shows the decision
- * somebody made rather than the whole inherited list. Array form when there is
- * nothing to configure, because `["float"]` is what a person would have typed.
- */
-function behaviourPlacement(e) {
-  const out = {}
-  for (const b of e.behaviours) {
-    if (!b.own && !b.overrides.length) continue
-    out[b.name] = Object.fromEntries(b.overrides.map(k => [k, b.bag[k]]))
-  }
-  for (const name of e._detached) out[name] = false
-
-  const names = Object.keys(out)
-  if (!names.length) return null
-  return names.every(n => out[n] && !Object.keys(out[n]).length) ? names : out
 }
 
 /**

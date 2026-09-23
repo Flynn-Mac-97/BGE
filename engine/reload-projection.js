@@ -30,6 +30,7 @@
  * whatever JSON cannot hold because sessionStorage is text.
  */
 import { makeValueProjection, LOST } from './value-projection.js'
+import { placementBehaviours, overriddenProperties } from './placement-projection.js'
 import { round3 } from './round3.js'
 
 /** The shape written to storage. A capture from an older engine is discarded rather than guessed at. */
@@ -114,7 +115,7 @@ const { project, resolve } = makeValueProjection({
  * Pure: it reads and copies, and touches no storage. That is what lets the whole
  * of it be proven in a headless world with no browser anywhere near it.
  */
-export function captureWorld({ world, loop, editor, view }, cause = {}) {
+export function captureSessionWorld({ world, loop, editor, view }, cause = {}) {
   const dropped = []
   const live = new WeakSet(world.entities)
 
@@ -281,7 +282,7 @@ function announceRestored(capture, editor, world, bus, context) {
  *
  * Returns what came back and, more importantly, what did not.
  */
-export async function restoreWorld(capture, { world, loop, editor, view, bus, context }) {
+export async function restoreSessionWorld(capture, { world, loop, editor, view, bus, context }) {
   const notRestored = []
   const missing = []
 
@@ -352,23 +353,6 @@ function colliderPlacement(held) {
   return held.setByPlacement?.collider && held.collider ? { collider: held.collider } : {}
 }
 
-/** A behaviour bag, included only when the placement named one. */
-function behaviourPlacement(attached) {
-  return attached ? { behaviours: attached } : {}
-}
-
-/**
- * The overrides whose value survived.
- *
- * An override naming a key with nothing behind it would write `undefined` into
- * the level on the next save, which reads as a decision somebody made.
- */
-function overrideProperties(held) {
-  return Object.fromEntries(
-    held.overrides.filter(key => held.properties[key] !== undefined).map(key => [key, held.properties[key]])
-  )
-}
-
 /**
  * The placement a restored entity is spawned from.
  *
@@ -377,7 +361,7 @@ function overrideProperties(held) {
  * afterwards.
  */
 function placementOf(held) {
-  const attached = placementBehaviours(held)
+  const attached = placementBehaviours(held.behaviours, held.detached || [])
   return {
     id: held.id,
     at: held.at,
@@ -386,8 +370,8 @@ function placementOf(held) {
     ...spritePlacement(held),
     ...meshPlacement(held),
     ...colliderPlacement(held),
-    properties: overrideProperties(held),
-    ...behaviourPlacement(attached),
+    properties: overriddenProperties(held.overrides, held.properties, { keepUndefined: false }),
+    ...(attached ? { behaviours: attached } : {}),
     ...held.extra
   }
 }
@@ -512,17 +496,4 @@ function restoreLosses(capture, { world, loop, missing, fromLevel }) {
   if (madeInTheRun) losses.push(pluginListLoss(madeInTheRun, capture.entities.length))
   else losses.push('anything a plugin holds outside the world, which was rebuilt from boot')
   return { losses, hold: madeInTheRun > 0 }
-}
-
-/** What this placement said about behaviours, in the form a level file writes. */
-function placementBehaviours(held) {
-  const out = {}
-  for (const b of held.behaviours) {
-    if (!b.own && !b.overrides.length) continue
-    out[b.name] = Object.fromEntries(b.overrides.map(key => [key, b.bag[key]]))
-  }
-  for (const name of held.detached || []) out[name] = false
-  const names = Object.keys(out)
-  if (!names.length) return null
-  return names.every(name => out[name] && !Object.keys(out[name]).length) ? names : out
 }
