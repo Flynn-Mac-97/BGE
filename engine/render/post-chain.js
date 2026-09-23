@@ -178,13 +178,76 @@ export function makePostChain(state) {
     warming = built = null
   }
 
+  /**
+   * The order each effect sits at, keyed by the effect object.
+   *
+   * Apart from the effect itself: an effect is the caller's own object, and
+   * `list` hands it back unchanged. A plain index is the fallback, so a list
+   * handed to `set` needs nothing written on it.
+   */
+  const passOrders = new Map()
+
+  /** The order one entry sits at. */
+  const orderAt = index => passOrders.get(passList[index]) ?? index
+
+  /** The highest order in the chain, or -1 when it is empty. */
+  function highestOrder() {
+    let highest = -1
+    for (let i = 0; i < passList.length; i++) highest = Math.max(highest, orderAt(i))
+    return highest
+  }
+
+  /** Drop every entry under this name, if any. */
+  function dropNamed(name) {
+    const kept = passList.filter(effect => effect.name !== name)
+    if (kept.length === passList.length) return false
+    for (const effect of passList) if (effect.name === name) passOrders.delete(effect)
+    passList = kept
+    return true
+  }
+
   /** The ordered post-processing passes; an empty list means none at all. */
   const passes = {
     /** The current list, so a neutral draw can take it away and put it back. */
     get list() { return [...passList] },
+    /**
+     * Replace the whole chain.
+     *
+     * The one destructive door, and Post Processing is its only caller. A
+     * plugin that wants to add an effect uses `add` so it cannot delete another
+     * plugin's chain.
+     */
     set(list) {
       passList = Array.isArray(list) ? list.filter(Boolean) : []
+      passOrders.clear()
+      passList.forEach((effect, index) => passOrders.set(effect, index))
       if (!passList.length) dropPost()
+    },
+    /**
+     * Add or replace one named effect at its place in the chain.
+     *
+     * `order` is a number and a lower one draws earlier; without it the effect
+     * goes last. A name already in the chain is replaced, so two plugins adding
+     * the same name do not both draw.
+     */
+    add(name, effect, options = {}) {
+      if (typeof name !== 'string' || !name || typeof effect?.apply !== 'function') {
+        reportOnce(`[render] passes.add: needs a name and an effect with an apply function, got ${JSON.stringify(name)}`)
+        return
+      }
+      dropNamed(name)
+      const wanted = Number.isFinite(options.order) ? options.order : highestOrder() + 1
+      const named = { ...effect, name }
+      let at = passList.length
+      for (let i = 0; i < passList.length; i++) {
+        if (orderAt(i) > wanted) { at = i; break }
+      }
+      passList = [...passList.slice(0, at), named, ...passList.slice(at)]
+      passOrders.set(named, wanted)
+    },
+    /** Take one named effect out, and leave the rest of the chain alone. */
+    remove(name) {
+      if (dropNamed(name) && !passList.length) dropPost()
     }
   }
 

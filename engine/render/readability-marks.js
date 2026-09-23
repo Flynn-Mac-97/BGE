@@ -23,10 +23,12 @@
  * rather than by it: a keyline and a floor mark are geometry the renderer builds,
  * and a model's own materials are never touched to make room for them.
  *
- * This file is the seam: the defaults, the rule for who gets what, and the
- * wiring. Each mark kind owns its geometry, material and cache in its own
- * module — `keyline-marks`, `contact-shadows`, `ground-rings` — over the
- * instance-quad helpers both floor marks share in `floor-mark`.
+ * Each mark registers through `renderer.marks`, the same door a plugin uses.
+ * Each kind owns its geometry, material and cache in its own module —
+ * `keyline-marks`, `contact-shadows`, `ground-rings` — over the instance-quad
+ * helpers both floor marks share in `floor-mark`. This file owns the defaults,
+ * the rule for who gets what, and the frame-level begin and place each kind
+ * needs.
  */
 import { makeKeylineMarks } from './keyline-marks.js'
 import { makeContactShadows } from './contact-shadows.js'
@@ -65,29 +67,33 @@ export function makeReadabilityMarks(state) {
   const groundRings = makeGroundRings(state)
 
   /**
-   * Give one entity its keyline and note its shadow and ring. True if it has a
-   * keyline.
+   * The keyline, and the record fact `stats.keylines` counts.
    *
-   * Scenery leaves in the first three lines. Several hundred props that never
-   * move must not pay to read their own shape again on every frame.
+   * It runs for every mesh entity, as every mark does. The keyline module's own
+   * width check makes a never-moved thing with no keyline one cheap read.
    */
-  function updateReadability(entity, object, declared, shape, moved, place, record) {
-    const asks = declared.keyline !== undefined || declared.shadow !== undefined
-      || declared.ring !== undefined
-    // The ringed actor is named, so it is entitled to a ring on the frame it
-    // appears, before it has moved. An object already drawing a keyline is not
-    // scenery either: leaving early would strand the hull when the declaration
-    // that asked for it is taken away.
-    if (!moved && !asks && !groundRings.ringNames(entity) && record.keylineMesh === null) return false
-
-    keylines.updateKeyline(entity, object, declared, shape, moved, record)
-    if (!entity.hidden) {
-      contactShadows.noteContactShadow(entity, declared, shape, moved, place)
-      groundRings.noteGroundRing(entity, declared, shape, place)
-    }
-    return record.keylineMesh !== null
-
+  function drawKeyline(entity, object, place, declared, record) {
+    keylines.updateKeyline(entity, object, declared, record.shape, record.moved, record)
+    record.keyline = record.keylineMesh !== null
   }
+
+  /** The contact shadow of one entity. A hidden entity draws no floor mark. */
+  function drawContactShadow(entity, object, place, declared, record) {
+    if (entity.hidden) return
+    contactShadows.noteContactShadow(entity, declared, record.shape, record.moved, place)
+  }
+
+  /** The ground ring of one entity, when the ring rule or `mesh.ring` names it. */
+  function drawGroundRing(entity, object, place, declared, record) {
+    if (entity.hidden) return
+    groundRings.noteGroundRing(entity, declared, record.shape, place)
+  }
+
+  // Registered in the order the frame drew them before the registry existed:
+  // keyline, then contact shadow, then ground ring.
+  state.marks.register('keyline', { draw: drawKeyline })
+  state.marks.register('contactShadow', { draw: drawContactShadow })
+  state.marks.register('groundRing', { draw: drawGroundRing })
 
   /** Start a frame's marks: no shadow and no ring noted yet. */
   function beginMarks() {
@@ -100,7 +106,6 @@ export function makeReadabilityMarks(state) {
     return { contactShadows: contactShadows.count(), groundRings: groundRings.count() }
   }
 
-  state.updateReadability = updateReadability
   state.noteContactShadow = contactShadows.noteContactShadow
   state.placeContactShadows = contactShadows.placeContactShadows
   state.placeGroundRings = groundRings.placeGroundRings

@@ -4,7 +4,7 @@
 
 ## Shape
 
-The kernel's boot closure is 81 modules, 13,386 lines. The top-level
+The kernel's boot closure is 82 modules, 13,386 lines. The top-level
 `plugins/builtin/*.js` are 22,681 more. The plugins have no privileges the
 kernel does not give everyone.
 
@@ -13,7 +13,7 @@ engine/     world.js 609   start-world.js 263   render.js 375
             ui.js 315   project-index.mjs 612   loop.js 571
             inspect.js 263   shell.js 290   start-world-node.mjs 137
             index.js 214   loader.js 221   files.js 221   bus.js 25
-            render/     28 files  3981
+            render/     29 files  4427
 
 plugins/builtin/
             tool-transform 386   tests 348    panel-inspector 323
@@ -100,6 +100,7 @@ in `ARCHITECTURE.md`.
 | `render/keyline-hull.js` | the geometry a keyline is drawn from, and the vertex node that grows it | the line that uses it |
 | `render/keyline-marks.js` | the keyline, a dark line of constant screen width | a model's own materials |
 | `render/lighting.js` | what the level says about light, fog and sky | what is lit |
+| `render/mark-registry.js` | the per-entity marks a plugin adds, at the one place the sync writes a mark | what a mark draws |
 | `render/material-registry.js` | what a surface is made of, contributed by plugins | which entity uses it |
 | `render/material-vocabulary.js` | the two ways this renderer touches a material | what a material means |
 | `render/model-cache.js` | a model file, fetched once, cloned per entity | where it is placed |
@@ -117,7 +118,7 @@ in `ARCHITECTURE.md`.
 The rows after `work-lock.mjs` are the newer, smaller kernel modules: the
 pieces the largest files were split into, plus the two helpers those splits
 produced. Every one is in the boot closure, so this table and the shape block
-count the same 81 modules.
+count the same 82 modules.
 
 The twelve rows after `asset-path.js` are boot plumbing the original table left
 out: the modules the two entries pull in. Six are node only —

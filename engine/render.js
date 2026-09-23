@@ -33,11 +33,12 @@
  * only correct answer to a first-person weapon clipping into a wall, and it is
  * why "one draw order" is a decision this file owns rather than a fact about it.
  *
- * There are two hook points and no more: `materials` for what a surface is made
- * of and `passes` for what happens to the finished picture. Both are deliberately
- * dumb. A renderer that holds the list of materials a game uses, or the list of
- * effects it wants, has started to know what the game is — and in this engine
- * that knowledge lives in a plugin. This file owns one GL context and one draw
+ * There are three hook points and no more: `materials` for what a surface is
+ * made of, `marks` for a visual drawn beside one entity, and `passes` for what
+ * happens to the finished picture. All are deliberately dumb. A renderer that
+ * holds the list of materials a game uses, the marks it draws, or the effects it
+ * wants, has started to know what the game is — and in this engine that
+ * knowledge lives in a plugin. This file owns one GL context and one draw
  * order, and it must never learn what bloom is.
  *
  * What it does know about is cost. Several hundred walls that never move are
@@ -69,6 +70,7 @@ import { makeMaterialRegistry } from './render/material-registry.js'
 import { makeObjectBuilder } from './render/object-builder.js'
 import { makeBatching } from './render/batching.js'
 import { makeReadability, makeReadabilityMarks } from './render/readability-marks.js'
+import { makeMarkRegistry } from './render/mark-registry.js'
 import { makeEntitySync } from './render/entity-sync.js'
 import { makeViewmodel } from './render/viewmodel.js'
 import { makePostChain } from './render/post-chain.js'
@@ -241,6 +243,8 @@ export async function makeRenderer(canvas, view, viewport) {
   makeMaterialRegistry(state)
   makeObjectBuilder(state)
   makeBatching(state)
+  // The marks registry exists before the readability marks register into it.
+  makeMarkRegistry(state)
   state.readability = makeReadability()
   makeReadabilityMarks(state)
   makeEntitySync(state)
@@ -261,6 +265,14 @@ export async function makeRenderer(canvas, view, viewport) {
       state.forgetDrawRecords()
       renderer.dispose()
     },
+
+    /**
+     * The scene object standing for one entity, or null before it is built.
+     *
+     * The id-to-object map the sync already holds, so a plugin does not have to
+     * traverse `renderer.scene` looking for `userData.entity`.
+     */
+    objectFor: entity => state.meshes.get(entity?.id) ?? null,
 
     // Both are the session's objects, re-exposed so existing plugins that reach
     // for renderer.view keep working.
@@ -330,8 +342,16 @@ export async function makeRenderer(canvas, view, viewport) {
     /** One draw of the world scene into a caller-owned render target, its pixels read back into `buffer`. */
     drawInto: state.drawInto,
 
-    // ---- the two hook points ----
+    // ---- the three hook points ----
     materials: state.materials,
+    /**
+     * The per-entity marks: a visual drawn beside one entity, by name.
+     *
+     * `register(name, { draw })` and `remove(name)`. `draw(entity, object,
+     * place, declared, record)` runs once per mesh entity the sync visits, from
+     * the same place the keyline and the two floor marks are drawn.
+     */
+    marks: state.marks,
     /** The ordered post-processing passes; an empty list means none at all. */
     passes: state.passes,
 

@@ -110,8 +110,11 @@ export function makeEntitySync(state) {
     record.simple = isSimpleMesh(declared)
     record.idle = isIdleMesh(declared, record.simple)
     state.considerForMerging(entity, object, described, opacity, !record.simple, turn, record)
-    // After merging, which is where "has this ever moved" is answered.
-    record.keyline = state.updateReadability(entity, object, declared, shape, record.moved, place, record)
+    // Marks run after merging, which is where "has this ever moved" is answered
+    // — the keyline reads it from `record.moved` and the floor marks follow the
+    // place. The keyline mark owns `record.keyline`, so it is cleared first.
+    record.keyline = false
+    state.drawMarks(entity, object, place, declared, record)
     record.steady = isSteady(entity, declared, record)
     placeMatrix(object, record)
     saveSlot(i, entity, object, record)
