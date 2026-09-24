@@ -41,8 +41,8 @@ npm run bench:baseline   # re-record the baseline from a run (only when a change
 
 ## The baseline
 
-`scripts/render-benchmark-baseline.json` holds the measured kernel share per
-scene, the entity sync at 10,000 entities, and the executor's overhead at 50
+`scripts/render-benchmark-baseline.json` holds the measured walk share per
+scene, the entity walk at 10,000 entities, and the executor's overhead at 50
 passes, with a stated tolerance. `npm run bench:check` fails when a run goes past
 them. It is not in `npm run check`, because it needs a browser; both are listed
 under a deliberate refusal rather than a slow default.

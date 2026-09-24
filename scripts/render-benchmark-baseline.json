@@ -1,28 +1,28 @@
 {
-  "measuredAt": "2026-09-23T17:02:50.275Z",
+  "measuredAt": "2026-09-24T03:05:30.586Z",
   "budgets": {
     "scenes": {
       "retro-2d": {
-        "kernelShare": 0.111,
-        "kernelShareTolerance": 0.35
+        "sceneExtractShare": 0.111,
+        "sceneExtractShareTolerance": 0.35
       },
       "mid": {
-        "kernelShare": 0.111,
-        "kernelShareTolerance": 0.35
+        "sceneExtractShare": 0.429,
+        "sceneExtractShareTolerance": 0.35
       },
       "aaa": {
-        "kernelShare": 0.015,
-        "kernelShareTolerance": 0.35
+        "sceneExtractShare": 0.061,
+        "sceneExtractShareTolerance": 0.35
       }
     },
     "entityCurve": {
-      "walkMsAt10000": 1.2,
+      "walkMsAt10000": 1.1,
       "tolerance": 0.75,
       "floorMs": 0.5,
-      "walkGrowthRatio": 11.999999999999998
+      "walkGrowthRatio": 11
     },
     "passCurve": {
-      "executorOverheadMsAt50": 0.1,
+      "executorOverheadMsAt50": 0,
       "tolerance": 1,
       "floorMs": 0.25
     }

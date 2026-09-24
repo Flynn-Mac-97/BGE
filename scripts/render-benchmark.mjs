@@ -169,7 +169,10 @@ function budgetsFrom(results) {
     // is quantised and a stage that measured near zero would otherwise trip on
     // the quantum alone.
     scenes: Object.fromEntries(
-      results.scenes.map(scene => [scene.name, { kernelShare: scene.kernelShare, kernelShareTolerance: 0.35 }])
+      results.scenes.map(scene => [
+        scene.name,
+        { sceneExtractShare: scene.sceneExtractShare, sceneExtractShareTolerance: 0.35 }
+      ])
     ),
     entityCurve: {
       walkMsAt10000: atEntity(10000)?.walkMs ?? null,
@@ -351,7 +354,7 @@ for (const scene of results.scenes) {
   console.log(
     `  ${scene.name.padEnd(9)} entities ${String(scene.entities).padStart(5)}  frame ${scene.stepMs} ms  ` +
       `walk ${scene.walkMs} ms  setup ${scene.kernelSetupMs} ms  executor ${scene.executorMs} ms  ` +
-      `kernel share ${(scene.kernelShare * 100).toFixed(1)}%`
+      `walk share ${(scene.sceneExtractShare * 100).toFixed(1)}%`
   )
 }
 console.log(`render-benchmark: wrote ${path.relative(checkout, resultsFile)}`)

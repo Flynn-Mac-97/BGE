@@ -204,7 +204,6 @@ async config => {
     // the pass and not counted as kernel work.
     const walkMs = round(median(perPass.get('scene')?.extract ?? []))
     const setupMs = passes.find(pass => pass.name === 'frame')?.prepareMs ?? 0
-    const kernelTotalMs = setupMs + (overheadMs ?? 0) + (drawTailMs ?? 0)
 
     return {
       frames: samples.step.length,
@@ -217,9 +216,11 @@ async config => {
       drawTailMs: round(drawTailMs),
       callbackMs: round(callbackMs),
       kernelSetupMs: round(setupMs),
-      kernelTotalMs: round(kernelTotalMs),
       passWorkMs: round(callbackMs - setupMs),
-      kernelShare: stepMs ? round(kernelTotalMs / stepMs) : null,
+      // The walk is the cost that scales with the scene, so it is the share to
+      // watch. The kernel's own stages are reported in ms and sit at the clock
+      // floor; a share of the frame would say nothing about them.
+      sceneExtractShare: stepMs ? round(walkMs / stepMs) : null,
       passClockReads: graph.clockReads,
       timingCostMs,
       passes,

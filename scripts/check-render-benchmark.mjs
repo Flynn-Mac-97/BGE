@@ -2,8 +2,8 @@
  * Fail when the render benchmark regresses past the committed baseline.
  *
  * The benchmark itself only measures. This reads the last result and the
- * baseline, and fails when a kernel stage got slower than the baseline allows:
- * a scene's kernel share past its absolute tolerance, the entity sync at ten
+ * baseline, and fails when a stage got slower than the baseline allows: a
+ * scene's walk share past its absolute tolerance, the entity walk at ten
  * thousand entities, or the executor's overhead at fifty passes.
  *
  * It needs a browser only through the result it reads, which is why it is not
@@ -49,7 +49,13 @@ function budget(what, measured, ceiling) {
 const checks = []
 for (const [name, sceneBaseline] of Object.entries(baseline.budgets.scenes || {})) {
   const scene = (result.scenes || []).find(entry => entry.name === name)
-  checks.push(budget(`${name}.kernelShare`, scene?.kernelShare, sceneBaseline.kernelShare + sceneBaseline.kernelShareTolerance))
+  checks.push(
+    budget(
+      `${name}.sceneExtractShare`,
+      scene?.sceneExtractShare,
+      sceneBaseline.sceneExtractShare + sceneBaseline.sceneExtractShareTolerance
+    )
+  )
 }
 const entity = baseline.budgets.entityCurve
 checks.push(

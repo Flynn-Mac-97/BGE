@@ -23,7 +23,7 @@ function heaviestPass(scene) {
 
 function sceneTable(scenes) {
   const rows = [
-    '| scene | entities | draw calls | merged | batches | targets | heap MB | frame ms | walk ms | setup ms | executor ms | executor overhead ms | pass work ms | kernel share |',
+    '| scene | entities | draw calls | merged | batches | targets | heap MB | frame ms | walk ms | setup ms | executor ms | executor overhead ms | pass work ms | walk share |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'
   ]
   for (const scene of scenes) {
@@ -31,7 +31,7 @@ function sceneTable(scenes) {
       `| ${scene.name} | ${scene.entities} | ${scene.stats.drawCalls} | ${scene.stats.merged} | ` +
         `${scene.stats.batches} | ${scene.targetsCreated} | ${scene.heapMB} | ${number(scene.stepMs)} | ` +
         `${number(scene.walkMs)} | ${number(scene.kernelSetupMs)} | ${number(scene.executorMs)} | ` +
-        `${number(scene.executorOverheadMs)} | ${number(scene.passWorkMs)} | ${percent(scene.kernelShare)} |`
+        `${number(scene.executorOverheadMs)} | ${number(scene.passWorkMs)} | ${percent(scene.sceneExtractShare)} |`
     )
   }
   return rows.join('\n')
@@ -53,13 +53,13 @@ function frameSystemTable(scene) {
 
 function entityTable(curve) {
   const rows = [
-    '| entities | step ms | walk ms | setup ms | executor overhead ms | frame systems ms | kernel share | walk µs/entity | heap MB |',
+    '| entities | step ms | walk ms | setup ms | executor overhead ms | frame systems ms | walk share | walk µs/entity | heap MB |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- |'
   ]
   for (const entry of curve) {
     rows.push(
       `| ${entry.entities} | ${number(entry.stepMs)} | ${number(entry.walkMs)} | ${number(entry.kernelSetupMs)} | ` +
-        `${number(entry.executorOverheadMs)} | ${number(entry.frameSystemsMs)} | ${percent(entry.kernelShare)} | ` +
+        `${number(entry.executorOverheadMs)} | ${number(entry.frameSystemsMs)} | ${percent(entry.sceneExtractShare)} | ` +
         `${perEntity(entry.walkMs, entry.entities)} | ${entry.heapMB} |`
     )
   }
@@ -68,7 +68,7 @@ function entityTable(curve) {
 
 function passCurveTable(curve) {
   const rows = [
-    '| added passes | live passes | executor ms | executor overhead ms | overhead µs/pass | timing cost ms | clock reads | frame ms | kernel share | heap MB |',
+    '| added passes | live passes | executor ms | executor overhead ms | overhead µs/pass | timing cost ms | clock reads | frame ms | heap MB |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'
   ]
   for (const entry of curve) {
@@ -76,7 +76,7 @@ function passCurveTable(curve) {
       `| ${entry.probePasses} | ${entry.passes.length} | ${number(entry.executorMs)} | ${number(entry.executorOverheadMs)} | ` +
         `${((entry.executorOverheadMs ?? 0) * 1000 / Math.max(1, entry.probePasses)).toFixed(2)} | ` +
         `${number(entry.timingCostMs, 4)} | ${entry.passClockReads} | ${number(entry.stepMs)} | ` +
-        `${percent(entry.kernelShare)} | ${entry.heapMB} |`
+        `${entry.heapMB} |`
     )
   }
   return rows.join('\n')
@@ -86,18 +86,17 @@ function findings(results) {
   const lines = []
   for (const scene of results.scenes) {
     const heaviest = heaviestPass(scene)
-    const kernel = scene.kernelTotalMs
     const name = heaviest?.pass?.name ?? 'nothing'
-    const systemsDominant = (scene.frameSystemsMs ?? 0) > (scene.kernelTotalMs ?? 0)
     const heaviestSystem = (scene.frameSystems ?? []).find(entry => (entry.ms ?? 0) > 0) ?? null
     lines.push(
       `- **${scene.name}**: the frame takes ${number(scene.stepMs)} ms. The heaviest draw is \`${name}\` at ` +
-        `${number((heaviest?.pass?.executeMs ?? 0) + (heaviest?.pass?.prepareMs ?? 0))} ms. Kernel stages total ` +
-        `${number(kernel)} ms (${percent(scene.kernelShare)}): walk ${number(scene.walkMs)} ms, setup ` +
-        `${number(scene.kernelSetupMs)} ms, executor overhead ${number(scene.executorOverheadMs)} ms. ` +
-        `Plugin frame systems cost ${number(scene.frameSystemsMs)} ms` +
+        `${number((heaviest?.pass?.executeMs ?? 0) + (heaviest?.pass?.prepareMs ?? 0))} ms. The kernel's own stages ` +
+        `are setup ${number(scene.kernelSetupMs)} ms and executor overhead ${number(scene.executorOverheadMs)} ms; ` +
+        `the entity walk in the scene pass's extract is ${number(scene.walkMs)} ms, ` +
+        `${percent(scene.sceneExtractShare)} of the frame. Plugin frame systems cost ` +
+        `${number(scene.frameSystemsMs)} ms` +
         (heaviestSystem ? `, most of it \`${heaviestSystem.plugin}\` at ${number(heaviestSystem.ms)} ms` : '') +
-        (systemsDominant ? ', more than every kernel stage together.' : '.')
+        '.'
     )
   }
 

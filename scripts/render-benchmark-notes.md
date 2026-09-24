@@ -13,16 +13,14 @@ draws dominate: `post` alone is 1.5 ms, and each of the 16 extra passes is
 at 1, 10 and 50 added passes: the kernel's per-frame work is the pass count, not
 what the passes contain.
 
-**The kernel is the bottleneck on a frame that draws almost nothing.** Three
+**The walk is the bottleneck on a frame that draws almost nothing.** Three
 thousand lambert meshes merge into 3 batches and 6 draw calls, so the scene draws
-in 0.2 ms — and the fixed kernel work is then most of the frame: setup 0.1 ms,
-executor 0.1 ms and the draw's tail, against the walk's 0.4 ms, 0.6 ms of 1.0 ms
-(60%) when the walk is counted with the kernel. The walk is now the scene pass's
-`extract`, so it belongs to the pass table, and the kernel's share is only the
-fixed stages. Better batching makes that fixed share larger, because batching
-removes the passes' cost and leaves the walk's. That is the engine's own `stats`
-reporting the merge working (`merged: 3000, batches: 3`), not a measurement
-artifact.
+in 0.2 ms — and the walk that feeds those batches is then most of the frame.
+Better batching makes the walk's share larger, because batching removes the
+passes' cost and leaves the walk's. That is the engine's own `stats` reporting
+the merge working (`merged: 3000, batches: 3`), not a measurement artifact. The
+kernel's own stages are not the cost here; the walk is, and the walk is the scene
+pass's `extract`.
 
 **The entity walk is the largest per-frame stage, and it is linear.** At 10,000
 entities the world merges to about a dozen batches, the frame is 1.8 ms, and the
@@ -33,10 +31,13 @@ times the walk, never a hundred. This is the cost the render-graph design moved
 out of the kernel: a plugin that replaces the scene pass does not pay it, and the
 kernel's fixed stages are the pass count instead.
 
-**A kernel share that falls with pass count.** 22.2% on a 0.9 ms retro frame, 60%
-on the batched mid frame, 3.2% on the 12.5 ms AAA frame, 1.7% on the 50-pass
-frame. The kernel is a fixed per-frame cost; the larger the passing work, the
-smaller its share.
+**A walk share that falls as the passes draw more.** The guarded per-scene share
+is the scene pass's `extract` — the entity walk — because the kernel's own stages
+now sit at the page clock's floor, and a share of the frame would say nothing
+about them. The walk is a fixed per-entity cost, so the more the passes draw, the
+smaller its share: the AAA frame is mostly GPU and passes, and the walk is a few
+percent of it. The metric used to be `kernelShare`, which counted the walk with
+the kernel; the walk moved into the pass, so the metric followed it.
 
 ### What the numbers showed beyond the expectation
 
