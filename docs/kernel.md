@@ -87,14 +87,14 @@ in `ARCHITECTURE.md`.
 | `report-once.js` | say a message once, then stay quiet | what the message means |
 | `round3.js` | round a number to three decimals before it is written down | anything else |
 | `render/batching.js` | static entities merged by material and grid cell | per-entity look |
-| `render/camera.js` | the two world cameras, and the viewport they are built from | meshes, materials |
+| `render/camera.js` | the world cameras, a reusable view camera, and the viewport they are built from | meshes, materials |
 | `render/contact-shadows.js` | the contact shadow, all of them in one draw call | a model's own materials |
 | `render/entity-look.js` | what one thing is: its turn, origin, sheet cell and fallback colour | how it is built |
 | `render/entity-record.js` | what a frame already knows about one entity, kept beside it | the entity's own fields |
 | `render/entity-scan.js` | the quiet snapshot and the two scans over it | building scene objects |
 | `render/entity-sync.js` | turning the entity list into scene objects, run by the scene pass's `extract` | the world's rules |
 | `render/floor-mark.js` | the shape both floor marks share: the instanced unit quad | what either mark draws |
-| `render/frame-draw.js` | one frame out of the card, and what the last one cost | what is drawn |
+| `render/frame-draw.js` | one frame out of the card, a view draw, and what the last one cost | what is drawn |
 | `render/geometry-cache.js` | solid geometry cached by its dimensions, and the one merge | materials |
 | `render/graph.js` | the ordered pass graph one frame runs, the resources it plans, and the executor that sorts and runs it | which passes a frame runs |
 | `render/ground-band.js` | the TSL of a flat mark on the floor | the ring that uses it |
@@ -303,6 +303,43 @@ later pass by writing a resource and by reading `targets.get(name)`; the frame
 record is the camera and the viewport only. Earlier versions passed an unused
 `sink` to `extract`; nothing read it and no pass handed another pass data
 through it, so it was removed.
+
+## Drawing the scene from another view
+
+A pass may draw the entity scene from a camera that is not the session camera —
+a minimap, a planar reflection, a preview thumbnail — into a target it declared.
+
+```
+renderer.drawView(view, target)
+```
+
+`view` is a plain record of camera parameters, the same shape the session holds
+and `cameraProjection` reads: `mode` (`'ortho'` or `'perspective'`), `x`, `y`,
+`z`, `yaw`, `pitch`, `fov` and `zoom`. Missing fields take the same defaults as
+the session view. The camera is built through the one construction path in
+`render/camera.js`, which reads `cameraProjection`, so an off-screen view cannot
+disagree with the main one. A camera pair is kept and reused, so a view drawn
+every frame allocates nothing.
+
+`target` is a kernel target. The pass declares it with `writes` and `target`,
+and reads it in `execute` as `targets.get(name)`. The graph pools it, sizes it
+from the viewport, rebuilds it after a device restore and frees it when nothing
+declares it, exactly as any other pass resource. The executor times the pass's
+`execute`, so the view draw's cost is attributed to that pass. The target's
+pixel size is the viewport for the projection, so the view's aspect matches its
+target. A target nothing reads is dropped by the graph's liveness walk, so a
+pass that only writes one and reads the pixels from JavaScript asks for
+`always: true`.
+
+The draw uses the scene the frame's walk already built. It does not sync, so the
+world is walked once for the main draw and every view draw. It clears the target
+before drawing, because a pooled target holds the last thing drawn into it. The
+bound render target is put back before returning.
+
+`renderer.drawInto(target, buffer, region)` is the other draw: the session camera
+into a caller-owned target, its pixels read straight back as data. It is for a
+query that consumes a frame as numbers; `drawView` is for a plugin that wants
+the scene drawn from another camera on the card.
 
 ## Per-pass statistics
 

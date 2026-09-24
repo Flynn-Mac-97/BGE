@@ -550,6 +550,16 @@ export async function makeRenderer(canvas, view, viewport, options = {}) {
     draw: state.draw,
     /** One draw of the world scene into a caller-owned render target, its pixels read back into `buffer`. */
     drawInto: state.drawInto,
+    /**
+     * Draw the entity scene from a view that is not the session camera, into a
+     * kernel-owned target the pass declared.
+     *
+     * The view is a plain record of camera parameters. Called inside a pass's
+     * execute; the graph pools the target and the executor attributes the draw
+     * to the pass. The scene is the one the frame's walk built, so the world is
+     * not walked again.
+     */
+    drawView: state.drawView,
 
     // ---- the three hook points ----
     materials: state.materials,

@@ -253,9 +253,36 @@ export function makeFrameDraw(state) {
     return buffer
   }
 
+  /**
+   * Draw the entity scene from a view that is not the session camera, into a
+   * target the kernel owns.
+   *
+   * The scene pass's walk already built the scene objects, so this is a draw
+   * and not a sync: the same scene is drawn again from another camera and the
+   * world is not walked a second time. It runs inside a pass's execute with the
+   * target the pass declared, so the graph pools that target, sizes it with the
+   * viewport, rebuilds it after a device restore, frees it when nothing
+   * declares it, and the executor attributes the draw's cost to the pass.
+   *
+   * `view` is a plain record of camera parameters — the shape `cameraProjection`
+   * reads. The target's pixel size is the viewport for that projection, so the
+   * view's aspect matches what it is drawn into. The target is cleared first,
+   * because a pooled target holds the last thing drawn into it and no other
+   * door clears one. The bound target is put back before returning.
+   */
+  function drawView(view, target) {
+    const camera = state.viewCamera(view, { width: target.width, height: target.height })
+    const keptTarget = state.renderer.getRenderTarget()
+    state.renderer.setRenderTarget(target)
+    state.renderer.clear()
+    state.renderer.render(state.scene, camera)
+    state.renderer.setRenderTarget(keptTarget)
+  }
+
   state.stats = stats
   state.gpuTime = gpuTime
   state.waitForGPU = waitForGPU
   state.draw = draw
   state.drawInto = drawInto
+  state.drawView = drawView
 }

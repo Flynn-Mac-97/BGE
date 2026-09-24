@@ -186,6 +186,9 @@ export function nullRenderer(view, viewport, shape) {
       stats.readbacks++
     },
 
+    /** A view draw needs a card; nothing here has one. */
+    drawView() {},
+
     materials: {
       register() {},
       has: () => false,
