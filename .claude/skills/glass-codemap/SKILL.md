@@ -1,9 +1,14 @@
 ---
-match: engine/** plugins/** bin/** test/** scripts/** tools/** electron/**
-triggers: codemap, map, structure, structural, codebase, architecture, dependency, dependencies, module graph, module map, system map, dependency tree
-description: Ask for a structural map of this checkout before reading whole files. Answers five views - every file's symbols, imports and exports, one file's structure, a system map, a module dependency tree, and a markdown report - read from the source with tree-sitter, so an agent finds what it needs without opening files it does not.
-category: core
+name: glass-codemap
+description: "Ask for a structural map of this checkout before reading whole files. Answers five views - every file's symbols, imports and exports, one file's structure, a system map, a module dependency tree, and a markdown report - read from the source with tree-sitter, so an agent finds what it needs without opening files it does not."
 ---
+<!-- generated from plugins/builtin/codemap.agent.md at server start; edits are lost -->
+
+Read the generated interface in `plugins/builtin/codemap.agent/interface.generated.md`. Plugin edits refresh it while the server runs. This packet command also checks freshness:
+
+```sh
+node bin/engine.mjs agent.context '{"task":"…","files":["plugins/builtin/codemap.js"]}'
+```
 
 # Codemap
 
