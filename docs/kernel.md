@@ -96,7 +96,7 @@ in `ARCHITECTURE.md`.
 | `render/floor-mark.js` | the shape both floor marks share: the instanced unit quad | what either mark draws |
 | `render/frame-draw.js` | one frame out of the card, and what the last one cost | what is drawn |
 | `render/geometry-cache.js` | solid geometry cached by its dimensions, and the one merge | materials |
-| `render/graph.js` | the ordered pass graph one frame runs, and the executor that sorts and runs it | which passes a frame runs |
+| `render/graph.js` | the ordered pass graph one frame runs, the resources it plans, and the executor that sorts and runs it | which passes a frame runs |
 | `render/ground-band.js` | the TSL of a flat mark on the floor | the ring that uses it |
 | `render/ground-rings.js` | the ground ring, one actor named by a rule | a model's own materials |
 | `render/keyline-hull.js` | the geometry a keyline is drawn from, and the vertex node that grows it | the line that uses it |
@@ -113,7 +113,7 @@ in `ARCHITECTURE.md`.
 | `render/readability-marks.js` | the three readability marks, and who gets them | a model's own materials |
 | `render/report.js` | the renderer's one history of messages already said | what each message means |
 | `render/scene-layers.js` | the two layers the scene draws on | what is on them |
-| `render/target-pool.js` | render targets reused across passes and frames, keyed by descriptor | what a pass writes |
+| `render/target-pool.js` | render targets reused across passes and frames, keyed by descriptor and resource kind | what a pass writes |
 | `render/texture-cache.js` | one texture, cached, in three readings of the same file | what it is drawn on |
 
 The rows after `work-lock.mjs` are the newer, smaller kernel modules: the
@@ -260,6 +260,49 @@ at all, and swapping physics would not affect rendering.
 The two-clock reality is hidden on purpose. Game code gets `update` and a `seconds`,
 and never has to learn what a fixed step is — which is why there are four hooks
 and no `FixedUpdate`.
+
+## Pass resources
+
+A pass declares the resources it reads and writes by name, and the resource it
+writes in `target`. The resource record is:
+
+```js
+{
+  kind: 'colour' | 'depth',              // default 'colour'
+  lifetime: 'transient' | 'persistent',  // default 'transient'
+  scale: 1, format: 'unsigned-byte', samples: 0, depth: true, stencil: false
+}
+```
+
+The plan uses the record, not the pass. `writes` names the resource, and the
+producer's `target` is its record. A read of a name that has no producer in the
+frame still gets a target when a registered pass declares it `persistent`.
+
+- `kind` decides what the target is read as. `colour` is a colour texture; the
+  pool attaches no readable depth texture. `depth` is read through
+  `target.depthTexture`, and a colour and a depth resource never share a slot.
+- `transient` is the per-frame resource. It may share one physical target with
+  any other transient whose span does not overlap, which is the only aliasing a
+  WebGL 2 backend allows. A transient target goes back to the pool at a
+  pass-set change.
+- `persistent` is the cross-frame resource. It is allocated once and never
+  aliased, so a read next frame sees what this frame wrote. A disabled pass
+  still declares it, so the target survives a frame that does not produce it.
+
+The graph plans a resource's span from the pass that writes it to the last pass
+that reads it. Two transient spans share a slot when the first has no reader
+after the second's producer; the pool hands back the same target for the same
+descriptor. A persistent resource gets a slot of its own and is carried across a
+pass-set change by name. A resize sizes it in place; `recreateTargets` drops it
+with the device and the next frame makes a new one from the record. Removing the
+last pass that declares it releases the target and `disposeUnused` frees the
+descriptor, exactly as for a transient.
+
+The kernel does not read what a pass puts in a resource. A pass hands data to a
+later pass by writing a resource and by reading `targets.get(name)`; the frame
+record is the camera and the viewport only. Earlier versions passed an unused
+`sink` to `extract`; nothing read it and no pass handed another pass data
+through it, so it was removed.
 
 ## Losing the device
 

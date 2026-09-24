@@ -6,6 +6,10 @@
  * `acquire`, and put back by `release`; a resize sizes every pooled target once
  * instead of per frame. A steady frame creates nothing.
  *
+ * A descriptor names a resource `kind`: `colour` is a colour texture, `depth` is
+ * a readable depth texture. The kind is part of the key, so a colour and a depth
+ * resource never share a target.
+ *
  * The pool also holds the device pixel ratio, because a target's size is the
  * drawing buffer's size: a screen-sized target must follow the ratio or it
  * draws at the wrong resolution after the window moves to another display.
@@ -19,12 +23,18 @@ const TYPES = {
   float: THREE.FloatType
 }
 
+/** The resource kind a descriptor names. Colour is the default. */
+function kindOf(descriptor) {
+  return descriptor.kind === 'depth' ? 'depth' : 'colour'
+}
+
 /** A stated ratio, or one, because a target of zero pixels is not a target. */
 const usableRatio = value => (Number.isFinite(value) && value > 0 ? value : 1)
 
 /** One string for one descriptor, so equal descriptors share one target. */
 export function descriptorKey(descriptor = {}) {
   return [
+    kindOf(descriptor),
     descriptor.scale ?? DEFAULT.scale,
     descriptor.format ?? DEFAULT.format,
     descriptor.samples ?? DEFAULT.samples,
@@ -66,6 +76,9 @@ export function makeTargetPool(options = {}) {
       depthBuffer: descriptor.depth !== false,
       stencilBuffer: descriptor.stencil === true
     })
+    // A depth resource is read through `target.depthTexture`; a colour resource
+    // keeps the depth buffer private, as before.
+    if (kindOf(descriptor) === 'depth') target.depthTexture = new THREE.DepthTexture(size.w, size.h)
     entries.push({ target, key: descriptorKey(descriptor), scale })
     return target
   }
@@ -97,6 +110,12 @@ export function makeTargetPool(options = {}) {
     for (const entry of entries) {
       const size = sizeFor(entry.scale)
       entry.target.setSize(size.w, size.h)
+      // `setSize` updates the colour textures only; a depth texture keeps its
+      // own image size, so it is resized here or it samples the old frame shape.
+      if (entry.target.depthTexture) {
+        entry.target.depthTexture.image.width = size.w
+        entry.target.depthTexture.image.height = size.h
+      }
     }
   }
 

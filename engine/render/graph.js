@@ -6,6 +6,19 @@
  * declares its edges by label (`after` / `before`), and the executor sorts them
  * once per pass-set change.
  *
+ * A pass declares the resources it reads and writes by name, and the resource it
+ * writes in `target`:
+ *
+ *   { kind: 'colour' | 'depth', lifetime: 'transient' | 'persistent',
+ *     scale, format, samples, depth, stencil }
+ *
+ * A transient resource lives for one frame and two spans that do not overlap
+ * share one target. A persistent resource outlives the frame: it is allocated
+ * once and reused, it never shares a target, and a read of it next frame sees
+ * what this frame wrote. Both defaults — colour, transient — are the old
+ * behaviour, so a record that says nothing but `writes` and `target` is
+ * unchanged.
+ *
  * The executor holds no scene, no entity list and no plugin data. It runs three
  * loops over the live passes, so its work is O(passes) and the same for a world
  * of one entity and a world of ten thousand. The sorted order, the resource
@@ -36,6 +49,11 @@ function normalise(record) {
     prepare: record.prepare ?? null,
     execute: record.execute
   }
+}
+
+/** Whether a resource record outlives the frame. Everything else is transient. */
+function isPersistent(resource) {
+  return resource?.lifetime === 'persistent'
 }
 
 /** Whether the graph can prove a pass wanted without reading a later one. */
@@ -200,13 +218,31 @@ function selectLive(ordered) {
 }
 
 /**
+ * Every resource a registered pass declares, by name.
+ *
+ * A disabled pass still declares its resource, so a persistent target survives
+ * the frame that produced it and can be read before the producer runs again.
+ */
+function declaredResources(records) {
+  const declarations = new Map()
+  for (const pass of records.values()) {
+    if (!pass.target) continue
+    for (const name of pass.writes) if (!declarations.has(name)) declarations.set(name, pass.target)
+  }
+  return declarations
+}
+
+/**
  * Give every written resource a target, sharing one where spans do not overlap.
  *
  * A resource's span runs from the pass that writes it to the last pass that
- * reads it. Two spans that do not overlap can share one physical target, which
- * is the only aliasing a WebGL 2 backend allows.
+ * reads it. Two transient spans that do not overlap can share one physical
+ * target, which is the only aliasing a WebGL 2 backend allows. A persistent
+ * resource gets a slot of its own, and a read of one whose producer is not in
+ * this frame still gets a span from its declaration, so the target outlives the
+ * frame that wrote it.
  */
-function planTargets(ordered) {
+function planTargets(ordered, declarations) {
   const spans = new Map()
   ordered.forEach((pass, index) => {
     for (const name of pass.writes) {
@@ -219,6 +255,13 @@ function planTargets(ordered) {
       }
     }
   })
+  for (const pass of ordered) {
+    for (const name of pass.reads) {
+      if (spans.has(name)) continue
+      const declared = declarations.get(name)
+      if (isPersistent(declared)) spans.set(name, { descriptor: declared, producer: Infinity, lastReader: 0 })
+    }
+  }
   ordered.forEach((pass, index) => {
     for (const name of pass.reads) {
       const span = spans.get(name)
@@ -231,15 +274,45 @@ function planTargets(ordered) {
   for (const [name, span] of spans) {
     if (!span.descriptor) continue
     const key = descriptorKey(span.descriptor)
-    let slot = slots.find(one => one.key === key && one.freeAfter < span.producer)
-    if (!slot) {
-      slot = { key, descriptor: span.descriptor, freeAfter: -1, target: null }
+    let slot
+    if (isPersistent(span.descriptor)) {
+      slot = { key, descriptor: span.descriptor, freeAfter: span.lastReader, target: null, persistent: true }
       slots.push(slot)
+    } else {
+      slot = slots.find(one => !one.persistent && one.key === key && one.freeAfter < span.producer)
+      if (!slot) {
+        slot = { key, descriptor: span.descriptor, freeAfter: -1, target: null, persistent: false }
+        slots.push(slot)
+      }
+      slot.freeAfter = Math.max(slot.freeAfter, span.lastReader)
     }
-    slot.freeAfter = Math.max(slot.freeAfter, span.lastReader)
     resourceSlot.set(name, slot)
   }
   return { slots, resourceSlot }
+}
+
+/**
+ * Move targets across a pass-set change.
+ *
+ * A transient target goes back to the pool, to be handed to whichever span
+ * needs its slot next. A persistent target is carried to the new slot of the
+ * same resource, so the frame after the change still reads what the last one
+ * wrote; one nothing declares any more is released and then disposed as usual.
+ */
+function carryPersistentTargets(previousResourceSlot, resourceSlot, pool) {
+  const kept = new Map()
+  for (const [name, slot] of previousResourceSlot) {
+    if (!slot.target) continue
+    if (slot.persistent) kept.set(name, { key: slot.key, target: slot.target })
+    else pool.release(slot.target)
+  }
+  for (const [name, keptTarget] of kept) {
+    const slot = resourceSlot.get(name)
+    // A record whose descriptor changed no longer matches the old target, so
+    // the old one goes back and the next frame makes one in the new shape.
+    if (slot?.persistent && slot.key === keptTarget.key) slot.target = keptTarget.target
+    else pool.release(keptTarget.target)
+  }
 }
 
 /** One sentence for a pass that threw, so every guard reports it the same way. */
@@ -282,26 +355,8 @@ export function makePassGraph(options = {}) {
     }
   }
 
-  // The sink `extract` writes its own GPU data through. The kernel stores the
-  // entries and never reads them; a plugin owns their shape.
-  const buffers = new Map()
-  const sink = {
-    attribute(name) {
-      let entry = buffers.get(name)
-      if (!entry) {
-        entry = { name, changed: false }
-        buffers.set(name, entry)
-      }
-      return entry
-    },
-    markDirty(name) {
-      const entry = buffers.get(name)
-      if (entry) entry.changed = true
-    }
-  }
-
   function rebuild() {
-    for (const slot of slots) if (slot.target) pool.release(slot.target)
+    const previousResourceSlot = resourceSlot
     // A disabled pass keeps its record so a pass that orders against its label
     // still has an edge; it is dropped from the run after the sort.
     const supported = [...records.values()].filter(pass => {
@@ -314,9 +369,10 @@ export function makePassGraph(options = {}) {
       return false
     })
     order = selectLive(topological(supported, report)).filter(pass => pass.enabled)
-    const plan = planTargets(order)
+    const plan = planTargets(order, declaredResources(records))
     slots = plan.slots
     resourceSlot = plan.resourceSlot
+    carryPersistentTargets(previousResourceSlot, resourceSlot, pool)
     // A pass a plugin removed no longer names its target; releasing the
     // descriptor here is what stops a toggled-off plugin holding GPU memory.
     pool.disposeUnused?.(new Set(slots.map(slot => slot.key)))
@@ -333,15 +389,20 @@ export function makePassGraph(options = {}) {
       pool.resize(width, height)
     }
     if (targetsReady) return
-    for (const slot of slots) slot.target = pool.acquire(slot.descriptor)
+    for (const slot of slots) {
+      if (slot.target) continue
+      slot.target = pool.acquire(slot.descriptor)
+    }
     targetsReady = true
   }
 
   /**
    * Rebuild every pooled target after the device came back.
    *
-   * Their textures died with the device. The pass set, the order and the frame
-   * record are unaffected: the next frame acquires fresh targets from the pool.
+   * Their textures died with the device, so a persistent resource comes back
+   * from its descriptor rather than from the old target. The pass set, the
+   * order and the frame record are unaffected: the next frame acquires fresh
+   * targets from the pool.
    */
   function recreateTargets() {
     for (const slot of slots) slot.target = null
@@ -358,7 +419,8 @@ export function makePassGraph(options = {}) {
    * Run every live pass's extract, in order.
    *
    * The renderer sets the frame's world and calls this so the scene pass can
-   * walk its entities; a caller that wants the whole frame calls `run`.
+   * walk its entities; a caller that wants the whole frame calls `run`. A pass
+   * hands data forward by writing a resource, not through the frame record.
    */
   function extract() {
     ensureBuilt()
@@ -370,7 +432,7 @@ export function makePassGraph(options = {}) {
       // rather than wrapped in a callback, because a callback would allocate
       // on every pass of every steady frame.
       try {
-        pass.extract(frame, sink)
+        pass.extract(frame)
       } catch (error) {
         report(passFailure(pass, error))
       }

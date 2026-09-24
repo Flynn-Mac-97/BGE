@@ -1,7 +1,8 @@
 /**
  * `extract` and `prepare` on the pass graph: each runs once per pass per frame,
- * every extract and prepare finishes before the first execute, and the kernel
- * hands the plugin a sink without ever reading what the plugin put in it.
+ * every extract and prepare finishes before the first execute, and `extract` is
+ * handed the one frame record and nothing else. A pass hands data forward by
+ * writing a resource, not through the frame record.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -73,24 +74,20 @@ test('a disabled pass gets no extract, prepare or execute', () => {
   assert.deepEqual(seen, [])
 })
 
-test('the sink stores plugin data and the kernel never reads it', () => {
+test('extract is handed the one frame record and no second argument', () => {
   const graph = makePassGraph({ report: noop })
-  const written = []
-  let seenFrame = null
+  const args = []
   graph.add({
     name: 'plugin',
-    extract(frame, sink) {
-      seenFrame = frame
-      const entry = sink.attribute('instances')
-      entry.values = [1, 2, 3]
-      sink.markDirty('instances')
-      written.push(entry.values.length)
+    extract(...received) {
+      args.push(received)
     },
     execute: noop
   })
   graph.add({ name: 'present', execute: noop })
   graph.run('camera', null, 8, 8)
-  assert.deepEqual(written, [3])
-  assert.equal(seenFrame, graph.frame, 'the plugin sees the one frame record')
-  assert.equal(seenFrame.camera, 'camera')
+  assert.equal(args.length, 1)
+  assert.equal(args[0].length, 1, 'the pass sees one argument')
+  assert.equal(args[0][0], graph.frame, 'and it is the one frame record')
+  assert.equal(graph.frame.camera, 'camera')
 })
