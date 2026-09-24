@@ -1,4 +1,4 @@
-<!--c7e18478-->
+<!--7673e9da-->
 parsed from source
   plugin Auto Weapons
   category game

@@ -64,10 +64,10 @@ function loadRuntime() {
 }
 
 /**
- * A reader that parses source and answers facts, or null when no grammar fits.
- *
- * Created once per process: compiling a grammar costs about a tenth of a second
- * and a run that describes 81 plugins must pay that once.
+ * A reader that parses source, answers plugin facts, and hands the tree to a
+ * caller with other questions. Created once per process: compiling a grammar
+ * costs about a tenth of a second and a run that describes 81 plugins must pay
+ * that once.
  */
 export async function makeSourceReader() {
   const { Parser, Language } = await loadRuntime()
@@ -81,7 +81,24 @@ export async function makeSourceReader() {
     return languages.get(name)
   }
 
+  /**
+   * Parse one file and hand its tree to `read`, then release the tree.
+   *
+   * `facts` asks a plugin's questions of a tree; a caller with other questions
+   * — codemap reads declarations, imports and exports — needs the tree itself.
+   * Both share this one parser and grammar cache, so no second grammar-loading
+   * path appears. `read` must finish with the tree before it returns.
+   */
+  const withTree = async (file, source, read) => {
+    const name = languageOf(file)
+    if (name === null) return null
+    parser.setLanguage(await languageFor(name))
+    const tree = parser.parse(source)
+    try { return read(tree) } finally { tree.delete() }
+  }
+
   return {
+    withTree,
     /**
      * Facts about one plugin source, or null when no grammar matches its name.
      *
@@ -90,11 +107,7 @@ export async function makeSourceReader() {
      * @returns {Promise<object|null>} The facts.
      */
     async facts(file, source) {
-      const name = languageOf(file)
-      if (name === null) return null
-      parser.setLanguage(await languageFor(name))
-      const tree = parser.parse(source)
-      try { return tree.rootNode.hasError ? null : readFacts(tree) } finally { tree.delete() }
+      return withTree(file, source, tree => tree.rootNode.hasError ? null : readFacts(tree))
     }
   }
 }

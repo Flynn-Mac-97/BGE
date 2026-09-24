@@ -1,4 +1,4 @@
-<!--b356c8f5-->
+<!--473ac3ff-->
 parsed from source
   plugin Spawn Ring
   category game
