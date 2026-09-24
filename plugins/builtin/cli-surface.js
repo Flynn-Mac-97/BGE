@@ -45,6 +45,7 @@ const KERNEL = [
 const OFFLINE = [
   { op: 'index', purpose: 'rebuild the project index and print it' },
   { op: 'tree', purpose: 'every project file, with its kind' },
+  { op: 'test', purpose: 'run only the core test areas the named or changed files call' },
   { op: 'check', purpose: 'exit 1 with file and line on anything broken or nondeterministic, or a kernel style, Trellis or Codemap failure' },
   {
     op: 'serve',

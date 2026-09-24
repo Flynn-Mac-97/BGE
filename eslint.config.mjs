@@ -118,7 +118,9 @@ const KERNEL_FILES = [
   'scripts/kernel-gate.mjs',
   'scripts/check-codemap.mjs',
   'scripts/check-structure.mjs',
-  'scripts/eslint-style-rules.mjs'
+  'scripts/eslint-style-rules.mjs',
+  'scripts/test-areas.mjs',
+  'scripts/test-mutants.mjs'
 ]
 
 export default [

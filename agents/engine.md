@@ -5,5 +5,6 @@
 - Prefer a plugin; change the kernel only when it blocks the feature.
 - Keep entities flat and the four hooks.
 - Use engine time, random and timers so runs repeat exactly.
+- While you work, run `node bin/engine.mjs test`: it runs only the core test areas your change calls. Run the full list before you finish.
 - Update `ARCHITECTURE.md` and `README.md` when the design changes.
 - Read `agents/engine.agent/rendering-backends.md` before a renderer backend.

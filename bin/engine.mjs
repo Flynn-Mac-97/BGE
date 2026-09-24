@@ -68,6 +68,8 @@ state     snapshot [--entities --log --plugins --commands --timers]
                                kernel fails format, lint, Trellis or Codemap
                                (agents/code-style.md). A problem marked
                                "warning" is reported and exits 0
+          test [files]         run only the core test areas the files call;
+                               no files means the files git says changed
           a list can name its columns instead of repeating them every row:
           snapshot '{"entities":["id","at"]}'                  the whole level
           commands '{"fields":["id"]}'                          every verb
@@ -1154,6 +1156,33 @@ if (op === 'check') {
   const failures = fatal(problems)
   out({ ok: failures.length === 0, problems })
   process.exit(failures.length === 0 ? 0 : 1)
+}
+
+/**
+ * Run only the core test areas a change needs.
+ *
+ * Files come from the words after `test`, or from git when there are none.
+ * The map from kernel file to area is measured by `npm run test:areas`, so a
+ * change runs the areas that call the changed code, not the whole suite.
+ */
+if (op === 'test') {
+  const { readAreaMap, areasForFiles, changedFiles } = await import('../scripts/test-areas.mjs')
+  const map = readAreaMap(CHECKOUT)
+  if (!map) {
+    out({ ok: false, error: 'no test area map: run npm run test:areas' })
+    process.exit(1)
+  }
+  const files = words.length ? words.map(word => word.split('\\').join('/')) : changedFiles(CHECKOUT)
+  const selected = areasForFiles(map, files)
+  if (!selected.length) {
+    out({ ok: true, areas: [], files, why: 'no core test area covers these files' })
+    process.exit(0)
+  }
+  for (const { area, why } of selected) process.stderr.write(`[test] ${area}: ${why}\n`)
+  const testFiles = selected.flatMap(({ area }) => map.areas[area])
+  const { spawnSync } = await import('node:child_process')
+  const run = spawnSync(process.execPath, ['--test', ...testFiles], { cwd: CHECKOUT, stdio: 'inherit' })
+  process.exit(run.status ?? 1)
 }
 
 /**

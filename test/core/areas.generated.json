@@ -1,0 +1,595 @@
+{
+  "areas": {
+    "boot": [
+      "test/core/boot/bare-boot.test.mjs",
+      "test/core/boot/bus-events.test.mjs",
+      "test/core/boot/context-save.test.mjs",
+      "test/core/boot/context-surface.test.mjs",
+      "test/core/boot/device-profile.test.mjs",
+      "test/core/boot/engine-surface.test.mjs",
+      "test/core/boot/log-wiring.test.mjs"
+    ],
+    "determinism": [
+      "test/core/determinism/checkpoint.test.mjs",
+      "test/core/determinism/determinism.test.mjs",
+      "test/core/determinism/input-record.test.mjs",
+      "test/core/determinism/rewind.test.mjs",
+      "test/core/determinism/startup-gate.test.mjs",
+      "test/core/determinism/state-hash.test.mjs",
+      "test/core/determinism/world-capture.test.mjs"
+    ],
+    "io": [
+      "test/core/io/asset-path.test.mjs",
+      "test/core/io/file-transport.test.mjs",
+      "test/core/io/node-write-guard.test.mjs",
+      "test/core/io/refusal-surfaces.test.mjs",
+      "test/core/io/work-lock.test.mjs",
+      "test/core/io/write-guard.test.mjs"
+    ],
+    "loop": [
+      "test/core/loop/live-camera.test.mjs",
+      "test/core/loop/quiet-answers.test.mjs"
+    ],
+    "plugin": [
+      "test/core/plugin/command-schema.test.mjs",
+      "test/core/plugin/plugin-contracts.test.mjs"
+    ],
+    "render": [
+      "test/core/render/camera-project.test.mjs",
+      "test/core/render/device-loss.test.mjs",
+      "test/core/render/entity-sync-cost.test.mjs",
+      "test/core/render/frame-light.test.mjs",
+      "test/core/render/frame-order.test.mjs",
+      "test/core/render/frame-plan.test.mjs",
+      "test/core/render/frame-readings.test.mjs",
+      "test/core/render/frame-signature.test.mjs",
+      "test/core/render/graph-cost.test.mjs",
+      "test/core/render/graph-cull.test.mjs",
+      "test/core/render/graph-extract.test.mjs",
+      "test/core/render/graph-lifetime.test.mjs",
+      "test/core/render/graph-order.test.mjs",
+      "test/core/render/graph-pool.test.mjs",
+      "test/core/render/graph-timing.test.mjs",
+      "test/core/render/headless-frame.test.mjs",
+      "test/core/render/kernel-memory.test.mjs",
+      "test/core/render/marks-registry.test.mjs",
+      "test/core/render/materials-registry.test.mjs",
+      "test/core/render/object-lifecycle.test.mjs",
+      "test/core/render/render-performance.test.mjs",
+      "test/core/render/render-stability.test.mjs",
+      "test/core/render/turn.test.mjs",
+      "test/core/render/view-draw.test.mjs"
+    ],
+    "tools": [
+      "test/core/tools/agent-index.test.mjs",
+      "test/core/tools/cli.offline.test.mjs"
+    ],
+    "ui": [
+      "test/core/ui/reload-notice.test.mjs",
+      "test/core/ui/shell-regions.test.mjs",
+      "test/core/ui/shell-shortcuts.test.mjs",
+      "test/core/ui/ui.test.mjs"
+    ],
+    "world": [
+      "test/core/world/lookup.test.mjs"
+    ]
+  },
+  "kernelFiles": {
+    "engine/agent-registration.mjs": [
+      "tools"
+    ],
+    "engine/agent-workspace-node.mjs": [
+      "boot",
+      "determinism",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/agent-workspace.js": [
+      "tools"
+    ],
+    "engine/asset-path.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui"
+    ],
+    "engine/bus.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/camera-project.js": [
+      "boot",
+      "render"
+    ],
+    "engine/checkpoint.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/command-schema.js": [
+      "boot",
+      "io",
+      "plugin"
+    ],
+    "engine/device-profile.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/files.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/frame-plan.js": [
+      "boot",
+      "render"
+    ],
+    "engine/frame-wiring.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/host-node.mjs": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/index-invariants.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/index-lint.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/index-writer.mjs": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/inspect.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/lane-browsers.mjs": [
+      "tools"
+    ],
+    "engine/loader.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/log.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/loop-input.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/loop-random.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/loop-timers.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/loop.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/null-renderer.mjs": [
+      "ui"
+    ],
+    "engine/on-disk.mjs": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/placement-projection.js": [
+      "boot",
+      "determinism",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/plugin-boot.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/plugin-guides.mjs": [
+      "tools"
+    ],
+    "engine/plugin-import.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/plugin-runtime.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/plugin-startup.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/project-index.mjs": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/project-path.mjs": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/project-problems.mjs": [
+      "loop",
+      "tools"
+    ],
+    "engine/project-servers.mjs": [
+      "tools"
+    ],
+    "engine/reload-notice-writer.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/reload-projection.js": [
+      "boot",
+      "ui"
+    ],
+    "engine/render.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/batching.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/camera.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/entity-look.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/entity-record.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/entity-scan.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/entity-sync.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/frame-draw.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/geometry-cache.js": [
+      "render"
+    ],
+    "engine/render/graph.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/lighting.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/mark-registry.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/material-registry.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/model-cache.js": [
+      "render"
+    ],
+    "engine/render/object-builder.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/picking.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/read-value.js": [
+      "render"
+    ],
+    "engine/render/target-pool.js": [
+      "boot",
+      "render"
+    ],
+    "engine/render/texture-cache.js": [
+      "render"
+    ],
+    "engine/report-once.js": [
+      "boot",
+      "determinism",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/rewind.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/round3.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/shell-regions.js": [
+      "ui"
+    ],
+    "engine/shell-shortcuts.js": [
+      "ui"
+    ],
+    "engine/snapshot.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools"
+    ],
+    "engine/start-world-node.mjs": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/start-world.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/supervisor-transport.mjs": [
+      "tools"
+    ],
+    "engine/supervisor.mjs": [
+      "tools"
+    ],
+    "engine/transport.js": [
+      "boot",
+      "determinism",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/ui.js": [
+      "ui"
+    ],
+    "engine/value-projection.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "render",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/work-lock.mjs": [
+      "boot",
+      "io"
+    ],
+    "engine/world-context.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/world-editor.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/world-look.js": [
+      "boot",
+      "determinism",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/world-project.js": [
+      "boot",
+      "determinism",
+      "io",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/world-state.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ],
+    "engine/world.js": [
+      "boot",
+      "determinism",
+      "io",
+      "loop",
+      "plugin",
+      "tools",
+      "ui",
+      "world"
+    ]
+  }
+}
