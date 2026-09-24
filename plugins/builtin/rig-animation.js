@@ -28,6 +28,8 @@
  *
  *   rig: { ..., masks: { upper: ['Spine', 'LeftArm', ...] }, layerFade: 0.12 }
  *   entity.rigLayer = { clip: 'draw', mask: 'upper' }   // null to let go
+ *   entity.rigLayer = { clip: 'stab', mask: 'upper', speed: 1.5, startedAt: context.time }
+ *     speed plays it faster or slower; a new startedAt plays it again from the start
  *
  * The layer fades in and out over `layerFade` seconds. `entity.rigLayerDone`
  * is true once a clip that plays once has reached its end.

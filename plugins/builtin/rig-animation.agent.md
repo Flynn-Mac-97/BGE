@@ -33,7 +33,7 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 - Type keys: `rig.clips` (name → file), `rig.default` (first clip), `rig.rootMotion` (false: the clip's travel is not added). Choose by assigning `entity.rigClip`; there is no `play()`.
 
 - Clips load asynchronously (a headless test awaits `rig.load`). A playing clip owns `entity.pose`. Unknown names hold the last pose. Switching `rigClip` does not blend.
-- Layers: `rig.masks` names node lists; `entity.rigLayer = { clip, mask }` plays a clip on those nodes over the base, fading over `rig.layerFade` (0.12 s). `null` fades out; `rigLayerDone` marks a once clip's end.
+- Layers: `rig.masks` names node lists; `entity.rigLayer = { clip, mask }` plays a clip on those nodes over the base, fading over `rig.layerFade` (0.12 s). `null` fades out; `rigLayerDone` marks a once clip's end. `speed` (default 1) plays it faster or slower; a new `startedAt` value plays the same clip again from its start.
 
 ## Detail
 

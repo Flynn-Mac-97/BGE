@@ -576,6 +576,20 @@ test('a layer fades in: part way in, the node is between the base and the layer'
   assert.ok(turn > 0.1 && turn < 0.95, `half faded, the head is part way round (${turn})`)
 })
 
+test('a layer with a speed plays its clip that many times faster', () => {
+  assert.equal(layered(5).rigLayerDone, false, 'at speed 1 the clip is not done after 5 steps')
+  assert.equal(layered(5, { clip: 'wave', mask: 'upper', speed: 3 }).rigLayerDone, true, 'at speed 3 it is')
+})
+
+test('a new startedAt plays the same clip again from its start', () => {
+  const entity = layered(12, { clip: 'wave', mask: 'upper', startedAt: 1 })
+  assert.equal(entity.rigLayerDone, true)
+  entity.rigLayer = { clip: 'wave', mask: 'upper', startedAt: 2 }
+  applyLayer(entity, LAYERED_RIG, 1 / 60, clipOf)
+  assert.equal(entity.rigLayerDone, false, 'the second press is not done')
+  assert.equal(entity._rigLayer.time, 0, 'and starts at the first frame')
+})
+
 test('a layer that plays once says when it is done, and fades out when let go', () => {
   const entity = layered(12)
   assert.equal(entity.rigLayerDone, true, 'a two-frame clip at 10 fps is done after 0.2 s')

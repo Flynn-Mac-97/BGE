@@ -18,9 +18,11 @@ export function applyLayer(entity, rig, seconds, clipOf) {
   if (!wanted && !held) return
 
   const fade = rig.layerFade ?? 0.12
-  const isNew = wanted && (!held || held.clip !== wanted.clip || held.mask !== wanted.mask)
-  const layer = isNew ? { clip: wanted.clip, mask: wanted.mask, time: 0, weight: held?.weight ?? 0 } : held
-  if (!isNew) layer.time += seconds
+  // A new `startedAt` plays the same clip again from its start: the same attack twice.
+  const isNew = wanted && (!held || held.clip !== wanted.clip || held.mask !== wanted.mask || held.startedAt !== wanted.startedAt)
+  const layer = isNew ? { clip: wanted.clip, mask: wanted.mask, startedAt: wanted.startedAt, time: 0, weight: held?.weight ?? 0 } : held
+  // Read every step, so a speed can change while the clip plays.
+  if (!isNew) layer.time += seconds * (wanted?.speed ?? 1)
   layer.weight = Math.max(0, Math.min(1, layer.weight + (wanted ? 1 : -1) * (fade > 0 ? seconds / fade : 1)))
   entity._rigLayer = layer.weight > 0 || wanted ? layer : null
   if (isNew) entity.rigLayerDone = false
