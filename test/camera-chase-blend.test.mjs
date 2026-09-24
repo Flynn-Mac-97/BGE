@@ -36,3 +36,21 @@ test('halfway between two steps, the eye is halfway between where each step put 
   frameSystem.run(context.world, 1 / 120, { ...context, loop: { blend: 1 } })
   assert.ok(Math.abs(context.view.x - eyeNow) < 1e-9, 'at a blend of 1 it is where the last step put it')
 })
+
+test('a close shot eases the chase camera in, and null eases it back to the level and its old pitch', async () => {
+  const { context, engine } = await startWorldInNode({ root: CHECKOUT, project: PROJECT })
+  context.bus.emit('play:started')
+  engine.simulate(0.5)
+  const distanceOf = () => Math.hypot(context.view.x - context.camera.focus.x, context.view.y - context.camera.focus.y, context.view.z - context.camera.focus.z)
+  assert.ok(Math.abs(distanceOf() - 5) < 1e-6, 'the level holds the eye 5 m back')
+
+  context.camera.closeUp({ distance: 2.5, pitch: -0.2, offsetY: 1.2 })
+  engine.simulate(1)
+  assert.ok(Math.abs(distanceOf() - 2.5) < 0.01, `a second later the eye is 2.5 m back (${distanceOf().toFixed(3)})`)
+  assert.ok(Math.abs(context.view.pitch + 0.2) < 0.01, 'and looks across at -0.2')
+
+  context.camera.closeUp(null)
+  engine.simulate(1)
+  assert.ok(Math.abs(distanceOf() - 5) < 0.01, 'let go, it is back at 5 m')
+  assert.ok(Math.abs(context.view.pitch + 0.5) < 0.01, 'at the pitch it had before')
+})

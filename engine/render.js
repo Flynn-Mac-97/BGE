@@ -606,6 +606,7 @@ export async function makeRenderer(canvas, view, viewport, options = {}) {
     toScreen: state.toScreen,
     toWorld: state.toWorld,
     pick: state.pick,
+    pickNode: state.pickNode,
     ray: state.ray,
 
     bounds: entityDrawSize,

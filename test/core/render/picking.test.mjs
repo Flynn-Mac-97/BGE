@@ -8,6 +8,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import * as THREE from 'three/webgpu'
 import { makeRenderer } from '../../../engine/render.js'
 
 const ORTHO = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
@@ -145,4 +146,66 @@ test('a perspective pixel that hits nothing falls back ten units along the ray',
     Math.abs(Math.hypot(point.x, point.y, point.z) - 10) < 1e-9,
     `expected the point ten units from the eye, got ${JSON.stringify(point)}`
   )
+})
+
+// ------------------------------------------------------------------ nodes
+/** A body of two named parts, one behind the other along the view, at z -5. */
+const namedBody = () =>
+  withById([
+    {
+      id: 'statue',
+      type: 'statue',
+      x: 0,
+      y: 0,
+      z: -5,
+      mesh: {
+        parts: [
+          { box: [1, 1, 1], at: [0, 0, 0.6], name: 'front' },
+          { box: [1, 1, 1], at: [0, 0, -0.6], name: 'back' }
+        ]
+      }
+    }
+  ])
+
+test('a node pick answers with the named part nearest the eye, and the point on it in its own space', async () => {
+  const frame = await makeRenderer(null, PERSPECTIVE, viewport())
+  const world = namedBody()
+  frame.sync(world)
+  const found = frame.pickNode(world.entities[0], 160, 90)
+  assert.equal(found.node, 'front')
+  assert.ok(Math.abs(found.point[2] - 0.5) < 1e-6, `the ray meets the front face, half a unit out (${found.point})`)
+  assert.ok(found.normal[2] > 0.99, 'and the face looks back at the eye')
+})
+
+test('a node pick of a skinned mesh answers with the bone its face is weighted to', async () => {
+  const frame = await makeRenderer(null, PERSPECTIVE, viewport())
+  const world = namedBody()
+  frame.sync(world)
+  const holder = frame.objectFor(world.entities[0])
+  const geometry = new THREE.BoxGeometry(3, 3, 0.2)
+  const count = geometry.attributes.position.count
+  // Every corner leans three quarters on bone 1, the forearm.
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Array(count).fill([0, 1, 0, 0]).flat(), 4))
+  geometry.setAttribute(
+    'skinWeight',
+    new THREE.Float32BufferAttribute(new Array(count).fill([0.25, 0.75, 0, 0]).flat(), 4)
+  )
+  const upper = new THREE.Bone()
+  upper.name = 'upperArm'
+  const forearm = new THREE.Bone()
+  forearm.name = 'forearm'
+  upper.add(forearm)
+  const skin = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial())
+  skin.position.z = 2
+  skin.add(upper)
+  skin.bind(new THREE.Skeleton([upper, forearm]))
+  holder.add(skin)
+  assert.equal(frame.pickNode(world.entities[0], 160, 90).node, 'forearm')
+})
+
+test('a node pick that misses the entity is null', async () => {
+  const frame = await makeRenderer(null, PERSPECTIVE, viewport())
+  const world = namedBody()
+  frame.sync(world)
+  assert.equal(frame.pickNode(world.entities[0], 5, 5), null)
 })

@@ -123,6 +123,32 @@ export function makePicking(state) {
   }
 
   /**
+   * Which named node of one entity is under a screen point, and where on it.
+   *
+   * A model's skinned mesh answers with the bone its hit face is most weighted
+   * to; any other mesh answers with its nearest named ancestor, a named part
+   * included. `point` and `normal` are in that node's own space, so an
+   * attachment written there is where the ray met the surface and moves with
+   * the node. Null when the ray does not meet the entity.
+   *
+   * @returns {{ node: string, point: number[], normal: number[] }|null}
+   */
+  function pickNode(entity, pixelX, pixelY) {
+    const hit = rayHits(pixelX, pixelY).find(candidate => entityIdOf(candidate.object) === entity.id)
+    if (!hit) return null
+    const node = boneUnder(hit) ?? namedAncestor(hit.object)
+    if (!node) return null
+    const point = node.worldToLocal(hit.point.clone())
+    const normal = hit.face
+      ? hit.face.normal
+          .clone()
+          .transformDirection(hit.object.matrixWorld)
+          .transformDirection(node.matrixWorld.clone().invert())
+      : new THREE.Vector3(0, 1, 0)
+    return { node: node.name, point: point.toArray(), normal: normal.toArray() }
+  }
+
+  /**
    * The world ray through a screen point, for tools that want to intersect
    * their own objects — a 3D gizmo — without going through entity picking.
    *
@@ -141,5 +167,29 @@ export function makePicking(state) {
   state.toScreen = toScreen
   state.toWorld = toWorld
   state.pick = pick
+  state.pickNode = pickNode
   state.ray = ray
+}
+
+/** The bone a skinned hit's face leans on most: its three corners' skin weights, summed per bone. */
+function boneUnder(hit) {
+  const mesh = hit.object
+  const skinIndex = mesh.isSkinnedMesh && mesh.geometry.attributes.skinIndex
+  if (!skinIndex || !hit.face) return null
+  const skinWeight = mesh.geometry.attributes.skinWeight
+  const weightOf = new Map()
+  for (const corner of [hit.face.a, hit.face.b, hit.face.c]) {
+    for (let slot = 0; slot < skinIndex.itemSize; slot++) {
+      const bone = skinIndex.getComponent(corner, slot)
+      weightOf.set(bone, (weightOf.get(bone) ?? 0) + skinWeight.getComponent(corner, slot))
+    }
+  }
+  const [heaviest] = [...weightOf].sort((first, second) => second[1] - first[1])
+  return mesh.skeleton.bones[heaviest[0]] ?? null
+}
+
+/** The nearest object with a name, from the hit object up. */
+function namedAncestor(object) {
+  for (let node = object; node; node = node.parent) if (node.name) return node
+  return null
 }

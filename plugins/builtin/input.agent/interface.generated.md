@@ -1,8 +1,9 @@
-<!--1baf54cd-->
+<!--05938090-->
 parsed from source
   plugin Keyboard Input
   category engine
   context input
   systems frame
+  listens shell:ready
   emits step:end
-  source 83 lines
+  source 114 lines

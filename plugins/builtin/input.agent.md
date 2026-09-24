@@ -19,6 +19,11 @@ category: gameplay
 | `bind(action, codes)` | replace what an action means |
 | `actions()` | every action name |
 | `codes(action)` | the physical keys one action means |
+| `pointer()` | the pointer over the game view, `{ x, y, isOver }` in viewport pixels — what `renderer.pickNode` takes |
+| `pointAt(x, y)` | put the pointer somewhere by hand, as a test does |
+
+- Mouse buttons over the game view are key codes: `Mouse0` left, `Mouse1` middle, `Mouse2` right. Bind them like keys.
+- While a run plays, a key bound to an action does not also do its browser job (Tab does not move focus).
 
 - `pressed` means this step only. It is cleared on `step:end`.
 - A test calls `press` and `release` with a real code from `codes(action)`, so
