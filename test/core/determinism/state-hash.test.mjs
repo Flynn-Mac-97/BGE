@@ -198,9 +198,9 @@ test('a level with a scoped plugin in it is the level never played, reloaded or 
     'game.json': { title: 'reload', startLevel: 'main' },
     'levels/main.json': {
       camera: { at: [0, 4] },
-      entities: Array.from({ length: 24 }, (unused, at) => ({
+      entities: Array.from({ length: 24 }, (unused, index) => ({
         type: 'mover',
-        at: [(at % 6) * 0.7 - 2, 1 + Math.floor(at / 6) * 0.9, 0]
+        at: [(index % 6) * 0.7 - 2, 1 + Math.floor(index / 6) * 0.9, 0]
       }))
     },
     'types/mover.js': 'export default { properties: { held: true } }\n'

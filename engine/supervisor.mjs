@@ -72,8 +72,13 @@ function recordEvent(state, event) {
   if (state.events.length > MAXIMUM_EVENTS) state.events.splice(0, state.events.length - MAXIMUM_EVENTS)
 }
 
-// Electron views and terminals report lifecycle events directly. They share
-// the instance list without pretending to be independently listening servers.
+/**
+ * Add a managed instance — an Electron view or a terminal reporting its own
+ * lifecycle — to the instance list, and return the entry.
+ *
+ * Electron views and terminals report lifecycle events directly. They share
+ * the instance list without pretending to be independently listening servers.
+ */
 export function registerManaged(state, fields, stop) {
   const entry = {
     id: nextId(state, fields.kind),
@@ -88,16 +93,19 @@ export function registerManaged(state, fields, stop) {
   return entry
 }
 
+/** Merge `fields` into a managed instance's entry. */
 export function updateManaged(state, entry, fields) {
   Object.assign(entry, fields)
 }
 
+/** Remove a managed instance from the instance list and record its close. */
 export function finishManaged(state, entry, detail = 'closed') {
   state.managed.delete(entry.id)
   state.instances = state.instances.filter(other => other !== entry)
   recordEvent(state, { event: 'closed', id: entry.id, detail })
 }
 
+/** Record one event against an instance by id, for the watch view's feed. */
 export function supervisorEvent(state, id, event, detail) {
   recordEvent(state, { id, event, detail: String(detail).slice(0, 4000) })
 }
@@ -784,7 +792,7 @@ async function runProver(state) {
       continue
     }
     entry.state = 'unresponsive'
-    // The count lives beside the instances, not on them, so a reply cannot
+    // The count is stored beside the instances, not on them, so a reply cannot
     // carry supervisor bookkeeping the caller never asked for.
     const rounds = (state.unresponsive.get(entry.id) || 0) + 1
     if (rounds >= 2) await discardInstance(state, entry, { event: 'gone', detail: 'no answer' })

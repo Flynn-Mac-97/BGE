@@ -64,8 +64,10 @@ const HELP = `engine — read and drive the running editor
 state     snapshot [--entities --log --plugins --commands --timers]
           entity <id>          index          tree
           check                exits 1 if anything is broken, nondeterministic,
-                               or a plugin file that will not load. A problem
-                               marked "warning" is reported and exits 0
+                               or a plugin file that will not load, or if the
+                               kernel fails format, lint, Trellis or Codemap
+                               (agents/code-style.md). A problem marked
+                               "warning" is reported and exits 0
           a list can name its columns instead of repeating them every row:
           snapshot '{"entities":["id","at"]}'                  the whole level
           commands '{"fields":["id"]}'                          every verb
@@ -1134,7 +1136,11 @@ if (op === 'check') {
   // These are the only problems whose cost falls entirely on an agent — a stale
   // guide is read all session and there is no second chance to correct it.
   const { agentRegistrationProblems } = await import('../engine/agent-registration.mjs')
+  // The kernel gate — format, lint, Trellis and Codemap — runs on every check,
+  // so an agent that only runs `check` still meets `agents/code-style.md`.
+  const { kernelGateProblems } = await import('../scripts/kernel-gate.mjs')
   const problems = [
+    ...await kernelGateProblems(CHECKOUT),
     ...pluginProblems(failed),
     // Building without writing saves the serialized index characters and leaves
     // no half-fresh artifact for the `index` route or a boot to disagree with;

@@ -1,7 +1,7 @@
 /**
  * Kernel: the named regions a plugin can mount DOM into.
  *
- * `shell.js` builds the frame and owns the region elements. Which DOM sits in a
+ * `shell.js` builds the frame and owns the region elements. Which DOM is in a
  * region, in what order, and when it leaves is a separate concern: this module
  * knows where a thing goes and when it leaves, never what the thing is. It is
  * the DOM counterpart of the renderer's pass graph: one ordered list, and a
@@ -31,7 +31,7 @@ export function makeRegions(hosts) {
   function orderedFor(region) {
     return [...entries.values()]
       .filter(entry => entry.region === region)
-      .sort((a, b) => a.order - b.order || a.sequence - b.sequence)
+      .sort((left, right) => left.order - right.order || left.sequence - right.sequence)
   }
 
   /** Put one entry where its order belongs, moving only that element. */

@@ -11,12 +11,13 @@ import { extractFile } from './extract.js'
 /**
  * Directory names that hold no project source.
  *
- * Dependencies, version-control metadata, generated output and agent scratch
+ * Dependencies, vendored builds, version-control metadata, generated output and agent scratch
  * all contain JavaScript that is not this project's structure, and mapping them
  * buries the files that are.
  */
 const IGNORED_DIRECTORIES = new Set([
   'node_modules',
+  'vendor',
   '.git',
   '.pi',
   'dist',

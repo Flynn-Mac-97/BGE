@@ -86,7 +86,7 @@ function cameraReadingFor(view) {
 }
 
 const frameWorld = {
-  entities: Array.from({ length: 8 }, (_, index) => ({
+  entities: Array.from({ length: 8 }, (unused, index) => ({
     id: `e${index}`,
     type: 'wall',
     x: index,

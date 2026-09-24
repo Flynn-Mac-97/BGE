@@ -8,6 +8,7 @@
  */
 import { entityPlan, turnRadians } from '../frame-plan.js'
 
+/** The per-entity record cache: the plan, the turn and the last placed transform, kept between frames. */
 export function makeEntityRecords(state) {
   /**
    * What `sync` already knows about one entity, keyed by the entity itself.

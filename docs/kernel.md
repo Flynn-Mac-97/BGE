@@ -505,7 +505,7 @@ startup                                  work a plugin declared and has not fini
 checkpoints  capture  restore            a whole moment of the run, taken and put back
 rewind                                   the last minutes of the run, as marks
 renderer  shell                          absent when nothing is drawing
-spawn  destroy  select  open  run  save  redraw  importProjectFile
+spawn  destroy  select  addToSelection  open  run  save  redraw  importProjectFile
 assets  types  levels  level  selection
 time  random  after  every  cancel          the deterministic runtime
 input  camera  play  audio  hud             contributed by plugins

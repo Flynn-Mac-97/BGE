@@ -24,6 +24,7 @@
  */
 import { reportOnce } from './report.js'
 
+/** Build the mark registry and write its methods onto `state`. */
 export function makeMarkRegistry(state) {
   /** The marks by name, in registration order. A re-registered name keeps its place. */
   const marks = new Map()
@@ -95,41 +96,41 @@ export function makeMarkRegistry(state) {
    * empty registry is a loop that never runs.
    */
   function drawMarks(entity, object, place, declared, record) {
-    for (let i = 0; i < ordered.length; i++) {
-      ordered[i].draw(entity, object, place, declared, record)
+    for (let index = 0; index < ordered.length; index++) {
+      ordered[index].draw(entity, object, place, declared, record)
     }
   }
 
   /** Start a frame's marks: reset whatever the marks accumulated last frame. */
   function beginMarks() {
-    for (let i = 0; i < ordered.length; i++) ordered[i].begin?.()
+    for (let index = 0; index < ordered.length; index++) ordered[index].begin?.()
   }
 
   /** Reserve room for one mark per entity, before the walk notes any. */
   function growMarks(count) {
-    for (let i = 0; i < ordered.length; i++) ordered[i].grow?.(count)
+    for (let index = 0; index < ordered.length; index++) ordered[index].grow?.(count)
   }
 
   /** Let the marks re-note a moved entity the fast path placed without a draw. */
   function moveMarks(entity, declared, shape, place) {
-    for (let i = 0; i < ordered.length; i++) ordered[i].move?.(entity, declared, shape, place)
+    for (let index = 0; index < ordered.length; index++) ordered[index].move?.(entity, declared, shape, place)
   }
 
   /** Write the frame's marks into what they draw. Called once, after the walk. */
   function placeMarks() {
-    for (let i = 0; i < ordered.length; i++) ordered[i].place?.()
+    for (let index = 0; index < ordered.length; index++) ordered[index].place?.()
   }
 
   /** Let each mark write its own counters onto `stats`. */
   function writeMarkStats(stats) {
-    for (let i = 0; i < ordered.length; i++) ordered[i].count?.(stats)
+    for (let index = 0; index < ordered.length; index++) ordered[index].count?.(stats)
   }
 
   /** Whether any mark must visit this entity on a still frame. */
   function holdsMark(entity, declared) {
     if (!anyHolds) return false
-    for (let i = 0; i < ordered.length; i++) {
-      if (ordered[i].holds?.(entity, declared)) return true
+    for (let index = 0; index < ordered.length; index++) {
+      if (ordered[index].holds?.(entity, declared)) return true
     }
     return false
   }
@@ -137,16 +138,16 @@ export function makeMarkRegistry(state) {
   /** Whether any mark must visit this entity on a frame that only moved it. */
   function holdsMovingMark(entity, declared) {
     if (!anyHoldsMoving) return false
-    for (let i = 0; i < ordered.length; i++) {
-      if (ordered[i].holdsMoving?.(entity, declared)) return true
+    for (let index = 0; index < ordered.length; index++) {
+      if (ordered[index].holdsMoving?.(entity, declared)) return true
     }
     return false
   }
 
   /** The entity id a mark's rule holds, so the scans never skip it. */
   function markHeldId(view) {
-    for (let i = 0; i < ordered.length; i++) {
-      const id = ordered[i].heldId?.(view)
+    for (let index = 0; index < ordered.length; index++) {
+      const id = ordered[index].heldId?.(view)
       if (id != null) return id
     }
     return null
@@ -154,8 +155,8 @@ export function makeMarkRegistry(state) {
 
   /** Whether a mark's own default changed, forcing one full pass. */
   function marksChanged() {
-    for (let i = 0; i < ordered.length; i++) {
-      if (ordered[i].changed?.()) return true
+    for (let index = 0; index < ordered.length; index++) {
+      if (ordered[index].changed?.()) return true
     }
     return false
   }
@@ -163,15 +164,15 @@ export function makeMarkRegistry(state) {
   /** Whether a declaration a mark owns keeps this entity out of every batch. */
   function markBlocksMerge(declared) {
     if (!anyBlocksMerge) return false
-    for (let i = 0; i < ordered.length; i++) {
-      if (ordered[i].blocksMerge?.(declared)) return true
+    for (let index = 0; index < ordered.length; index++) {
+      if (ordered[index].blocksMerge?.(declared)) return true
     }
     return false
   }
 
   /** Drop a mark's caches for an edited file. */
   function forgetMarks(file) {
-    for (let i = 0; i < ordered.length; i++) ordered[i].forget?.(file)
+    for (let index = 0; index < ordered.length; index++) ordered[index].forget?.(file)
   }
 
   state.marks = registry

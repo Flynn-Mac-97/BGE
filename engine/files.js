@@ -46,7 +46,7 @@ const clientName = () => {
  * @property {(path: string) => Promise<string>} read One project file's text.
  * @property {(selection?: string) => Promise<object>} sourceCatalog The engine and project sources for one selection.
  * @property {() => Promise<Array>} listDocuments Every saved system document.
- * @property {(id: string, backup?: boolean) => Promise<object>} readDocument One saved document, or its backup.
+ * @property {(id: string) => Promise<object>} readDocument One saved document.
  * @property {(id: string, documentData: object, revision: number) => Promise<object>} writeDocument Save one document at the revision it was read from.
  * @property {(scope: string, file: string, text: string, expectedHash: string) => Promise<object>} writeSource Write one source file, refusing when its hash moved.
  * @property {(scope: string, path: string) => Promise<{scope: string, file: string, text: string, hash: string}>} readSource One source file and its hash.
@@ -80,8 +80,7 @@ export function overHTTP() {
     read: async path => (await request('/api/file?path=' + encodeURIComponent(path))).text,
     sourceCatalog: (selection = 'core') => request('/api/systems/catalog?selection=' + encodeURIComponent(selection)),
     listDocuments: () => request('/api/systems/documents'),
-    readDocument: (id, backup = false) =>
-      request('/api/systems/document?id=' + encodeURIComponent(id) + '&backup=' + backup),
+    readDocument: id => request('/api/systems/document?id=' + encodeURIComponent(id)),
     writeDocument: (id, documentData, revision) =>
       request('/api/systems/document', {
         method: 'POST',
@@ -221,8 +220,8 @@ export function makeFiles(bus, transport = overHTTP()) {
     async listDocuments() {
       return transport.listDocuments()
     },
-    async readDocument(id, backup = false) {
-      return transport.readDocument(id, backup)
+    async readDocument(id) {
+      return transport.readDocument(id)
     },
     async writeDocument(id, documentData, revision) {
       stopIfRefused('.engine/systems/' + id + '.json', 'project')

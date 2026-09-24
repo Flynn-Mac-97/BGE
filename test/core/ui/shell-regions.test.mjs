@@ -29,20 +29,20 @@ class FakeElement {
 
   insertBefore(child, before) {
     if (child.parentNode) child.parentNode.removeChild(child)
-    const at = this.children.indexOf(before)
-    if (at === -1) {
+    const index = this.children.indexOf(before)
+    if (index === -1) {
       this.children.push(child)
       child.parentNode = this
       return
     }
-    this.children.splice(at, 0, child)
+    this.children.splice(index, 0, child)
     child.parentNode = this
   }
 
   removeChild(child) {
-    const at = this.children.indexOf(child)
-    if (at !== -1) {
-      this.children.splice(at, 1)
+    const index = this.children.indexOf(child)
+    if (index !== -1) {
+      this.children.splice(index, 1)
       child.parentNode = null
     }
   }
@@ -69,10 +69,10 @@ test('a tie keeps the order the mounts were made in', () => {
   const overlay = new FakeElement('overlay')
   const regions = makeRegions({ overlay })
 
-  const a = new FakeElement('a')
-  const b = new FakeElement('b')
-  regions.mount('overlay', a, { order: 50 })
-  regions.mount('overlay', b, { order: 50 })
+  const elementA = new FakeElement('a')
+  const elementB = new FakeElement('b')
+  regions.mount('overlay', elementA, { order: 50 })
+  regions.mount('overlay', elementB, { order: 50 })
 
   assert.deepEqual(names(overlay), ['a', 'b'])
 })
@@ -81,11 +81,11 @@ test('mounting one element again moves it rather than adding it twice', () => {
   const overlay = new FakeElement('overlay')
   const regions = makeRegions({ overlay })
 
-  const a = new FakeElement('a')
-  const b = new FakeElement('b')
-  regions.mount('overlay', a, { order: 10 })
-  regions.mount('overlay', b, { order: 20 })
-  regions.mount('overlay', a, { order: 30 })
+  const elementA = new FakeElement('a')
+  const elementB = new FakeElement('b')
+  regions.mount('overlay', elementA, { order: 10 })
+  regions.mount('overlay', elementB, { order: 20 })
+  regions.mount('overlay', elementA, { order: 30 })
 
   assert.equal(overlay.children.length, 2)
   assert.deepEqual(names(overlay), ['b', 'a'])
@@ -95,15 +95,15 @@ test('unmount takes the element out, and a second unmount does nothing', () => {
   const overlay = new FakeElement('overlay')
   const regions = makeRegions({ overlay })
 
-  const a = new FakeElement('a')
-  const b = new FakeElement('b')
-  regions.mount('overlay', a)
-  regions.mount('overlay', b)
+  const elementA = new FakeElement('a')
+  const elementB = new FakeElement('b')
+  regions.mount('overlay', elementA)
+  regions.mount('overlay', elementB)
 
-  assert.equal(regions.unmount(a), true)
+  assert.equal(regions.unmount(elementA), true)
   assert.deepEqual(names(overlay), ['b'])
-  assert.equal(a.parentNode, null)
-  assert.equal(regions.unmount(a), false)
+  assert.equal(elementA.parentNode, null)
+  assert.equal(regions.unmount(elementA), false)
 })
 
 test('clear empties one region and leaves another alone', () => {
@@ -111,10 +111,10 @@ test('clear empties one region and leaves another alone', () => {
   const bar = new FakeElement('bar')
   const regions = makeRegions({ overlay, bar })
 
-  const a = new FakeElement('a')
-  const b = new FakeElement('b')
-  regions.mount('overlay', a)
-  regions.mount('bar', b)
+  const elementA = new FakeElement('a')
+  const elementB = new FakeElement('b')
+  regions.mount('overlay', elementA)
+  regions.mount('bar', elementB)
 
   regions.clear('overlay')
 

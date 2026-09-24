@@ -11,10 +11,13 @@ families: complexity/erosion, duplication, import cycles, plus a separate
 non-scoring safeguards inspection. No models, no network; the default run writes
 nothing.
 
-A converted JavaScript checkout is vendored at `vendor/trellis` (from
-`jayminwest/trellis`; see `vendor/trellis/VENDOR.md` for provenance). It imports
-the `bun:` protocol, so it runs under bun, not node. The project installs bun as
-a devDependency (`node_modules/.bin/bun`).
+The kernel budget needs nothing here: `npm run check:structure` and
+`node bin/engine.mjs check` run the Trellis library in `vendor/trellis` under
+node (see `vendor/trellis/VENDOR.md`).
+
+The full CLI below (human reports, `compare`, `guide`) needs a Trellis checkout
+and bun. The helper script finds them through `TRELLIS_DIR` and `TRELLIS_BUN`;
+neither is in this repository.
 
 ## Usage
 

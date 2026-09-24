@@ -22,13 +22,13 @@ export function missingAttachments(index) {
   const out = []
   /** Push one problem for each name that has no behaviour file. */
   const check = (names, file, where) => {
-    for (const n of names || []) {
-      if (!index.behaviours[n])
-        out.push({ file, why: `${where} attaches behaviour "${n}" — no project/behaviours/${n}.js` })
+    for (const name of names || []) {
+      if (!index.behaviours[name])
+        out.push({ file, why: `${where} attaches behaviour "${name}" — no project/behaviours/${name}.js` })
     }
   }
-  for (const [name, t] of Object.entries(index.types)) check(t.behaviours, t.file, `type "${name}"`)
-  for (const [name, l] of Object.entries(index.levels)) check(l.behaviours, l.file, `level "${name}"`)
+  for (const [name, type] of Object.entries(index.types)) check(type.behaviours, type.file, `type "${name}"`)
+  for (const [name, level] of Object.entries(index.levels)) check(level.behaviours, level.file, `level "${name}"`)
   return out
 }
 
@@ -56,17 +56,17 @@ export function missingAssets(index) {
     out.push({ file, reference, references, why: `${said} — there is no project/${resolved}` })
   }
 
-  for (const [name, t] of Object.entries(index.types)) {
-    for (const reference of t.uses || []) {
-      const where = t.usesBy?.[reference]
-      missing(reference, t.file, 1, `type "${name}" names "${reference}"${where ? ` as ${where}` : ''}`)
+  for (const [name, type] of Object.entries(index.types)) {
+    for (const reference of type.uses || []) {
+      const where = type.usesBy?.[reference]
+      missing(reference, type.file, 1, `type "${name}" names "${reference}"${where ? ` as ${where}` : ''}`)
     }
   }
 
-  for (const [name, l] of Object.entries(index.levels)) {
-    for (const [reference, use] of Object.entries(l.assets || {})) {
+  for (const [name, level] of Object.entries(index.levels)) {
+    for (const [reference, use] of Object.entries(level.assets || {})) {
       const times = use.count === 1 ? 'once' : `${use.count} times`
-      missing(reference, l.file, use.count, `level "${name}" names "${reference}" ${times}, first at ${use.first}`)
+      missing(reference, level.file, use.count, `level "${name}" names "${reference}" ${times}, first at ${use.first}`)
     }
   }
 
@@ -93,13 +93,13 @@ export function missingAssets(index) {
  */
 export function missingTypes(index) {
   const out = []
-  for (const [name, l] of Object.entries(index.levels)) {
-    for (const type of l.types || []) {
+  for (const [name, level] of Object.entries(index.levels)) {
+    for (const type of level.types || []) {
       if (typeof type !== 'string' || !type.trim()) {
-        out.push({ file: l.file, why: `level "${name}" has a placement with no "type" — it will place nothing` })
+        out.push({ file: level.file, why: `level "${name}" has a placement with no "type" — it will place nothing` })
       } else if (!index.types[type] && !(index.pluginTypes || []).includes(type)) {
         out.push({
-          file: l.file,
+          file: level.file,
           why: `level "${name}" places type "${type}" — there is no project/types/${type}.js, so those placements are empty`
         })
       }
@@ -117,9 +117,9 @@ export function missingTypes(index) {
  */
 function assetSummary(missing) {
   if (!missing.length) return []
-  const files = [...new Set(missing.map(m => m.file))]
+  const files = [...new Set(missing.map(entry => entry.file))]
   const where = files.length === 1 ? files[0] : `${files.length} files`
-  const references = missing.reduce((total, m) => total + (m.references || 1), 0)
+  const references = missing.reduce((total, entry) => total + (entry.references || 1), 0)
   // A map naming four absent textures on 231 brushes is four things to draw and
   // 231 places it shows, and both numbers are worth having.
   const named = references === missing.length ? '' : `, named ${references} times`
@@ -342,8 +342,8 @@ export function problemsIn(index) {
     ...assetSummary(missing),
     ...missing,
     ...Object.entries(index.tests)
-      .filter(([, t]) => t.error)
-      .map(([name, t]) => ({ file: t.file, why: `test "${name}" failed to load — ${t.error}` })),
+      .filter(([, test]) => test.error)
+      .map(([name, test]) => ({ file: test.file, why: `test "${name}" failed to load — ${test.error}` })),
     ...describedProblems(index),
     ...index.warnings
   ]

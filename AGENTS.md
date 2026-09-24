@@ -22,24 +22,12 @@ Give a sub-agent the packet, not a summary of it. `agent.prepare` writes the
 whole text beside the game it is for, and returns that path as `packet`; point
 the brief at that file.
 
-## Style — this holds for every file you write
+## Style
 
-- Explain why, not what the code already says. Delete comments that no longer
-  match the code.
-- Say it straight: no metaphor, no analogy, no story. State the fact and the
-  reason.
-- State the rule, not the mistake that taught it. History is in git and the
-  pain ledger.
-- Literal verbs. A file is in a directory, not "sitting" there; a value is
-  stored, not "living" somewhere.
-- Never a long word where a short one works. Active voice. Cut every word doing
-  no work — the reader is usually an agent, and every word costs a token.
-- Full names: `context`, not `ctx`. Plain words that say what a thing does.
-- One idea in one small function.
-
-The full rules are `agents/code-style.md` and `agents/comment-style.md`, and
-every packet carries them. A project may add its own on top for its own files;
-these still hold.
+`agents/code-style.md` is the one set of rules for every file you write: code,
+comments and design. Every packet carries it, and `node bin/engine.mjs check`
+fails on each rule a tool can check. A project may replace it for its own
+files.
 
 ## Seeing the game
 

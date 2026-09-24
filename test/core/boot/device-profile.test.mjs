@@ -42,10 +42,10 @@ function pngPixels(file) {
  * Draw a headless frame and hand back the file it wrote. Deleted when the test
  * ends: agent-runs/see is the shared frame directory, not this test's.
  */
-async function sketchFrame(t, engine) {
+async function sketchFrame(testContext, engine) {
   const drawn = await engine.run('see.sketch', {})
   assert.ok(drawn.files?.[0], `see.sketch wrote no frame: ${JSON.stringify(drawn)}`)
-  t.after(() => {
+  testContext.after(() => {
     for (const name of drawn.files) fs.rmSync(path.join(ROOT, name), { force: true })
   })
   return { files: drawn.files, png: path.join(ROOT, drawn.files[0]) }
@@ -95,13 +95,13 @@ test('a measured screen beats the declaration', async () => {
   assert.equal(context.device.width, 540)
 })
 
-test('the frame is written at the declared screen, not at the agent window', async t => {
+test('the frame is written at the declared screen, not at the agent window', async testContext => {
   const { engine, context } = await startWorldInNode({
     root: ROOT,
     project: PORTRAIT,
     viewport: { width: 800, height: 600 }
   })
-  const frame = await sketchFrame(t, engine)
+  const frame = await sketchFrame(testContext, engine)
   // 540x960 at the sketch's fixed quarter scale. The window would give 200x150,
   // and an ortho camera fitted to 800x600 shows world the phone never does.
   assert.deepEqual(
@@ -113,16 +113,16 @@ test('the frame is written at the declared screen, not at the agent window', asy
   assert.equal(context.viewport.height, 600)
 })
 
-test('a game with no declaration writes its frame at the default screen', async t => {
+test('a game with no declaration writes its frame at the default screen', async testContext => {
   const { engine } = await startWorldInNode({ root: ROOT, project: FIXTURE })
   // 1280x720 at the same quarter scale.
-  assert.deepEqual(pngPixels((await sketchFrame(t, engine)).png), [320, 180])
+  assert.deepEqual(pngPixels((await sketchFrame(testContext, engine)).png), [320, 180])
 })
 
-test('two frames of one world are two files on disk, named without a client', async t => {
+test('two frames of one world are two files on disk, named without a client', async testContext => {
   const { engine, context } = await startWorldInNode({ root: ROOT, project: PORTRAIT })
-  const first = await sketchFrame(t, engine)
-  const second = await sketchFrame(t, engine)
+  const first = await sketchFrame(testContext, engine)
+  const second = await sketchFrame(testContext, engine)
   const level = context.editor.levelName
   // Headless there is no page, so no client name goes in the stem and the
   // frame number alone keeps two frames apart.

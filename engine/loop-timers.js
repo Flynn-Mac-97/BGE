@@ -32,41 +32,49 @@ export function makeTimers({ onError } = {}) {
     if (!timers.length) return
     // Snapshot first: a callback may add or cancel timers, and mutating the
     // list mid-walk is how a scheduler quietly drops one.
-    for (const t of [...timers]) {
-      if (t.cancelled || now < t.at) continue
+    for (const timer of [...timers]) {
+      if (timer.cancelled || now < timer.at) continue
       try {
-        t.fn()
-      } catch (e) {
-        onError?.(e, t)
+        timer.fn()
+      } catch (error) {
+        onError?.(error, timer)
       }
       // Count intervals from the start rather than adding to `at`, so a
       // repeating timer cannot accumulate error over a long run.
-      if (t.every && !t.cancelled) t.at = t.start + ++t.n * t.every
-      else t.cancelled = true
+      if (timer.every && !timer.cancelled) timer.at = timer.start + ++timer.n * timer.every
+      else timer.cancelled = true
     }
-    if (timers.some(t => t.cancelled)) timers = timers.filter(t => !t.cancelled)
+    if (timers.some(timer => timer.cancelled)) timers = timers.filter(timer => !timer.cancelled)
   }
 
   return {
-    /** Run `fn` once, `seconds` of engine time from `now`. */
-    after(seconds, now, fn) {
-      const t = { id: nextId++, start: now, n: 1, at: now + seconds, every: 0, fn, cancelled: false }
-      timers.push(t)
-      return t.id
+    /** Run `listener` once, `seconds` of engine time from `now`. */
+    after(seconds, now, listener) {
+      const timer = { id: nextId++, start: now, n: 1, at: now + seconds, every: 0, fn: listener, cancelled: false }
+      timers.push(timer)
+      return timer.id
     },
 
-    /** Run `fn` every `seconds` of engine time, starting one interval from `now`. */
-    every(seconds, now, fn) {
-      const t = { id: nextId++, start: now, n: 1, at: now + seconds, every: seconds, fn, cancelled: false }
-      timers.push(t)
-      return t.id
+    /** Run `listener` every `seconds` of engine time, starting one interval from `now`. */
+    every(seconds, now, listener) {
+      const timer = {
+        id: nextId++,
+        start: now,
+        n: 1,
+        at: now + seconds,
+        every: seconds,
+        fn: listener,
+        cancelled: false
+      }
+      timers.push(timer)
+      return timer.id
     },
 
     /** Cancel one scheduled timer. Returns whether it was still pending. */
     cancel(id) {
-      const t = timers.find(x => x.id === id)
-      if (t) t.cancelled = true
-      return !!t
+      const timer = timers.find(candidate => candidate.id === id)
+      if (timer) timer.cancelled = true
+      return !!timer
     },
 
     run,
@@ -78,22 +86,22 @@ export function makeTimers({ onError } = {}) {
 
     /** Move every pending timer with a clock that was put back or picked up. */
     shiftBy(delta) {
-      for (const t of timers) {
-        t.start += delta
-        t.at += delta
+      for (const timer of timers) {
+        timer.start += delta
+        timer.at += delta
       }
     },
 
     /** How many timers are still pending, for a checkpoint that cannot carry a closure. */
     count() {
-      return timers.filter(t => !t.cancelled).length
+      return timers.filter(timer => !timer.cancelled).length
     },
 
     /** The pending timers as `{ id, in, every }`, `in` measured from `now`. */
     list(now) {
       return timers
-        .filter(t => !t.cancelled)
-        .map(t => ({ id: t.id, in: round3(t.at - now), every: t.every || undefined }))
+        .filter(timer => !timer.cancelled)
+        .map(timer => ({ id: timer.id, in: round3(timer.at - now), every: timer.every || undefined }))
     }
   }
 }

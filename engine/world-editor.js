@@ -32,20 +32,28 @@ export function makeEditor({ projectDirectory, projectName, projectUntitled, bus
     context: null,
 
     /**
-     * Replace or extend the selection with the given ids.
+     * Replace the selection with the given ids.
      *
      * @param {string|string[]|object|object[]} ids One id, or a list of ids or
      *   objects with an `id`. Falsy entries are dropped.
-     * @param {boolean} [additive] Keep the current selection instead of
-     *   replacing it.
      * @returns {void}
      */
-    select(ids, additive = false) {
+    select(ids) {
+      editor.selection.clear()
+      editor.addToSelection(ids)
+    },
+
+    /**
+     * Add the given ids to the selection and keep what is already selected.
+     *
+     * @param {string|string[]|object|object[]} ids As for `select`.
+     * @returns {void}
+     */
+    addToSelection(ids) {
       const list = []
         .concat(ids ?? [])
-        .map(v => (typeof v === 'string' ? v : v?.id))
+        .map(entry => (typeof entry === 'string' ? entry : entry?.id))
         .filter(Boolean)
-      if (!additive) editor.selection.clear()
       for (const id of list) editor.selection.add(id)
       bus.emit('selection:changed', [...editor.selection])
     },

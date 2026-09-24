@@ -2,14 +2,14 @@
  * Kernel: the two ways this renderer touches a material.
  *
  * Both are used by the object builder, the material registry and any pass that
- * owns a model, so the rule for each lives in one place.
+ * owns a model, so the rule for each is in one place.
  */
 
-/** Call `fn` with every material on one node, whether it has one or an array. */
-export const eachMaterial = (node, fn) => {
+/** Call `listener` with every material on one node, whether it has one or an array. */
+export const eachMaterial = (node, listener) => {
   if (!node.material) return
-  if (Array.isArray(node.material)) node.material.forEach(fn)
-  else fn(node.material)
+  if (Array.isArray(node.material)) node.material.forEach(listener)
+  else listener(node.material)
 }
 
 /**

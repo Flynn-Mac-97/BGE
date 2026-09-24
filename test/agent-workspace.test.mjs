@@ -157,9 +157,8 @@ test('a packet built from a task alone still carries the style rules', async () 
   const packet = await contextFromDisk(ROOT, { task: 'finish the See plugin' })
   const ids = packet.nodes.map(node => node.id)
   assert.ok(ids.includes('code-style'), `code-style is missing from ${ids.join(', ')}`)
-  assert.ok(ids.includes('comment-style'), `comment-style is missing from ${ids.join(', ')}`)
-  assert.match(packet.text, /Explain why, not what the code already says/)
-  assert.match(packet.text, /Use full names/)
+  assert.match(packet.text, /A comment says what the code cannot/)
+  assert.match(packet.text, /Full words: `context`, not `ctx`/)
 })
 
 test('a packet says what it withheld and that no files were named', async () => {

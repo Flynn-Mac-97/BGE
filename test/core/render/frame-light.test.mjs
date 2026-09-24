@@ -17,7 +17,7 @@ const lights = frame => ({
   sun: frame.scene.children.find(object => object.isDirectionalLight)
 })
 
-const close = (a, b) => Math.abs(a - b) < 1e-9
+const close = (first, second) => Math.abs(first - second) < 1e-9
 
 test('a world is lit before any level says a word about light', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)

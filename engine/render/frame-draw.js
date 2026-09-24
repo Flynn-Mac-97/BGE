@@ -14,6 +14,7 @@ import * as THREE from 'three/webgpu'
 import { makePassGraph } from './graph.js'
 import { reportOnce } from './report.js'
 
+/** Builds the frame draw controller for one render state: the default graph and its stats. */
 export function makeFrameDraw(state) {
   /**
    * What the last frame cost.
@@ -134,9 +135,9 @@ export function makeFrameDraw(state) {
         // process and returns from `finish()` before the card is done, so a
         // wall-clock measurement built on it reads a heavy shader as cheap.
         // A synchronous read cannot return until the pixel exists.
-        const gl = backend.gl
-        gl.finish()
-        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
+        const glContext = backend.gl
+        glContext.finish()
+        glContext.readPixels(0, 0, 1, 1, glContext.RGBA, glContext.UNSIGNED_BYTE, new Uint8Array(4))
         return true
       }
     } catch {
@@ -148,7 +149,7 @@ export function makeFrameDraw(state) {
   /** Whether a post pass draws this frame. An indexed walk allocates nothing. */
   function drawsPost() {
     const ordered = graph.passes
-    for (let at = 0; at < ordered.length; at++) if (ordered[at].name === 'post') return true
+    for (let index = 0; index < ordered.length; index++) if (ordered[index].name === 'post') return true
     return false
   }
 

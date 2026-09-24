@@ -31,7 +31,7 @@ test('the steady walk visits every entity exactly once, so ten times the entitie
   const sizes = [1, 1000, 10000]
   const counted = []
   for (const size of sizes) {
-    const world = { entities: Array.from({ length: size }, (_, at) => box(`e${at}`)) }
+    const world = { entities: Array.from({ length: size }, (unused, index) => box(`e${index}`)) }
     frame.sync(world)
     visits = 0
     frame.sync(world)

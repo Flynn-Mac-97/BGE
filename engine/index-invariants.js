@@ -81,11 +81,11 @@ function brokenInvariantProblem(level, named, declared, result) {
 }
 
 /** The problem one placement has with its type's invariant, or null when it passes. */
-function placementInvariantProblem(index, level, levelName, placement, at) {
+function placementInvariantProblem(index, level, levelName, placement, placementIndex) {
   const found = declaredInvariant(index, placement)
   if (!found) return null
   const { typeName, type, declared } = found
-  const named = `level "${levelName}" placement "${placement.id ?? `#${at}`}" (type "${typeName}")`
+  const named = `level "${levelName}" placement "${placement.id ?? `#${placementIndex}`}" (type "${typeName}")`
   const rule = INVARIANT_RULES[declared.rule]
   if (!rule) return unknownRuleProblem(type, typeName, declared)
   const result = rule(declared, type, placement)
@@ -115,8 +115,8 @@ export function invariantProblems(index, levelPlacements) {
     const level = index.levels[levelName]
     if (!level || level.error) continue
 
-    placements.forEach((placement, at) => {
-      const problem = placementInvariantProblem(index, level, levelName, placement, at)
+    placements.forEach((placement, placementIndex) => {
+      const problem = placementInvariantProblem(index, level, levelName, placement, placementIndex)
       if (problem) out.push(problem)
     })
   }
@@ -159,12 +159,12 @@ function tintedType(index, placement) {
 }
 
 /** Add one tinted placement to the per-type count for its level. */
-function collectTintHit(index, hit, placement, at) {
+function collectTintHit(index, hit, placement, placementIndex) {
   const type = tintedType(index, placement)
   if (!type) return
   const seen = hit.get(placement.type) || {
     count: 0,
-    first: placement.id ?? `#${at}`,
+    first: placement.id ?? `#${placementIndex}`,
     tint: type.meshTint,
     typeFile: type.file
   }
@@ -209,7 +209,7 @@ export function tintProblems(index, levelPlacements) {
     if (!level || level.error) continue
 
     const hit = new Map()
-    placements.forEach((placement, at) => collectTintHit(index, hit, placement, at))
+    placements.forEach((placement, placementIndex) => collectTintHit(index, hit, placement, placementIndex))
 
     for (const [typeName, seen] of hit) out.push(tintProblem(level, levelName, typeName, seen))
   }

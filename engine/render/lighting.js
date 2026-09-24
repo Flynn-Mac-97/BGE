@@ -6,6 +6,7 @@ import * as THREE from 'three/webgpu'
 import { readColour, readIntensity } from './read-value.js'
 import { reportOnce } from './report.js'
 
+/** Attach the sun, the ambient light and the shadow-map bookkeeping to the renderer state. */
 export function makeLighting(state) {
   /**
    * Light exists before any level says a word about it.
@@ -33,7 +34,7 @@ export function makeLighting(state) {
   function aimSun(direction) {
     if (direction === undefined || direction === null) return
     const given = Array.isArray(direction) ? direction.map(Number) : []
-    if (given.length !== 3 || !given.every(Number.isFinite) || given.every(n => n === 0)) {
+    if (given.length !== 3 || !given.every(Number.isFinite) || given.every(component => component === 0)) {
       reportOnce(`[render] setSun: ${JSON.stringify(direction)} is not a direction — leaving the sun where it is`)
       return
     }
@@ -159,8 +160,8 @@ export function makeLighting(state) {
   function setAmbient(intensity, colour) {
     const amount = readIntensity(intensity, 'setAmbient')
     if (amount !== null) ambient.intensity = amount
-    const c = readColour(colour, 'setAmbient')
-    if (c) ambient.color = c
+    const colourValue = readColour(colour, 'setAmbient')
+    if (colourValue) ambient.color = colourValue
   }
 
   /** The sun: which way it shines, how hard, and what colour. */
@@ -168,8 +169,8 @@ export function makeLighting(state) {
     aimSun(direction)
     const amount = readIntensity(intensity, 'setSun')
     if (amount !== null) sun.intensity = amount
-    const c = readColour(colour, 'setSun')
-    if (c) sun.color = c
+    const colourValue = readColour(colour, 'setSun')
+    if (colourValue) sun.color = colourValue
   }
 
   state.aimSun = aimSun

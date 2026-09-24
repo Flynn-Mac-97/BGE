@@ -66,9 +66,9 @@ function installTab() {
   }
 }
 
-test('a reload restores the run, holds it still, and says what it lost', async t => {
+test('a reload restores the run, holds it still, and says what it lost', async context => {
   const project = await temporaryProject(PROJECT, 'reload-notice-')
-  t.after(() => fs.rmSync(project, { recursive: true, force: true }))
+  context.after(() => fs.rmSync(project, { recursive: true, force: true }))
 
   // A headless world has no session, so there is nothing to carry back and
   // nothing is announced. This runs before any capture exists: the notice keeps
@@ -78,7 +78,7 @@ test('a reload restores the run, holds it still, and says what it lost', async t
   assert.equal(takeReloadNote(), null)
 
   const tab = installTab()
-  t.after(() => tab.restore())
+  context.after(() => tab.restore())
 
   const before = await startWorldInNode({ root: CHECKOUT, project, renderer: 'null' })
   before.loop.step(3)

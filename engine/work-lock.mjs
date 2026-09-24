@@ -194,22 +194,22 @@ export function roleOfClient(root, clientId) {
 }
 
 /**
- * Whether one op may run, for one caller.
+ * Whether one operation may run, for one caller.
  *
  * `role` comes from `roleOfClient`, never from the caller. A lane may play and
  * capture in its own page and may never write a file through this door.
  */
-export function permits(lock, op, role = 'person') {
+export function permits(lock, operation, role = 'person') {
   if (role === 'lane') {
-    if (WRITES_A_FILE.has(op)) {
+    if (WRITES_A_FILE.has(operation)) {
       return {
         allowed: false,
-        why: `"${op}" writes to the checkout, and a lane render page is a viewer. Its world is its own; the files are not.`
+        why: `"${operation}" writes to the checkout, and a lane render page is a viewer. Its world is its own; the files are not.`
       }
     }
     return { allowed: true }
   }
   if (!lock.locked) return { allowed: true }
-  if (!WRITING_OPS.has(op)) return { allowed: true }
-  return { allowed: false, why: `"${op}" is held: ${lock.why}` }
+  if (!WRITING_OPS.has(operation)) return { allowed: true }
+  return { allowed: false, why: `"${operation}" is held: ${lock.why}` }
 }

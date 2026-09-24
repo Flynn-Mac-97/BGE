@@ -28,10 +28,10 @@ const BANNED = [
 /** Report determinism problems in one file, with line numbers. */
 export function lint(file, text) {
   const out = []
-  text.split('\n').forEach((line, i) => {
+  text.split('\n').forEach((line, index) => {
     if (/^\s*(\/\/|\*)/.test(line)) return // a comment may name them
-    for (const [re, why] of BANNED) {
-      if (re.test(line)) out.push({ file, line: i + 1, why, code: line.trim().slice(0, 80) })
+    for (const [pattern, why] of BANNED) {
+      if (pattern.test(line)) out.push({ file, line: index + 1, why, code: line.trim().slice(0, 80) })
     }
   })
   return out

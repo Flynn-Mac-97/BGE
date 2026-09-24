@@ -22,9 +22,9 @@ export async function bootPlugins({ loader, loadPlugins, game, context }) {
   // Where a plugin was found travels beside it rather than being guessed from
   // its name later. Sorting works on definitions, so the flag is carried in a
   // side map instead of being copied onto the definition itself.
-  const cameFromBuiltin = new Map(found.map(f => [f.definition, f.builtin === true]))
-  for (const definition of loader.order(found.map(f => f.definition))) {
-    loader.add(definition, cameFromBuiltin.get(definition) === true)
+  const cameFromBuiltin = new Map(found.map(entry => [entry.definition, entry.builtin === true]))
+  for (const definition of loader.order(found.map(entry => entry.definition))) {
+    loader.add(definition, { builtin: cameFromBuiltin.get(definition) === true })
   }
 
   // Turning a plugin off has to mean it never ran, so the list is applied

@@ -7,4 +7,5 @@
  */
 import { makeOnceReporter } from '../report-once.js'
 
+/** `reportOnce(message)` prints a message the first time it is said; `clearReported()` forgets what was said. */
 export const { report: reportOnce, clearSaid: clearReported } = makeOnceReporter()

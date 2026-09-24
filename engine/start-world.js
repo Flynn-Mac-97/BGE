@@ -40,9 +40,9 @@ import { loadLevel, loadTypes, reloadBehaviour, reloadType, saveLevel, togglePla
 /**
  * Where the camera is looking. Session state, not renderer state.
  *
- * It used to live inside the renderer, which meant game code could only reach
+ * It used to be inside the renderer, which meant game code could only reach
  * it through `context.renderer.view` — and a world with nothing rendering it
- * had no camera at all. It is a game value, so it lives with the game.
+ * had no camera at all. It is a game value, so it is stored with the game.
  */
 const DEFAULT_VIEW = {
   x: 7,

@@ -6,6 +6,7 @@ import * as THREE from 'three/webgpu'
 import { mergeMeshes } from './geometry-cache.js'
 import { DRAWN, MERGED } from './scene-layers.js'
 
+/** Builds the batching controller for one render state: merges static entities into few draw calls. */
 export function makeBatching(state) {
   /**
    * Several hundred boxes, drawn in a few dozen calls.

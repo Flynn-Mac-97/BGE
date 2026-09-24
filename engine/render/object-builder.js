@@ -61,6 +61,7 @@ function poseNode(object, nodes, name, turn) {
   node.updateMatrix()
 }
 
+/** Build the object builder and write its methods onto `state`. */
 export function makeObjectBuilder(state) {
   /**
    * The object standing for one entity.

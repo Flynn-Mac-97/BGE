@@ -26,7 +26,7 @@ test('a steady frame reuses the order, the targets and the frame record', () => 
   const made = graph.pool.created
   const rebuilds = graph.rebuilds
 
-  for (let i = 0; i < 1000; i++) graph.run(null, null, 64, 64)
+  for (let index = 0; index < 1000; index++) graph.run(null, null, 64, 64)
 
   assert.equal(graph.passes, order, 'the sorted order is the same array')
   assert.equal(graph.frame, frame, 'the frame record is the same object')
@@ -41,7 +41,7 @@ test('a pass-set change rebuilds, and an unchanged set does not', () => {
   graph.add({ name: 'a', execute: noop })
   graph.passes
   const settled = graph.rebuilds
-  for (let i = 0; i < 100; i++) graph.run(null, null, 8, 8)
+  for (let index = 0; index < 100; index++) graph.run(null, null, 8, 8)
   assert.equal(graph.rebuilds, settled)
   graph.add({ name: 'b', execute: noop })
   graph.passes
@@ -51,8 +51,8 @@ test('a pass-set change rebuilds, and an unchanged set does not', () => {
 test('one extract and one execute per pass, whatever the world holds', () => {
   const graph = makePassGraph({ report: noop })
   const work = []
-  for (let i = 0; i < 50; i++) {
-    graph.add({ name: `pass${i}`, extract: () => work.push('x'), execute: () => work.push('e') })
+  for (let index = 0; index < 50; index++) {
+    graph.add({ name: `pass${index}`, extract: () => work.push('x'), execute: () => work.push('e') })
   }
   graph.add({ name: 'present', execute: () => work.push('e') })
 
@@ -61,7 +61,7 @@ test('one extract and one execute per pass, whatever the world holds', () => {
   const callsForOne = work.length
   work.length = 0
 
-  const many = { entities: Array.from({ length: 10000 }, (_, i) => ({ id: `e${i}` })) }
+  const many = { entities: Array.from({ length: 10000 }, (placeholder, index) => ({ id: `e${index}` })) }
   graph.run(many, null, 8, 8)
   assert.equal(work.length, callsForOne, 'the executor does the same work for 1 and 10,000 entities')
   assert.equal(callsForOne, 101, '50 extracts, 51 executes')
@@ -97,15 +97,15 @@ test('the kernel runs a single screen pass and a many-pass chain the same way', 
   const rich = makePassGraph({ report: noop })
   const richRan = []
   let previous = null
-  for (let i = 0; i < 40; i++) {
-    const resource = `colour${i}`
+  for (let index = 0; index < 40; index++) {
+    const resource = `colour${index}`
     const reads = previous ? [previous] : []
     rich.add({
-      name: `pass${i}`,
+      name: `pass${index}`,
       reads,
       writes: [resource],
       target: { format: 'half-float' },
-      execute: () => richRan.push(`pass${i}`)
+      execute: () => richRan.push(`pass${index}`)
     })
     previous = resource
   }
@@ -117,12 +117,12 @@ test('the kernel runs a single screen pass and a many-pass chain the same way', 
 
 test('a thousand frames of a two-hundred-pass graph stay far under the budget', () => {
   const graph = makePassGraph({ report: noop })
-  for (let i = 0; i < 200; i++) graph.add({ name: `pass${i}`, execute: noop })
+  for (let index = 0; index < 200; index++) graph.add({ name: `pass${index}`, execute: noop })
   graph.add({ name: 'present', execute: noop })
   graph.run(null, null, 8, 8)
 
   const started = performance.now()
-  for (let i = 0; i < 1000; i++) graph.run(null, null, 8, 8)
+  for (let index = 0; index < 1000; index++) graph.run(null, null, 8, 8)
   const elapsed = performance.now() - started
 
   // Budget: 4000 ms for 1000 frames of 201 passes, which is 201,000 no-op

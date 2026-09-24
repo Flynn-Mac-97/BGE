@@ -12,8 +12,8 @@
  *   { kind: 'colour' | 'depth', lifetime: 'transient' | 'persistent',
  *     scale, format, samples, depth, stencil }
  *
- * A transient resource lives for one frame and two spans that do not overlap
- * share one target. A persistent resource outlives the frame: it is allocated
+ * A transient resource is allocated for one frame and two spans that do not
+ * overlap share one target. A persistent resource outlives the frame: it is allocated
  * once and reused, it never shares a target, and a read of it next frame sees
  * what this frame wrote. Both defaults — colour, transient — are the old
  * behaviour, so a record that says nothing but `writes` and `target` is
@@ -105,17 +105,17 @@ function isCulled(pass, shortfall, resourceSlot) {
 }
 
 /** Add one edge unless it is a self-edge or already recorded. */
-function addEdge(seen, out, indegree, from, to) {
-  if (from === to) return
+function addEdge(seen, out, indegree, from, target) {
+  if (from === target) return
   let set = seen.get(from)
   if (!set) {
     set = new Set()
     seen.set(from, set)
   }
-  if (set.has(to)) return
-  set.add(to)
-  out.get(from).push(to)
-  indegree.set(to, indegree.get(to) + 1)
+  if (set.has(target)) return
+  set.add(target)
+  out.get(from).push(target)
+  indegree.set(target, indegree.get(target) + 1)
 }
 
 /**
@@ -166,10 +166,10 @@ function walkOrder(ready, byName, indegree, out) {
   for (let head = 0; head < ready.length; head++) {
     const name = ready[head]
     ordered.push(byName.get(name))
-    for (const to of out.get(name)) {
-      const left = indegree.get(to) - 1
-      indegree.set(to, left)
-      if (left === 0) ready.push(to)
+    for (const target of out.get(name)) {
+      const left = indegree.get(target) - 1
+      indegree.set(target, left)
+      if (left === 0) ready.push(target)
     }
   }
   return ordered
@@ -363,6 +363,7 @@ function passFailure(pass, error) {
   return `[render] graph: "${pass.name}" threw — ${error?.message || error}`
 }
 
+/** Builds the pass graph executor: sorts passes into order and runs extract, prepare and execute each frame. */
 export function makePassGraph(options = {}) {
   const report = options.report ?? reportOnce
   // The pool reports a target format it cannot build, and takes the device
@@ -487,8 +488,8 @@ export function makePassGraph(options = {}) {
   function extract() {
     ensureBuilt()
     clockReads = 0
-    for (let i = 0; i < order.length; i++) {
-      const pass = order[i]
+    for (let index = 0; index < order.length; index++) {
+      const pass = order[index]
       if (!pass.extract || isCulled(pass, targetShortfall, resourceSlot)) continue
       // A pass that throws is skipped for this frame and tried again on the
       // next, and the passes after it still run. The guard is written out
@@ -501,7 +502,7 @@ export function makePassGraph(options = {}) {
       } catch (error) {
         report(passFailure(pass, error))
       }
-      passCosts[i].extractMs = now() - startedAt
+      passCosts[index].extractMs = now() - startedAt
       clockReads++
     }
     extracted = true
@@ -519,8 +520,8 @@ export function makePassGraph(options = {}) {
     // the world again.
     if (!extracted) extract()
     extracted = false
-    for (let i = 0; i < order.length; i++) {
-      const pass = order[i]
+    for (let index = 0; index < order.length; index++) {
+      const pass = order[index]
       if (!pass.prepare || isCulled(pass, targetShortfall, resourceSlot)) continue
       const startedAt = now()
       clockReads++
@@ -529,11 +530,11 @@ export function makePassGraph(options = {}) {
       } catch (error) {
         report(passFailure(pass, error))
       }
-      passCosts[i].prepareMs = now() - startedAt
+      passCosts[index].prepareMs = now() - startedAt
       clockReads++
     }
-    for (let i = 0; i < order.length; i++) {
-      const pass = order[i]
+    for (let index = 0; index < order.length; index++) {
+      const pass = order[index]
       if (isCulled(pass, targetShortfall, resourceSlot)) continue
       const startedAt = now()
       clockReads++
@@ -543,7 +544,7 @@ export function makePassGraph(options = {}) {
       } catch (error) {
         report(passFailure(pass, error))
       }
-      passCosts[i].executeMs = now() - startedAt
+      passCosts[index].executeMs = now() - startedAt
       clockReads++
     }
   }

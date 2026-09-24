@@ -2,8 +2,11 @@
 
 import { PROJECT_PREFIX } from './asset-path.js'
 
+/** Path to the engine's own instruction manifest. */
 export const ENGINE_AGENT_MANIFEST = 'agents/manifest.json'
+/** Path to a project's instruction manifest. */
 export const PROJECT_AGENT_MANIFEST = 'agents/manifest.json'
+/** Path to a project's agent settings file. */
 export const AGENT_SETTINGS = 'agents/settings.json'
 
 /** A path in the one spelling the tree uses: forward slashes, no leading `./`. */
@@ -207,9 +210,9 @@ const selectableKind = node => ['instruction', 'skill'].includes(node.kind)
 function namesPluginSource(node, file) {
   const source = cleanPath(node.source)
   if (!source) return false
-  const at = source.lastIndexOf('/')
-  const directory = at < 0 ? '' : source.slice(0, at + 1)
-  const stem = source.slice(at + 1).replace(/\.js$/, '')
+  const slashIndex = source.lastIndexOf('/')
+  const directory = slashIndex < 0 ? '' : source.slice(0, slashIndex + 1)
+  const stem = source.slice(slashIndex + 1).replace(/\.js$/, '')
   const bare = cleanPath(file).replace(new RegExp(`^${PROJECT_PREFIX}/`), '')
   return bare === source || bare.startsWith(`${directory}${stem}/`)
 }
@@ -224,8 +227,8 @@ function namesPluginSource(node, file) {
 function namesTrigger(task, trigger) {
   const word = String(trigger).toLowerCase()
   if (!word) return false
-  for (let at = task.indexOf(word); at !== -1; at = task.indexOf(word, at + 1)) {
-    if (at === 0 || !/[a-z0-9]/.test(task[at - 1])) return true
+  for (let matchIndex = task.indexOf(word); matchIndex !== -1; matchIndex = task.indexOf(word, matchIndex + 1)) {
+    if (matchIndex === 0 || !/[a-z0-9]/.test(task[matchIndex - 1])) return true
   }
   return false
 }

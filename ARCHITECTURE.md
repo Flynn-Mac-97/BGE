@@ -27,13 +27,12 @@ docs. `docs/kernel.md` says how that one name reaches a directory anywhere.
 
 ## Shape
 
-About 5,200 lines. Roughly half kernel, half plugins — and the plugins have no
-privileges the kernel does not give everyone. Physics is a plugin; the
+About 23,000 lines of JavaScript in `engine/` and 37,000 in `plugins/`. The
+plugins have no privileges the kernel does not give everyone. Physics is a plugin; the
 inspector is a plugin; delete both and the engine still boots. Everything above
 `start-world.js` runs identically in the browser and headless.
 
-Every name is spelled out: `properties` not props, `context` not ctx, `entity`
-not e, `seconds` not dt. Plugin names are plain Title Case — `Inspector Panel`,
+Names follow `agents/code-style.md`. Plugin names are plain Title Case — `Inspector Panel`,
 `Terminal Bridge`. A short name saves nothing and costs the reader a decoding
 step.
 

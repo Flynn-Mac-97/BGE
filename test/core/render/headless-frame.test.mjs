@@ -32,7 +32,7 @@ test('a headless frame never draws, because there is no card to draw into', asyn
 
 test('entities that hold still merge into batches, and a moving one leaves its batch', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
-  const world = { entities: Array.from({ length: 8 }, (_, index) => box(`e${index}`)) }
+  const world = { entities: Array.from({ length: 8 }, (unused, index) => box(`e${index}`)) }
   frame.sync(world)
   assert.equal(frame.stats.merged, 0, 'nothing merges before it has held still')
 

@@ -32,28 +32,30 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
      */
     assets: kind =>
       Object.entries(editor.index.assets)
-        .filter(([, a]) => !kind || a.kind === kind)
-        .map(([name, a]) => ({ name, ...a })),
+        .filter(([, asset]) => !kind || asset.kind === kind)
+        .map(([name, asset]) => ({ name, ...asset })),
     /**
      * The project's types, each with its name.
      *
      * @returns {object[]} One `{ name, ...entry }` per type.
      */
-    types: () => Object.entries(editor.index.types).map(([name, t]) => ({ name, ...t })),
+    types: () => Object.entries(editor.index.types).map(([name, type]) => ({ name, ...type })),
     /**
      * The project's behaviours, each with its name.
      *
      * @returns {object[]} One `{ name, ...entry }` per behaviour.
      */
-    behaviours: () => Object.entries(editor.index.behaviours || {}).map(([name, b]) => ({ name, ...b })),
+    behaviours: () =>
+      Object.entries(editor.index.behaviours || {}).map(([name, behaviour]) => ({ name, ...behaviour })),
     /**
      * The project's levels, each with its name.
      *
      * @returns {object[]} One `{ name, ...entry }` per level.
      */
-    levels: () => Object.entries(editor.index.levels).map(([name, l]) => ({ name, ...l })),
+    levels: () => Object.entries(editor.index.levels).map(([name, level]) => ({ name, ...level })),
     level: () => editor.levelName,
-    select: (x, additive) => editor.select(x, additive),
+    select: ids => editor.select(ids),
+    addToSelection: ids => editor.addToSelection(ids),
     /**
      * Ask the editor to open a file.
      *
@@ -64,23 +66,23 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
     /**
      * Add an entity to the world and announce it.
      *
-     * @param {string} t The type name.
-     * @param {object} [p] The placement.
+     * @param {string} type The type name.
+     * @param {object} [placement] The placement.
      * @returns {object} The spawned entity.
      */
-    spawn: (t, p) => {
-      const e = world.spawn(t, p)
+    spawn: (type, placement) => {
+      const entity = world.spawn(type, placement)
       bus.emit('world:changed')
-      return e
+      return entity
     },
     /**
      * Remove an entity from the world and announce it.
      *
-     * @param {object} e The entity to remove.
+     * @param {object} entity The entity to remove.
      * @returns {void}
      */
-    destroy: e => {
-      world.destroy(e)
+    destroy: entity => {
+      world.destroy(entity)
       bus.emit('world:changed')
     },
     run: (id, args) => context.engine.run(id, args),
@@ -113,8 +115,8 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
     // For anything that only draws. Kept apart from `random` so a change to an
     // effect cannot move where an enemy spawns.
     drawing: loop.drawing,
-    after: (seconds, fn) => loop.after(seconds, fn),
-    every: (seconds, fn) => loop.every(seconds, fn),
+    after: (seconds, listener) => loop.after(seconds, listener),
+    every: (seconds, listener) => loop.every(seconds, listener),
     cancel: id => loop.cancel(id)
   })
 

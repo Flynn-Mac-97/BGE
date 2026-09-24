@@ -20,14 +20,15 @@
     "test:offline": "node --test \"test/*.test.mjs\" \"test/core/**/*.test.mjs\"",
     "test:core": "node --test \"test/core/**/*.test.mjs\"",
     "test:agent": "node --test test/agent-workspace.test.mjs",
-    "lint": "eslint engine test/core eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs",
-    "format": "prettier --write \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
-    "format:check": "prettier --check \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
+    "lint": "eslint engine test/core eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/check-codemap.mjs scripts/kernel-gate.mjs scripts/eslint-style-rules.mjs",
+    "format": "prettier --write \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/check-codemap.mjs scripts/kernel-gate.mjs scripts/eslint-style-rules.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
+    "format:check": "prettier --check \"engine/**/*.{js,mjs}\" \"test/core/**/*.mjs\" eslint.config.mjs prettier.config.mjs scripts/check-structure.mjs scripts/check-codemap.mjs scripts/kernel-gate.mjs scripts/eslint-style-rules.mjs scripts/structure-budget.json scripts/kernel-trellis.yaml package.json",
     "check:structure": "node scripts/check-structure.mjs",
+    "check:codemap": "node scripts/check-codemap.mjs",
     "bench:render": "node scripts/render-benchmark.mjs",
     "bench:baseline": "node scripts/render-benchmark.mjs --write-baseline",
     "bench:check": "node scripts/check-render-benchmark.mjs",
-    "check": "npm run format:check && npm run lint && npm run test:core && npm run check:structure",
+    "check": "node scripts/kernel-gate.mjs && npm run test:core",
     "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine --config scripts/kernel-trellis.yaml",
     "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit .",
     "bench:show": "node scripts/render-benchmark.mjs --show aaa"
@@ -55,7 +56,10 @@
     "electron": "^44.4.3",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
+    "js-yaml": "^4.3.2",
     "prettier": "^3.9.9",
-    "vite": "^5.4.0"
+    "typescript": "6.0.3",
+    "vite": "^5.4.0",
+    "zod": "^4.6.5"
   }
 }

@@ -22,8 +22,8 @@
  * missing later. Called without a loader there is nowhere to put it and only
  * the console is left — which is where it used to go, and no worse than that.
  */
-export function reportImportFailure(loader, file, error, builtin = false) {
-  if (loader) loader.failedImport(file, error, builtin)
+export function reportImportFailure(loader, file, error, { builtin = false } = {}) {
+  if (loader) loader.failedImport(file, error, { builtin })
   else console.error(`[loader] ${file} failed to import`, error)
 }
 
@@ -56,7 +56,7 @@ export async function importPlugin({ file, load, loader, builtin = false }) {
     }
     return definition
   } catch (error) {
-    reportImportFailure(loader, file, error, builtin)
+    reportImportFailure(loader, file, error, { builtin })
     return null
   }
 }

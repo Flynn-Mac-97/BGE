@@ -9,6 +9,7 @@
  */
 import { makeTargetPool } from '../../../engine/render/target-pool.js'
 
+/** Wrap a target pool, counting its acquire and release calls. */
 export function makeCountingPool(pool = makeTargetPool()) {
   let acquired = 0
   let released = 0

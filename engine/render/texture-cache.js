@@ -2,7 +2,7 @@
  * Kernel: one texture, cached, in three readings of the same file.
  *
  * `sprite`, `world` and `lightmap` differ in filtering, mipmaps and wrap, so the
- * reading is part of the cache key. Repeat lives on the texture object, so a
+ * reading is part of the cache key. Repeat is stored on the texture object, so a
  * copy with its own repeat is cached by that repeat as well.
  *
  * The cache outlives any one renderer — `cachedTexture()` is shared by every renderer
@@ -33,6 +33,7 @@ export function setMaxAnisotropy(value) {
   maxAnisotropy = value
 }
 
+/** Whether the texture for `src` in `mode` has loaded, is loading, or failed. */
 export const textureStatus = (src, mode) => texState.get(`${mode}:${src}`)?.status || 'unknown'
 
 /**
@@ -66,13 +67,13 @@ export function cachedTexture(src, mode, onFail) {
 
   const url = assetURL(src)
   const state = { status: 'loading', waiting: onFail ? [onFail] : [] }
-  const t = loader.load(
+  const texture = loader.load(
     url,
     () => {
       state.status = 'ready'
       // Copies made while the file was in flight are holding off their upload
       // until now; see guardUpload.
-      for (const fn of state.ready || []) fn()
+      for (const resume of state.ready || []) resume()
       state.ready = null
     },
     undefined,
@@ -84,27 +85,27 @@ export function cachedTexture(src, mode, onFail) {
       // well would be a second source of truth for one fact, and the two would
       // eventually disagree.
       state.status = 'failed'
-      for (const fn of state.waiting) fn()
+      for (const resume of state.waiting) resume()
       state.waiting.length = 0
     }
   )
 
   if (mode === 'sprite') {
     // pixel art stays crisp: no smoothing, no mipmaps
-    t.magFilter = THREE.NearestFilter
-    t.minFilter = THREE.NearestFilter
-    t.generateMipmaps = false
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.generateMipmaps = false
   } else {
-    t.magFilter = THREE.LinearFilter
-    t.minFilter = THREE.LinearMipmapLinearFilter
-    t.generateMipmaps = true
-    t.anisotropy = maxAnisotropy
-    t.wrapS = t.wrapT = mode === 'lightmap' ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping
+    texture.magFilter = THREE.LinearFilter
+    texture.minFilter = THREE.LinearMipmapLinearFilter
+    texture.generateMipmaps = true
+    texture.anisotropy = maxAnisotropy
+    texture.wrapS = texture.wrapT = mode === 'lightmap' ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping
   }
-  t.colorSpace = THREE.SRGBColorSpace
-  texCache.set(key, t)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texCache.set(key, texture)
   texState.set(key, state)
-  return t
+  return texture
 }
 
 /**
@@ -136,20 +137,20 @@ function guardUpload(base, copy, src, mode) {
 /**
  * A texture with its own repeat, cached by that repeat.
  *
- * Repeat lives on the texture object, so two walls tiling the same file at
+ * Repeat is stored on the texture object, so two walls tiling the same file at
  * different densities cannot share one — but four hundred walls tiling it the
  * SAME way can, and on a real map they mostly do. Caching the copy by its repeat
  * turns two hundred and thirty texture objects into eight, and it is what makes
  * one shared material per look possible, which is in turn what makes merging
  * possible.
  */
-export function tiledTexture(src, mode, u, v, onFail) {
-  const key = `${mode}:${u},${v}:${src}`
+export function tiledTexture(src, mode, repeatU, repeatV, onFail) {
+  const key = `${mode}:${repeatU},${repeatV}:${src}`
   const found = variantCache.get(key)
   if (found) return found
   const base = cachedTexture(src, mode, onFail)
   const copy = base.clone()
-  copy.repeat.set(u, v)
+  copy.repeat.set(repeatU, repeatV)
   guardUpload(base, copy, src, mode)
   variantCache.set(key, copy)
   return copy

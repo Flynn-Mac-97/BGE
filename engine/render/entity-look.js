@@ -59,29 +59,32 @@ export function anchorOffset(entity) {
 }
 
 /**
- * Where frame N sits in a sheet, as a UV window.
+ * Where frame N is in a sheet, as a UV window.
  *
  * Frames run left to right then top to bottom, and the column count comes from
  * the image once it has loaded — declaring it as well would be a second source
  * of truth that could disagree with the file.
  */
 export function frameWindow(sprite, frame, image) {
-  const [cw, ch] = sprite.size || [image.width, image.height]
-  const cols = Math.max(1, Math.floor(image.width / cw))
-  const rows = Math.max(1, Math.floor(image.height / ch))
-  const n = Math.max(0, Math.floor(frame || 0)) % (cols * rows)
+  const [cellWidth, cellHeight] = sprite.size || [image.width, image.height]
+  const cols = Math.max(1, Math.floor(image.width / cellWidth))
+  const rows = Math.max(1, Math.floor(image.height / cellHeight))
+  const frameIndex = Math.max(0, Math.floor(frame || 0)) % (cols * rows)
   return {
-    repeat: [cw / image.width, ch / image.height],
+    repeat: [cellWidth / image.width, cellHeight / image.height],
     // Three's V axis runs bottom-up while a sheet reads top-down.
-    offset: [((n % cols) * cw) / image.width, 1 - ch / image.height - (Math.floor(n / cols) * ch) / image.height]
+    offset: [
+      ((frameIndex % cols) * cellWidth) / image.width,
+      1 - cellHeight / image.height - (Math.floor(frameIndex / cols) * cellHeight) / image.height
+    ]
   }
 }
 
 /** Stable colour per type so untextured entities are still distinguishable. */
 export function entityTint(type) {
   let hash = 0
-  for (let i = 0; i < type.length; i++) hash = (hash * 31 + type.charCodeAt(i)) | 0
-  const c = new THREE.Color()
-  c.setHSL(((hash >>> 0) % 360) / 360, 0.32, 0.55)
-  return c
+  for (let index = 0; index < type.length; index++) hash = (hash * 31 + type.charCodeAt(index)) | 0
+  const color = new THREE.Color()
+  color.setHSL(((hash >>> 0) % 360) / 360, 0.32, 0.55)
+  return color
 }

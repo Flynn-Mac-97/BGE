@@ -23,7 +23,7 @@ function makeOrthographicCamera() {
 /**
  * A perspective world camera.
  *
- * Near is 0.05 rather than something rounder because the eye sits 1.62 m up
+ * Near is 0.05 rather than something rounder because the eye is 1.62 m up
  * and a wall it is pressed against must not clip away. Far is 400 m, which is
  * an order of magnitude past the longest sightline any map of this kind has.
  */
@@ -62,6 +62,7 @@ function applyProjection(camera, projection) {
   camera.updateProjectionMatrix()
 }
 
+/** The session's cameras and the viewport calls they read and write. */
 export function makeCamera(state) {
   const orthographic = makeOrthographicCamera()
   const perspective = makePerspectiveCamera()
@@ -72,9 +73,9 @@ export function makeCamera(state) {
 
   /** Take the canvas's own size as the viewport and rebuild the camera for it. */
   function resize() {
-    const r = state.canvas.getBoundingClientRect()
-    state.viewport.width = Math.max(1, r.width)
-    state.viewport.height = Math.max(1, r.height)
+    const rect = state.canvas.getBoundingClientRect()
+    state.viewport.width = Math.max(1, rect.width)
+    state.viewport.height = Math.max(1, rect.height)
     state.renderer.setSize(state.viewport.width, state.viewport.height, false)
     updateCamera()
   }
@@ -155,10 +156,10 @@ export function makeCamera(state) {
   }
 
   /** A pixel in the viewport as normalized device coordinates, y upward. */
-  const toNDC = (px, py) =>
+  const toNDC = (pixelX, pixelY) =>
     new THREE.Vector2(
-      (px / Math.max(1, state.viewport.width)) * 2 - 1,
-      1 - (py / Math.max(1, state.viewport.height)) * 2
+      (pixelX / Math.max(1, state.viewport.width)) * 2 - 1,
+      1 - (pixelY / Math.max(1, state.viewport.height)) * 2
     )
 
   state.flat = flat

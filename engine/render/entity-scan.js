@@ -87,33 +87,33 @@ export function makeEntityScans(state, records) {
    * what this frame shows and does not have to be compared.
    */
   function saveSlot(index, entity, object, record) {
-    const at = index * SLOT_STRIDE
-    snapshot[at] = entity
-    snapshot[at + SLOT_OBJECT] = object
-    snapshot[at + SLOT_MESH] = entity.mesh
-    snapshot[at + SLOT_COLLIDER] = entity.collider
-    snapshot[at + SLOT_TYPE] = entity.type
-    snapshot[at + SLOT_SCALE] = entity.scale
-    snapshot[at + SLOT_YAW] = entity.yaw
-    snapshot[at + SLOT_HIDDEN] = entity.hidden
-    snapshot[at + SLOT_OPACITY] = entity.opacity
-    snapshot[at + SLOT_X] = entity.x
-    snapshot[at + SLOT_Y] = entity.y
-    snapshot[at + SLOT_Z] = entity.z
+    const slot = index * SLOT_STRIDE
+    snapshot[slot] = entity
+    snapshot[slot + SLOT_OBJECT] = object
+    snapshot[slot + SLOT_MESH] = entity.mesh
+    snapshot[slot + SLOT_COLLIDER] = entity.collider
+    snapshot[slot + SLOT_TYPE] = entity.type
+    snapshot[slot + SLOT_SCALE] = entity.scale
+    snapshot[slot + SLOT_YAW] = entity.yaw
+    snapshot[slot + SLOT_HIDDEN] = entity.hidden
+    snapshot[slot + SLOT_OPACITY] = entity.opacity
+    snapshot[slot + SLOT_X] = entity.x
+    snapshot[slot + SLOT_Y] = entity.y
+    snapshot[slot + SLOT_Z] = entity.z
     // The slot place and the drawn place hold the same three numbers: the
     // still scan compares the first, the moving scan the second.
     const drawn = index * DRAWN_STRIDE
     drawnPlaces[drawn] = entity.x
     drawnPlaces[drawn + 1] = entity.y
     drawnPlaces[drawn + 2] = entity.z
-    snapshot[at + SLOT_ANCHOR] = record.anchor
-    snapshot[at + SLOT_DECLARED] = record.declared
-    snapshot[at + SLOT_SHAPE] = record.shape
+    snapshot[slot + SLOT_ANCHOR] = record.anchor
+    snapshot[slot + SLOT_DECLARED] = record.declared
+    snapshot[slot + SLOT_SHAPE] = record.shape
     // Settled, idle and never moved: the answers that let the next frame skip
     // this entity, and whether it draws an outline while skipped. Steady is the
     // moving counterpart: a simple mesh, out of every batch, whose outline is
     // already resolved, so a frame that only moved it needs to write a place.
-    snapshot[at + SLOT_FLAGS] =
+    snapshot[slot + SLOT_FLAGS] =
       (record.settled && record.idle && !record.moved ? SLOT_QUIET : 0) |
       (record.outline ? SLOT_OUTLINE : 0) |
       (record.steady ? SLOT_STEADY : 0)
@@ -131,9 +131,9 @@ export function makeEntityScans(state, records) {
   ]
 
   /** Whether the slot still holds the entity's declaration, field for field. */
-  function sameFields(entity, at) {
-    for (const [slot, field] of SAME_FIELDS) {
-      if (snapshot[at + slot] !== entity[field]) return false
+  function sameFields(entity, slot) {
+    for (const [offset, field] of SAME_FIELDS) {
+      if (snapshot[slot + offset] !== entity[field]) return false
     }
     return true
   }
@@ -152,9 +152,9 @@ export function makeEntityScans(state, records) {
    * is compared once here. Each caller tests the slot's first cell first, which
    * is the cheapest way to reject a slot whose entity changed.
    */
-  function sameApartFromPlace(entity, at, ringedId) {
+  function sameApartFromPlace(entity, slot, ringedId) {
     if (typeof entity.rotation === 'object') return false
-    if (!sameFields(entity, at)) return false
+    if (!sameFields(entity, slot)) return false
     return !isRinged(entity, ringedId)
   }
 
@@ -163,14 +163,14 @@ export function makeEntityScans(state, records) {
    * never moved, and has not changed since. Such an entity is drawn exactly as
    * it was, on a still frame and on a playing frame alike.
    */
-  function isQuiet(entity, at, ringedId) {
+  function isQuiet(entity, slot, ringedId) {
     return (
-      snapshot[at] === entity &&
-      (snapshot[at + SLOT_FLAGS] & SLOT_QUIET) !== 0 &&
-      snapshot[at + SLOT_X] === entity.x &&
-      snapshot[at + SLOT_Y] === entity.y &&
-      snapshot[at + SLOT_Z] === entity.z &&
-      sameApartFromPlace(entity, at, ringedId)
+      snapshot[slot] === entity &&
+      (snapshot[slot + SLOT_FLAGS] & SLOT_QUIET) !== 0 &&
+      snapshot[slot + SLOT_X] === entity.x &&
+      snapshot[slot + SLOT_Y] === entity.y &&
+      snapshot[slot + SLOT_Z] === entity.z &&
+      sameApartFromPlace(entity, slot, ringedId)
     )
   }
 
@@ -191,15 +191,15 @@ export function makeEntityScans(state, records) {
   function scanQuiet(entities, frame, sweep, ringedId) {
     dirtyIndices.length = 0
     let keylines = 0
-    for (let i = 0; i < entities.length; i++) {
-      const entity = entities[i]
-      const at = i * SLOT_STRIDE
-      if (isQuiet(entity, at, ringedId)) {
-        if (sweep) snapshot[at + SLOT_OBJECT].userData.seen = frame
-        if (snapshot[at + SLOT_FLAGS] & SLOT_OUTLINE) keylines++
+    for (let index = 0; index < entities.length; index++) {
+      const entity = entities[index]
+      const slot = index * SLOT_STRIDE
+      if (isQuiet(entity, slot, ringedId)) {
+        if (sweep) snapshot[slot + SLOT_OBJECT].userData.seen = frame
+        if (snapshot[slot + SLOT_FLAGS] & SLOT_OUTLINE) keylines++
         continue
       }
-      dirtyIndices.push(i)
+      dirtyIndices.push(index)
     }
     return keylines
   }
@@ -210,18 +210,18 @@ export function makeEntityScans(state, records) {
    * It must be the entity the last pass drew, steady, and moved since — and its
    * declaration unchanged, which `sameApartFromPlace` answers.
    */
-  function isPlaceable(entity, at, drawn, flags, ringedId) {
-    if (snapshot[at] !== entity) return false
+  function isPlaceable(entity, slot, drawn, flags, ringedId) {
+    if (snapshot[slot] !== entity) return false
     if ((flags & SLOT_STEADY) === 0) return false
     if (drawnPlaces[drawn] === entity.x && drawnPlaces[drawn + 1] === entity.y && drawnPlaces[drawn + 2] === entity.z)
       return false
-    return sameApartFromPlace(entity, at, ringedId)
+    return sameApartFromPlace(entity, slot, ringedId)
   }
 
   /** Move an entity's object to its blended place, and let the marks follow it. */
-  function placeMoving(entity, object, at, blend, drawInto) {
+  function placeMoving(entity, object, slot, blend, drawInto) {
     const place = drawInto(drawnPlaceScratch, entity, blend)
-    object.position.set(place.x, place.y + snapshot[at + SLOT_ANCHOR], place.z || 0)
+    object.position.set(place.x, place.y + snapshot[slot + SLOT_ANCHOR], place.z || 0)
     // The record keeps the last transform written so a later full pass can tell
     // a real move from a pose change; this fast path moves the object, so it
     // writes through the same bookkeeping rather than around it.
@@ -229,7 +229,7 @@ export function makeEntityScans(state, records) {
     // The keyline hangs off the object and moves with it, so only the ground mark
     // has to be written again.
     if (!entity.hidden) {
-      state.moveMarks(entity, snapshot[at + SLOT_DECLARED], snapshot[at + SLOT_SHAPE], place)
+      state.moveMarks(entity, snapshot[slot + SLOT_DECLARED], snapshot[slot + SLOT_SHAPE], place)
     }
   }
 
@@ -247,26 +247,26 @@ export function makeEntityScans(state, records) {
   function scanMoving(entities, blend, drawInto, ringedId) {
     dirtyIndices.length = 0
     let keylines = 0
-    for (let i = 0; i < entities.length; i++) {
-      const entity = entities[i]
-      const at = i * SLOT_STRIDE
-      const drawn = i * DRAWN_STRIDE
-      const flags = snapshot[at + SLOT_FLAGS]
+    for (let index = 0; index < entities.length; index++) {
+      const entity = entities[index]
+      const slot = index * SLOT_STRIDE
+      const drawn = index * DRAWN_STRIDE
+      const flags = snapshot[slot + SLOT_FLAGS]
       // A level in play is mostly things that never move. Their place before
       // the step is their place now, so they are drawn as the last pass left them.
-      if (isQuiet(entity, at, ringedId)) {
+      if (isQuiet(entity, slot, ringedId)) {
         if (flags & SLOT_OUTLINE) keylines++
         continue
       }
-      if (isPlaceable(entity, at, drawn, flags, ringedId)) {
-        placeMoving(entity, snapshot[at + SLOT_OBJECT], at, blend, drawInto)
+      if (isPlaceable(entity, slot, drawn, flags, ringedId)) {
+        placeMoving(entity, snapshot[slot + SLOT_OBJECT], slot, blend, drawInto)
         drawnPlaces[drawn] = entity.x
         drawnPlaces[drawn + 1] = entity.y
         drawnPlaces[drawn + 2] = entity.z
         if (flags & SLOT_OUTLINE) keylines++
         continue
       }
-      dirtyIndices.push(i)
+      dirtyIndices.push(index)
     }
     return keylines
   }

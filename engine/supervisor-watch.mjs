@@ -3,7 +3,7 @@
  *
  * `supervisor --watch` and `engine.cmd` both call `watchSupervisor`. The table
  * is the same for an agent and a person: kind, id, port, pid, project, age, the
- * state the prover last proved, and whether the page can be seen. Under it sits the event feed the supervisor
+ * state the prover last proved, and whether the page can be seen. Below it is the event feed the supervisor
  * keeps, so a start, a stop or a death found by the prover is not silent. Keys
  * open a dev server, open a visible or headless engine on one, stop one, stop
  * all and quit. Nothing here is a dependency: `readline` and raw mode are built in.

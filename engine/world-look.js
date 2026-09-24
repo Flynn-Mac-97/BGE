@@ -62,23 +62,23 @@ export const RESERVED = new Set([
  *   behaviours: { float: { speed: 3 } }    defaults changed here
  *   behaviours: { float: false }           this placement takes it back off
  */
-export const asAttached = v => {
-  if (!v) return {}
-  if (Array.isArray(v)) return Object.fromEntries(v.map(n => [n, {}]))
-  return v
+export const asAttached = value => {
+  if (!value) return {}
+  if (Array.isArray(value)) return Object.fromEntries(value.map(name => [name, {}]))
+  return value
 }
 
 /** Expand the shorthand form of a value: 'coin.png' -> { image: 'coin.png' } */
-export const expand = (v, key) => (typeof v === 'string' ? { [key]: v } : v)
+export const expand = (value, key) => (typeof value === 'string' ? { [key]: value } : value)
 
 /**
  * The entity always holds the expanded object form, but the type may have
  * declared the string shorthand — compare what they mean, not how they were
  * written, or every save writes an override that is not one.
  */
-export const sameLook = (a, b, key) => {
-  const norm = v => JSON.stringify(expand(v, key) ?? null)
-  return norm(a) === norm(b)
+export const sameLook = (first, second, key) => {
+  const norm = value => JSON.stringify(expand(value, key) ?? null)
+  return norm(first) === norm(second)
 }
 
 /**
@@ -98,19 +98,19 @@ export const sameLook = (a, b, key) => {
  * engine/project-index.mjs.
  */
 export const mergeLook = (base, over, key) => {
-  const a = expand(base, key)
-  const b = expand(over, key)
-  if (!a) return b
-  if (!b) return a
-  return { ...a, ...b }
+  const baseLook = expand(base, key)
+  const overLook = expand(over, key)
+  if (!baseLook) return overLook
+  if (!overLook) return baseLook
+  return { ...baseLook, ...overLook }
 }
 
 /** What this value says that its type default does not. The decision, not the copy. */
 export const lookDiff = (value, base) => {
   if (!value) return null
   const out = {}
-  for (const [k, v] of Object.entries(value)) {
-    if (JSON.stringify(base?.[k]) !== JSON.stringify(v)) out[k] = v
+  for (const [fieldKey, fieldValue] of Object.entries(value)) {
+    if (JSON.stringify(base?.[fieldKey]) !== JSON.stringify(fieldValue)) out[fieldKey] = fieldValue
   }
   return Object.keys(out).length ? out : null
 }

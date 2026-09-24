@@ -36,9 +36,9 @@
  * made of; and `marks` is a visual drawn beside one entity. All are
  * deliberately dumb. A renderer that holds the list of materials a game uses,
  * the marks it draws, the passes it runs, or the way it draws the world, has
- * started to know what the game is — and in this engine that knowledge lives in
- * a plugin. This file owns one GL context and one draw order, and it must never
- * learn what bloom is.
+ * started to know what the game is — and in this engine that knowledge is kept
+ * in a plugin. This file owns one GL context and one draw order, and it must
+ * never learn what bloom is.
  *
  * What it does know about is cost. Several hundred walls that never move are
  * merged by material into a handful of meshes, each one still small enough to be
@@ -242,6 +242,11 @@ function monitorDevice({ renderer, state, bus, canvas }) {
   }
 }
 
+/**
+ * Build the GL context and return the renderer surface: sync, draw, pick, the
+ * device hooks and the frame stats. `view` and `viewport` are handed in, not
+ * owned here.
+ */
 export async function makeRenderer(canvas, view, viewport, options = {}) {
   // WebGPU where the browser has it, WebGL 2 where it does not. The backend
   // is chosen during init, which is why this function is async and why the

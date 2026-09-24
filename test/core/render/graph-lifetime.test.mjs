@@ -1,6 +1,6 @@
 /**
- * The resource lifetimes the pass graph plans: a transient resource lives for
- * one frame and pools with any other transient whose span does not overlap; a
+ * The resource lifetimes the pass graph plans: a transient resource is allocated
+ * for one frame and pools with any other transient whose span does not overlap; a
  * persistent resource outlives the frame, is never aliased, is read next frame
  * with what the last one wrote, survives a resize and a device restore, and is
  * released when nothing declares it any more.

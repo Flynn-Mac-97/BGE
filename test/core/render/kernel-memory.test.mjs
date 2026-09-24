@@ -44,12 +44,12 @@ test('fifty full-size passes fit under the ceiling, and a runaway pass set is cu
   // at the 1280x720 viewport. Aliasing usually makes this one target; the
   // distinct scales here force fifty, which is the number the ceiling must clear.
   const legit = makePassGraph({ report: noop })
-  for (let at = 0; at < 50; at++) {
+  for (let index = 0; index < 50; index++) {
     legit.add({
-      name: `probe${at}`,
+      name: `probe${index}`,
       always: true,
-      writes: [`colour${at}`],
-      target: { format: 'half-float', scale: 1 + at / 1000 },
+      writes: [`colour${index}`],
+      target: { format: 'half-float', scale: 1 + index / 1000 },
       execute: noop
     })
   }
@@ -61,12 +61,12 @@ test('fifty full-size passes fit under the ceiling, and a runaway pass set is cu
   // rest, reports the ceiling once, and the graph runs no pass without a target.
   const said = []
   const heavy = makePassGraph({ report: message => said.push(message) })
-  for (let at = 0; at < 120; at++) {
+  for (let index = 0; index < 120; index++) {
     heavy.add({
-      name: `probe${at}`,
+      name: `probe${index}`,
       always: true,
-      writes: [`colour${at}`],
-      target: { format: 'half-float', scale: 1 + at / 1000 },
+      writes: [`colour${index}`],
+      target: { format: 'half-float', scale: 1 + index / 1000 },
       execute: noop
     })
   }

@@ -44,11 +44,11 @@ const STORAGE_LIMIT = 3_000_000
  */
 function reloadCause(capture) {
   const file = capture.cause?.file
-  const at = capture.cause?.at || null
-  const clock = String(at || '').slice(11, 19)
+  const instant = capture.cause?.at || null
+  const clock = String(instant || '').slice(11, 19)
   return {
     file: file || null,
-    at,
+    at: instant,
     trigger: file ? `a hot reload of ${file} reloaded the page` : 'the page reloaded',
     when: clock ? ` at ${clock} UTC` : ''
   }

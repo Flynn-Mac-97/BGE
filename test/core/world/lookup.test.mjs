@@ -38,16 +38,17 @@ function countIndexProbes(body) {
 test('byId makes one index probe per lookup, whatever the entity count', () => {
   for (const count of [8, 4000]) {
     const world = makeWorld(makeBus())
-    for (let at = 0; at < count; at++) world.spawn('crate', { id: `crate-${at}` })
+    for (let index = 0; index < count; index++) world.spawn('crate', { id: `crate-${index}` })
 
     const found = []
     const probes = countIndexProbes(() => {
-      for (let at = 0; at < count; at++) found.push(world.byId(`crate-${at}`))
+      for (let index = 0; index < count; index++) found.push(world.byId(`crate-${index}`))
       found.push(world.byId('no-such-id'))
     })
 
     assert.equal(found.length, count + 1)
-    for (let at = 0; at < count; at++) assert.equal(found[at].id, `crate-${at}`, `crate-${at} is found`)
+    for (let index = 0; index < count; index++)
+      assert.equal(found[index].id, `crate-${index}`, `crate-${index} is found`)
     assert.equal(found[count], undefined, 'an id no live entity has answers undefined, as find did')
     assert.equal(probes, count + 1, `one probe per lookup at ${count} entities, got ${probes}`)
   }

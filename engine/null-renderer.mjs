@@ -17,8 +17,12 @@
  */
 function nullCanvas(width = 1, height = 1) {
   /** A zeroed ImageData of one size, for a readback of a frame nothing drew. */
-  // eslint-disable-next-line id-denylist -- ImageData names this field data.
-  const blankPixels = (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(Math.max(0, w * h * 4)) })
+  const blankPixels = (pixelWidth, pixelHeight) => ({
+    width: pixelWidth,
+    height: pixelHeight,
+    // eslint-disable-next-line id-denylist -- ImageData names this field data.
+    data: new Uint8ClampedArray(Math.max(0, pixelWidth * pixelHeight * 4))
+  })
   const pen = {
     fillStyle: '#000000',
     strokeStyle: '#000000',
@@ -36,9 +40,9 @@ function nullCanvas(width = 1, height = 1) {
     stroke() {},
     save() {},
     restore() {},
-    createImageData: (w, h) => blankPixels(w, h),
+    createImageData: (pixelWidth, pixelHeight) => blankPixels(pixelWidth, pixelHeight),
     putImageData() {},
-    getImageData: (x, y, w, h) => blankPixels(w, h)
+    getImageData: (x, y, pixelWidth, pixelHeight) => blankPixels(pixelWidth, pixelHeight)
   }
   return {
     width,
@@ -113,8 +117,8 @@ export function nullRenderer(view, viewport, shape) {
       return scene
     },
     remove(object) {
-      const at = scene.children.indexOf(object)
-      if (at >= 0) scene.children.splice(at, 1)
+      const index = scene.children.indexOf(object)
+      if (index >= 0) scene.children.splice(index, 1)
       return scene
     }
   }

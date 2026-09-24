@@ -66,8 +66,8 @@ export function makeValueProjection(policy) {
   /** One lost element loses the whole array when the policy says a shorter array is a different array. */
   function projectArray(value, live, lost, where, depth) {
     const out = []
-    for (let at = 0; at < value.length; at++) {
-      const item = project(value[at], live, lost, `${where}[${at}]`, depth + 1)
+    for (let index = 0; index < value.length; index++) {
+      const item = project(value[index], live, lost, `${where}[${index}]`, depth + 1)
       if (item === LOST && policy.loseWholeArray) return LOST
       out.push(item)
     }
@@ -75,7 +75,7 @@ export function makeValueProjection(policy) {
   }
 
   function projectSet(value, live, lost, where, depth) {
-    return { $set: [...value].map((item, at) => project(item, live, lost, `${where}<${at}>`, depth + 1)) }
+    return { $set: [...value].map((item, index) => project(item, live, lost, `${where}<${index}>`, depth + 1)) }
   }
 
   function projectMap(value, live, lost, where, depth) {
@@ -155,7 +155,7 @@ export function makeValueProjection(policy) {
   }
 
   function resolveArray(copy, resolveEntity, onMissing, where) {
-    return copy.map((item, at) => resolve(item, resolveEntity, onMissing, `${where}[${at}]`))
+    return copy.map((item, index) => resolve(item, resolveEntity, onMissing, `${where}[${index}]`))
   }
 
   /** A reference to an entity resolves against the world it goes into, or is named missing. */

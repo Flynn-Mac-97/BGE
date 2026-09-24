@@ -28,11 +28,12 @@ export { invariantProblems, tintProblems }
 /** The checkout this module was loaded from. The engine's own plugins are here. */
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-// Where a named asset lives is the one rule this file shares with the browser,
-// so it is imported from the pure module both halves may import rather than
-// copied. Not re-exported: a second door onto one rule is how the copies
-// started.
+// Where a named asset is stored is the one rule this file shares with the
+// browser, so it is imported from the pure module both halves may import
+// rather than copied. Not re-exported: a second door onto one rule is how the
+// copies started.
 
+/** The hook names a type or behaviour may define, in call order. */
 export const HOOKS = ['start', 'update', 'onCollide', 'onDestroy']
 
 /** Folder prefixes a project file's kind comes from, most specific first. */
@@ -90,10 +91,10 @@ async function walkByFolder(directory, base = '') {
   } catch {
     return out
   }
-  for (const it of items) {
-    if (it.name.startsWith('.')) continue
-    const rel = base ? `${base}/${it.name}` : it.name
-    if (it.isDirectory()) out.push(...(await walkByFolder(path.join(directory, it.name), rel)))
+  for (const item of items) {
+    if (item.name.startsWith('.')) continue
+    const rel = base ? `${base}/${item.name}` : item.name
+    if (item.isDirectory()) out.push(...(await walkByFolder(path.join(directory, item.name), rel)))
     else out.push(rel)
   }
   return out
@@ -218,7 +219,7 @@ let sourceRecorderInstalled = false
 /**
  * Record the source of every file module this process loads.
  *
- * The hook sits in front of the standard loader and returns its result
+ * The hook is in front of the standard loader and returns its result
  * untouched: this observes, it never changes what loads. Node without
  * `registerHooks` records nothing, and every reader falls back to disk.
  */
@@ -274,12 +275,12 @@ async function typesRegisteredByPlugins(projectFiles, projectDirectory, checkout
       )
     )
   )
-  project.forEach((file, at) => {
+  project.forEach((file, index) => {
     // A plugin file is read once here for the names it registers and again by
     // the determinism lint below. Hand the text over so the lint can skip its read.
-    if (texts[at] === null) return
-    sources.set(file, texts[at])
-    for (const name of registeredTypeNames(texts[at])) found.add(name)
+    if (texts[index] === null) return
+    sources.set(file, texts[index])
+    for (const name of registeredTypeNames(texts[index])) found.add(name)
   })
   return [...found].sort()
 }
@@ -526,10 +527,10 @@ async function readBehaviour(file, relative) {
     // list without ever opening it, so its defaults have to be readable
     // from here or nobody knows what they are agreeing to.
     entry.properties = loaded.properties || {}
-    entry.hooks = HOOKS.filter(h => typeof loaded[h] === 'function')
+    entry.hooks = HOOKS.filter(hook => typeof loaded[hook] === 'function')
     if (loaded.about) entry.about = String(loaded.about)
-  } catch (e) {
-    entry.error = String(e.message || e)
+  } catch (error) {
+    entry.error = String(error.message || error)
   }
   return entry
 }
@@ -555,9 +556,9 @@ async function readLevel(file, relative) {
       const seen = assets[reference] || (assets[reference] = { count: 0, first: where })
       seen.count++
     }
-    placed.forEach((placement, at) => {
-      const named = placement?.type ? `entity ${at} (type "${placement.type}")` : `entity ${at}`
-      for (const r of assetReferences(placement)) note(r.reference, `${named} ${r.where}`)
+    placed.forEach((placement, index) => {
+      const named = placement?.type ? `entity ${index} (type "${placement.type}")` : `entity ${index}`
+      for (const reference of assetReferences(placement)) note(reference.reference, `${named} ${reference.where}`)
     })
     // The level's own world block names one too, and a sky that is not there
     // is exactly as invisible as a texture that is not there.
@@ -569,15 +570,15 @@ async function readLevel(file, relative) {
       entry: {
         file: relative,
         entities: placed.length,
-        types: [...new Set(placed.map(e => e.type))],
+        types: [...new Set(placed.map(entity => entity.type))],
         // Behaviours attached per placement rather than by the type. Without
         // this, a behaviour used only in a level reads as unreferenced.
-        behaviours: [...new Set(placed.flatMap(e => attachedNames(e.behaviours)))],
+        behaviours: [...new Set(placed.flatMap(entity => attachedNames(entity.behaviours)))],
         assets
       }
     }
-  } catch (e) {
-    return { name, placements: null, entry: { file: relative, error: String(e.message || e) } }
+  } catch (error) {
+    return { name, placements: null, entry: { file: relative, error: String(error.message || error) } }
   }
 }
 
@@ -588,8 +589,8 @@ async function readTest(file, relative) {
     const loaded = await importFresh(file)
     if (loaded.name) entry.title = loaded.name
     if (loaded.level) entry.level = loaded.level
-  } catch (e) {
-    entry.error = String(e.message || e)
+  } catch (error) {
+    entry.error = String(error.message || error)
   }
   return entry
 }

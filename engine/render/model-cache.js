@@ -48,7 +48,8 @@ export function cloneModel(loaded) {
   return skinned ? cloneSkinned(loaded) : loaded.clone(true)
 }
 
-export const modelCache = new Map() // file -> { status, scene, waiting }
+/** Every model fetched so far, by file: `{ status, scene, waiting }`. */
+export const modelCache = new Map()
 
 /**
  * A loaded model, once — and then cloned per entity.
@@ -78,7 +79,7 @@ export function cachedModel(file, onReady, onFail) {
   const fail = detail => {
     entry.status = 'failed'
     reportOnce(`[render] missing model ${url} (referenced as "${file}")${detail ? ` — ${detail}` : ''}`)
-    for (const w of entry.waiting) w.onFail()
+    for (const waiter of entry.waiting) waiter.onFail()
     entry.waiting.length = 0
   }
 
@@ -89,7 +90,7 @@ export function cachedModel(file, onReady, onFail) {
         result => {
           entry.status = 'ready'
           entry.scene = result.scene
-          for (const w of entry.waiting) w.onReady(entry.scene)
+          for (const waiter of entry.waiting) waiter.onReady(entry.scene)
           entry.waiting.length = 0
         },
         undefined,

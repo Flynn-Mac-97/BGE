@@ -1,6 +1,7 @@
 // The packaged editor and Vite use the same named engine messages.
 let connection
 
+/** The one channel the editor talks to the dev server through, built on first use. */
 export function engineTransport(development) {
   if (development) return development
   if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return null

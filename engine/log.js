@@ -41,8 +41,8 @@ function wireOnce() {
   if (wired) return
   wired = true
 
-  const uncaught = (error, at) =>
-    reportToLogs('error', 'uncaught', error?.stack || error?.message || String(error), { at })
+  const uncaught = (error, location) =>
+    reportToLogs('error', 'uncaught', error?.stack || error?.message || String(error), { at: location })
   const rejected = reason => reportToLogs('error', 'rejection', reason?.stack || reason?.message || String(reason))
 
   if (typeof addEventListener === 'function') {
@@ -60,7 +60,7 @@ function wireOnce() {
 
   const original = console.error
   console.error = (...args) => {
-    reportToLogs('error', 'console', args.map(a => a?.stack || a?.message || String(a)).join(' '))
+    reportToLogs('error', 'console', args.map(arg => arg?.stack || arg?.message || String(arg)).join(' '))
     original.apply(console, args)
   }
 }
@@ -83,6 +83,7 @@ function hotAppliedNote(change) {
   return change.skipped || 'applied'
 }
 
+/** A new log wired to the process-wide error channels, driven by `bus`. */
 export function makeLog(bus) {
   const lines = []
 
@@ -114,7 +115,7 @@ export function makeLog(bus) {
   bus.on('device:restored', () =>
     push('info', 'render', 'the graphics device came back — kernel render targets rebuilt')
   )
-  bus.on('hot:failed', c => push('error', 'hot', `${c.file} — ${c.error}`))
+  bus.on('hot:failed', failure => push('error', 'hot', `${failure.file} — ${failure.error}`))
 
   const log = { lines, push }
   // This world is now one of the logs a process-wide error is reported to, and

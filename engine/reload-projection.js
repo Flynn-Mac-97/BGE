@@ -97,11 +97,14 @@ const { project, resolve } = makeValueProjection({
   keepOtherPrimitives: false,
   entityTag: ENTITY_REFERENCE,
   report(lost, loss) {
-    if (loss.reason === 'number') lost.push(`${loss.where} (${String(loss.value)})`)
-    else if (loss.reason === 'kind') lost.push(`${loss.where} (a ${loss.kind})`)
-    else if (loss.reason === 'function') lost.push(`${loss.where} (a function)`)
-    else if (loss.reason === 'deep') lost.push(`${loss.where} (nested deeper than ${loss.maxDepth})`)
-    else if (loss.reason === 'notPlain') lost.push(`${loss.where} (a ${loss.name || 'thing that is not data'})`)
+    const describeLoss = {
+      number: () => `${loss.where} (${String(loss.value)})`,
+      kind: () => `${loss.where} (a ${loss.kind})`,
+      function: () => `${loss.where} (a function)`,
+      deep: () => `${loss.where} (nested deeper than ${loss.maxDepth})`,
+      notPlain: () => `${loss.where} (a ${loss.name || 'thing that is not data'})`
+    }[loss.reason]
+    if (describeLoss) lost.push(describeLoss())
   }
 })
 
@@ -164,7 +167,7 @@ export function captureSessionWorld({ world, loop, editor, view }, cause = {}) {
     types: [...world.types.keys()],
     state: project(world.state, live, dropped, 'world.state'),
     entities: world.entities.map(entity => {
-      const named = new Set(entity.behaviours.map(b => b.name))
+      const named = new Set(entity.behaviours.map(behaviour => behaviour.name))
       const fields = {}
       for (const key of Object.keys(entity)) {
         if (MODELLED.has(key) || named.has(key)) continue
@@ -191,11 +194,11 @@ export function captureSessionWorld({ world, loop, editor, view }, cause = {}) {
         detached: [...entity._detached],
         extra: take(entity._extraKeys, 'placement keys') || {},
         fields,
-        behaviours: entity.behaviours.map(b => ({
-          name: b.name,
-          own: !!b.own,
-          overrides: [...b.overrides],
-          bag: take(b.bag, `${b.name}`) || {}
+        behaviours: entity.behaviours.map(behaviour => ({
+          name: behaviour.name,
+          own: !!behaviour.own,
+          overrides: [...behaviour.overrides],
+          bag: take(behaviour.bag, `${behaviour.name}`) || {}
         }))
       }
     }),
@@ -385,8 +388,8 @@ function readField(value, world, missing, fieldPath) {
   return resolve(
     value,
     id => world.byId(id),
-    (at, id) => {
-      missing.push(`${at} pointed at "${id}", which is not in the restored world`)
+    (where, id) => {
+      missing.push(`${where} pointed at "${id}", which is not in the restored world`)
     },
     fieldPath
   )

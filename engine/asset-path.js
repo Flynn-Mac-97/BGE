@@ -5,7 +5,7 @@
  * audio, decals and particles plugins — and nothing kept them in step. When the
  * renderer's copy and node's copy drift, `check` either swears a file is there
  * that the renderer cannot fetch, or reports two hundred missing assets that are
- * all sitting on disk. So the half both sides agree on lives here, alone.
+ * all stored on disk. So the half both sides agree on is stored here, alone.
  *
  * This is the mirror image of `engine/project-index.mjs`, which says at its top
  * that nothing in the browser half may import it. BOTH HALVES MAY IMPORT THIS
@@ -33,12 +33,12 @@ export const PROJECT_PREFIX = 'project'
 
 /**
  * The project's own folders. A reference that starts with one of these is
- * project-relative; everything else lives under `assets/`.
+ * project-relative; everything else is stored under `assets/`.
  */
 const PROJECT_FOLDER = /^(assets|levels|types|behaviours|tests|plugins)\//
 
 /**
- * Where a named file actually lives, as a path from `project/`.
+ * Where a named file actually is stored, as a path from `project/`.
  *
  * A bare name means `assets/`, because the project is depth 1 and writing
  * `sprite: 'player.png'` should just work. A path is project-relative only when

@@ -15,6 +15,7 @@ import { UNIT_PLANE, solidGeometry } from './geometry-cache.js'
 import { cachedTexture, tiledTexture, privateTexture, textureStatus } from './texture-cache.js'
 import { reportOnce } from './report.js'
 
+/** Build the material registry and write its methods onto `state`. */
 export function makeMaterialRegistry(state) {
   /**
    * What a surface is made of, contributed by plugins.
@@ -45,7 +46,7 @@ export function makeMaterialRegistry(state) {
    *
    * See `measureUVsInMetres` for why the metres are in the first set.
    */
-  const UV = { face: () => uvAttribute(1), metres: () => uvAttribute() }
+  const uvSets = { face: () => uvAttribute(1), metres: () => uvAttribute() }
 
   const materialBuilders = new Map()
   const sharedMaterials = new Map()
@@ -106,11 +107,11 @@ export function makeMaterialRegistry(state) {
   /** The material inputs one mesh declaration asks for, and the texture they tile. */
   function meshMaterialInputs(entity, declared, where, part) {
     const declaredColour = readColour(declared.tint, `${where}.tint`)
-    const [u, v] = tilingOf(declared.tiling, part ? part.shape : meshShape(entity), `${where}.tiling`)
+    const [tileU, tileV] = tilingOf(declared.tiling, part ? part.shape : meshShape(entity), `${where}.tiling`)
 
     let map = null
     if (declared.texture && textureStatus(declared.texture, 'world') !== 'failed') {
-      map = tiledTexture(declared.texture, 'world', u, v, invalidateEverything)
+      map = tiledTexture(declared.texture, 'world', tileU, tileV, invalidateEverything)
     }
     // Only a declared tint multiplies into a texture. Falling back to the
     // per-type colour there would wash every textured wall a different shade.
@@ -137,7 +138,7 @@ export function makeMaterialRegistry(state) {
       texture: map,
       tint: colour,
       view: state.view,
-      uv: UV
+      uv: uvSets
     })
 
     applyLightmap(material, declared, where)

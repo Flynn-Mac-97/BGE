@@ -57,10 +57,10 @@ export async function listDocuments(root) {
     }
   return { documents, errors }
 }
-/** One document by id, or its last backup when `backup` is set. */
-export async function readDocument(root, id, backup = false) {
+/** One document by id. The `.bak` copy beside it is for recovery by hand. */
+export async function readDocument(root, id) {
   const { file } = await location(root, id)
-  return read(file + (backup ? '.bak' : ''))
+  return read(file)
 }
 /** Save one document under a revision check, keeping the previous version as a backup. */
 export async function writeDocument(root, id, documentData, expectedRevision = null) {

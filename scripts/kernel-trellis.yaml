@@ -1,9 +1,9 @@
 # Kernel closure for `npm run check:structure` and `npm run audit`.
 #
 # The audit runs over engine/**, but the peripheral tooling tree below is not the
-# kernel: no kernel file imports any of it, it depends on the kernel one way, and
-# its complexity dominates the raw engine/ audit. Excluding it by name keeps the
-# budget a measure of the kernel. A new file is measured unless it is added here,
+# kernel: no kernel file imports any of it (`check-codemap.mjs` enforces that),
+# it depends on the kernel one way, and its complexity dominates the raw engine/
+# audit. Excluding it by name keeps the budget a measure of the kernel. A new file is measured unless it is added here,
 # so the scope cannot grow without a visible edit. The closure is 80 files: 58 in
 # the engine root (render.js and frame-plan.js included) and 22 in render/.
 source:
@@ -24,17 +24,3 @@ source:
     - project-servers.mjs
     - evolve.mjs
     - transport.js
-
-# The six unresolved imports the closure measures, bounded so a seventh fails
-# `npm run check:structure`. The config schema (`auditConfigSchema`) is a strict
-# object of `source`, `providers` and `policy` only: there is no key that
-# declares or ignores a deliberate dynamic import, and a non-literal `import()`
-# argument cannot resolve. So the floor is stated here as a budget over the
-# measured metric instead. A budget over `graph.edges.unresolved` carries a
-# value, so it is evaluated (not skipped) and trips when a new unresolved import
-# appears. See `structure-budget.json` for why the sloppiness index is not
-# budgeted.
-policy:
-  budgets:
-    graph.edges.unresolved:
-      max: 6

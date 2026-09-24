@@ -225,7 +225,7 @@ test('blocksMerge keeps a mark-owned entity out of every batch', async () => {
   for (const [label, hook, expected] of cases) {
     const frame = await makeRenderer(null, VIEW, VIEWPORT)
     frame.marks.register('probe', { ...hook, draw: () => {} })
-    const world = { entities: Array.from({ length: 8 }, (_, index) => box(`e${index}`)) }
+    const world = { entities: Array.from({ length: 8 }, (placeholder, index) => box(`e${index}`)) }
     settle(frame, world, 60)
     assert.equal(frame.stats.merged, expected, label)
   }

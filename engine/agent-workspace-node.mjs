@@ -86,19 +86,19 @@ function editRegistry(root, change) {
 
 /** The directory part of a glob before its first wildcard. */
 function staticPrefix(pattern) {
-  const at = pattern.search(/[?*]/)
-  return normal(at < 0 ? pattern : pattern.slice(0, at)).replace(/\/$/, '')
+  const wildcardIndex = pattern.search(/[?*]/)
+  return normal(wildcardIndex < 0 ? pattern : pattern.slice(0, wildcardIndex)).replace(/\/$/, '')
 }
 
 /** Whether two claimed paths are the same or one is inside the other. */
 export function claimsOverlap(left, right) {
-  const a = normal(left),
-    b = normal(right)
-  if (a === b) return true
-  const ap = staticPrefix(a),
-    bp = staticPrefix(b)
-  if (!ap || !bp) return true
-  return ap.startsWith(bp + '/') || bp.startsWith(ap + '/')
+  const leftPath = normal(left),
+    rightPath = normal(right)
+  if (leftPath === rightPath) return true
+  const leftPrefix = staticPrefix(leftPath),
+    rightPrefix = staticPrefix(rightPath)
+  if (!leftPrefix || !rightPrefix) return true
+  return leftPrefix.startsWith(rightPrefix + '/') || rightPrefix.startsWith(leftPrefix + '/')
 }
 
 /**
@@ -129,9 +129,9 @@ export const claimsCollide = (root, left, right) => {
  */
 /** A free id suffixed off `id`, so a suggestion still names the work. */
 function freeId(taken, id) {
-  let n = 2
-  while (taken.has(`${id}-${n}`)) n++
-  return `${id}-${n}`
+  let suffix = 2
+  while (taken.has(`${id}-${suffix}`)) suffix++
+  return `${id}-${suffix}`
 }
 
 /** Refuse an id or file claim that an active or unmerged run already holds. */

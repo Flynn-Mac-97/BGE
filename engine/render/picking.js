@@ -8,6 +8,7 @@
 import * as THREE from 'three/webgpu'
 import { entityDrawSize, spinRadians } from '../frame-plan.js'
 
+/** Build the picking system and write its methods onto `state`. */
 export function makePicking(state) {
   const raycaster = new THREE.Raycaster()
   // Merged entities keep a mesh nobody draws, on its own layer, so that picking
@@ -30,10 +31,10 @@ export function makePicking(state) {
   }
 
   /** Everything the ray meets, nearest first, skipping what is not being drawn. */
-  function rayHits(px, py) {
+  function rayHits(pixelX, pixelY) {
     state.readyCamera()
     state.scene.updateMatrixWorld()
-    raycaster.setFromCamera(state.toNDC(px, py), state.activeCamera())
+    raycaster.setFromCamera(state.toNDC(pixelX, pixelY), state.activeCamera())
     // Recursive, because a model is a group of meshes rather than one mesh.
     return raycaster.intersectObjects([...state.meshes.values()], true).filter(hit => shownInTree(hit.object))
   }
@@ -58,10 +59,10 @@ export function makePicking(state) {
     // "behind", and a point genuinely behind but within range "in front", so a
     // caller drew its gizmo at a convincing wrong place.
     const behind = point.clone().applyMatrix4(camera.matrixWorldInverse).z > 0
-    const p = point.project(camera)
+    const projected = point.project(camera)
     return {
-      x: (p.x * 0.5 + 0.5) * state.viewport.width,
-      y: (0.5 - p.y * 0.5) * state.viewport.height,
+      x: (projected.x * 0.5 + 0.5) * state.viewport.width,
+      y: (0.5 - projected.y * 0.5) * state.viewport.height,
       behind
     }
   }
@@ -74,36 +75,36 @@ export function makePicking(state) {
    * when it hits nothing, because dropping a type onto empty air should still
    * land where the person was pointing.
    */
-  function toWorld(px, py) {
+  function toWorld(pixelX, pixelY) {
     if (state.flat()) {
       return {
-        x: (px - state.viewport.width / 2) / state.view.zoom + state.view.x,
-        y: state.view.y - (py - state.viewport.height / 2) / state.view.zoom
+        x: (pixelX - state.viewport.width / 2) / state.view.zoom + state.view.x,
+        y: state.view.y - (pixelY - state.viewport.height / 2) / state.view.zoom
       }
     }
-    const [hit] = rayHits(px, py)
+    const [hit] = rayHits(pixelX, pixelY)
     if (hit) return { x: hit.point.x, y: hit.point.y, z: hit.point.z }
 
     // rayHits has just aimed the shared raycaster through this pixel, so the
     // ray is the one to intersect the ground with — no need to build a second.
     const castRay = raycaster.ray
     const toGround = castRay.direction.y < -1e-6 ? -castRay.origin.y / castRay.direction.y : 0
-    const p = castRay.at(toGround > 0 ? toGround : 10, new THREE.Vector3())
-    return { x: p.x, y: p.y, z: p.z }
+    const groundPoint = castRay.at(toGround > 0 ? toGround : 10, new THREE.Vector3())
+    return { x: groundPoint.x, y: groundPoint.y, z: groundPoint.z }
   }
 
   /** Every entity under a screen point, front to back. */
-  function pick(world, px, py) {
+  function pick(world, pixelX, pixelY) {
     if (state.flat()) {
-      const p = toWorld(px, py)
-      const hits = world.entities.filter(e => {
-        const { w, h } = entityDrawSize(e)
-        const a = -spinRadians(e)
-        const dx = p.x - e.x,
-          dy = p.y - e.y
-        const lx = dx * Math.cos(a) - dy * Math.sin(a)
-        const ly = dx * Math.sin(a) + dy * Math.cos(a)
-        return Math.abs(lx) <= w / 2 && Math.abs(ly) <= h / 2
+      const worldPoint = toWorld(pixelX, pixelY)
+      const hits = world.entities.filter(entity => {
+        const { w, h } = entityDrawSize(entity)
+        const angle = -spinRadians(entity)
+        const deltaX = worldPoint.x - entity.x,
+          deltaY = worldPoint.y - entity.y
+        const localX = deltaX * Math.cos(angle) - deltaY * Math.sin(angle)
+        const localY = deltaX * Math.sin(angle) + deltaY * Math.cos(angle)
+        return Math.abs(localX) <= w / 2 && Math.abs(localY) <= h / 2
       })
       return hits.reverse()
     }
@@ -111,12 +112,12 @@ export function makePicking(state) {
     // geometry actually on screen rather than against a box approximating it.
     const seen = new Set()
     const found = []
-    for (const hit of rayHits(px, py)) {
+    for (const hit of rayHits(pixelX, pixelY)) {
       const id = entityIdOf(hit.object)
       if (!id || seen.has(id)) continue
       seen.add(id)
-      const e = world.byId(id)
-      if (e) found.push(e)
+      const entity = world.byId(id)
+      if (entity) found.push(entity)
     }
     return found
   }
@@ -129,10 +130,10 @@ export function makePicking(state) {
    * that reaches for this and then casts against its own scene objects sees
    * exactly the ray the entity pick would have used.
    */
-  function ray(px, py) {
+  function ray(pixelX, pixelY) {
     state.readyCamera()
     state.scene.updateMatrixWorld()
-    raycaster.setFromCamera(state.toNDC(px, py), state.activeCamera())
+    raycaster.setFromCamera(state.toNDC(pixelX, pixelY), state.activeCamera())
     return raycaster.ray
   }
 

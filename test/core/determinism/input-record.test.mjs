@@ -84,8 +84,8 @@ test('a run is played again from its own record', async () => {
   try {
     const first = await boot(project)
     first.loop.input.press('KeyD')
-    for (let at = 0; at < 60; at++) {
-      if (at === 30) first.loop.input.release('KeyD')
+    for (let step = 0; step < 60; step++) {
+      if (step === 30) first.loop.input.release('KeyD')
       first.loop.step(1)
     }
     const record = first.loop.input.events
@@ -94,7 +94,7 @@ test('a run is played again from its own record', async () => {
     // The second world is only ever told what the first one recorded.
     const second = await boot(project)
     const pending = [...record]
-    for (let at = 0; at < 60; at++) {
+    for (let step = 0; step < 60; step++) {
       while (pending.length && pending[0].at <= second.loop.steps) {
         const event = pending.shift()
         if (event.down) second.loop.input.press(event.code)

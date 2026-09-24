@@ -23,11 +23,11 @@ export function makeFrameWiring({ world, loader, context }) {
     /**
      * Report a loop error without stopping the loop.
      *
-     * @param {Error} e The error the step threw.
+     * @param {Error} error The error the step threw.
      * @returns {void}
      */
-    onError(e) {
-      console.error('[timer]', e)
+    onError(error) {
+      console.error('[timer]', error)
     },
     /**
      * Record where every entity is before the step moves it.
@@ -52,21 +52,21 @@ export function makeFrameWiring({ world, loader, context }) {
       // One flag, set at the only place time advances, so nothing can step the
       // world without marking it — including engine.simulate().
       world.simulated = true
-      for (const s of loader.schedule.fixed) {
-        if (!loader.plugins.get(s.plugin)?.enabled) continue
+      for (const system of loader.schedule.fixed) {
+        if (!loader.plugins.get(system.plugin)?.enabled) continue
         try {
-          s.run(world, seconds, context)
-        } catch (e) {
-          loader.fail(s.plugin, e)
+          system.run(world, seconds, context)
+        } catch (error) {
+          loader.fail(system.plugin, error)
         }
       }
       // world.hook runs the attached behaviours first, then the type's own
       // update — so a type always gets the last word on what it composed. An
       // entity with no behaviours and no update hook has nothing to ask, and at
       // a large entity count asking every one of them is most of the step.
-      for (const e of [...world.entities]) {
-        if (!e.behaviours.length && typeof e._definition?.update !== 'function') continue
-        world.hook(e, 'update', seconds, context)
+      for (const entity of [...world.entities]) {
+        if (!entity.behaviours.length && typeof entity._definition?.update !== 'function') continue
+        world.hook(entity, 'update', seconds, context)
       }
     },
     /**
@@ -76,12 +76,12 @@ export function makeFrameWiring({ world, loader, context }) {
      * @returns {void}
      */
     onFrame(seconds) {
-      for (const s of loader.schedule.frame) {
-        if (!loader.plugins.get(s.plugin)?.enabled) continue
+      for (const system of loader.schedule.frame) {
+        if (!loader.plugins.get(system.plugin)?.enabled) continue
         try {
-          s.run(world, seconds, context)
-        } catch (e) {
-          loader.fail(s.plugin, e)
+          system.run(world, seconds, context)
+        } catch (error) {
+          loader.fail(system.plugin, error)
         }
       }
       // Optional on purpose: a world with no renderer runs the same systems in

@@ -46,6 +46,7 @@ export const profileDirectory = (checkout, name) => path.join(checkout, '.browse
  */
 const SESSION_FILES = ['Current Session', 'Current Tabs', 'Last Session', 'Last Tabs']
 
+/** Remove the profile's saved session, so a fresh browser restores no old tabs. */
 export function clearSessionState(profile) {
   const chromium = path.join(profile, 'Default')
   // A browser still holding the profile locks these, and Windows answers EPERM.

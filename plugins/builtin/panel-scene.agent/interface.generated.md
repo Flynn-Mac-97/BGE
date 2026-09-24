@@ -1,4 +1,4 @@
-<!--e9a312e2-->
+<!--28c90a31-->
 parsed from source
   plugin Scene Panel
   category editor
@@ -6,4 +6,4 @@ parsed from source
   commands scene.selectAll
   scene.deleteSelected
   arguments scene.selectAll:;scene.deleteSelected:
-  source 77 lines
+  source 81 lines

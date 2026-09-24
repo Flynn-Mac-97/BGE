@@ -72,15 +72,15 @@ function stubDevice() {
 function stubCanvas() {
   const listeners = new Map()
   return {
-    addEventListener(type, fn) {
+    addEventListener(type, listener) {
       if (!listeners.has(type)) listeners.set(type, new Set())
-      listeners.get(type).add(fn)
+      listeners.get(type).add(listener)
     },
-    removeEventListener(type, fn) {
-      listeners.get(type)?.delete(fn)
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener)
     },
     fire(type, event = {}) {
-      for (const fn of listeners.get(type) || []) fn(event)
+      for (const listener of listeners.get(type) || []) listener(event)
     }
   }
 }

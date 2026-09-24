@@ -13,6 +13,7 @@ import { applyAttachments } from './model-nodes.js'
 import { makeEntityRecords } from './entity-record.js'
 import { makeEntityScans } from './entity-scan.js'
 
+/** Build the sync pass: walk the entities that changed, sweep the ones that left, and count the frame. */
 export function makeEntitySync(state) {
   const records = makeEntityRecords(state)
   const scans = makeEntityScans(state, records)
@@ -79,7 +80,7 @@ export function makeEntitySync(state) {
   }
 
   /** Draw one entity from its mesh. Returns 1 when it draws an outline, 0 when it does not. */
-  function syncMeshEntity(i, entity, object, record, place, plan) {
+  function syncMeshEntity(index, entity, object, record, place, plan) {
     const shape = plan.shape
     const described = plan.described
     const declared = meshOf(entity)
@@ -115,7 +116,7 @@ export function makeEntitySync(state) {
     state.drawMarks(entity, object, place, declared, record)
     record.steady = isSteady(entity, declared, record)
     placeMatrix(object, record)
-    saveSlot(i, entity, object, record)
+    saveSlot(index, entity, object, record)
     return record.outline ? 1 : 0
   }
 
@@ -138,7 +139,7 @@ export function makeEntitySync(state) {
   }
 
   /** Draw one entity from its sprite. A sprite never draws an outline. */
-  function syncSpriteEntity(i, entity, object, record, painters) {
+  function syncSpriteEntity(index, entity, object, record, painters) {
     const { w, h } = entityDrawSize(entity)
     object.rotation.set(0, 0, spinRadians(entity))
     object.scale.set(w, h, 1)
@@ -146,7 +147,7 @@ export function makeEntitySync(state) {
     // Painter's order is the layering in 2D: z first, then the order the level
     // lists them in. In a first-person scene the world in front is real
     // geometry, so a sprite has to be tested against it.
-    object.renderOrder = (entity.z || 0) * 1000 + i
+    object.renderOrder = (entity.z || 0) * 1000 + index
     object.material.depthTest = !painters
     applySpriteTile(object, entity, w, h)
     applySheetFrame(object, entity)
@@ -154,7 +155,7 @@ export function makeEntitySync(state) {
     // without touching the collider or the transform gizmo.
     if (entity.flip) object.scale.x = -object.scale.x
     placeMatrix(object, record)
-    saveSlot(i, entity, object, record)
+    saveSlot(index, entity, object, record)
     return 0
   }
 
@@ -165,10 +166,10 @@ export function makeEntitySync(state) {
    * Returns 1 when the entity draws an outline, 0 when it does not. This is its
    * own function because `sync` is large enough that V8 leaves it in the
    * baseline tier, where nothing it calls is inlined; the per-entity loop is the
-   * whole cost of a playing frame, so it lives where it can be optimized.
+   * whole cost of a playing frame, so it stays where it can be optimized.
    */
-  function syncEntity(pass, i, entity) {
-    const record = recordAt(i, entity)
+  function syncEntity(pass, index, entity) {
+    const record = recordAt(index, entity)
     const plan = planFor(entity, record)
     const described = plan.described
     const object = state.objectFor(entity, described, record)
@@ -180,8 +181,8 @@ export function makeEntitySync(state) {
     record.anchor = anchor
     object.position.set(place.x, place.y + anchor, place.z || 0)
     object.visible = !entity.hidden
-    if (entity.mesh) return syncMeshEntity(i, entity, object, record, place, plan)
-    return syncSpriteEntity(i, entity, object, record, pass.painters)
+    if (entity.mesh) return syncMeshEntity(index, entity, object, record, place, plan)
+    return syncSpriteEntity(index, entity, object, record, pass.painters)
   }
 
   /**
@@ -193,9 +194,9 @@ export function makeEntitySync(state) {
    */
   function syncChanged(pass, indices, count) {
     let keylines = 0
-    for (let c = 0; c < count; c++) {
-      const i = indices === null ? c : indices[c]
-      keylines += syncEntity(pass, i, pass.entities[i])
+    for (let counted = 0; counted < count; counted++) {
+      const index = indices === null ? counted : indices[counted]
+      keylines += syncEntity(pass, index, pass.entities[index])
     }
     return keylines
   }
@@ -235,7 +236,7 @@ export function makeEntitySync(state) {
     return null
   }
 
-  /** Drop the objects for entities that left, by the sweep or by a rebuilt living set. */
+  /** Drop the objects for entities that left, by the sweep or by a rebuilt set of the ids still present. */
   function dropGoneObjects(entities, frame, sweep) {
     if (sweep) {
       for (const [id, object] of state.meshes) {
@@ -248,7 +249,7 @@ export function makeEntitySync(state) {
     }
     if (!state.objectsGrew) return
     const living = new Set()
-    for (let i = 0; i < entities.length; i++) living.add(entities[i].id)
+    for (let index = 0; index < entities.length; index++) living.add(entities[index].id)
     for (const [id, object] of state.meshes) {
       if (living.has(id)) continue
       state.leaveBatch(id)

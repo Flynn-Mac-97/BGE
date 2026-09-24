@@ -6,7 +6,7 @@
  * moment; `levelFromWorld` writes the level shape, so a save keeps every decision
  * the level file can hold.
  *
- * The walk over a single value lives in `value-projection.js`, under the policy
+ * The walk over a single value is in `value-projection.js`, under the policy
  * below. This file adds what a checkpoint is: which entity fields to carry, and
  * how to put an entity back without handing out a new object.
  *
@@ -29,6 +29,13 @@ const CHECKPOINT_DEPTH = 6
 /** Bumped when the shape of a checkpoint changes, so an old one is refused rather than misread. */
 const CHECKPOINT_VERSION = 1
 
+/** One message per reason a value did not survive a checkpoint, keyed by `loss.reason`. */
+const LOSS_MESSAGES = {
+  function: loss => `${loss.where} is a function`,
+  deep: loss => `${loss.where} is deeper than ${loss.maxDepth}`,
+  notPlain: loss => `${loss.where} is a ${loss.name || 'object'}, which a checkpoint cannot copy`
+}
+
 /**
  * What a checkpoint keeps and loses.
  *
@@ -46,10 +53,8 @@ const { project, resolve } = makeValueProjection({
   keepOtherPrimitives: true,
   entityTag: '$entity',
   report(lost, loss) {
-    if (loss.reason === 'function') lost.push(`${loss.where} is a function`)
-    else if (loss.reason === 'deep') lost.push(`${loss.where} is deeper than ${loss.maxDepth}`)
-    else if (loss.reason === 'notPlain')
-      lost.push(`${loss.where} is a ${loss.name || 'object'}, which a checkpoint cannot copy`)
+    const message = LOSS_MESSAGES[loss.reason]?.(loss)
+    if (message) lost.push(message)
   }
 })
 

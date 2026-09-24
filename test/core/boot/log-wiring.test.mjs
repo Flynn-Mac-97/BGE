@@ -37,7 +37,7 @@ test('twelve worlds do not each bring their own process listeners', async () => 
       uncaught: process.listenerCount('uncaughtException')
     }
 
-    for (let at = 0; at < 12; at++) await boot(project)
+    for (let count = 0; count < 12; count++) await boot(project)
 
     const added = {
       rejection: process.listenerCount('unhandledRejection') - before.rejection,

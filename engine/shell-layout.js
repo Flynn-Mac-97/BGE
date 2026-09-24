@@ -55,7 +55,7 @@ export function makeLayout(root, frame, onResize) {
   }
 
   /** Set one layout size, clamp it to its range, and tell the renderer the viewport changed. */
-  function resize(key, value, save = false) {
+  function resize(key, value) {
     const [least, most] = boundsFor(key)
     layout[key] = Math.round(Math.max(least, Math.min(most, Number(value) || DEFAULT_LAYOUT[key])))
     frame.style.setProperty(`--${key}-size`, `${layout[key]}px`)
@@ -63,7 +63,6 @@ export function makeLayout(root, frame, onResize) {
     handle?.setAttribute('aria-valuemin', String(least))
     handle?.setAttribute('aria-valuemax', String(most))
     handle?.setAttribute('aria-valuenow', String(layout[key]))
-    if (save) saveLayout(layout)
     onResize?.()
   }
 
@@ -121,7 +120,10 @@ export function makeLayout(root, frame, onResize) {
       if (!backward && !forward && event.key !== 'Home') return
       event.preventDefault()
       if (event.key === 'Home') resetLayout(key)
-      else resize(key, layout[key] + (backward ? -16 : 16) * direction, true)
+      else {
+        resize(key, layout[key] + (backward ? -16 : 16) * direction)
+        saveLayout(layout)
+      }
     })
   }
 

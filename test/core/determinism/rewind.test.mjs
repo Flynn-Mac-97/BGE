@@ -170,7 +170,7 @@ test('a ring holds only as deep as it is told to, and says how far back it reach
   await withProject(PROJECT, ({ loop, world, checkpoints }) => {
     const ring = makeRewind({ world, loop, checkpoints, depth: 3, stride: 10 })
     assert.equal(ring.oldest, null, 'a fresh ring holds nothing')
-    for (let at = 0; at < 4; at++) {
+    for (let count = 0; count < 4; count++) {
       ring.observe()
       loop.step(10)
     }

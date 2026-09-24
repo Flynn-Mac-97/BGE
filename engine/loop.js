@@ -495,8 +495,16 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
      * @param {number} [where.hitStop] Fixed steps of hit stop left.
      * @param {number} [where.scheduled] Captured callback count; clears the schedule when present.
      */
-    resume({ steps: to = 0, seed, draws = 0, input: inputRecords, holds: holdNames, hitStop, scheduled } = {}) {
-      const target = Math.max(0, Math.round(to))
+    resume({
+      steps: resumeSteps = 0,
+      seed,
+      draws = 0,
+      input: inputRecords,
+      holds: holdNames,
+      hitStop,
+      scheduled
+    } = {}) {
+      const target = Math.max(0, Math.round(resumeSteps))
       const shift = (target - steps) * STEP
       steps = target
       fixed = steps * STEP
@@ -579,14 +587,14 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
 
     // ---- scheduling, on the fixed clock ----
 
-    /** Run `fn` once, `seconds` of engine time from now. */
-    after(seconds, fn) {
-      return timers.after(seconds, fixed, fn)
+    /** Run `listener` once, `seconds` of engine time from now. */
+    after(seconds, listener) {
+      return timers.after(seconds, fixed, listener)
     },
 
-    /** Run `fn` every `seconds` of engine time, starting one interval from now. */
-    every(seconds, fn) {
-      return timers.every(seconds, fixed, fn)
+    /** Run `listener` every `seconds` of engine time, starting one interval from now. */
+    every(seconds, listener) {
+      return timers.every(seconds, fixed, listener)
     },
 
     /** Cancel one scheduled timer. Returns whether it was still pending. */
@@ -607,7 +615,7 @@ export function makeLoop({ onFixed, onFrame, onError, onStepStart }) {
      * seconds and tell me where the player ended up".
      */
     step(count = 1) {
-      for (let i = 0; i < count; i++) fixedStep()
+      for (let stepIndex = 0; stepIndex < count; stepIndex++) fixedStep()
       // A stepped world is read as it is, not between steps.
       blend = 1
       onFrame(STEP * count, fixed)

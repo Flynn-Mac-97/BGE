@@ -31,7 +31,11 @@ export default {
             ui.spacer(),
             e.overrides.length ? ui.raw(mark('·')) : null
           ],
-          onPick: (e, event) => { context.select(e, event.shiftKey); context.redraw() }
+          onPick: (e, event) => {
+            if (event.shiftKey) context.addToSelection(e)
+            else context.select(e)
+            context.redraw()
+          }
         }),
         shown.length < hits.length && ui.empty(`${hits.length - shown.length} more — filter to find one`)
       ])

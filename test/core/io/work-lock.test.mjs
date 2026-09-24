@@ -17,9 +17,9 @@ import { spawnSync } from 'node:child_process'
 
 import { workLock, permits, roleOfClient } from '../../../engine/work-lock.mjs'
 
-function checkout(t, { runs = [], browsers = [] } = {}) {
+function checkout(testContext, { runs = [], browsers = [] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-work-lock-'))
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  testContext.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const engine = path.join(root, '.engine')
   fs.mkdirSync(engine, { recursive: true })
   fs.writeFileSync(path.join(engine, 'agents.json'), JSON.stringify({ runs }))
@@ -39,16 +39,16 @@ const LIVE_PID = process.pid
  */
 const DEAD_PID = spawnSync(process.execPath, ['-e', '0']).pid
 
-test('nothing working means nothing is held', t => {
-  const lock = workLock(checkout(t))
+test('nothing working means nothing is held', testContext => {
+  const lock = workLock(checkout(testContext))
   assert.equal(lock.locked, false)
   assert.deepEqual(lock.holders, [])
   assert.deepEqual(lock.stale, [])
   assert.equal(permits(lock, 'set').allowed, true)
 })
 
-test('an active run holds the person out of every writing op', t => {
-  const root = checkout(t, {
+test('an active run holds the person out of every writing op', testContext => {
+  const root = checkout(testContext, {
     runs: [
       { id: 'crowd', status: 'active', files: ['engine/render.js'], startedAt: '2026-08-31T07:00:00Z' },
       { id: 'old', status: 'merged', files: ['a.js'] }
@@ -59,20 +59,20 @@ test('an active run holds the person out of every writing op', t => {
   assert.equal(lock.holders.length, 1, 'a merged run holds nothing')
   assert.match(lock.why, /crowd/)
 
-  for (const op of ['set', 'spawn', 'destroy', 'play', 'saveLevel', 'new.file']) {
-    const { allowed, why } = permits(lock, op)
-    assert.equal(allowed, false, `${op} must be held`)
-    assert.match(why, /crowd/, `${op} must say who holds it`)
+  for (const operation of ['set', 'spawn', 'destroy', 'play', 'saveLevel', 'new.file']) {
+    const { allowed, why } = permits(lock, operation)
+    assert.equal(allowed, false, `${operation} must be held`)
+    assert.match(why, /crowd/, `${operation} must say who holds it`)
   }
   // Reading is the whole point of watching lanes work.
-  for (const op of ['snapshot', 'entity', 'see.describe', 'clients']) {
-    assert.equal(permits(lock, op).allowed, true, `${op} must still answer`)
+  for (const operation of ['snapshot', 'entity', 'see.describe', 'clients']) {
+    assert.equal(permits(lock, operation).allowed, true, `${operation} must still answer`)
   }
 })
 
-test('a lane browser holds the lock while its process runs', t => {
+test('a lane browser holds the lock while its process runs', testContext => {
   const lock = workLock(
-    checkout(t, {
+    checkout(testContext, {
       browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID, startedAt: '2026-08-31T07:00:00Z' }]
     })
   )
@@ -82,9 +82,9 @@ test('a lane browser holds the lock while its process runs', t => {
   assert.match(lock.why, /lane-a/)
 })
 
-test('a killed lane browser holds nothing, and the reply says to clear it', t => {
+test('a killed lane browser holds nothing, and the reply says to clear it', testContext => {
   const lock = workLock(
-    checkout(t, {
+    checkout(testContext, {
       browsers: [{ client: 'charlie', port: 9401, pid: DEAD_PID, startedAt: '2026-08-31T07:00:00Z' }]
     })
   )
@@ -98,15 +98,15 @@ test('a killed lane browser holds nothing, and the reply says to clear it', t =>
   assert.equal(permits(lock, 'set').allowed, true, 'the person may edit again')
 })
 
-test('a record with no pid cannot be proved, so it holds nothing', t => {
-  const lock = workLock(checkout(t, { browsers: [{ client: 'nameless', port: 9402 }] }))
+test('a record with no pid cannot be proved, so it holds nothing', testContext => {
+  const lock = workLock(checkout(testContext, { browsers: [{ client: 'nameless', port: 9402 }] }))
   assert.equal(lock.locked, false)
   assert.match(lock.stale[0].why, /unrecorded/)
 })
 
-test('a dead record does not hide a live one', t => {
+test('a dead record does not hide a live one', testContext => {
   const lock = workLock(
-    checkout(t, {
+    checkout(testContext, {
       browsers: [
         { client: 'charlie', port: 9401, pid: DEAD_PID },
         { client: 'delta', port: 9402, pid: LIVE_PID }
@@ -123,9 +123,9 @@ test('a dead record does not hide a live one', t => {
   assert.match(lock.why, /lanes\.stop/)
 })
 
-test('several holders are all named, once each', t => {
+test('several holders are all named, once each', testContext => {
   const lock = workLock(
-    checkout(t, {
+    checkout(testContext, {
       runs: [
         { id: 'crowd', status: 'active' },
         { id: 'hero', status: 'active' }
@@ -139,8 +139,8 @@ test('several holders are all named, once each', t => {
   assert.match(lock.why, /agent\.release/, 'it says how to release')
 })
 
-test('role comes from the registry, not from the caller', t => {
-  const root = checkout(t, {
+test('role comes from the registry, not from the caller', testContext => {
+  const root = checkout(testContext, {
     browsers: [
       { client: 'lane-a', port: 9400, pid: LIVE_PID },
       { client: 'charlie', port: 9401, pid: DEAD_PID }
@@ -154,8 +154,8 @@ test('role comes from the registry, not from the caller', t => {
   assert.equal(roleOfClient(root, 'LANE-A'), 'person', 'the name must match the record exactly')
 })
 
-test('a visible editor window holds nothing and may write', t => {
-  const root = checkout(t, {
+test('a visible editor window holds nothing and may write', testContext => {
+  const root = checkout(testContext, {
     browsers: [{ client: 'editor', port: 9400, pid: LIVE_PID, headless: false }]
   })
   const lock = workLock(root)
@@ -166,35 +166,35 @@ test('a visible editor window holds nothing and may write', t => {
   assert.equal(permits(lock, 'set').allowed, true)
 })
 
-test('role is unaffected by what the page reports about itself', t => {
+test('role is unaffected by what the page reports about itself', testContext => {
   // The page's headless flag and user agent reach the server as ordinary
   // strings. Neither is a client name, so neither can reach this function.
-  const root = checkout(t, { browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID }] })
+  const root = checkout(testContext, { browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID }] })
   for (const claimed of ['HeadlessChrome/151.0.0.0', 'true', 'lane', 'headless']) {
     assert.equal(roleOfClient(root, claimed), 'person', `"${claimed}" is not a lane record`)
   }
 })
 
-test('the lane role may drive its own world and is refused every file write', t => {
+test('the lane role may drive its own world and is refused every file write', testContext => {
   // This is the rule permits states. vite.config.js enforces it at
   // POST /api/engine and at both file routes; this proves the rule, not the
   // wiring.
-  const lock = workLock(checkout(t, { browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID }] }))
+  const lock = workLock(checkout(testContext, { browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID }] }))
 
-  for (const op of ['play', 'stop', 'simulate', 'seed']) {
-    assert.equal(permits(lock, op, 'lane').allowed, true, `a lane must be able to ${op}`)
+  for (const operation of ['play', 'stop', 'simulate', 'seed']) {
+    assert.equal(permits(lock, operation, 'lane').allowed, true, `a lane must be able to ${operation}`)
   }
-  for (const op of ['saveLevel', 'new.file', 'code.save', 'set', 'spawn', 'destroy']) {
-    const { allowed, why } = permits(lock, op, 'lane')
-    assert.equal(allowed, false, `permits must refuse ${op} to a lane`)
+  for (const operation of ['saveLevel', 'new.file', 'code.save', 'set', 'spawn', 'destroy']) {
+    const { allowed, why } = permits(lock, operation, 'lane')
+    assert.equal(allowed, false, `permits must refuse ${operation} to a lane`)
     assert.match(why, /viewer|checkout/)
   }
   assert.equal(permits(lock, 'see.capture', 'lane').allowed, true, 'capturing is why the page exists')
 })
 
-test('a missing or unreadable registry is not a lock', t => {
+test('a missing or unreadable registry is not a lock', testContext => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-work-lock-bare-'))
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  testContext.after(() => fs.rmSync(root, { recursive: true, force: true }))
   assert.equal(workLock(root).locked, false, 'a checkout that has never run a lane is not held')
   assert.equal(roleOfClient(root, 'lane-a'), 'person', 'no registry means no lane')
 })

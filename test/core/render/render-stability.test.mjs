@@ -44,7 +44,7 @@ test('twenty thousand frames leave the order, the targets, the pool and the rebu
   const rebuilds = graph.rebuilds
 
   const started = performance.now()
-  for (let i = 0; i < 20000; i++) graph.run(null, null, 64, 64)
+  for (let index = 0; index < 20000; index++) graph.run(null, null, 64, 64)
   const elapsed = performance.now() - started
 
   assert.equal(graph.passes, order, 'the sorted order is the same array')
@@ -169,7 +169,7 @@ test('a pass that throws every frame does not stop the loop', async () => {
   })
 
   const loop = makeLoop({ onFixed: () => {}, onFrame: () => frame.draw({ entities: [] }) })
-  for (let i = 0; i < 300; i++) loop.step(1)
+  for (let index = 0; index < 300; index++) loop.step(1)
 
   assert.equal(loop.steps, 300, 'the loop ran every step')
   assert.equal(completed.length, 300, 'every frame completed the pass before the broken one')
@@ -211,8 +211,8 @@ test('dispose frees a plugin object and its children, and the sweep frees a drop
   // A hundred add-and-drop cycles must leave the scene as it was: a release that
   // only disposed but did not remove would stack an object per cycle.
   const settled = frame.scene.children.length
-  for (let i = 0; i < 100; i++) {
-    frame.sync({ entities: [box(`t${i}`)] })
+  for (let index = 0; index < 100; index++) {
+    frame.sync({ entities: [box(`t${index}`)] })
     frame.sync({ entities: [] })
   }
   assert.equal(frame.scene.children.length, settled, 'a hundred dropped entities left nothing behind')
@@ -239,7 +239,7 @@ test('repeated resize resizes targets in place and leaks none', () => {
 test('one geometry size requested many times stays one geometry', () => {
   const geometry = solidGeometry('box', 1, 1, 1)
   const sphere = solidGeometry('sphere', 1, 1, 1)
-  for (let i = 0; i < 100; i++) {
+  for (let index = 0; index < 100; index++) {
     assert.equal(solidGeometry('box', 1, 1, 1), geometry, 'one size, one geometry')
     assert.equal(solidGeometry('sphere', 1, 1, 1), sphere, 'one sphere size, one geometry')
   }
@@ -250,7 +250,7 @@ test('one texture and one tiling requested many times stay one cached texture', 
   withImageDocument(() => {
     const world = cachedTexture('wall.png', 'world')
     const tiled = tiledTexture('wall.png', 'world', 2, 2)
-    for (let i = 0; i < 100; i++) {
+    for (let index = 0; index < 100; index++) {
       assert.equal(cachedTexture('wall.png', 'world'), world, 'one request, one texture')
       assert.equal(tiledTexture('wall.png', 'world', 2, 2), tiled, 'one tiling, one texture')
     }
@@ -260,7 +260,7 @@ test('one texture and one tiling requested many times stay one cached texture', 
 })
 
 test('one model file requested many times stays one cache entry', () => {
-  for (let i = 0; i < 50; i++) cachedModel('hero.glb', noop, noop)
+  for (let index = 0; index < 50; index++) cachedModel('hero.glb', noop, noop)
   assert.equal(modelCache.size, 1, 'fifty requests for one file made one entry')
 
   forgetModel('hero.glb')

@@ -27,6 +27,10 @@ const inside = (file, root) => {
 
 // The built editor needs file routes, project watches, and its command bridge.
 // These are the same handlers used by Vite; only the HTTP and socket adapter differs.
+/**
+ * Starts the desktop HTTP and WebSocket server for one project and returns
+ * its handle, with file routes, project watches and the command bridge wired up.
+ */
 export async function startDesktopServer({ root, project, port = 0, desktopSnapshot, desktopCapture }) {
   await ensureProject(resolveProject(root, project))
   const config = engineServerConfig({ root, project, desktop: true, desktopSnapshot, desktopCapture })

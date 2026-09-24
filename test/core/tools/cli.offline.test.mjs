@@ -31,8 +31,8 @@ const run = (args, options = {}) => {
       ...options
     })
     return { code: 0, stdout, stderr: '' }
-  } catch (e) {
-    return { code: e.status ?? -1, stdout: e.stdout || '', stderr: e.stderr || '' }
+  } catch (error) {
+    return { code: error.status ?? -1, stdout: error.stdout || '', stderr: error.stderr || '' }
   }
 }
 
@@ -43,10 +43,10 @@ const insightFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'engin
 const withInsight = (file, args) => run(args, { env: { ...process.env, ENGINE_INSIGHT_FILE: file } })
 
 test('help exits 0 and names the verb groups', () => {
-  const r = run(['help'])
-  assert.equal(r.code, 0)
+  const result = run(['help'])
+  assert.equal(result.code, 0)
   for (const word of ['snapshot', 'check', 'pain', 'agent.context']) {
-    assert.ok(r.stdout.includes(word), `help mentions ${word}`)
+    assert.ok(result.stdout.includes(word), `help mentions ${word}`)
   }
 })
 
@@ -162,9 +162,9 @@ test('lanes.stop all sweeps every browser instead of naming a client', () => {
 
 test('a JSON argument is sent as JSON, not a string', () => {
   // agent.context coerces a JSON array into a file list.
-  const r = run(['agent.context', '["engine/world.js"]'])
-  assert.equal(r.code, 0)
-  assert.deepEqual(JSON.parse(r.stdout).files, ['engine/world.js'])
+  const result = run(['agent.context', '["engine/world.js"]'])
+  assert.equal(result.code, 0)
+  assert.deepEqual(JSON.parse(result.stdout).files, ['engine/world.js'])
 })
 
 /**
@@ -215,19 +215,19 @@ test('an entity list can be projected to named columns', () => {
 })
 
 test('a projection naming a field that does not exist is refused, with the ones that do', () => {
-  const r = run(['--headless', '--project', FIXTURE, 'snapshot', '{"entities":["nope"]}'])
-  assert.equal(r.code, 1, 'a bad field is a usage error, not an empty column')
-  assert.match(r.stderr, /no field "nope"/)
-  assert.match(r.stderr, /id, type, at, rotation, note, properties, behaviours/)
+  const result = run(['--headless', '--project', FIXTURE, 'snapshot', '{"entities":["nope"]}'])
+  assert.equal(result.code, 1, 'a bad field is a usage error, not an empty column')
+  assert.match(result.stderr, /no field "nope"/)
+  assert.match(result.stderr, /id, type, at, rotation, note, properties, behaviours/)
 })
 
 test('a projection written as a bare flag is refused, not quietly answered without it', () => {
   // `--entities` has to stay a bare boolean, so the fields after it arrive as a
   // string argument. Answering the compact reply would read as the flag doing nothing.
-  const r = run(['--headless', '--project', FIXTURE, 'snapshot', '--entities', 'id,at'])
-  assert.equal(r.code, 1)
-  assert.match(r.stderr, /takes an options object/)
-  assert.match(r.stderr, /\{"entities":\["id","at"\]\}/, 'and shows the form that works')
+  const result = run(['--headless', '--project', FIXTURE, 'snapshot', '--entities', 'id,at'])
+  assert.equal(result.code, 1)
+  assert.match(result.stderr, /takes an options object/)
+  assert.match(result.stderr, /\{"entities":\["id","at"\]\}/, 'and shows the form that works')
 })
 
 test('the determinism lint names each banned source with a line', () => {
@@ -245,38 +245,38 @@ test('the determinism lint names each banned source with a line', () => {
     ].join('\n')
   )
   assert.ok(
-    problems.some(p => /performance\.now/.test(p.why)),
+    problems.some(problem => /performance\.now/.test(problem.why)),
     'names the wall clock'
   )
   assert.ok(
-    problems.some(p => /Math\.random/.test(p.why)),
+    problems.some(problem => /Math\.random/.test(problem.why)),
     'names the random source'
   )
   assert.ok(
-    problems.some(p => /setTimeout/.test(p.why)),
+    problems.some(problem => /setTimeout/.test(problem.why)),
     'names the scheduler'
   )
   assert.ok(
-    problems.every(p => p.line > 0),
+    problems.every(problem => problem.line > 0),
     'every problem has a line number'
   )
   assert.equal(problems.length, 3, 'the comment line is not a problem')
 })
 
 test('check passes clean with nothing running, and a warning never fails it', () => {
-  const r = run(['check', '--project', FIXTURE])
-  const reply = JSON.parse(r.stdout)
-  assert.equal(r.code, 0)
+  const result = run(['check', '--project', FIXTURE])
+  const reply = JSON.parse(result.stdout)
+  assert.equal(result.code, 0)
   assert.equal(reply.ok, true)
   assert.deepEqual(
-    reply.problems.filter(p => !p.warning),
+    reply.problems.filter(problem => !problem.warning),
     [],
     'nothing fatal'
   )
   // Undescribed types are reported and must never fail the run: a check that
   // failed the build the day it shipped is a check somebody switches off.
   assert.ok(
-    reply.problems.every(p => p.warning),
+    reply.problems.every(problem => problem.warning),
     'anything left is a warning'
   )
 })
@@ -400,8 +400,8 @@ test('pain records, lists and resolves against an isolated file', () => {
 test('pain rejects a bad kind', () => {
   const file = painFile()
   try {
-    const r = withPain(file, ['pain', 'x', '--kind', 'nonsense'])
-    assert.equal(r.code, 1)
+    const result = withPain(file, ['pain', 'x', '--kind', 'nonsense'])
+    assert.equal(result.code, 1)
   } finally {
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   }
@@ -500,9 +500,9 @@ test('the two ledgers are separate files', () => {
 })
 
 test('a headless world starts with nothing running', () => {
-  const r = run(['--headless', 'snapshot'])
-  assert.equal(r.code, 0, 'the world started')
-  assert.equal(JSON.parse(r.stdout).mode, 'edit')
+  const result = run(['--headless', 'snapshot'])
+  assert.equal(result.code, 0, 'the world started')
+  assert.equal(JSON.parse(result.stdout).mode, 'edit')
 })
 
 /**
@@ -535,7 +535,7 @@ test('a headless run that stepped a solver exits 0', async () => {
   )
 
   try {
-    const r = run([
+    const result = run([
       '--headless',
       '--project',
       project,
@@ -546,9 +546,9 @@ test('a headless run that stepped a solver exits 0', async () => {
         ['snapshot', {}]
       ])
     ])
-    assert.equal(r.code, 0, `the run exited ${r.code}: ${r.stderr.trim().split('\n')[0]}`)
-    assert.doesNotMatch(r.stderr, /UV_HANDLE_CLOSING/, 'and it was not an assertion on the way out')
-    const reply = JSON.parse(r.stdout)
+    assert.equal(result.code, 0, `the run exited ${result.code}: ${result.stderr.trim().split('\n')[0]}`)
+    assert.doesNotMatch(result.stderr, /UV_HANDLE_CLOSING/, 'and it was not an assertion on the way out')
+    const reply = JSON.parse(result.stdout)
     assert.equal(reply.length, 3, 'every op answered')
     assert.equal(reply[2].time, 1, 'and the world really stepped')
     assert.notEqual(reply[2].hash, reply[0].hash, 'a world that moved, so the step was not a no-op')
@@ -595,7 +595,7 @@ test('a plugin that failed to import is named everywhere a command turns up miss
   )
 
   const broken = makeLoader(makeBus())
-  broken.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), true)
+  broken.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), { builtin: true })
   broken.boot({})
   const engine = await inspectOver(broken, makeBus())
 
@@ -644,11 +644,11 @@ test('a log that was listening from the start records a failed plugin exactly on
   const bus = makeBus()
   const log = makeLog(bus)
   const loader = makeLoader(bus)
-  loader.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), true)
+  loader.failedImport('plugins/builtin/see.js', new SyntaxError("Unexpected token '}'"), { builtin: true })
   loader.boot({})
 
   const engine = await inspectOver(loader, bus, log)
-  const failures = engine.snapshot().errors.filter(l => /failed to import/.test(l.message))
+  const failures = engine.snapshot().errors.filter(entry => /failed to import/.test(entry.message))
   assert.equal(failures.length, 1, 'heard once, not seeded a second time')
   assert.match(failures[0].message, /plugins\/builtin\/see\.js failed to import — SyntaxError/)
 })

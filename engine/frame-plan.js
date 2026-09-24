@@ -125,12 +125,12 @@ export function meshParts(declared, where = 'mesh') {
       h: declaredNumber(box[1], 0.1, `${spot}.box[1]`),
       d: declaredNumber(box[2], 0.1, `${spot}.box[2]`)
     }
-    const at = Array.isArray(part?.at) ? part.at : []
+    const partAt = Array.isArray(part?.at) ? part.at : []
     const turn = Array.isArray(part?.rotation) ? part.rotation : []
     const offset = {
-      x: declaredNumber(at[0], 0, `${spot}.at[0]`),
-      y: declaredNumber(at[1], 0, `${spot}.at[1]`),
-      z: declaredNumber(at[2], 0, `${spot}.at[2]`)
+      x: declaredNumber(partAt[0], 0, `${spot}.at[0]`),
+      y: declaredNumber(partAt[1], 0, `${spot}.at[1]`),
+      z: declaredNumber(partAt[2], 0, `${spot}.at[2]`)
     }
 
     // Bounds ignore the part's own rotation. They are only used to frame a
@@ -331,18 +331,18 @@ function boxShape(entity, declared, collider) {
     report(`[render] ${entity.type}.mesh: no box and no three-number collider — drawing a 1 m cube`)
     return { kind: 'box', w: 1, h: 1, d: 1 }
   }
-  const w = box[0],
-    h = box[1],
-    d = box[2]
-  if (Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(d)) {
-    return { kind: 'box', w, h, d, segments: subdivisionOf(declared, entity) }
+  const width = box[0],
+    height = box[1],
+    depth = box[2]
+  if (Number.isFinite(width) && Number.isFinite(height) && Number.isFinite(depth)) {
+    return { kind: 'box', w: width, h: height, d: depth, segments: subdivisionOf(declared, entity) }
   }
   const where = declaredBox ? `${entity.type}.mesh.box` : `${entity.type}.collider.box`
   return {
     kind: 'box',
-    w: declaredNumber(w, 1, `${where}[0]`),
-    h: declaredNumber(h, 1, `${where}[1]`),
-    d: declaredNumber(d, 1, `${where}[2]`)
+    w: declaredNumber(width, 1, `${where}[0]`),
+    h: declaredNumber(height, 1, `${where}[1]`),
+    d: declaredNumber(depth, 1, `${where}[2]`)
   }
 }
 
@@ -394,7 +394,7 @@ export function entityDrawSize(entity) {
 }
 
 /** The image a sprite points at: a sheet or a single picture. */
-export const spriteSource = s => s?.sheet || s?.image || null
+export const spriteSource = sprite => sprite?.sheet || sprite?.image || null
 
 // ------------------------------------------------------------- the material
 
@@ -407,11 +407,11 @@ export const spriteSource = s => s?.sheet || s?.image || null
 function absoluteTiling(tiling, shape, where) {
   const width = shape.w || 1
   const height = shape.h || 1
-  const u = tiling[0],
-    v = tiling[1]
-  if (Number.isFinite(u) && Number.isFinite(v)) return [u / width, v / height]
+  const tileU = tiling[0],
+    tileV = tiling[1]
+  if (Number.isFinite(tileU) && Number.isFinite(tileV)) return [tileU / width, tileV / height]
   const reference = index => (where ? `${where}[${index}]` : where)
-  return [declaredNumber(u, 1, reference(0)) / width, declaredNumber(v, 1, reference(1)) / height]
+  return [declaredNumber(tileU, 1, reference(0)) / width, declaredNumber(tileV, 1, reference(1)) / height]
 }
 
 /**
@@ -495,8 +495,8 @@ const SHAPE_KEYS = new Set([
  * materials rather than one drawing twice.
  */
 export function materialLook(entity, declared, shape) {
-  const [u, v] = tilingOf(declared.tiling, shape)
-  let key = `${materialNameFor(declared)}|${u},${v}`
+  const [tileU, tileV] = tilingOf(declared.tiling, shape)
+  let key = `${materialNameFor(declared)}|${tileU},${tileV}`
   for (const name of Object.keys(declared).sort()) {
     if (SHAPE_KEYS.has(name)) continue
     const value = declared[name]

@@ -21,12 +21,12 @@ const STREAM_STEP = 0x6d2b79f5
  * browser and cannot be replayed.
  */
 function mulberry32(seed) {
-  let a = seed >>> 0
+  let state = seed >>> 0
   return () => {
-    a = (a + STREAM_STEP) >>> 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    state = (state + STREAM_STEP) >>> 0
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state)
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296
   }
 }
 
@@ -50,12 +50,12 @@ export function makeRandom(seed) {
   }
 
   const random = () => next()
-  random.range = (lo, hi) => lo + next() * (hi - lo)
-  random.int = (lo, hi) => Math.floor(lo + next() * (hi - lo + 1))
+  random.range = (low, high) => low + next() * (high - low)
+  random.int = (low, high) => Math.floor(low + next() * (high - low + 1))
   random.pick = list => list[Math.floor(next() * list.length)]
-  random.chance = p => next() < p
-  random.reset = s => {
-    current = s ?? current
+  random.chance = probability => next() < probability
+  random.reset = newSeed => {
+    current = newSeed ?? current
     drawn = 0
     generator = mulberry32(current)
   }
@@ -68,9 +68,9 @@ export function makeRandom(seed) {
    * same next number the original would have given and every number after it.
    * That is what lets a world be put back mid-run and still be the same run.
    */
-  random.resume = (s, n = 0) => {
-    current = s ?? current
-    drawn = Math.max(0, Math.round(n))
+  random.resume = (newSeed, draws = 0) => {
+    current = newSeed ?? current
+    drawn = Math.max(0, Math.round(draws))
     generator = mulberry32((current + Math.imul(drawn, STREAM_STEP)) >>> 0)
   }
 

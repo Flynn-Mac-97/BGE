@@ -72,9 +72,9 @@ test('pick answers the entities under a pixel, front to back', async () => {
     ['both at the origin, the later one first', 160, 90, ['over', 'under']],
     ['nothing under an empty pixel', 5, 5, []]
   ]
-  for (const [label, px, py, expected] of cases) {
+  for (const [label, pixelX, pixelY, expected] of cases) {
     assert.deepEqual(
-      frame.pick(world, px, py).map(entity => entity.id),
+      frame.pick(world, pixelX, pixelY).map(entity => entity.id),
       expected,
       label
     )

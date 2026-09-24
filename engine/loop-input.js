@@ -82,21 +82,21 @@ export function makeInputRecord({ step }) {
    * Put a recorded input timeline back.
    *
    * @param {Array} records Events as `{ at, code, down }`, oldest first.
-   * @param {number} at The step count being resumed to.
+   * @param {number} resumeStep The step count being resumed to.
    */
-  function restore(records, at) {
+  function restore(records, resumeStep) {
     events = records.map(record => ({ at: record.at, code: record.code, down: record.down }))
     keysDown = new Set()
     pressedNow = new Set()
     applied = 0
     for (const record of events) {
-      if (record.at > at) break
+      if (record.at > resumeStep) break
       if (record.down) keysDown.add(record.code)
       else keysDown.delete(record.code)
       applied++
     }
     // Whatever was pressed on the step being resumed to is about to run.
-    for (const record of events) if (record.down && record.at === at) pressedNow.add(record.code)
+    for (const record of events) if (record.down && record.at === resumeStep) pressedNow.add(record.code)
   }
 
   return {

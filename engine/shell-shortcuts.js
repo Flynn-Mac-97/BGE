@@ -43,7 +43,7 @@ export function readShortcut(declaration) {
   // ' ' is what the space bar reports and 'space' is what an author writes.
   // Both mean the space bar, and a declaration that reads well but never fires
   // is found by pressing it and getting nothing.
-  return [...MODIFIERS.filter(m => keyParts.includes(m)), key === 'space' ? ' ' : key].join('+')
+  return [...MODIFIERS.filter(modifier => keyParts.includes(modifier)), key === 'space' ? ' ' : key].join('+')
 }
 
 /** The input types that swallow a character, so a shortcut must stay out of them. */

@@ -7,8 +7,8 @@
  * server's file routes: the same project-relative paths, the same refusal to
  * leave the project, and the same index rebuild after a write.
  *
- * Which `.agent.md` files a scope may name is policy, not transport, and lives
- * in `agent-files.mjs`.
+ * Which `.agent.md` files a scope may name is policy, not transport, and is in
+ * `agent-files.mjs`.
  *
  * Node only. The browser reaches the open project through the dev server and
  * never learns where it is on disk.
@@ -69,12 +69,13 @@ export function onDisk(projectDirectory, checkout = ROOT) {
 
   return {
     index: () => buildIndex(projectDirectory, root),
-    tree: async () => (await walk(projectDirectory)).filter(f => !f.startsWith('.engine')).map(f => ({ path: f })),
+    tree: async () =>
+      (await walk(projectDirectory)).filter(file => !file.startsWith('.engine')).map(file => ({ path: file })),
     agentPlugins: pluginSidecars,
     agentInterface,
     sourceCatalog: selection => sourceCatalog(root, projectDirectory, selection),
     listDocuments: () => listDocuments(projectDirectory),
-    readDocument: (id, backup) => readDocument(projectDirectory, id, backup),
+    readDocument: id => readDocument(projectDirectory, id),
     writeDocument: (id, documentData, revision) => writeDocument(projectDirectory, id, documentData, revision),
     writeSource: (scope, file, text, expectedHash) =>
       writeSource(root, projectDirectory, scope, file, text, expectedHash),

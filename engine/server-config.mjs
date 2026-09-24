@@ -34,7 +34,8 @@ import {
   UNTITLED
 } from './project-path.mjs'
 
-// eslint-disable-next-line max-lines-per-function -- one Vite config factory; its plugin factories share the mutable PROJECT and client maps, so splitting it needs a shared-state record. A redesign.
+/* eslint-disable max-lines-per-function -- one Vite config factory; its plugin factories share the mutable PROJECT and client maps, so splitting it needs a shared-state record. A redesign. */
+/** The Vite dev-server config: project routing, file watching, the CLI's HTTP API, and plugin wiring. */
 export function engineServerConfig({
   root = process.cwd(),
   project = process.env.ENGINE_PROJECT,
@@ -75,13 +76,13 @@ export function engineServerConfig({
 
   const lastWritten = new Map()
 
-  const slash = p => p.split(path.sep).join('/')
+  const slash = filePath => filePath.split(path.sep).join('/')
   // Read per call, not once: the served project changes when one is opened.
   const projectURL = () => slash(PROJECT)
   const PROJECT_ROOT_URL = slash(ROOT)
-  const inProject = p => slash(p).startsWith(projectURL() + '/')
+  const inProject = filePath => slash(filePath).startsWith(projectURL() + '/')
 
-  const relative = p => slash(p).slice(projectURL().length + 1)
+  const relative = filePath => slash(filePath).slice(projectURL().length + 1)
 
   const watched = file => {
     const full = slash(path.resolve(file))
@@ -92,10 +93,10 @@ export function engineServerConfig({
     return !/(^|\/)\.[^/]/.test(full.slice(base.length))
   }
 
-  async function renameWhenFree(from, to, attempts = 20) {
+  async function renameWhenFree(from, destination, attempts = 20) {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await fs.rename(from, to)
+        return await fs.rename(from, destination)
       } catch (error) {
         const busy = ['EPERM', 'EBUSY', 'EACCES', 'ENOTEMPTY'].includes(error.code)
         if (!busy || attempt >= attempts) throw error
@@ -112,9 +113,9 @@ export function engineServerConfig({
 
   const readBody = req =>
     new Promise(resolve => {
-      let s = ''
-      req.on('data', c => (s += c))
-      req.on('end', () => resolve(s ? JSON.parse(s) : {}))
+      let body = ''
+      req.on('data', chunk => (body += chunk))
+      req.on('end', () => resolve(body ? JSON.parse(body) : {}))
     })
 
   function safe(rel) {
@@ -222,7 +223,9 @@ export function engineServerConfig({
       const files = await walk(PROJECT)
       return {
         status: 200,
-        body: files.filter(f => !f.startsWith('.engine')).map(f => ({ path: f, kind: KIND(f) }))
+        body: files
+          .filter(filePath => !filePath.startsWith('.engine'))
+          .map(filePath => ({ path: filePath, kind: KIND(filePath) }))
       }
     },
 
@@ -258,8 +261,8 @@ export function engineServerConfig({
         body: {
           projects: home,
           names: entries
-            .filter(e => e.isDirectory() && !e.name.startsWith('.'))
-            .map(e => e.name)
+            .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+            .map(entry => entry.name)
             .sort()
         }
       }
@@ -275,7 +278,7 @@ export function engineServerConfig({
       if (!said) return { status: 400, body: { error: 'which project? a directory path' } }
       const wanted = path.resolve(ROOT, said)
       const there = await fs.stat(wanted).then(
-        s => s.isDirectory(),
+        stat => stat.isDirectory(),
         () => false
       )
       if (!there) return { status: 404, body: { error: `no project directory at ${wanted}` } }
@@ -345,9 +348,7 @@ export function engineServerConfig({
 
     '/api/systems/document': async ({ url, req }) => {
       if (req.method === 'GET') {
-        const id = url.searchParams.get('id')
-        const backup = url.searchParams.get('backup') === 'true'
-        return { status: 200, body: await readDocument(PROJECT, id, backup) }
+        return { status: 200, body: await readDocument(PROJECT, url.searchParams.get('id')) }
       }
       if (req.method !== 'POST') return null
       const refused = refusedFileWrite(req)
@@ -424,8 +425,8 @@ export function engineServerConfig({
             const answer = route ? await route({ server, url, req }) : null
             if (!answer) return send(res, 404, { error: 'no such endpoint' })
             return send(res, answer.status, answer.body)
-          } catch (e) {
-            return send(res, 500, { error: String(e.message || e) })
+          } catch (error) {
+            return send(res, 500, { error: String(error.message || error) })
           }
         })
       }
@@ -450,8 +451,8 @@ export function engineServerConfig({
         // re-import would be served the cached transform and the edit would
         // appear to do nothing. Drop the cached module first, then decline the
         // reload.
-        for (const m of server.moduleGraph.getModulesByFile(file) || []) {
-          server.moduleGraph.invalidateModule(m)
+        for (const moduleEntry of server.moduleGraph.getModulesByFile(file) || []) {
+          server.moduleGraph.invalidateModule(moduleEntry)
         }
         return []
       },
@@ -489,7 +490,7 @@ export function engineServerConfig({
           if (rel.startsWith('.engine/') || path.basename(rel).startsWith('.')) return
 
           // The root guide is a generated compatibility file. Its small source
-          // lives with the other agent lanes and should update just as promptly.
+          // is with the other agent lanes and should update just as promptly.
           // Our own save coming back at us.
           if (lastWritten.has(rel)) {
             if (event === 'change') {
@@ -895,3 +896,4 @@ export function engineServerConfig({
     }
   }
 }
+/* eslint-enable max-lines-per-function */

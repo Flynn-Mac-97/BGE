@@ -1,4 +1,5 @@
 // Ledger text is evidence to review, never a command to execute.
+/** Build the ledger items and message for an evolution review, filtered by an optional query. */
 export function evolutionBrief(painpoints, insights, query = '') {
   const records = [
     ...painpoints.map(record => ({ ...record, source: 'pain' })),

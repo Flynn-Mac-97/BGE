@@ -24,8 +24,8 @@ function addConstraints(node, direction, phase, byId, incoming) {
   for (const target of node[direction] || []) {
     if (!byId.has(target)) throw new Error(`system ${node.id}: missing ${direction} target ${target}`)
     if (byId.get(target).phase !== phase) throw new Error(`system ${node.id}: ${target} belongs to another phase`)
-    const [from, to] = direction === 'after' ? [node.id, target] : [target, node.id]
-    incoming.get(from).add(to)
+    const [from, toId] = direction === 'after' ? [node.id, target] : [target, node.id]
+    incoming.get(from).add(toId)
   }
 }
 

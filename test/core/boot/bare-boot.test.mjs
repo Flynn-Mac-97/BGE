@@ -63,7 +63,7 @@ function dependentsFirst(definitions) {
   }
   return definitions
     .slice()
-    .sort((a, b) => depthOf(b) - depthOf(a))
+    .sort((left, right) => depthOf(right) - depthOf(left))
     .map(definition => definition.name)
 }
 

@@ -1,13 +1,13 @@
 import js from '@eslint/js'
 import globals from 'globals'
+import style from './scripts/eslint-style-rules.mjs'
 
 /**
- * The kernel's lint gate.
+ * The kernel's lint gate: every rule in `agents/code-style.md` a tool can check.
  *
- * Correctness rules are errors everywhere the config covers. The clarity rules
- * bind `engine/**` and `test/core/**` only: the tooling and plugin trees are
- * not shaped to them, and the gate exists to hold the kernel to the engine's
- * own style.
+ * Correctness rules are errors everywhere the config covers. The style rules
+ * bind `engine/**`, `test/core/**` and the gate's own scripts: the tooling
+ * and plugin trees are not shaped to them yet.
  *
  * `state`, `value`, `result`, `item`, `handle`, `config` and `bar` are absent
  * from the deny list on purpose. Each names a real concept here: world state, a
@@ -15,7 +15,7 @@ import globals from 'globals'
  * config, and a UI bar.
  */
 
-/** Names that say nothing about what they hold. See `agents/code-style.md`. */
+/** Names that say nothing about what they hold. Code style: "Names". */
 const NOISE_NAMES = [
   'data',
   'info',
@@ -33,7 +33,62 @@ const NOISE_NAMES = [
   'manager'
 ]
 
-/** The shape limits the kernel keeps to. Non-slop, "Functions". */
+/**
+ * The only names shorter than three letters: coordinates, an id, the UI, and
+ * Node's own module names.
+ */
+const SHORT_NAMES = ['x', 'y', 'z', 'id', 'ui', 'fs', 'os']
+
+/** Shapes the code style bans, each with the rule it breaks. */
+const BANNED_SHAPES = [
+  { selector: 'SwitchStatement', message: 'Use a lookup table, not a switch. Code style: "Branching".' },
+  {
+    selector: 'IfStatement[alternate.type="IfStatement"][alternate.alternate.type="IfStatement"]',
+    message: 'Use a lookup table, not an else-if ladder. Code style: "Branching".'
+  },
+  {
+    selector: ':function > AssignmentPattern[right.type="Literal"][right.raw=/^(true|false)$/]',
+    message: 'Write two named functions, not a true/false flag parameter. Code style: "Functions".'
+  }
+]
+
+/**
+ * A call that adds to or fires the event bus. Code style bans observers; the
+ * bus is the plugin channel, which the plugin rewrite replaces.
+ */
+const BUS_CALL = {
+  selector:
+    'CallExpression[callee.property.name=/^(on|once|off|emit)$/]:matches([callee.object.name="bus"], [callee.object.property.name="bus"])',
+  message: 'No observers. Code style: "Architecture".'
+}
+
+/** Files that use the event bus today. The list only shrinks. */
+const BUS_FILES = [
+  'engine/checkpoint.js',
+  'engine/files.js',
+  'engine/index.js',
+  'engine/inspect.js',
+  'engine/loader.js',
+  'engine/log.js',
+  'engine/plugin-runtime.js',
+  'engine/plugin-startup.js',
+  'engine/reload-notice-writer.js',
+  'engine/reload-projection.js',
+  'engine/render.js',
+  'engine/rewind.js',
+  'engine/shell-shortcuts.js',
+  'engine/shell.js',
+  'engine/world-context.js',
+  'engine/world-editor.js',
+  'engine/world-project.js',
+  'engine/world.js',
+  'test/core/boot/bus-events.test.mjs',
+  'test/core/plugin/plugin-contracts.test.mjs',
+  'test/core/render/device-loss.test.mjs',
+  'test/core/ui/reload-notice.test.mjs'
+]
+
+/** The shape limits the kernel keeps to. Code style: "Functions". */
 const CLARITY_RULES = {
   complexity: ['error', 20],
   'max-depth': ['error', 4],
@@ -49,8 +104,22 @@ const CLARITY_RULES = {
   'no-var': 'error',
   eqeqeq: ['error', 'always', { null: 'ignore' }],
   'no-nested-ternary': 'error',
-  'id-denylist': ['error', ...NOISE_NAMES]
+  'id-denylist': ['error', ...NOISE_NAMES],
+  'id-length': ['error', { min: 3, exceptions: SHORT_NAMES, properties: 'never' }],
+  'style/export-contract': 'error',
+  'style/literal-comment': 'error'
 }
+
+/** The files the style rules bind. The gate's scripts are held to the rules they enforce. */
+const KERNEL_FILES = [
+  'engine/**/*.js',
+  'engine/**/*.mjs',
+  'test/core/**/*.mjs',
+  'scripts/kernel-gate.mjs',
+  'scripts/check-codemap.mjs',
+  'scripts/check-structure.mjs',
+  'scripts/eslint-style-rules.mjs'
+]
 
 export default [
   js.configs.recommended,
@@ -59,12 +128,17 @@ export default [
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node }
   },
   {
-    files: ['engine/**/*.js', 'engine/**/*.mjs', 'test/core/**/*.mjs'],
+    files: KERNEL_FILES,
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: { ...globals.browser, ...globals.node }
     },
-    rules: CLARITY_RULES
+    plugins: { style },
+    rules: { ...CLARITY_RULES, 'no-restricted-syntax': ['error', ...BANNED_SHAPES, BUS_CALL] }
+  },
+  {
+    files: BUS_FILES,
+    rules: { 'no-restricted-syntax': ['error', ...BANNED_SHAPES] }
   }
 ]

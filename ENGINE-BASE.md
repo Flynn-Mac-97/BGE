@@ -30,9 +30,7 @@ file, and nothing is saved anywhere else.
 
 ## Style links
 
-- Code style: `agents/code-style.md`
-- Comment style: `agents/comment-style.md`
-- Codebase design: `agents/codebase-design.md`
+- Code, comment and design style: `agents/code-style.md` — the one set of rules
 - Plugin rules: Plugin Master — `plugins/builtin/plugin-master.agent.md`
 
 ## Where everything is

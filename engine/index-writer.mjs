@@ -14,7 +14,7 @@ import path from 'node:path'
  * What the agent view keeps of each record kind, and in the order it writes it.
  *
  * The fields are named here rather than copied one by one, so the shape of a
- * record lives in one place: the entry built in `project-index.mjs`. `always` names
+ * record is stored in one place: the entry built in `project-index.mjs`. `always` names
  * agent must see even when they are empty, because "none" and "not asked" are
  * different facts — `properties: []` says the type has no properties, and a
  * missing `properties` says the type never loaded.
@@ -148,11 +148,11 @@ async function writeAtomic(file, text) {
  * A plain timer, not `context.after`: this is build tooling in node, running
  * outside any world, and there is no fixed clock here to be deterministic on.
  */
-async function renameWhenAllowed(from, to, tries = 5) {
+async function renameWhenAllowed(from, destination, tries = 5) {
   const BUSY = new Set(['EPERM', 'EBUSY', 'EACCES'])
   for (let attempt = 1; ; attempt++) {
     try {
-      return await fs.rename(from, to)
+      return await fs.rename(from, destination)
     } catch (error) {
       if (attempt >= tries || !BUSY.has(error.code)) throw error
       await new Promise(resolve => setTimeout(resolve, attempt * 20))

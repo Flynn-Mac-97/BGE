@@ -241,8 +241,11 @@ export function makeLoader(bus) {
       return out
     },
 
-    /** Register one definition. With a context already booted, activate it now. */
-    add(definition, builtin = false) {
+    /**
+     * Register one definition. With a context already booted, activate it now.
+     * `builtin` records that the engine shipped it, not the project.
+     */
+    add(definition, { builtin = false } = {}) {
       if (!definition?.name) throw new Error('plugin has no name')
       if (plugins.has(definition.name)) throw new Error(`duplicate plugin: ${definition.name}`)
       plugins.set(definition.name, { definition, enabled: true, error: null, builtin, active: false, loaded: false })
@@ -258,10 +261,10 @@ export function makeLoader(bus) {
       }
     },
     /** Turn one plugin on or off, cascading to the plugins that depend on it. */
-    enable(name, on) {
+    enable(name, enabled) {
       const plugin = plugins.get(name)
       if (!plugin) throw new Error(`unknown plugin: ${name}`)
-      if (!on) deactivate(name)
+      if (!enabled) deactivate(name)
       else {
         plugin.enabled = true
         if (context)
@@ -287,7 +290,7 @@ export function makeLoader(bus) {
      * It has no plugin name, so the path is its key; a command it would have
      * owned then answers as missing instead of failing silently.
      */
-    failedImport(file, error, builtin = false) {
+    failedImport(file, error, { builtin = false } = {}) {
       const path = String(file).replaceAll('\\', '/')
       const reason = describe(error)
       plugins.set(path, { definition: NOTHING, enabled: false, error: reason, builtin, file: path })

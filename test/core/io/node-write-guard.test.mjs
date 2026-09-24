@@ -46,9 +46,9 @@ const NEW_FILE = `export default {
  * plugin command without reading one off the shipped tree. Nothing else is
  * needed; the world starts with no other.
  */
-function checkout(t, runs = []) {
+function checkout(testContext, runs = []) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-node-write-guard-'))
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  testContext.after(() => fs.rmSync(root, { recursive: true, force: true }))
 
   const coordination = path.join(root, '.engine')
   fs.mkdirSync(coordination, { recursive: true })
@@ -93,8 +93,8 @@ const headless = (root, ...args) => {
 
 const wrote = root => fs.existsSync(path.join(root, 'game/types/x.js'))
 
-test('a locked checkout refuses a headless write and exits 1', t => {
-  const root = checkout(t, working)
+test('a locked checkout refuses a headless write and exits 1', testContext => {
+  const root = checkout(testContext, working)
   const run = headless(root, 'run', 'new.file', '["type","x"]')
 
   assert.equal(run.code, 1, `exit code — stdout was ${run.out}`)
@@ -103,8 +103,8 @@ test('a locked checkout refuses a headless write and exits 1', t => {
   assert.equal(wrote(root), false, 'nothing may land on disk')
 })
 
-test('the same write lands and exits 0 when no lane is working', t => {
-  const root = checkout(t)
+test('the same write lands and exits 0 when no lane is working', testContext => {
+  const root = checkout(testContext)
   const run = headless(root, 'run', 'new.file', '["type","x"]')
 
   assert.equal(run.code, 0, `exit code — stderr was ${run.error}`)
@@ -112,8 +112,8 @@ test('the same write lands and exits 0 when no lane is working', t => {
   assert.equal(wrote(root), true)
 })
 
-test('a command that ignores the refusal still fails the run', t => {
-  const root = checkout(t, working)
+test('a command that ignores the refusal still fails the run', testContext => {
+  const root = checkout(testContext, working)
   const run = headless(root, 'run', 'probe.writeIgnoringRefusal')
 
   assert.equal(run.code, 1, `exit code — stdout was ${run.out}`)
@@ -121,8 +121,8 @@ test('a command that ignores the refusal still fails the run', t => {
   assert.equal(wrote(root), false)
 })
 
-test('a locked checkout still simulates and answers', t => {
-  const root = checkout(t, working)
+test('a locked checkout still simulates and answers', testContext => {
+  const root = checkout(testContext, working)
 
   const played = headless(root, 'simulate', '1')
   assert.equal(played.code, 0, `simulate must run while locked — ${played.error}`)

@@ -5,8 +5,9 @@ description: Write and review code for clarity using this repo's requirements-fi
 
 # Non-slop
 
-The rules that keep this codebase clear. `AGENTS.md` has the short form; this is the
-long form with rationale, examples, and a review procedure.
+`agents/code-style.md` is the one set of rules for this engine, and
+`node bin/engine.mjs check` enforces it. This file is background: rationale and
+examples. Where the two differ, `agents/code-style.md` wins.
 
 ## The paradigm
 

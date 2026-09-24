@@ -57,10 +57,11 @@ function markDrawn(node, draws) {
 function collectKeeps(instance, holder, rigs) {
   const keeps = new Set([holder, instance])
   for (const rig of rigs) {
-    for (const bone of rig.bones) if (bone) for (let at = bone; at; at = at.parent) keeps.add(at)
+    for (const bone of rig.bones)
+      if (bone) for (let ancestor = bone; ancestor; ancestor = ancestor.parent) keeps.add(ancestor)
   }
   instance.traverse(node => {
-    if (drawsSomething(node)) for (let at = node; at; at = at.parent) keeps.add(at)
+    if (drawsSomething(node)) for (let ancestor = node; ancestor; ancestor = ancestor.parent) keeps.add(ancestor)
   })
   return keeps
 }
@@ -126,14 +127,14 @@ const prunedParents = new WeakMap()
  */
 function reattach(node, holder) {
   const chain = []
-  for (let at = node; at && at !== holder; at = at.parent) {
-    if (prunedParents.has(at)) chain.push(at)
+  for (let ancestor = node; ancestor && ancestor !== holder; ancestor = ancestor.parent) {
+    if (prunedParents.has(ancestor)) chain.push(ancestor)
   }
-  for (let i = chain.length - 1; i >= 0; i--) {
-    const at = chain[i]
-    const parent = prunedParents.get(at)
-    prunedParents.delete(at)
-    parent.add(at)
+  for (let index = chain.length - 1; index >= 0; index--) {
+    const pruned = chain[index]
+    const parent = prunedParents.get(pruned)
+    prunedParents.delete(pruned)
+    parent.add(pruned)
   }
 }
 
@@ -145,7 +146,7 @@ function reattach(node, holder) {
 function sameRig(first, second) {
   if (first.bones.length !== second.bones.length) return false
   if (first.boneInverses !== second.boneInverses) return false
-  for (let i = 0; i < first.bones.length; i++) if (first.bones[i] !== second.bones[i]) return false
+  for (let index = 0; index < first.bones.length; index++) if (first.bones[index] !== second.bones[index]) return false
   return true
 }
 
@@ -191,7 +192,7 @@ function removeStaleAttachments(record, declared, where, release) {
   }
 }
 
-/** Put the attachment where the declaration says it sits on the node. */
+/** Put the attachment at the position the declaration gives for the node. */
 function positionAttachment(entry, spec, where, name) {
   const position = readVector(spec.position, `${where}.attachments.${name}.position`)
   const rotation = readVector(spec.rotation, `${where}.attachments.${name}.rotation`)
@@ -206,7 +207,7 @@ function positionAttachment(entry, spec, where, name) {
  * have to show again before the attachment draws.
  */
 function showChain(node, holder) {
-  for (let at = node; at && at !== holder; at = at.parent) at.visible = true
+  for (let ancestor = node; ancestor && ancestor !== holder; ancestor = ancestor.parent) ancestor.visible = true
 }
 
 /**

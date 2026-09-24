@@ -2,8 +2,8 @@
  * Kernel: the entity store, the type and behaviour registries, and the hooks
  * that run them.
  *
- * An entity is flat. Position lives on the entity, not on a Transform that lives
- * on the entity: e.x, not e.transform.position.x.
+ * An entity is flat. Position is stored on the entity, not on a Transform that
+ * is stored on the entity: e.x, not e.transform.position.x.
  *
  * The one form of composition is a *behaviour*: a file shaped exactly like a
  * type, minus the art, that a type or a single placement can attach by name.
@@ -52,7 +52,7 @@ const foldNumber = (hash, value) => {
 /** Fold text in, one code unit at a time. */
 const foldText = (hash, text) => {
   let out = hash
-  for (let at = 0; at < text.length; at++) out = fold(out, text.charCodeAt(at))
+  for (let index = 0; index < text.length; index++) out = fold(out, text.charCodeAt(index))
   return out
 }
 
@@ -146,14 +146,14 @@ const NOT_STATE = new Set(['_definition'])
 export function stateHash(world) {
   const entities = world.entities
   let hash = fold(0x811c9dc5, entities.length)
-  for (const e of entities) {
-    hash = foldValue(hash, e.id)
-    hash = foldValue(hash, e.type)
-    for (const key of Object.keys(e)) {
+  for (const entity of entities) {
+    hash = foldValue(hash, entity.id)
+    hash = foldValue(hash, entity.type)
+    for (const key of Object.keys(entity)) {
       if (NOT_STATE.has(key) || key === 'behaviours') continue
-      hash = foldValue(foldText(hash, key), e[key])
+      hash = foldValue(foldText(hash, key), entity[key])
     }
-    for (const record of e.behaviours || []) {
+    for (const record of entity.behaviours || []) {
       hash = foldValue(foldText(hash, record.name), record.bag)
     }
   }
@@ -201,7 +201,7 @@ function drawnPlaceInto(target, entity, blend) {
  * The entity store, the type and behaviour registries, and the hooks that run
  * them.
  *
- * State lives in the closure, so two worlds share nothing and a test makes one
+ * State is stored in the closure, so two worlds share nothing and a test makes one
  * per case. The bus is the only way out: every change worth noticing is
  * emitted, and a reader listens rather than polling.
  *
@@ -231,13 +231,13 @@ export function makeWorld(bus) {
 
   /** Where and how big the entity is, from the placement's own numbers. */
   function entityPlacementFor(typeName, placement) {
-    const at = placement.at || [0, 0, 0]
+    const placedAt = placement.at || [0, 0, 0]
     return {
       id: entityIdFor(typeName, placement),
       type: typeName,
-      x: at[0] ?? 0,
-      y: at[1] ?? 0,
-      z: at[2] ?? 0,
+      x: placedAt[0] ?? 0,
+      y: placedAt[1] ?? 0,
+      z: placedAt[2] ?? 0,
       rotation: placement.rotation ?? 0,
       scale: placement.scale ?? 1
     }
@@ -355,7 +355,7 @@ export function makeWorld(bus) {
    * reason. Dropping it would lose it from the level file on the next save —
    * silently deleting the author's work because a file had a typo in it.
    */
-  function addBehaviour(e, name, { own = true, typeProps = {}, overrides = {} } = {}) {
+  function addBehaviour(entity, name, { own = true, typeProps = {}, overrides = {} } = {}) {
     const record = { name, own, overrides: Object.keys(overrides), definition: {}, error: null }
 
     if (RESERVED.has(name)) record.error = `"${name}" is already an entity field`
@@ -363,10 +363,10 @@ export function makeWorld(bus) {
     else record.definition = behaviours.get(name)
 
     record.bag = { ...(record.definition.properties || {}), ...typeProps, ...overrides }
-    if (!RESERVED.has(name)) e[name] = record.bag
+    if (!RESERVED.has(name)) entity[name] = record.bag
 
-    if (record.error) console.error(`[behaviour] ${e.id} — ${record.error}`)
-    e.behaviours.push(record)
+    if (record.error) console.error(`[behaviour] ${entity.id} — ${record.error}`)
+    entity.behaviours.push(record)
     return record
   }
 
@@ -377,24 +377,24 @@ export function makeWorld(bus) {
    * effect on everything already placed. Anything this placement added or took
    * off for itself is left alone.
    */
-  function syncTypeBehaviours(e, definition) {
+  function syncTypeBehaviours(entity, definition) {
     const fromType = asAttached(definition.behaviours)
     const order = Object.keys(fromType)
 
-    for (const b of [...e.behaviours]) {
-      if (b.own || b.name in fromType) continue
-      e.behaviours.splice(e.behaviours.indexOf(b), 1)
-      delete e[b.name]
+    for (const behaviour of [...entity.behaviours]) {
+      if (behaviour.own || behaviour.name in fromType) continue
+      entity.behaviours.splice(entity.behaviours.indexOf(behaviour), 1)
+      delete entity[behaviour.name]
     }
     for (const name of order) {
-      if (e._detached.has(name) || e.behaviours.some(b => b.name === name)) continue
-      addBehaviour(e, name, { own: false, typeProps: fromType[name] || {} })
+      if (entity._detached.has(name) || entity.behaviours.some(behaviour => behaviour.name === name)) continue
+      addBehaviour(entity, name, { own: false, typeProps: fromType[name] || {} })
     }
 
     // Order is the declared order, so a file edit that reorders the list
     // reorders the hooks. Placement-added ones run after the type's.
-    const rank = b => (b.own ? order.length + 1 : order.indexOf(b.name))
-    e.behaviours.sort((a, b) => rank(a) - rank(b))
+    const rank = behaviour => (behaviour.own ? order.length + 1 : order.indexOf(behaviour.name))
+    entity.behaviours.sort((first, second) => rank(first) - rank(second))
   }
 
   /**
@@ -407,20 +407,20 @@ export function makeWorld(bus) {
    * Errors are named `type:behaviour`, because "which of the four things
    * attached to this crate threw" is the only question worth asking here.
    */
-  function hook(e, which, ...args) {
-    for (const b of e.behaviours) {
-      if (typeof b.definition[which] !== 'function') continue
+  function hook(entity, which, ...args) {
+    for (const behaviour of entity.behaviours) {
+      if (typeof behaviour.definition[which] !== 'function') continue
       try {
-        b.definition[which](e, ...args, b.bag)
+        behaviour.definition[which](entity, ...args, behaviour.bag)
       } catch (err) {
-        console.error(`[${e.type}:${b.name}] ${which}`, err)
+        console.error(`[${entity.type}:${behaviour.name}] ${which}`, err)
       }
     }
-    if (typeof e._definition?.[which] !== 'function') return
+    if (typeof entity._definition?.[which] !== 'function') return
     try {
-      e._definition[which](e, ...args)
+      entity._definition[which](entity, ...args)
     } catch (err) {
-      console.error(`[${e.type}] ${which}`, err)
+      console.error(`[${entity.type}] ${which}`, err)
     }
   }
 
@@ -432,7 +432,7 @@ export function makeWorld(bus) {
     behaviours,
     hook,
 
-    /** Shared game state — score, lives, whatever the game needs across types. */
+    /** Shared game state — score, remaining tries, whatever the game needs across types. */
     state: {},
 
     /**
@@ -447,7 +447,7 @@ export function makeWorld(bus) {
       const list = entities
       for (let index = 0; index < list.length; index++) {
         const entity = list[index]
-        // The before place lives on the entity, reused rather than replaced: a
+        // The before place is stored on the entity, reused rather than replaced: a
         // fresh object — or a map probe — for every entity every step is what
         // stopped a large level running smoothly. Non-enumerable, so nothing
         // that copies or saves an entity sees it.
@@ -503,27 +503,27 @@ export function makeWorld(bus) {
       types.set(name, definition)
       let moved = 0
 
-      for (const e of entities) {
-        if (e.type !== name) continue
+      for (const entity of entities) {
+        if (entity.type !== name) continue
         // What this placement said about its mesh, worked out against the OLD
         // definition — so it has to be read before the pointer moves.
-        const ownMesh = lookDiff(e.mesh, expand(e._definition.mesh, 'texture'))
-        e._definition = definition
+        const ownMesh = lookDiff(entity.mesh, expand(entity._definition.mesh, 'texture'))
+        entity._definition = definition
 
         // Re-merge from the new defaults, keeping only what this placement
         // actually overrode. Changing a default in the file then shows up on
         // every entity that never disagreed with it.
         const kept = {}
-        for (const k of e.overrides) kept[k] = e.properties[k]
-        e.properties = { ...(definition.properties || {}), ...kept }
+        for (const key of entity.overrides) kept[key] = entity.properties[key]
+        entity.properties = { ...(definition.properties || {}), ...kept }
 
-        if (!e._setByPlacement.sprite) e.sprite = expand(definition.sprite, 'image')
+        if (!entity._setByPlacement.sprite) entity.sprite = expand(definition.sprite, 'image')
         // Merge, not replace: changing a texture in the type file reaches every
         // wall that never disagreed with it, while a wall that set its own box
         // keeps that box.
-        e.mesh = mergeLook(definition.mesh, ownMesh, 'texture')
-        if (!e._setByPlacement.collider) e.collider = definition.collider ?? null
-        syncTypeBehaviours(e, definition)
+        entity.mesh = mergeLook(definition.mesh, ownMesh, 'texture')
+        if (!entity._setByPlacement.collider) entity.collider = definition.collider ?? null
+        syncTypeBehaviours(entity, definition)
         moved++
       }
 
@@ -556,17 +556,19 @@ export function makeWorld(bus) {
       behaviours.set(name, definition)
       let moved = 0
 
-      for (const e of entities) {
-        const record = e.behaviours.find(b => b.name === name)
+      for (const entity of entities) {
+        const record = entity.behaviours.find(behaviour => behaviour.name === name)
         if (!record || RESERVED.has(name)) continue
-        const runtime = Object.fromEntries(Object.entries(record.bag).filter(([k]) => !(k in (old.properties || {}))))
+        const runtime = Object.fromEntries(
+          Object.entries(record.bag).filter(([key]) => !(key in (old.properties || {})))
+        )
         const kept = {}
-        for (const k of record.overrides) kept[k] = record.bag[k]
+        for (const key of record.overrides) kept[key] = record.bag[key]
 
         record.definition = definition
         record.error = null
         record.bag = { ...(definition.properties || {}), ...runtime, ...kept }
-        e[name] = record.bag
+        entity[name] = record.bag
         moved++
       }
 
@@ -577,8 +579,8 @@ export function makeWorld(bus) {
     /** The file went away. Entities keep the attachment, marked, so a save keeps it too. */
     unregisterBehaviour(name) {
       behaviours.delete(name)
-      for (const e of entities) {
-        const record = e.behaviours.find(b => b.name === name)
+      for (const entity of entities) {
+        const record = entity.behaviours.find(behaviour => behaviour.name === name)
         if (record) {
           record.definition = {}
           record.error = `no behaviours/${name}.js`
@@ -588,12 +590,13 @@ export function makeWorld(bus) {
     },
 
     /** Attach one to a live entity — the drop, and the CLI verb, both land here. */
-    attach(e, name, properties = {}) {
-      if (e.behaviours.some(b => b.name === name)) throw new Error(`${e.id} already has "${name}"`)
+    attach(entity, name, properties = {}) {
+      if (entity.behaviours.some(behaviour => behaviour.name === name))
+        throw new Error(`${entity.id} already has "${name}"`)
       if (RESERVED.has(name)) throw new Error(`"${name}" is already an entity field`)
       if (!behaviours.has(name)) throw new Error(`no behaviour "${name}"`)
-      e._detached.delete(name)
-      const record = addBehaviour(e, name, { own: true, overrides: properties })
+      entity._detached.delete(name)
+      const record = addBehaviour(entity, name, { own: true, overrides: properties })
       bus.emit('world:changed')
       return record
     },
@@ -604,20 +607,20 @@ export function makeWorld(bus) {
      * A behaviour the type declares is recorded as detached, or the next sync
      * from the type file would put it straight back.
      */
-    detach(e, name) {
-      const i = e.behaviours.findIndex(b => b.name === name)
-      if (i < 0) return false
-      const [record] = e.behaviours.splice(i, 1)
-      if (!record.own) e._detached.add(name)
-      delete e[name]
+    detach(entity, name) {
+      const index = entity.behaviours.findIndex(behaviour => behaviour.name === name)
+      if (index < 0) return false
+      const [record] = entity.behaviours.splice(index, 1)
+      if (!record.own) entity._detached.add(name)
+      delete entity[name]
       bus.emit('world:changed')
       return true
     },
 
     /** Change one behaviour's value on one entity, and remember it was changed here. */
-    setBehaviourProp(e, name, key, value) {
-      const record = e.behaviours.find(b => b.name === name)
-      if (!record) throw new Error(`${e.id} has no "${name}"`)
+    setBehaviourProp(entity, name, key, value) {
+      const record = entity.behaviours.find(behaviour => behaviour.name === name)
+      if (!record) throw new Error(`${entity.id} has no "${name}"`)
       record.bag[key] = value
       if (!record.overrides.includes(key)) record.overrides.push(key)
       bus.emit('world:changed')
@@ -631,25 +634,25 @@ export function makeWorld(bus) {
      * ids are position-in-file and stable across loads.
      */
     spawn(typeName, placement) {
-      const e = makeEntity(typeName, placement)
+      const entity = makeEntity(typeName, placement)
       // A generated id must not land on one a level already used, and level ids
       // are stable across reloads, so check rather than trust the counter.
-      while (!placement?.id && byIdIndex.has(e.id)) e.id = `${typeName}-${nextId++}`
-      entities.push(e)
-      byIdIndex.set(e.id, e)
-      bus.emit('entity:added', e)
-      return e
+      while (!placement?.id && byIdIndex.has(entity.id)) entity.id = `${typeName}-${nextId++}`
+      entities.push(entity)
+      byIdIndex.set(entity.id, entity)
+      bus.emit('entity:added', entity)
+      return entity
     },
 
     /** Remove one entity, run its onDestroy hook, and announce it. */
-    destroy(e) {
-      const i = entities.indexOf(e)
-      if (i < 0) return
-      entities.splice(i, 1)
+    destroy(entity) {
+      const index = entities.indexOf(entity)
+      if (index < 0) return
+      entities.splice(index, 1)
       // Clear only the entry that names this entity; a shared id may point elsewhere.
-      if (byIdIndex.get(e.id) === e) byIdIndex.delete(e.id)
-      hook(e, 'onDestroy', world.context)
-      bus.emit('entity:removed', e)
+      if (byIdIndex.get(entity.id) === entity) byIdIndex.delete(entity.id)
+      hook(entity, 'onDestroy', world.context)
+      bus.emit('entity:removed', entity)
     },
 
     /**
@@ -659,19 +662,19 @@ export function makeWorld(bus) {
      * it is made. The index is keyed by id, so the entry has to move with it or
      * `byId` reads a key no live entity has.
      */
-    setId(e, id) {
-      if (byIdIndex.get(e.id) === e) byIdIndex.delete(e.id)
-      e.id = id
-      byIdIndex.set(id, e)
+    setId(entity, id) {
+      if (byIdIndex.get(entity.id) === entity) byIdIndex.delete(entity.id)
+      entity.id = id
+      byIdIndex.set(id, entity)
     },
 
     /** The first entity of a type. */
     find(typeName) {
-      return entities.find(e => e.type === typeName)
+      return entities.find(entity => entity.type === typeName)
     },
     /** Every entity of a type. */
     all(typeName) {
-      return entities.filter(e => e.type === typeName)
+      return entities.filter(entity => entity.type === typeName)
     },
     /**
      * One entity by its level id.

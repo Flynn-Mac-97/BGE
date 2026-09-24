@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three/webgpu'
 
+/** The 1x1 plane every sprite and 2D quad shares before it is scaled to size. */
 export const UNIT_PLANE = new THREE.PlaneGeometry(1, 1)
 
 /** Geometry cached by kind and dimensions, so a map of walls shares a handful of sizes. */
@@ -11,9 +12,10 @@ const geometryCache = new Map()
 
 /** One solid shape per kind, built from its size and segment count. */
 const SOLID_BY_KIND = {
-  sphere: (w, h, d, parts) => new THREE.SphereGeometry(0.5, Math.max(8, parts * 2), Math.max(6, parts)).scale(w, h, d),
-  quad: (w, h, d, parts) => new THREE.PlaneGeometry(w, h, parts, parts),
-  box: (w, h, d, parts) => new THREE.BoxGeometry(w, h, d, parts, parts, parts)
+  sphere: (width, height, depth, parts) =>
+    new THREE.SphereGeometry(0.5, Math.max(8, parts * 2), Math.max(6, parts)).scale(width, height, depth),
+  quad: (width, height, depth, parts) => new THREE.PlaneGeometry(width, height, parts, parts),
+  box: (width, height, depth, parts) => new THREE.BoxGeometry(width, height, depth, parts, parts, parts)
 }
 
 /**
@@ -24,9 +26,9 @@ const SOLID_BY_KIND = {
  * hitch on load. Nothing here is ever disposed: the cache is keyed by size, so
  * it is bounded by how many sizes the project actually uses.
  */
-export function solidGeometry(kind, w, h, d, segments = 1) {
+export function solidGeometry(kind, width, height, depth, segments = 1) {
   const parts = Math.max(1, Math.min(96, Math.round(segments) || 1))
-  const key = `${kind}:${w},${h},${d}:${parts}`
+  const key = `${kind}:${width},${height},${depth}:${parts}`
   const cached = geometryCache.get(key)
   if (cached) return cached
   // A vertex shader can only move vertices that exist, so `segments` is what
@@ -34,13 +36,13 @@ export function solidGeometry(kind, w, h, d, segments = 1) {
   // triangles cost more than the shape is worth, and an author who types a
   // thousand meant a hundred.
   const build = SOLID_BY_KIND[kind] || SOLID_BY_KIND.box
-  const geometry = build(w, h, d, parts)
+  const geometry = build(width, height, depth, parts)
   // The second UV set is copied off the first BEFORE it is rewritten in metres,
   // so it is still the 0..1 parameterisation a baked lightmap wants. Two floats
   // per vertex on geometry that is already shared by every wall of this size is
   // not worth making conditional.
   geometry.setAttribute('uv1', geometry.attributes.uv.clone())
-  measureUVsInMetres(geometry, kind, w, h, d)
+  measureUVsInMetres(geometry, kind, width, height, depth)
   geometryCache.set(key, geometry)
   return geometry
 }
@@ -55,29 +57,29 @@ export function solidGeometry(kind, w, h, d, segments = 1) {
  * is. It costs nothing at runtime — the numbers are baked once, into geometry
  * that is then shared by every wall of that size.
  */
-function measureUVsInMetres(geometry, kind, w, h, d) {
-  const uv = geometry.attributes.uv
+function measureUVsInMetres(geometry, kind, width, height, depth) {
+  const uvAttribute = geometry.attributes.uv
   // Face order is the order BoxGeometry builds them in: +X, -X, +Y, -Y, +Z, -Z.
   // A sphere is one continuous surface with one UV wrap; measuring it in metres
   // per "face" would tear it at the seam.
   if (kind === 'sphere') return
   const faces =
     kind === 'quad'
-      ? [[w, h]]
+      ? [[width, height]]
       : [
-          [d, h],
-          [d, h],
-          [w, d],
-          [w, d],
-          [w, h],
-          [w, h]
+          [depth, height],
+          [depth, height],
+          [width, depth],
+          [width, depth],
+          [width, height],
+          [width, height]
         ]
-  const perFace = uv.count / faces.length
-  for (let i = 0; i < uv.count; i++) {
-    const [faceWidth, faceHeight] = faces[Math.floor(i / perFace)]
-    uv.setXY(i, uv.getX(i) * faceWidth, uv.getY(i) * faceHeight)
+  const perFace = uvAttribute.count / faces.length
+  for (let index = 0; index < uvAttribute.count; index++) {
+    const [faceWidth, faceHeight] = faces[Math.floor(index / perFace)]
+    uvAttribute.setXY(index, uvAttribute.getX(index) * faceWidth, uvAttribute.getY(index) * faceHeight)
   }
-  uv.needsUpdate = true
+  uvAttribute.needsUpdate = true
 }
 
 /**
@@ -98,7 +100,7 @@ export function mergeMeshes(members) {
 
   const position = new Float32Array(vertices * 3)
   const normal = new Float32Array(vertices * 3)
-  const uv = new Float32Array(vertices * 2)
+  const uvArray = new Float32Array(vertices * 2)
   const uv1 = new Float32Array(vertices * 2)
   const index = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices)
 
@@ -111,36 +113,37 @@ export function mergeMeshes(members) {
     mesh.updateMatrix()
     normalMatrix.getNormalMatrix(mesh.matrix)
     const geometry = mesh.geometry
-    const p = geometry.attributes.position
-    const n = geometry.attributes.normal
-    const t = geometry.attributes.uv
-    const t1 = geometry.attributes.uv1 || t
+    const positionAttribute = geometry.attributes.position
+    const normalAttribute = geometry.attributes.normal
+    const uvAttribute = geometry.attributes.uv
+    const uv1Attribute = geometry.attributes.uv1 || uvAttribute
 
-    for (let i = 0; i < p.count; i++) {
-      const at = vertexAt + i
-      point.fromBufferAttribute(p, i).applyMatrix4(mesh.matrix)
-      position[at * 3] = point.x
-      position[at * 3 + 1] = point.y
-      position[at * 3 + 2] = point.z
-      point.fromBufferAttribute(n, i).applyMatrix3(normalMatrix).normalize()
-      normal[at * 3] = point.x
-      normal[at * 3 + 1] = point.y
-      normal[at * 3 + 2] = point.z
-      uv[at * 2] = t.getX(i)
-      uv[at * 2 + 1] = t.getY(i)
-      uv1[at * 2] = t1.getX(i)
-      uv1[at * 2 + 1] = t1.getY(i)
+    for (let vertex = 0; vertex < positionAttribute.count; vertex++) {
+      const absoluteVertex = vertexAt + vertex
+      point.fromBufferAttribute(positionAttribute, vertex).applyMatrix4(mesh.matrix)
+      position[absoluteVertex * 3] = point.x
+      position[absoluteVertex * 3 + 1] = point.y
+      position[absoluteVertex * 3 + 2] = point.z
+      point.fromBufferAttribute(normalAttribute, vertex).applyMatrix3(normalMatrix).normalize()
+      normal[absoluteVertex * 3] = point.x
+      normal[absoluteVertex * 3 + 1] = point.y
+      normal[absoluteVertex * 3 + 2] = point.z
+      uvArray[absoluteVertex * 2] = uvAttribute.getX(vertex)
+      uvArray[absoluteVertex * 2 + 1] = uvAttribute.getY(vertex)
+      uv1[absoluteVertex * 2] = uv1Attribute.getX(vertex)
+      uv1[absoluteVertex * 2 + 1] = uv1Attribute.getY(vertex)
     }
-    for (let i = 0; i < geometry.index.count; i++) index[indexAt + i] = vertexAt + geometry.index.getX(i)
+    for (let element = 0; element < geometry.index.count; element++)
+      index[indexAt + element] = vertexAt + geometry.index.getX(element)
 
-    vertexAt += p.count
+    vertexAt += positionAttribute.count
     indexAt += geometry.index.count
   }
 
   const merged = new THREE.BufferGeometry()
   merged.setAttribute('position', new THREE.BufferAttribute(position, 3))
   merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3))
-  merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+  merged.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2))
   merged.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2))
   merged.setIndex(new THREE.BufferAttribute(index, 1))
   merged.computeBoundingSphere()

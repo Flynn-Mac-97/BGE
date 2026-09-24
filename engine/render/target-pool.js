@@ -37,7 +37,7 @@ const TYPE_BYTES = { 'unsigned-byte': 1, 'half-float': 2, float: 4 }
  * The benchmark's 50-pass curve at 1280x720 is the largest legitimate pass set
  * the kernel knows of. If all fifty needed their own half-float colour-plus-depth
  * target the plan would take about 527 MiB; a real plan aliases transients and
- * takes a fraction of that. One GiB sits above the fifty-target worst case and
+ * takes a fraction of that. One GiB is above the fifty-target worst case and
  * still bounds a runaway pass set.
  */
 export const TARGET_CEILING_BYTES = 1024 * 1024 * 1024
@@ -75,6 +75,7 @@ export function descriptorKey(descriptor = {}) {
   ].join('|')
 }
 
+/** Build a render-target pool keyed by descriptor and size. */
 export function makeTargetPool(options = {}) {
   // A format this pool cannot build is reported rather than silently drawn as
   // the default, so a pass that asked for float cannot appear to have got it.
@@ -203,8 +204,8 @@ export function makeTargetPool(options = {}) {
       if (referencedKeys.has(entry.key)) continue
       const list = free.get(entry.key)
       if (list) {
-        const at = list.indexOf(entry.target)
-        if (at >= 0) list.splice(at, 1)
+        const freeIndex = list.indexOf(entry.target)
+        if (freeIndex >= 0) list.splice(freeIndex, 1)
         if (!list.length) free.delete(entry.key)
       }
       entry.target.dispose()

@@ -26,8 +26,8 @@ export async function loadTypes({ world, editor, importProjectFile }) {
   for (const [name, behaviour] of Object.entries(editor.index.behaviours || {})) {
     try {
       world.registerBehaviour(name, await importProjectFile(behaviour.file))
-    } catch (e) {
-      console.error(`[behaviours] ${name} failed`, e)
+    } catch (error) {
+      console.error(`[behaviours] ${name} failed`, error)
     }
   }
 
@@ -35,8 +35,8 @@ export async function loadTypes({ world, editor, importProjectFile }) {
   for (const [name, type] of Object.entries(editor.index.types)) {
     try {
       world.registerType(name, await importProjectFile(type.file))
-    } catch (e) {
-      console.error(`[types] ${name} failed`, e)
+    } catch (error) {
+      console.error(`[types] ${name} failed`, error)
     }
   }
 }
@@ -244,7 +244,7 @@ export function togglePlay(parts) {
     // handler that tests it does nothing at all. Hold, subscribe or schedule;
     // never gate on `running` here.
     bus.emit('play:started')
-    for (const e of [...world.entities]) world.hook(e, 'start', context)
+    for (const entity of [...world.entities]) world.hook(entity, 'start', context)
     loop.start()
   }
   bus.emit('plugins:changed')

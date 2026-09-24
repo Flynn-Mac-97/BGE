@@ -110,7 +110,7 @@ test('every builtin plugin packet carries its live commands and work instruction
     const request = { files: [node.source] }
     const packet = await context.agents.context(request)
     assert.doesNotMatch(packet.text, /Interface unavailable/, node.source)
-    for (const rule of ['Shared Rules', 'Code Style', 'Comment Style', 'Plugin Master', 'Required checks', 'Not included']) {
+    for (const rule of ['Shared Rules', 'Code Style', 'A comment says what the code cannot', 'Plugin Master', 'Required checks', 'Not included']) {
       assert.ok(packet.text.includes(rule), `${node.source}: ${rule}`)
     }
     const source = await fs.readFile(path.join(CHECKOUT, node.source), 'utf8')

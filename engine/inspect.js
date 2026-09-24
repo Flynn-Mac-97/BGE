@@ -53,8 +53,17 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      */
     commands({ fields } = {}) {
       const rows = [
-        ...loader.contributions.commands.map(c => ({ id: c.id, label: c.label, plugin: c.plugin })),
-        ...loader.contributions.menus.map(m => ({ id: m.id, label: m.label, plugin: m.plugin, toolbar: true }))
+        ...loader.contributions.commands.map(command => ({
+          id: command.id,
+          label: command.label,
+          plugin: command.plugin
+        })),
+        ...loader.contributions.menus.map(menu => ({
+          id: menu.id,
+          label: menu.label,
+          plugin: menu.plugin,
+          toolbar: true
+        }))
       ]
       if (fields === undefined) return rows
       if (fields === true) throw new Error(`commands takes the fields as a value — commands '{"fields":["id"]}'`)
@@ -66,7 +75,8 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     // instead of a pending promise.
     async run(id, args) {
       const command =
-        loader.contributions.commands.find(c => c.id === id) || loader.contributions.menus.find(m => m.id === id)
+        loader.contributions.commands.find(candidate => candidate.id === id) ||
+        loader.contributions.menus.find(menu => menu.id === id)
       if (!command) throw new Error(missingCommand(id, loader.failures()))
       validateCommandInput(
         command.inputSchema,
@@ -84,8 +94,8 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
 
     /** One entity in full, or null when no entity has that id. */
     entity(id) {
-      const e = world.byId(id)
-      return e ? entityView(e) : null
+      const entity = world.byId(id)
+      return entity ? entityView(entity) : null
     },
 
     // ---- direct verbs, for driving without going through a command ----
@@ -125,7 +135,7 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
         // what stops a hook's own save writing a mid-simulation level, and what
         // keeps those spawns out of the History palette.
         world.simulated = true
-        for (const e of [...world.entities]) world.hook(e, 'start', editor.context)
+        for (const entity of [...world.entities]) world.hook(entity, 'start', editor.context)
       }
       const before = loop.time
       loop.step(Math.round(seconds * 60))
@@ -153,15 +163,15 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      * A save the editor skipped is named in the reply for the same reason.
      */
     async set(id, key, value) {
-      const e = world.byId(id)
-      if (!e) throw new Error(`no entity "${id}"`)
-      if (key in e.properties) {
-        e.properties[key] = value
-        if (!e.overrides.includes(key)) e.overrides.push(key)
-      } else e[key] = value
+      const entity = world.byId(id)
+      if (!entity) throw new Error(`no entity "${id}"`)
+      if (key in entity.properties) {
+        entity.properties[key] = value
+        if (!entity.overrides.includes(key)) entity.overrides.push(key)
+      } else entity[key] = value
       bus.emit('world:changed')
       const saved = await editor.saveLevel()
-      const savedView = entityView(e)
+      const savedView = entityView(entity)
       return saved?.skipped ? { ...savedView, notSaved: saved.skipped } : savedView
     },
 
@@ -176,10 +186,10 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
       return { seed: loop.random.seed, time: loop.time }
     },
 
-    /** The last `n` log lines, oldest first. */
-    log: (n = 40) => activeLog.lines.slice(-n),
+    /** The last `count` log lines, oldest first. */
+    log: (count = 40) => activeLog.lines.slice(-count),
     /** Every error-level line in the ring. */
-    errors: () => activeLog.lines.filter(l => l.level === 'error'),
+    errors: () => activeLog.lines.filter(line => line.level === 'error'),
     /** Empty the log ring. */
     clearLog: () => {
       activeLog.lines.length = 0
@@ -284,8 +294,10 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
 const missingCommand = (id, failures) => {
   if (!failures.length) return `no command "${id}". Try engine.commands()`
   const why = failures
-    .map(f =>
-      f.file ? `Plugin file ${f.file} failed to import: ${f.error}.` : `Plugin "${f.name}" failed to load: ${f.error}.`
+    .map(failure =>
+      failure.file
+        ? `Plugin file ${failure.file} failed to import: ${failure.error}.`
+        : `Plugin "${failure.name}" failed to load: ${failure.error}.`
     )
     .join(' ')
   return (

@@ -6,4 +6,5 @@
  * against real geometry.
  */
 export const DRAWN = 0 // layer the camera renders
-export const MERGED = 1 // layer only the raycaster looks at
+/** The layer a merged entity's own mesh stays on; only the raycaster looks at it. */
+export const MERGED = 1

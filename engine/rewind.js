@@ -65,16 +65,16 @@ export function makeRewind({ world, loop, checkpoints, depth = DEPTH, stride = S
 
   /** Take a moment now, and keep it until the ring is deeper than it holds. */
   function mark() {
-    const at = loop.steps
-    marks.push({ steps: at, moment: captureMoment(parts) })
+    const steps = loop.steps
+    marks.push({ steps, moment: captureMoment(parts) })
     while (marks.length > depth) marks.shift()
-    newest = at
-    return at
+    newest = steps
+    return steps
   }
 
   /** The newest mark at or before `steps`, or null when the ring does not reach back that far. */
   const newestAtOrBefore = steps => {
-    for (let at = marks.length - 1; at >= 0; at--) if (marks[at].steps <= steps) return marks[at]
+    for (let index = marks.length - 1; index >= 0; index--) if (marks[index].steps <= steps) return marks[index]
     return null
   }
 
@@ -131,15 +131,15 @@ export function makeRewind({ world, loop, checkpoints, depth = DEPTH, stride = S
 
   /** The reply for a rewind, naming what was refused, lost, or holding the clock. */
   function rewindReply(from, target, markAt, replayed, back) {
-    const at = loop.steps
-    const reached = at === target
+    const now = loop.steps
+    const reached = now === target
     return {
       from,
       to: target,
       reached,
       mark: markAt.steps,
       replayed,
-      at,
+      at: now,
       // Named, because a solver that would not go back leaves a world that reads
       // as rewound and runs as the later one.
       ...(back.refused.length ? { refused: back.refused } : {}),
@@ -166,7 +166,7 @@ export function makeRewind({ world, loop, checkpoints, depth = DEPTH, stride = S
    * @returns {object} `from`, `to`, the `mark` used, the `replayed` steps, where the
    *   clock actually ended up, and why not when it did not land.
    */
-  function to(steps) {
+  function seekTo(steps) {
     const from = loop.steps
     const { target, error } = targetStep(steps, from)
     if (error) return error
@@ -235,12 +235,12 @@ export function makeRewind({ world, loop, checkpoints, depth = DEPTH, stride = S
       return mark()
     },
 
-    to,
+    to: seekTo,
 
     /** Go back `count` steps from where the clock is. */
     back(count = 1) {
       const wanted = Math.max(1, Math.round(Number(count) || 1))
-      return to(loop.steps - wanted)
+      return seekTo(loop.steps - wanted)
     }
   }
 }

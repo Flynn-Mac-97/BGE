@@ -69,6 +69,7 @@ function validateArrayItems(schema, value, path) {
   if (schema.items) value.forEach((item, index) => validateCommandInput(schema.items, item, `${path}[${index}]`))
 }
 
+/** Throw when `value` does not match `schema`; otherwise return nothing. */
 export function validateCommandInput(schema, value, path = 'args') {
   if (!schema) return
   assertSupportedKeywords(schema, path)

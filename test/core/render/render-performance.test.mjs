@@ -27,9 +27,9 @@ test('the executor calls each pass once, so its work grows linearly with the pas
   for (const size of sizes) {
     const graph = makePassGraph({ report: noop })
     let calls = 0
-    for (let i = 0; i < size; i++) {
+    for (let index = 0; index < size; index++) {
       graph.add({
-        name: `pass${i}`,
+        name: `pass${index}`,
         extract: () => {
           calls++
         },
@@ -48,19 +48,19 @@ test('the executor calls each pass once, so its work grows linearly with the pas
 
   // A quadratic executor would call the pass set once per pass, so doubling the
   // pass count would quadruple the work. Doubling the count doubles it instead.
-  for (let i = 1; i < sizes.length; i++) {
-    assert.equal(work[i], work[i - 1] * 2, `doubling to ${sizes[i]} passes doubled the work`)
+  for (let index = 1; index < sizes.length; index++) {
+    assert.equal(work[index], work[index - 1] * 2, `doubling to ${sizes[index]} passes doubled the work`)
   }
 })
 
 test('a large pass graph stays far under a wall-clock budget', () => {
   const graph = makePassGraph({ report: noop })
-  for (let i = 0; i < 100; i++) graph.add({ name: `pass${i}`, execute: noop })
+  for (let index = 0; index < 100; index++) graph.add({ name: `pass${index}`, execute: noop })
   graph.add({ name: 'present', execute: noop })
   graph.run(null, null, 8, 8)
 
   const started = performance.now()
-  for (let i = 0; i < 2000; i++) graph.run(null, null, 8, 8)
+  for (let index = 0; index < 2000; index++) graph.run(null, null, 8, 8)
   const elapsed = performance.now() - started
 
   // Budget: 2000 ms for 2000 frames of 101 passes — 202,000 no-op calls. The
@@ -85,7 +85,7 @@ test('a steady frame allocates nothing: the order, the frame, the targets and th
   const created = pool.created
   const acquired = pool.acquired
 
-  for (let i = 0; i < 10000; i++) graph.run(null, null, 64, 64)
+  for (let index = 0; index < 10000; index++) graph.run(null, null, 64, 64)
 
   assert.equal(graph.passes, order, 'the sorted order is the same array')
   assert.equal(graph.frame, frame, 'the frame record is the same object')
@@ -101,9 +101,9 @@ test('the kernel does the same per-frame work for one entity and for ten thousan
   const graph = makePassGraph({ report: noop, pool })
   let calls = 0
   graph.add({ name: 'produce', writes: ['x'], target: { format: 'half-float' }, execute: noop })
-  for (let i = 0; i < 20; i++) {
+  for (let index = 0; index < 20; index++) {
     graph.add({
-      name: `pass${i}`,
+      name: `pass${index}`,
       extract: () => {
         calls++
       },
@@ -125,7 +125,7 @@ test('the kernel does the same per-frame work for one entity and for ten thousan
   }
   calls = 0
 
-  const many = { entities: Array.from({ length: 10000 }, (_, i) => ({ id: `e${i}` })) }
+  const many = { entities: Array.from({ length: 10000 }, (unused, index) => ({ id: `e${index}` })) }
   graph.run(many, null, 8, 8)
 
   assert.equal(calls, one.calls, 'the same callbacks ran for ten thousand entities as for one')
@@ -143,7 +143,7 @@ test('the target pool acquires and releases one target in constant time, and gro
 
   const first = pool.acquire(shared)
   pool.release(first)
-  for (let i = 0; i < 10000; i++) {
+  for (let index = 0; index < 10000; index++) {
     const target = pool.acquire(shared)
     assert.equal(target, first, 'a released target is the one handed back')
     pool.release(target)
@@ -220,7 +220,7 @@ test('the default frame hands a change a recorded budget to fail against', async
   assert.deepEqual(recorded, EXPECTED_BUDGET)
 
   let lastFrameDraws = 0
-  for (let i = 0; i < 200; i++) {
+  for (let index = 0; index < 200; index++) {
     lastFrameDraws = drawOnce(world)
     assert.equal(lastFrameDraws, 1, 'every frame makes one world draw')
   }

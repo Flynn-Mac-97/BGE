@@ -506,6 +506,7 @@ function browserState(mine, clients, running) {
   return 'gone'
 }
 
+/** Every recorded lane browser under `root`, each with its live state. */
 export async function listLaneBrowsers(root) {
   const browsers = readLaneBrowsers(root)
   return Promise.all(

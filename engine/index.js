@@ -1,7 +1,7 @@
 /**
  * Editor boot — the browser half.
  *
- * Everything that does not need a document lives in `start-world.js`. What is
+ * Everything that does not need a document is in `start-world.js`. What is
  * left here is the screen: find the plugin files, import project files by URL,
  * mount the shell, build the renderer, and keep painting while nothing is
  * playing.
@@ -72,7 +72,7 @@ const PROJECT_PLUGIN = /^plugins\/[^/]+\.js$/
  * written a second ago is found on the next load, either side of the split.
  *
  * Importing a file and saying what went wrong when it will not import is the
- * one half both finders share, so it lives in `plugin-import.js` and this one
+ * one half both finders share, so it is in `plugin-import.js` and this one
  * only decides which files to offer it. The loader is the argument that makes
  * that possible: a file that throws has no plugin name, so the loader is the
  * only thing that can answer for it when a command turns up missing later.
@@ -88,16 +88,16 @@ async function findPlugins(loader) {
   let listing = []
   try {
     listing = await overHTTP().tree()
-  } catch (e) {
+  } catch (error) {
     // A project whose file list cannot be read has no plugins as far as this is
     // concerned, and an editor quietly missing eight of them is the worst way to
     // find that out.
-    reportImportFailure(loader, `${PROJECT_PREFIX}/plugins/`, e)
+    reportImportFailure(loader, `${PROJECT_PREFIX}/plugins/`, error)
   }
 
   for (const file of listing
     .map(entry => entry.path)
-    .filter(f => PROJECT_PLUGIN.test(f))
+    .filter(entryPath => PROJECT_PLUGIN.test(entryPath))
     .sort()) {
     const definition = await importPlugin({
       file: `${PROJECT_PREFIX}/${file}`,
@@ -239,8 +239,8 @@ async function boot() {
   console.log('%cengine ready', 'font-weight:600', '— try engine.snapshot() or engine.commands()')
 }
 
-boot().catch(e => {
+boot().catch(error => {
   document.getElementById('app').innerHTML =
-    `<pre style="padding:24px;font:12px ui-monospace">boot failed\n\n${e.stack || e}</pre>`
-  console.error(e)
+    `<pre style="padding:24px;font:12px ui-monospace">boot failed\n\n${error.stack || error}</pre>`
+  console.error(error)
 })

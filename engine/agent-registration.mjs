@@ -125,7 +125,7 @@ function firstSentences(text, limit) {
     return `@@${spans.length - 1}@@`
   })
   /** Put the masked code spans back, so a split never cut inside one. */
-  const restore = value => value.replace(/@@(\d+)@@/g, (_, index) => spans[index])
+  const restore = value => value.replace(/@@(\d+)@@/g, (match, index) => spans[index])
   const sentences = masked.match(/[^.!?]+[.!?]+(\s|$)/g) || []
   let out = ''
   for (const sentence of sentences) {

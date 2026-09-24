@@ -12,7 +12,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 /**
- * Where the record lives.
+ * Where the record is stored.
  *
  * Anchored to the MAIN worktree, exactly as the agent run registry is. A lane
  * runs in `.agent-worktrees/<id>`, so a record written there is deleted with the
@@ -285,7 +285,7 @@ const describeTabs = tabs =>
  * Every server this checkout knows about, proved one by one.
  *
  * `alsoProbe` names ports to ask about even though no record mentions them. The
- * default port belongs on that list: a server nothing wrote down, sitting where
+ * default port belongs on that list: a server nothing wrote down, running where
  * every command looks by default, is the exact situation an agent cannot see.
  */
 export async function listServers(checkout, alsoProbe = []) {

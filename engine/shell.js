@@ -17,12 +17,6 @@ import { makeRegions } from './shell-regions.js'
 
 export { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from './shell-shortcuts.js'
 
-/**
- * Mount the dock frame into `root` and return its handles.
- *
- * The shell composes panels without knowing them: `panelsFor` asks the loader
- * for whatever a plugin contributed to a dock.
- */
 /** What the status line says about the level being on disk. */
 function saveStatus(editor, files) {
   if (editor.projectUntitled) return 'untitled · edits held, name it to keep them'
@@ -30,6 +24,12 @@ function saveStatus(editor, files) {
   return 'saved to disk'
 }
 
+/**
+ * Mount the dock frame into `root` and return its handles.
+ *
+ * The shell composes panels without knowing them: `panelsFor` asks the loader
+ * for whatever a plugin contributed to a dock.
+ */
 export function makeShell(root, context) {
   const { loader, bus, editor } = context
   // renderer is read lazily: the canvas it draws into is created below, so the
@@ -77,10 +77,10 @@ export function makeShell(root, context) {
    * Collapse the frame to the viewport, or put the docks back.
    *
    * This is the same split the engine makes everywhere: the kernel owns the
-   * vocabulary and a plugin owns the policy. The frame lives here, so knowing
-   * *how* to get out of the way lives here too — and nothing in this file knows
-   * that play is the reason. `Play Focus` decides *when*, and a different plugin
-   * could decide differently without the kernel changing.
+   * vocabulary and a plugin owns the policy. The frame is built here, so
+   * knowing *how* to get out of the way is written here too — and nothing in
+   * this file knows that play is the reason. `Play Focus` decides *when*, and
+   * a different plugin could decide differently without the kernel changing.
    *
    * A class, never a rebuild. A dock that is destroyed loses its scroll
    * position, its search text and whatever its panel was holding, and the whole
@@ -88,8 +88,8 @@ export function makeShell(root, context) {
    * recoverable; rebuilt is not — so nothing is removed and `draw()` is not
    * called, which is what makes coming back free.
    */
-  function focus(on) {
-    const wanted = !!on
+  function focus(wantsFocus) {
+    const wanted = !!wantsFocus
     if (!frame) return false
     if (frame.classList.contains('focused') === wanted) return wanted
     frame.classList.toggle('focused', wanted)
@@ -108,10 +108,10 @@ export function makeShell(root, context) {
    */
   function panelsFor(dock) {
     return loader.contributions.panels
-      .filter(p => p.dock === dock)
-      .filter(p => !p.whenTool || p.whenTool === editor.tool)
-      .filter(p => !p.when || p.when(context))
-      .sort((a, b) => (a.order ?? 50) - (b.order ?? 50))
+      .filter(panel => panel.dock === dock)
+      .filter(panel => !panel.whenTool || panel.whenTool === editor.tool)
+      .filter(panel => !panel.when || panel.when(context))
+      .sort((first, second) => (first.order ?? 50) - (second.order ?? 50))
   }
 
   /**
@@ -121,46 +121,46 @@ export function makeShell(root, context) {
    * A panel that throws disables its plugin and says so in its body, so one
    * broken panel does not take the rest of the editor down.
    */
-  function drawPanel(p) {
-    if (!panelState.has(p.id)) panelState.set(p.id, {})
-    const state = panelState.get(p.id)
+  function drawPanel(panel) {
+    if (!panelState.has(panel.id)) panelState.set(panel.id, {})
+    const state = panelState.get(panel.id)
 
     const wrap = document.createElement('section')
     wrap.className = 'panel'
-    wrap.dataset.panel = p.id
+    wrap.dataset.panel = panel.id
 
     const head = document.createElement('div')
     head.className = 'panel-head'
-    head.innerHTML = `<span class="t">${p.title}</span>`
+    head.innerHTML = `<span class="t">${panel.title}</span>`
     // A panel from the project is credited to the plugin that added it. A
     // built-in one is not, because "Inspector Panel · Inspector Panel" says
     // nothing twice.
-    if (p.plugin && !p.builtin) {
-      head.insertAdjacentHTML('beforeend', `<span class="by">${p.plugin}</span>`)
+    if (panel.plugin && !panel.builtin) {
+      head.insertAdjacentHTML('beforeend', `<span class="by">${panel.plugin}</span>`)
     }
-    if (p.actions) {
-      for (const a of p.actions) {
-        const b = document.createElement('button')
-        b.className = 'panel-act'
-        b.textContent = a.label
-        b.title = a.title || a.label
-        b.onclick = () => {
-          a.run(context)
+    if (panel.actions) {
+      for (const action of panel.actions) {
+        const button = document.createElement('button')
+        button.className = 'panel-act'
+        button.textContent = action.label
+        button.title = action.title || action.label
+        button.onclick = () => {
+          action.run(context)
           draw()
         }
-        head.append(b)
+        head.append(button)
       }
     }
     wrap.append(head)
 
     const bodyEl = document.createElement('div')
-    bodyEl.className = 'panel-body' + (p.scroll === false ? '' : ' scroll')
+    bodyEl.className = 'panel-body' + (panel.scroll === false ? '' : ' scroll')
     try {
       const ui = makeUI(state, () => draw())
-      const node = p.render(ui, { ...context, state })
+      const node = panel.render(ui, { ...context, state })
       if (node) bodyEl.append(node)
-    } catch (e) {
-      loader.fail(p.plugin, e)
+    } catch (error) {
+      loader.fail(panel.plugin, error)
       bodyEl.innerHTML = `<div class="u-empty">panel failed — plugin disabled</div>`
     }
     wrap.append(bodyEl)
@@ -185,7 +185,7 @@ export function makeShell(root, context) {
       frame.classList.toggle('no-bottom', list.length === 0)
       element('resize-bottom').classList.toggle('hidden', list.length === 0)
     }
-    for (const p of list) host.append(drawPanel(p))
+    for (const panel of list) host.append(drawPanel(panel))
   }
 
   /** The play/stop button. */
@@ -271,12 +271,12 @@ export function makeShell(root, context) {
 
   /** Draw the status line: selection, the agent hint, and whether the level is saved. */
   function drawStatus() {
-    const s = element('status')
+    const statusElement = element('status')
     const sel = [...editor.selection]
     // An untitled project never writes its level, so claiming "saved to disk"
     // would be a lie a person only finds out about by losing work.
     const saved = saveStatus(editor, context.files)
-    s.innerHTML = `<span>${sel.length ? sel.join(', ') : 'nothing selected'}</span>
+    statusElement.innerHTML = `<span>${sel.length ? sel.join(', ') : 'nothing selected'}</span>
       <span>AI: run agent.context, not screenshots</span>
       <span class="end">${saved}</span>`
   }
@@ -290,7 +290,7 @@ export function makeShell(root, context) {
   function paint() {
     queued = false
     drawBar()
-    for (const d of ['left', 'right', 'centre', 'bottom']) drawDock(d)
+    for (const dock of ['left', 'right', 'centre', 'bottom']) drawDock(dock)
     drawStatus()
     rend()?.resize()
   }

@@ -136,17 +136,19 @@ function fullView(entity, out) {
   return out
 }
 
+/** One entity as a reply, with every property. A single lookup is cheap. */
+export function entityView(entity) {
+  return fullView(entity, entityBase(entity))
+}
+
 /**
- * One entity as a reply.
- *
- * `bulk` trims properties to the overridden ones. In a list of fifty entities the
- * type defaults are the same fifty times and are already in the index, so
- * repeating them is the single most wasteful thing this surface can do.
- * A single-entity lookup is cheap, so that one stays complete.
+ * One entity as a row in a list, with only its overridden properties. In a
+ * list of fifty entities the type defaults are the same fifty times and are
+ * already in the index, so repeating them is the most wasteful thing this
+ * surface can do.
  */
-export function entityView(e, bulk = false) {
-  const out = entityBase(e)
-  return bulk ? bulkView(e, out) : fullView(e, out)
+function entityRow(entity) {
+  return bulkView(entity, entityBase(entity))
 }
 
 /** Every plugin, by name where it has one and by file where it never loaded. */
@@ -162,7 +164,7 @@ function pluginList(loader) {
 
 /** The entity rows a caller asked for, as rows or as columns. */
 function entityRows(world, options) {
-  const rows = world.entities.map(entity => entityView(entity, true))
+  const rows = world.entities.map(entityRow)
   return options.entities === true ? rows : asColumns(rows, wantedFields(options.entities, ENTITY_COLUMNS))
 }
 
@@ -218,11 +220,11 @@ export function projectSnapshot({ world, loader, loop, files, editor, view, log,
       entities: world.entities.length,
       types: types.length,
       behaviours: world.behaviours.size,
-      plugins: [...loader.plugins.values()].filter(p => p.enabled).length
+      plugins: [...loader.plugins.values()].filter(plugin => plugin.enabled).length
     },
     selection: [...editor.selection],
-    byType: types.reduce((a, t) => ((a[t] = world.all(t).length), a), {}),
-    errors: log.lines.filter(l => l.level === 'error').slice(-5),
+    byType: types.reduce((counts, type) => ((counts[type] = world.all(type).length), counts), {}),
+    errors: log.lines.filter(line => line.level === 'error').slice(-5),
     // Its own key, not a line in the error ring, because the ring keeps the
     // last five and a broken plugin must not be pushed out of the summary
     // by five later complaints. Absent when everything loaded, so the
