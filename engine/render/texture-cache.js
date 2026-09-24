@@ -186,3 +186,17 @@ export function forgetTextures(file) {
   }
   for (const key of [...variantCache.keys()]) if (matches(key)) variantCache.delete(key)
 }
+
+/**
+ * Drop every cached texture and free its GPU memory.
+ *
+ * `release` calls this: the renderer is finished, so every texture the kernel
+ * fetched is dead memory. A later page rebuilds from the same files.
+ */
+export function clearTextures() {
+  for (const texture of texCache.values()) texture.dispose()
+  for (const copy of variantCache.values()) copy.dispose()
+  texCache.clear()
+  texState.clear()
+  variantCache.clear()
+}

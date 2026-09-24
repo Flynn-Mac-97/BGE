@@ -60,8 +60,8 @@
 // disjoint, so a shader language choice is a renderer choice.
 import * as THREE from 'three/webgpu'
 import { entityDrawSize } from './frame-plan.js'
-import { setMaxAnisotropy, forgetTextures } from './render/texture-cache.js'
-import { modelCache, forgetModel } from './render/model-cache.js'
+import { setMaxAnisotropy, forgetTextures, clearTextures } from './render/texture-cache.js'
+import { modelCache, forgetModel, clearModels } from './render/model-cache.js'
 import { clearReported, reportOnce } from './render/report.js'
 import { makeCamera } from './render/camera.js'
 import { makeLighting } from './render/lighting.js'
@@ -396,6 +396,11 @@ export async function makeRenderer(canvas, view, viewport, options = {}) {
      */
     release() {
       state.forgetDrawRecords()
+      // The target pool and the two module-level asset caches outlive a frame,
+      // so three's own dispose does not free them. Release drops them here.
+      state.graph?.pool?.dispose?.()
+      clearTextures()
+      clearModels()
       device.release()
       renderer.dispose()
     },

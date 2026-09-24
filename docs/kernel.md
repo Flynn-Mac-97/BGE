@@ -304,6 +304,24 @@ record is the camera and the viewport only. Earlier versions passed an unused
 `sink` to `extract`; nothing read it and no pass handed another pass data
 through it, so it was removed.
 
+`pool.usage` reports what the pool holds: `{ targets, bytes }`. Bytes are the
+unit that matters, because the planner aliases transients down to a handful of
+targets whatever the viewport size, so the target count alone would say almost
+nothing. `bytes` is each target's colour attachment — four channels of its
+format per pixel — plus its depth attachment, four bytes per pixel, times its
+sample count.
+
+The pool refuses a target that would pass `TARGET_CEILING_BYTES`, one GiB. The benchmark's 50-pass
+curve at 1280x720 is the largest pass set the kernel knows of, and fifty distinct
+half-float colour-plus-depth targets there would take about 527 MiB; a real plan
+aliases them down and takes a fraction of that, so the ceiling cannot fire on a
+legitimate frame. It exists to stop a runaway pass set from holding GPU memory
+without bound. A request that would pass it is reported once, through
+`render/report.js`, and refused; the pass that named the refused target is
+culled rather than handed null, so it does not run and does not throw. Targets
+the pool already gave out are unaffected, and a later plan that fits gets its
+targets again.
+
 ## Drawing the scene from another view
 
 A pass may draw the entity scene from a camera that is not the session camera —
@@ -397,6 +415,17 @@ own materials, textures, geometry and compute pipelines are the plugin's to
 rebuild, so the kernel says `device:restored` on the bus and a plugin rebuilds
 there. `device:lost` carries the reason. Both reach the log through `log.js`:
 the loss as an error, the restore as a note.
+
+`release` is the final give-back, for a page that can no longer be driven. It
+disposes three's renderer, stops the device watch, frees the pooled targets,
+and clears the two module-level caches that outlive a frame: the shared texture
+cache (`render/texture-cache.js`) and the model cache
+(`render/model-cache.js`). Three's own dispose does not reach those three. It
+deliberately frees neither a plugin-owned resource nor the size-keyed geometry
+cache, which is bounded by the sizes a project declares. A plugin's materials,
+textures, geometry and compute pipelines are the plugin's, and a plugin that
+keeps the page alive ends them itself. After release the pool is empty and both
+asset caches are gone, so a new renderer rebuilds all of it.
 
 `test/core/render/device-loss.test.mjs` drives a stub device through the same
 callbacks and canvas events, so the skip, the rebuild, the plugin notice and the

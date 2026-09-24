@@ -81,6 +81,29 @@ function isSink(pass) {
   return pass.always || pass.name === 'present' || pass.target == null
 }
 
+/**
+ * Whether every resource this pass names has a target, so the pass can run.
+ *
+ * The pool refuses a target past its ceiling; a pass that names a refused slot
+ * is culled rather than handed null.
+ */
+function hasTargets(pass, resourceSlot) {
+  for (const name of pass.writes) {
+    const slot = resourceSlot.get(name)
+    if (slot && !slot.target) return false
+  }
+  for (const name of pass.reads) {
+    const slot = resourceSlot.get(name)
+    if (slot && !slot.target) return false
+  }
+  return true
+}
+
+/** Whether a refused target means this pass must not run. */
+function isCulled(pass, shortfall, resourceSlot) {
+  return shortfall && !hasTargets(pass, resourceSlot)
+}
+
 /** Add one edge unless it is a self-edge or already recorded. */
 function addEdge(seen, out, indegree, from, to) {
   if (from === to) return
@@ -368,6 +391,9 @@ export function makePassGraph(options = {}) {
   let extracted = false
   let rebuildCount = 0
   let targetsReady = false
+  // Set when the pool refused a target, so only then is a pass with no target
+  // culled. Before the first run every slot has no target and must still extract.
+  let targetShortfall = false
   let targetWidth = 0
   let targetHeight = 0
 
@@ -406,6 +432,7 @@ export function makePassGraph(options = {}) {
     // descriptor here is what stops a toggled-off plugin holding GPU memory.
     pool.disposeUnused?.(new Set(slots.map(slot => slot.key)))
     targetsReady = false
+    targetShortfall = false
     dirty = false
     extracted = false
     rebuildCount++
@@ -418,11 +445,16 @@ export function makePassGraph(options = {}) {
       pool.resize(width, height)
     }
     if (targetsReady) return
+    let shortfall = false
     for (const slot of slots) {
       if (slot.target) continue
       slot.target = pool.acquire(slot.descriptor)
+      if (!slot.target) shortfall = true
     }
-    targetsReady = true
+    targetShortfall = shortfall
+    // A shortfall retries on the next frame, so a target freed elsewhere can
+    // still fill the slot; the pool reports the ceiling only once.
+    targetsReady = !shortfall
   }
 
   /**
@@ -436,6 +468,7 @@ export function makePassGraph(options = {}) {
   function recreateTargets() {
     for (const slot of slots) slot.target = null
     targetsReady = false
+    targetShortfall = false
     pool.recreate?.()
   }
 
@@ -456,7 +489,7 @@ export function makePassGraph(options = {}) {
     clockReads = 0
     for (let i = 0; i < order.length; i++) {
       const pass = order[i]
-      if (!pass.extract) continue
+      if (!pass.extract || isCulled(pass, targetShortfall, resourceSlot)) continue
       // A pass that throws is skipped for this frame and tried again on the
       // next, and the passes after it still run. The guard is written out
       // rather than wrapped in a callback, because a callback would allocate
@@ -488,7 +521,7 @@ export function makePassGraph(options = {}) {
     extracted = false
     for (let i = 0; i < order.length; i++) {
       const pass = order[i]
-      if (!pass.prepare) continue
+      if (!pass.prepare || isCulled(pass, targetShortfall, resourceSlot)) continue
       const startedAt = now()
       clockReads++
       try {
@@ -501,6 +534,7 @@ export function makePassGraph(options = {}) {
     }
     for (let i = 0; i < order.length; i++) {
       const pass = order[i]
+      if (isCulled(pass, targetShortfall, resourceSlot)) continue
       const startedAt = now()
       clockReads++
       try {

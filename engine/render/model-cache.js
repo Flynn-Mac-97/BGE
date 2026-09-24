@@ -110,3 +110,23 @@ export function forgetModel(file) {
   if (modelCache.has(file)) modelCache.delete(file)
   if (modelCache.has(name)) modelCache.delete(name)
 }
+
+/**
+ * Drop every cached model and free the geometry and materials its scenes hold.
+ *
+ * `release` calls this: the renderer is finished, so every model the kernel
+ * fetched is dead memory. A later page fetches the files again.
+ */
+export function clearModels() {
+  for (const entry of modelCache.values()) disposeModel(entry.scene)
+  modelCache.clear()
+}
+
+/** Dispose every geometry and material under one loaded model. */
+function disposeModel(scene) {
+  scene?.traverse(node => {
+    node.geometry?.dispose()
+    const materials = Array.isArray(node.material) ? node.material : [node.material]
+    for (const material of materials) material?.dispose()
+  })
+}

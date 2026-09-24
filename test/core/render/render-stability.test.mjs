@@ -19,6 +19,7 @@ import { solidGeometry } from '../../../engine/render/geometry-cache.js'
 import { cachedTexture, tiledTexture } from '../../../engine/render/texture-cache.js'
 import { cachedModel, modelCache, forgetModel } from '../../../engine/render/model-cache.js'
 import { makeCountingPool } from './counting-pool.mjs'
+import { withImageDocument } from './image-document.mjs'
 
 const noop = () => {}
 const ORTHO = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
@@ -268,34 +269,6 @@ test('one model file requested many times stays one cache entry', () => {
   cachedModel('hero.glb', noop, noop)
   assert.equal(modelCache.size, 1, 'the cache holds one entry per file, not per request')
 })
-
-/**
- * Install the image element three's texture loader asks the document for, so a
- * texture can be cached with no browser. The element never fires a load, so the
- * texture stays in the cache; only the cache keying is under test, not upload.
- */
-function withImageDocument(run) {
-  const saved = globalThis.document
-  globalThis.document = {
-    createElementNS: () => ({
-      complete: false,
-      addEventListener() {},
-      removeEventListener() {},
-      set src(value) {
-        this._src = value
-      },
-      get src() {
-        return this._src
-      }
-    })
-  }
-  try {
-    return run()
-  } finally {
-    if (saved === undefined) delete globalThis.document
-    else globalThis.document = saved
-  }
-}
 
 test('a new device pixel ratio resizes the pooled targets and is recorded', async () => {
   const frame = await makeRenderer(null, ORTHO, viewport())
