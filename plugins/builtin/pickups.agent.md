@@ -14,7 +14,7 @@ category: gameplay
   following after you leave it, **accelerates** from a walking pace to far faster
   than you can run, and **never misses**. Tune with
   `configure({ radius, grab, startSpeed, acceleration, maximumSpeed })`;
-  a collector's own `properties.pickupRadius` beats the setting.
+  a collector's own `properties.pickupRadius` beats the setting; 0 takes nothing.
 - `properties.bobHeight` / `bobSpeed` make an untouched pickup bob so a field of
   them reads as loot. Silent when unset.
 - What a kind *means* is the game's business — wire it in one line.

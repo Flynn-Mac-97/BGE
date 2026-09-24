@@ -68,8 +68,8 @@ export default {
 
     const all = () => context.world.entities.filter(entity => entity.properties?.pickup)
 
-    /** How far this collector reaches. Its own number wins, then the setting. */
-    const reachOf = entity => Number(entity?.properties?.pickupRadius) || settings.radius
+    /** How far this collector reaches. Its own number wins, 0 included, then the setting. */
+    const reachOf = entity => Number(entity?.properties?.pickupRadius ?? settings.radius)
 
     /** Its own motion, in its own bag, so nothing else on the entity collides. */
     const motionOf = entity => (entity.pickupMotion ||= { latched: false, speed: 0 })
