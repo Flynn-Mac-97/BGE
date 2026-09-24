@@ -27,6 +27,9 @@ export function makeCountingPool(pool = makeTargetPool()) {
     dispose() {
       pool.dispose()
     },
+    recreate() {
+      pool.recreate()
+    },
     key: pool.key,
     get created() {
       return pool.created

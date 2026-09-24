@@ -102,6 +102,18 @@ export function makeLog(bus) {
   // "I wrote the file — did it take?" has to be answerable from the log, or an
   // agent has no way to tell a hot swap that worked from one that never ran.
   bus.on('hot:applied', change => push('info', 'hot', `${change.file} ${hotAppliedNote(change)}`))
+  // A lost device is an error: without it the canvas stays blank and a reader
+  // must be able to say why. The restore is a note, because drawing resumed.
+  bus.on('device:lost', loss =>
+    push(
+      'error',
+      'render',
+      `the graphics device was lost — ${loss?.message || 'reason unknown'}; frames are skipped until it comes back`
+    )
+  )
+  bus.on('device:restored', () =>
+    push('info', 'render', 'the graphics device came back — kernel render targets rebuilt')
+  )
   bus.on('hot:failed', c => push('error', 'hot', `${c.file} — ${c.error}`))
 
   const log = { lines, push }

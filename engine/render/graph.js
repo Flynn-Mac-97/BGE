@@ -337,6 +337,18 @@ export function makePassGraph(options = {}) {
     targetsReady = true
   }
 
+  /**
+   * Rebuild every pooled target after the device came back.
+   *
+   * Their textures died with the device. The pass set, the order and the frame
+   * record are unaffected: the next frame acquires fresh targets from the pool.
+   */
+  function recreateTargets() {
+    for (const slot of slots) slot.target = null
+    targetsReady = false
+    pool.recreate?.()
+  }
+
   /** Rebuild the sorted order when the pass set changed. */
   function ensureBuilt() {
     if (dirty) rebuild()
@@ -454,6 +466,7 @@ export function makePassGraph(options = {}) {
     },
     run,
     extract,
+    recreateTargets,
     frame,
     targets,
     pool,

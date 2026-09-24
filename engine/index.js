@@ -148,7 +148,9 @@ async function boot() {
       // owning them, so game code reaches the camera as context.view whether
       // anything is drawing or not. `context` is the outer const this call is
       // still assigning, so the world's own object is the one to write.
-      const renderer = await makeRenderer(shell.canvas, worldContext.view, worldContext.viewport)
+      const renderer = await makeRenderer(shell.canvas, worldContext.view, worldContext.viewport, {
+        bus: worldContext.bus
+      })
       worldContext.renderer = renderer
       renderer.resize()
     }

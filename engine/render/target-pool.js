@@ -109,6 +109,19 @@ export function makeTargetPool(options = {}) {
   }
 
   /**
+   * Drop every target and start the pool empty.
+   *
+   * A lost device takes every texture on it, so a held target is dead memory.
+   * The next `acquire` makes new ones from the same descriptors. A caller that
+   * still holds a target must drop it too, which the graph does for its slots.
+   */
+  function recreate() {
+    for (const entry of entries) entry.target.dispose()
+    entries.length = 0
+    free.clear()
+  }
+
+  /**
    * Dispose every target whose descriptor key is not in `referencedKeys`.
    *
    * A pass a plugin removed no longer names its target, and leaving the
@@ -129,9 +142,7 @@ export function makeTargetPool(options = {}) {
   }
 
   function dispose() {
-    for (const entry of entries) entry.target.dispose()
-    entries.length = 0
-    free.clear()
+    recreate()
   }
 
   return {
@@ -139,6 +150,7 @@ export function makeTargetPool(options = {}) {
     release,
     resize,
     setPixelRatio,
+    recreate,
     disposeUnused,
     dispose,
     key: descriptorKey,

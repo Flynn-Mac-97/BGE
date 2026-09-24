@@ -132,6 +132,8 @@ export function nullRenderer(view, viewport, shape) {
 
   return {
     blank: true,
+    // Nothing here has a device to lose, so the state is always ready.
+    deviceState: 'ready',
     view,
     scene,
     get size() {

@@ -261,6 +261,37 @@ The two-clock reality is hidden on purpose. Game code gets `update` and a `secon
 and never has to learn what a fixed step is — which is why there are four hooks
 and no `FixedUpdate`.
 
+## Losing the device
+
+A GPU reset, a driver update or a backgrounded tab takes the graphics device
+away, and every texture on it with it. The kernel treats that as a case, not a
+crash.
+
+`monitorDevice` in `render.js` is the one seam. three routes a lost WebGL
+context and a lost WebGPU device through the same `onDeviceLost` callback, and
+that is what the kernel overrides; an uncaptured WebGPU error is reported
+through `onError` and does not mean the device is gone. WebGL's
+`webglcontextrestored` event, which three does not listen for, is watched on the
+canvas. `renderer.deviceState` is `ready` or `lost`, and `renderer.deviceLost` /
+`renderer.deviceRestored` report a transition directly when there is no browser
+event to wait for.
+
+While the device is lost `draw` skips the frame and reports the skip once: the
+loop keeps ticking and the dead device is never asked again.
+
+On restore the kernel rebuilds what it held on the device, and only that. The
+pass graph nulls its slots and the target pool drops every target, so the next
+frame makes new ones from the same descriptors; the render surface is re-sized
+and re-ratioed. The pass set, the order and the frame record survive. A plugin's
+own materials, textures, geometry and compute pipelines are the plugin's to
+rebuild, so the kernel says `device:restored` on the bus and a plugin rebuilds
+there. `device:lost` carries the reason. Both reach the log through `log.js`:
+the loss as an error, the restore as a note.
+
+`test/core/render/device-loss.test.mjs` drives a stub device through the same
+callbacks and canvas events, so the skip, the rebuild, the plugin notice and the
+frame that follows are checked without a card.
+
 ## A moment of a run
 
 `context.capture()` takes a moment of the whole run and `context.restore(moment)`

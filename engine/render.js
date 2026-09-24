@@ -62,7 +62,7 @@ import * as THREE from 'three/webgpu'
 import { entityDrawSize } from './frame-plan.js'
 import { setMaxAnisotropy, forgetTextures } from './render/texture-cache.js'
 import { modelCache, forgetModel } from './render/model-cache.js'
-import { clearReported } from './render/report.js'
+import { clearReported, reportOnce } from './render/report.js'
 import { makeCamera } from './render/camera.js'
 import { makeLighting } from './render/lighting.js'
 import { makeMaterialRegistry } from './render/material-registry.js'
@@ -162,7 +162,87 @@ function headlessRenderer() {
   }
 }
 
-export async function makeRenderer(canvas, view, viewport) {
+/**
+ * Watch a device for loss and restore, and rebuild what the kernel held on it.
+ *
+ * three routes a lost WebGL context and a lost WebGPU device through the one
+ * `onDeviceLost` callback, so that is the seam both backends reach. A restore
+ * has no callback of three's own, so the WebGL canvas events are watched here
+ * and a caller may report a restore directly.
+ *
+ * `state.deviceLost` is the flag the frame draw reads. The pooled targets are on
+ * `state.graph`, and rebuilding them is the kernel's part; the bus event tells a
+ * plugin to rebuild what it owns.
+ */
+function monitorDevice({ renderer, state, bus, canvas }) {
+  /**
+   * The device went away: nothing can be drawn on it until it comes back.
+   *
+   * three's default handler sets a lost flag and reports; overriding the handler
+   * replaces that, so the flag is set here by hand. The transition runs once per
+   * loss, which is what makes the report once-only.
+   */
+  function lost(loss) {
+    if (state.deviceLost) return
+    state.deviceLost = true
+    renderer._isDeviceLost = true
+    bus?.emit('device:lost', loss)
+  }
+
+  /**
+   * The device came back: rebuild the pooled targets and tell every plugin.
+   *
+   * three has no restore path of its own — the WebGL fallback never listens for
+   * `webglcontextrestored` and leaves its lost flag set — so clearing the flag
+   * by hand is the only way a draw reaches the backend again. The pass set, the
+   * order and the frame record survive; only the memory changed.
+   */
+  function restored() {
+    if (!state.deviceLost) return
+    state.deviceLost = false
+    renderer._isDeviceLost = false
+    state.graph?.recreateTargets?.()
+    renderer.setPixelRatio?.(state.pixelRatio)
+    renderer.setSize?.(state.viewport.width, state.viewport.height, false)
+    bus?.emit('device:restored')
+  }
+
+  // WebGL reports a lost and a restored context on the canvas. three's own
+  // listener also calls `onDeviceLost`, and the transition guard makes that
+  // second report a no-op.
+  const onContextLost = event => {
+    event?.preventDefault?.()
+    lost({ api: 'WebGL', message: event?.statusMessage || 'context lost', originalEvent: event })
+  }
+  const onContextRestored = () => restored()
+  const watchesContext = typeof canvas?.addEventListener === 'function'
+  if (watchesContext) {
+    canvas.addEventListener('webglcontextlost', onContextLost)
+    canvas.addEventListener('webglcontextrestored', onContextRestored)
+  }
+
+  // three calls `onDeviceLost` for both backends: the WebGPU device's `lost`
+  // promise and the WebGL context's lost event. An uncaptured GPU error is a
+  // separate report — an error does not mean the device is gone.
+  renderer.onDeviceLost = lost
+  renderer.onError = failure =>
+    reportOnce(
+      `[render] uncaptured ${failure?.api || 'GPU'} ${failure?.type || 'error'} — ${failure?.message || 'no message'}`
+    )
+
+  return {
+    lost,
+    restored,
+    /** Stop watching the canvas when the page gives the renderer up. */
+    release() {
+      if (!watchesContext) return
+      canvas.removeEventListener('webglcontextlost', onContextLost)
+      canvas.removeEventListener('webglcontextrestored', onContextRestored)
+    }
+  }
+}
+
+export async function makeRenderer(canvas, view, viewport, options = {}) {
   // WebGPU where the browser has it, WebGL 2 where it does not. The backend
   // is chosen during init, which is why this function is async and why the
   // caller awaits a renderer rather than being handed one.
@@ -172,29 +252,40 @@ export async function makeRenderer(canvas, view, viewport) {
   // time measures how long it took to describe a frame, which is a different
   // question and answers neither "is this shader heavy" nor "how many of these
   // can I draw".
-  const headless = !canvas
+  // A device handed in by a kernel test or a lane replaces the one three would
+  // build, so loss and restore can be driven with no graphics card behind it.
+  const injected = options.device ?? null
+  // The plugin event channel. A device loss and a restore reach a plugin
+  // through it; a test that does not drive the event passes nothing.
+  const bus = options.bus ?? null
+  const headless = !canvas && !injected
   // The ratio the drawing buffer uses. A headless world has no screen, so its
-  // buffer is the viewport, one pixel per pixel.
-  const initialPixelRatio = headless ? 1 : Math.min(devicePixelRatio, 2)
-  const renderer = headless
-    ? headlessRenderer()
-    : new THREE.WebGPURenderer({
-        canvas,
-        antialias: true,
-        alpha: true,
-        trackTimestamp: true,
-        // Raw GLSL is inserted into the shader three generates, and the WebGPU
-        // backend generates WGSL, so a project drawing GLSL-only shaders asks for
-        // WebGL. Read here because the backend is chosen once, during init.
-        forceWebGL: wantsWebGL()
-      })
+  // buffer is the viewport, one pixel per pixel. Node has no screen ratio
+  // either, so an injected device falls back to one.
+  const screenRatio = typeof devicePixelRatio === 'number' ? devicePixelRatio : 1
+  const initialPixelRatio = headless ? 1 : Math.min(screenRatio, 2)
+  const renderer =
+    injected ??
+    (headless
+      ? headlessRenderer()
+      : new THREE.WebGPURenderer({
+          canvas,
+          antialias: true,
+          alpha: true,
+          trackTimestamp: true,
+          // Raw GLSL is inserted into the shader three generates, and the WebGPU
+          // backend generates WGSL, so a project drawing GLSL-only shaders asks for
+          // WebGL. Read here because the backend is chosen once, during init.
+          forceWebGL: wantsWebGL()
+        }))
   if (headless) {
     // The counters survive both passes in a drawing world; a headless one still
     // reports them, as zero.
     renderer.autoClear = false
     renderer.info.autoReset = false
   } else {
-    await renderer.init()
+    // An injected device is already initialized; only three's own is not.
+    if (!injected) await renderer.init()
     renderer.setPixelRatio(initialPixelRatio)
     setMaxAnisotropy(renderer.getMaxAnisotropy())
     // The frame is several passes over one target, so clearing is this file's
@@ -249,6 +340,9 @@ export async function makeRenderer(canvas, view, viewport) {
     viewport,
     headless,
     renderer,
+    // Set while the device is gone, so the frame draw skips instead of asking a
+    // dead device for a picture.
+    deviceLost: false,
     // The device's own feature answer, and the ratio its drawing buffer uses.
     hasFeature: deviceHasFeature,
     pixelRatio: initialPixelRatio,
@@ -289,6 +383,8 @@ export async function makeRenderer(canvas, view, viewport) {
   makePicking(state)
   makeFrameDraw(state)
 
+  const device = monitorDevice({ renderer, state, bus, canvas })
+
   return {
     /**
      * Give the graphics card back everything this renderer holds.
@@ -300,6 +396,7 @@ export async function makeRenderer(canvas, view, viewport) {
      */
     release() {
       state.forgetDrawRecords()
+      device.release()
       renderer.dispose()
     },
 
@@ -333,6 +430,26 @@ export async function makeRenderer(canvas, view, viewport) {
     get stats() {
       return { ...state.stats }
     },
+    /**
+     * 'ready' while the device draws, 'lost' while frames are skipped until it
+     * comes back. A caller reads this rather than guessing from a blank canvas.
+     */
+    get deviceState() {
+      return state.deviceLost ? 'lost' : 'ready'
+    },
+    /**
+     * Report the device lost, through the same seam the browser event uses.
+     *
+     * A browser drives this through its own event; a lane or a test calls it
+     * directly when it has no event to wait for. The second report while the
+     * device is already lost does nothing.
+     */
+    deviceLost: device.lost,
+    /**
+     * Report the device restored: the kernel rebuilds its pooled targets and
+     * tells every plugin to rebuild what it owns through `device:restored`.
+     */
+    deviceRestored: device.restored,
     /**
      * Which backend is drawing, and which optional features it has.
      *

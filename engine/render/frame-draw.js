@@ -184,6 +184,12 @@ export function makeFrameDraw(state) {
    * reaching the loop: a half-drawn frame is a frame, a stopped loop is not.
    */
   function draw(world = graph.frame.world, blend = graph.frame.blend ?? 1) {
+    // A lost device cannot be drawn on. Report the first skip and return, so
+    // the loop keeps ticking and never asks the dead device again.
+    if (state.deviceLost) {
+      reportOnce('[render] the frame was skipped because the device is lost')
+      return
+    }
     const startedAt = performance.now()
     try {
       const camera = state.readyCamera()
@@ -220,6 +226,13 @@ export function makeFrameDraw(state) {
    * because that is the orientation GL reads back in.
    */
   async function drawInto(target, buffer, region = null) {
+    // A query is a draw too: with no device there are no pixels to read, and
+    // zeros are the truth rather than a throw.
+    if (state.deviceLost) {
+      buffer.fill(0)
+      reportOnce('[render] the readback was skipped because the device is lost')
+      return buffer
+    }
     const camera = state.readyCamera()
     state.scene.updateMatrixWorld()
     const keptTarget = state.renderer.getRenderTarget()
