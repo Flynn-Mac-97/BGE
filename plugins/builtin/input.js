@@ -11,8 +11,8 @@
  * browser events, the action table — and holds no state of its own.
  *
  * The mouse over the game view is the same: its buttons are key codes,
- * `Mouse0` (left), `Mouse1` (middle) and `Mouse2` (right), so an action binds
- * a button like a key. `pointer()` is where it is, in viewport pixels — the
+ * `MouseLeft`, `MouseMiddle` and `MouseRight`, so an action binds a button
+ * like a key. `pointer()` is where it is, in viewport pixels — the
  * pixels `renderer.pick` and `renderer.pickNode` take.
  */
 const ACTIONS = {
@@ -23,6 +23,30 @@ const ACTIONS = {
   jump:  ['Space', 'ArrowUp', 'KeyW'],
   fire:  ['KeyJ', 'KeyZ']
 }
+
+/**
+ * What each mouse button is called, indexed by `MouseEvent.button`.
+ *
+ * The DOM numbers them 0 = left, **1 = middle**, **2 = right**, which is not the
+ * order anybody says them in. Naming them `Mouse0`, `Mouse1`, `Mouse2` from that
+ * index is the bug this table exists to make impossible: a secondary action
+ * bound to `Mouse1` would fire on the middle button while the right button did
+ * nothing — off by one and silent about it.
+ *
+ * So the buttons are named for what they are. A code that says `MouseRight`
+ * cannot be off by one, and `mouseButtonName` below is the single place a raw
+ * DOM index is ever translated.
+ */
+export const MOUSE_BUTTONS = ['MouseLeft', 'MouseMiddle', 'MouseRight', 'MouseBack', 'MouseForward']
+
+/**
+ * The name of one DOM button index. Exported so a test can press what a real
+ * click would press, rather than the code string it hopes a click produces.
+ *
+ * An index past the table is still given a name rather than dropped — a mouse
+ * with nine buttons is a real thing, and a button nobody has bound is harmless.
+ */
+export const mouseButtonName = index => MOUSE_BUTTONS[index] ?? `MouseButton${index}`
 
 /**
  * Follow the pointer over the game view, and press its buttons as key codes.
@@ -37,8 +61,10 @@ function watchPointer(viewport, keys, pointer) {
   }
   viewport.addEventListener('pointermove', place)
   viewport.addEventListener('pointerleave', () => { pointer.isOver = false })
-  viewport.addEventListener('pointerdown', event => { place(event); keys.press(`Mouse${event.button}`) })
-  addEventListener('pointerup', event => keys.release(`Mouse${event.button}`))
+  // In the capture phase: Mouse Look stops a click there while playing, so the
+  // editor under it does not see a shot, and a bubbling listener would miss it.
+  viewport.addEventListener('pointerdown', event => { place(event); keys.press(mouseButtonName(event.button)) }, { capture: true })
+  addEventListener('pointerup', event => keys.release(mouseButtonName(event.button)))
 }
 
 /** Whether any action is bound to this physical key. */

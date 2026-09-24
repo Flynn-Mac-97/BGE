@@ -49,6 +49,7 @@ and says nothing.
 - No canvas means no pointer capture, logged once. `look()` and `lookBy()` keep
   working, so a bot or a test still aims.
 - A browser that refuses pointer lock is reported with its own reason.
+- It captures the pointer only while playing a `first-person` view. A chase camera never reads `look()`, so there the cursor stays free for the game to point with.
 
 ## Command
 

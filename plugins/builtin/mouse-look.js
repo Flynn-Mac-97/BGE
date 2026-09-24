@@ -8,7 +8,8 @@
  * Three things live here:
  *
  *   pointer lock    a mouse that stops at the edge of the window cannot turn
- *                   you round, so play captures the pointer and stop hands it back
+ *                   you round, so first-person play captures the pointer and
+ *                   stop hands it back
  *   the accumulator context.input.look() — radians turned since the last read
  *   the bindings    the first-person action names every other file will use
  *
@@ -22,6 +23,7 @@
  * mouse's own path. There is no second input route to disagree with the first,
  * which is the same reason `press` exists on the keyboard plugin.
  */
+import { MOUSE_BUTTONS, mouseButtonName } from './input.js'
 
 /**
  * Degrees turned per mouse count. 0.022 is m_yaw, the first-person constant
@@ -34,28 +36,11 @@ const DEFAULT_SENSITIVITY = 2.5
 export const radiansPerCount = sensitivity => sensitivity * DEGREES_PER_COUNT * Math.PI / 180
 
 /**
- * What each mouse button is called, indexed by `MouseEvent.button`.
- *
- * The DOM numbers them 0 = left, **1 = middle**, **2 = right**, which is not the
- * order anybody says them in. Naming them `Mouse0`, `Mouse1`, `Mouse2` from that
- * index is the bug this table exists to make impossible: a secondary action
- * bound to `Mouse1` would fire on the middle button while the right button did
- * nothing — off by one and silent about it.
- *
- * So the buttons are named for what they are. A code that says `MouseRight`
- * cannot be off by one, and `mouseButtonName` below is the single place a raw
- * DOM index is ever translated.
+ * Mouse buttons are named in Keyboard Input, which presses them over the game
+ * view; this file presses the same names while the pointer is captured.
+ * Re-exported, so a test can press what a real click would press.
  */
-const MOUSE_BUTTONS = ['MouseLeft', 'MouseMiddle', 'MouseRight', 'MouseBack', 'MouseForward']
-
-/**
- * The name of one DOM button index. Exported so a test can press what a real
- * click would press, rather than the code string it hopes a click produces.
- *
- * An index past the table is still given a name rather than dropped — a mouse
- * with nine buttons is a real thing, and a button nobody has bound is harmless.
- */
-export const mouseButtonName = index => MOUSE_BUTTONS[index] ?? `MouseButton${index}`
+export { MOUSE_BUTTONS, mouseButtonName }
 
 /**
  * One notch of the wheel, per `WheelEvent.deltaMode`.
@@ -273,6 +258,10 @@ function attach(context, accumulated) {
     // Asked of the loop rather than mirrored from play:started into a flag here,
     // because a copy of "are we playing" is a copy that can be wrong.
     if (!context.loop.running) return
+    // Only a first-person view turns with the mouse. A chase camera never reads
+    // look(), and a captured pointer there only hides the cursor the game may
+    // want to point with.
+    if (context.view?.mode !== 'first-person') return
     if (document.pointerLockElement === canvas) return
     try {
       const request = canvas.requestPointerLock()

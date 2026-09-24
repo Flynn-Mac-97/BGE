@@ -10,9 +10,11 @@ import input from '../plugins/builtin/input.js'
 /** A stand-in element that keeps its listeners and can fire them. */
 function standIn(rect = { left: 0, top: 0 }) {
   const listeners = {}
+  const isCapturing = {}
   return {
     listeners,
-    addEventListener: (name, listener) => { listeners[name] = listener },
+    isCapturing,
+    addEventListener: (name, listener, options) => { listeners[name] = listener; isCapturing[name] = options?.capture === true },
     getBoundingClientRect: () => rect,
     fire: (name, event) => listeners[name]?.(event)
   }
@@ -64,9 +66,10 @@ test('the pointer over the game view is in viewport pixels, and a button is a ke
   viewport.fire('pointermove', { clientX: 260, clientY: 130 })
   assert.deepEqual(context.input.pointer(), { x: 160, y: 90, isOver: true })
   viewport.fire('pointerdown', { clientX: 260, clientY: 130, button: 0 })
-  assert.ok(pressedCodes.has('Mouse0'), 'the left button presses Mouse0')
+  assert.ok(pressedCodes.has('MouseLeft'), 'the left button presses MouseLeft')
   window.pointerup({ button: 0 })
-  assert.ok(!pressedCodes.has('Mouse0'), 'and letting go anywhere releases it')
+  assert.ok(!pressedCodes.has('MouseLeft'), 'and letting go anywhere releases it')
+  assert.ok(viewport.isCapturing.pointerdown, 'the press is caught in the capture phase, before Mouse Look stops it')
   viewport.fire('pointerleave', {})
   assert.equal(context.input.pointer().isOver, false)
 })

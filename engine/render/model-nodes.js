@@ -235,6 +235,8 @@ function createAttachment(holder, name, spec, record, nodes, where) {
   showChain(node, holder)
   const group = new THREE.Group()
   group.rotation.order = 'YXZ'
+  // So a pick that hits the attached model can say which attachment it was.
+  group.userData.attachment = name
   node.add(group)
   const entry = { model: spec.model, node: nodeName, group }
   record.set(name, entry)

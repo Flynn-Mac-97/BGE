@@ -177,6 +177,25 @@ test('a node pick answers with the named part nearest the eye, and the point on 
   assert.ok(found.normal[2] > 0.99, 'and the face looks back at the eye')
 })
 
+test('a node pick of an attachment answers with the node it hangs from, and names it', async () => {
+  const frame = await makeRenderer(null, PERSPECTIVE, viewport())
+  const world = namedBody()
+  frame.sync(world)
+  const front = frame.objectFor(world.entities[0]).getObjectByName('front')
+  const hung = new THREE.Group()
+  hung.userData.attachment = 'sword-1'
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial())
+  blade.name = 'Cylinder'
+  blade.position.z = 0.8
+  hung.add(blade)
+  front.add(hung)
+  const found = frame.pickNode(world.entities[0], 160, 90)
+  assert.equal(found.node, 'front')
+  assert.equal(found.attachment, 'sword-1')
+  const through = frame.pickNode(world.entities[0], 160, 90, { ignore: ['sword-1'] })
+  assert.equal(through.attachment, null, 'an ignored attachment lets the ray through to the node')
+})
+
 test('a node pick of a skinned mesh answers with the bone its face is weighted to', async () => {
   const frame = await makeRenderer(null, PERSPECTIVE, viewport())
   const world = namedBody()

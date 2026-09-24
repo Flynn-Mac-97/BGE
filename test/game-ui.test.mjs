@@ -45,3 +45,21 @@ test('hide takes a panel down, and stopping play takes them all down', () => {
   context.bus.emit('play:stopped')
   assert.deepEqual(context.gameUi.shown(), [])
 })
+
+test('a panel the page took off is put back on the next frame', () => {
+  const context = loaded()
+  const element = { dataset: {}, style: {}, isConnected: false, attachShadow: () => ({ innerHTML: '' }) }
+  let mountCount = 0
+  context.ui = { mount: () => { mountCount++; element.isConnected = true } }
+  const saved = globalThis.document
+  globalThis.document = { createElement: () => element }
+  const drawFrame = () => gameUi.systems[0].run(null, 0, context)
+  context.gameUi.show('hud', { html: '<b>85</b>' })
+  drawFrame()
+  drawFrame()
+  assert.equal(mountCount, 1, 'mounted once while it stays on the page')
+  element.isConnected = false
+  drawFrame()
+  assert.equal(mountCount, 2, 'and again once it was taken off')
+  globalThis.document = saved
+})

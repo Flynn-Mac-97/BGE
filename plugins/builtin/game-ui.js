@@ -119,8 +119,10 @@ function writePanel(context, id, panel) {
     element.style.cssText = `position:absolute;inset:0;pointer-events:${panel.isInteractive ? 'auto' : 'none'}`
     panel.root = element.attachShadow({ mode: 'open' })
     panel.element = element
-    context.ui.mount(REGION, element, { plugin: 'Game UI' })
   }
+  // Also when the page took it off since: a panel that still says it is showing
+  // must be on the page. Seen once right after play started, cause not found.
+  if (!panel.element.isConnected) context.ui.mount(REGION, panel.element, { plugin: 'Game UI' })
   const html = htmlOf(panel)
   if (html === panel.written) return
   panel.written = html

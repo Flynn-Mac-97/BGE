@@ -127,16 +127,25 @@ export function makePicking(state) {
    *
    * A model's skinned mesh answers with the bone its hit face is most weighted
    * to; any other mesh answers with its nearest named ancestor, a named part
-   * included. `point` and `normal` are in that node's own space, so an
+   * included. A hit on something hung from the entity through
+   * `entity.attachments` answers with the node it hangs from, and names the
+   * attachment. `point` and `normal` are in that node's own space, so an
    * attachment written there is where the ray met the surface and moves with
    * the node. Null when the ray does not meet the entity.
    *
-   * @returns {{ node: string, point: number[], normal: number[] }|null}
+   * `ignore` lists attachment names the ray passes through, such as a preview
+   * drawn under the pointer.
+   *
+   * @returns {{ node: string, point: number[], normal: number[], attachment: string|null }|null}
    */
-  function pickNode(entity, pixelX, pixelY) {
-    const hit = rayHits(pixelX, pixelY).find(candidate => entityIdOf(candidate.object) === entity.id)
+  function pickNode(entity, pixelX, pixelY, { ignore = [] } = {}) {
+    const isIgnored = candidate => ignore.includes(attachmentAbove(candidate.object)?.userData.attachment)
+    const hit = rayHits(pixelX, pixelY).find(
+      candidate => entityIdOf(candidate.object) === entity.id && !isIgnored(candidate)
+    )
     if (!hit) return null
-    const node = boneUnder(hit) ?? namedAncestor(hit.object)
+    const hung = attachmentAbove(hit.object)
+    const node = hung ? hung.parent : (boneUnder(hit) ?? namedAncestor(hit.object))
     if (!node) return null
     const point = node.worldToLocal(hit.point.clone())
     const normal = hit.face
@@ -145,7 +154,12 @@ export function makePicking(state) {
           .transformDirection(hit.object.matrixWorld)
           .transformDirection(node.matrixWorld.clone().invert())
       : new THREE.Vector3(0, 1, 0)
-    return { node: node.name, point: point.toArray(), normal: normal.toArray() }
+    return {
+      node: node.name,
+      point: point.toArray(),
+      normal: normal.toArray(),
+      attachment: hung?.userData.attachment ?? null
+    }
   }
 
   /**
@@ -186,6 +200,12 @@ function boneUnder(hit) {
   }
   const [heaviest] = [...weightOf].sort((first, second) => second[1] - first[1])
   return mesh.skeleton.bones[heaviest[0]] ?? null
+}
+
+/** The attachment group a hit object is inside, or null. model-nodes.js marks each group with its name. */
+function attachmentAbove(object) {
+  for (let node = object; node; node = node.parent) if (node.userData.attachment) return node
+  return null
 }
 
 /** The nearest object with a name, from the hit object up. */
