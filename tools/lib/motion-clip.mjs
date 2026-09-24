@@ -112,14 +112,18 @@ export function buildClip({
   }
 
   const window = cycle ? loopWindow(outputRotations) : { first: 0, last: frames }
+  // A cycle's window ends one frame before the pose it returns to. That frame
+  // is kept only to close the loop, then dropped.
+  const loopRotations = cycle ? closeQuaternionLoop(outputRotations.slice(window.first, window.last + 1)) : outputRotations
+  const loopPositions = list => (cycle ? closeVectorLoop(list.slice(window.first, window.last + 1)) : list)
   return {
     name,
     framesPerSecond,
     loop,
     nodes: model ? [...plan, ...plan.followers].map(entry => entry.node) : wanted.map(one => one.node),
-    rotations: outputRotations.slice(window.first, window.last),
+    rotations: cycle ? loopRotations.map(frame => frame.map(round)) : loopRotations,
     positions: Object.keys(outputPositions).length
-      ? Object.fromEntries(Object.entries(outputPositions).map(([node, list]) => [node, list.slice(window.first, window.last)]))
+      ? Object.fromEntries(Object.entries(outputPositions).map(([node, list]) => [node, cycle ? loopPositions(list).map(frame => frame.map(round)) : list]))
       : null,
     root: outputRoot.length ? outputRoot.slice(window.first, window.last) : null,
     // The capture frames kept, so a clip frame can be matched to its source frame.
@@ -146,6 +150,53 @@ export function loopWindow(rotations, shortest = 24) {
     }
   }
   return best
+}
+
+/**
+ * Spread a loop's jump back to its start evenly over the whole loop.
+ *
+ * `frames` runs one past the loop: its last frame is the pose the loop returns
+ * to, which should equal its first. Frame `i` of `n` is moved back by `i / n`
+ * of the difference, so the last kept frame flows into the first with no pop.
+ * Each quaternion is taken on the first frame's side before the difference and
+ * normalized after. The returned list drops the closing frame.
+ */
+export function closeQuaternionLoop(frames) {
+  const count = frames.length - 1
+  const start = frames[0]
+  const end = alignedTo(start, frames[count])
+  return frames.slice(0, count).map((frame, index) => {
+    const aligned = alignedTo(start, frame)
+    const share = index / count
+    return normalizeEach(aligned.map((value, at) => value - (end[at] - start[at]) * share))
+  })
+}
+
+/** The same closing for a list of `[x, y, z]` positions. */
+export function closeVectorLoop(frames) {
+  const count = frames.length - 1
+  const start = frames[0]
+  const end = frames[count]
+  return frames.slice(0, count).map((frame, index) => frame.map((value, axis) => value - (end[axis] - start[axis]) * (index / count)))
+}
+
+/** Each quaternion of `frame` flipped where needed to lie on the same side as `reference`'s. */
+function alignedTo(reference, frame) {
+  const out = frame.slice()
+  for (let at = 0; at < frame.length; at += 4) {
+    const dot = reference[at] * frame[at] + reference[at + 1] * frame[at + 1] + reference[at + 2] * frame[at + 2] + reference[at + 3] * frame[at + 3]
+    if (dot < 0) for (let part = at; part < at + 4; part++) out[part] = -frame[part]
+  }
+  return out
+}
+
+/** Every quaternion in a flat frame scaled back to length one. */
+function normalizeEach(frame) {
+  for (let at = 0; at < frame.length; at += 4) {
+    const length = Math.hypot(frame[at], frame[at + 1], frame[at + 2], frame[at + 3])
+    for (let part = at; part < at + 4; part++) frame[part] /= length
+  }
+  return frame
 }
 
 /** Summed angle-like distance between two frames of quaternions. */

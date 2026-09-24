@@ -1,4 +1,4 @@
-<!--2be5d866-->
+<!--62b5a842-->
 parsed from source
   plugin 3D View
   category visuals
@@ -8,4 +8,4 @@ parsed from source
   view.3d
   arguments view.3d: on;view.3d.report:;view.3d:
   listens level:loaded, shell:ready
-  source 318 lines
+  source 319 lines

@@ -80,10 +80,12 @@ export function focusSpot(state) {
   ]
 }
 
-/** Frame every box. Below this zoom a label is smaller than it is legible. */
-export const FIT_MIN_ZOOM = 0.55
-
-/** Set the view so every box is on screen, centred, and no smaller than legible. */
+/**
+ * Set the view so every box is on screen, centred, and never above 2x.
+ *
+ * There is no lower limit: a box off screen is worse than small text, which
+ * the wheel zooms in on. For a big board, widen the panel with `draft.full`.
+ */
 export function fitBoard(state) {
   const nodes = state.doc?.nodes ?? []
   const size = state.stageSize ?? { width: 640, height: 420 }
@@ -93,8 +95,7 @@ export function fitBoard(state) {
   const top = Math.min(...boxes.map((box) => box.y))
   const right = Math.max(...boxes.map((box) => box.x + box.w))
   const bottom = Math.max(...boxes.map((box) => box.y + box.h))
-  const zoom = Math.min(2, Math.max(FIT_MIN_ZOOM,
-    Math.min((size.width - 60) / (right - left), (size.height - 60) / (bottom - top))))
+  const zoom = Math.min(2, (size.width - 60) / (right - left), (size.height - 60) / (bottom - top))
   state.view = {
     zoom,
     x: (size.width - (right - left) * zoom) / 2 - left * zoom,

@@ -123,11 +123,12 @@ function enter(context) {
   state.ortho = { x: v.x, y: v.y, zoom: v.zoom }
 
   if (!state.pose) {
-    // First time: look down at the flat view's centre from a height, turned
-    // a little so the map reads as a room rather than as a floor.
+    // First time: look down at the flat view's centre from above and behind
+    // it. Y is up, so the height goes on y; at the flat view's own y a floor is
+    // seen edge-on. The eye is straight back along +Z, so yaw 0 faces the centre.
     state.pose = {
-      x: v.x, y: v.y, z: 14,
-      yaw: 0.7, pitch: -0.45, fov: v.fov || 90
+      x: v.x, y: v.y + 8, z: 14,
+      yaw: 0, pitch: -0.5, fov: v.fov || 90
     }
   }
   state.active = true

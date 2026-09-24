@@ -1,4 +1,4 @@
-<!--c84f750d-->
+<!--9a9e0b01-->
 parsed from source
   plugin Draft
   category editor
@@ -11,12 +11,13 @@ parsed from source
   draft.read
   draft.show
   draft.fit
+  draft.full
   draft.add
   draft.set
   draft.connect
   draft.label
   draft.remove
   draft.board
-  arguments draft.panel:;draft.list:;draft.new: options;draft.plan: options;draft.open: options;draft.read: options;draft.show: options;draft.fit: options;draft.add: options;draft.set: options;draft.connect: options;draft.label: options;draft.remove: options;draft.board:
+  arguments draft.panel:;draft.list:;draft.new: options;draft.plan: options;draft.open: options;draft.read: options;draft.show: options;draft.fit: options;draft.full: options;draft.add: options;draft.set: options;draft.connect: options;draft.label: options;draft.remove: options;draft.board:
   context draft
-  source 359 lines
+  source 372 lines

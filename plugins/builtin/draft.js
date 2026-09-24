@@ -32,6 +32,7 @@ const state = {
   error: null,
   stageSize: null,
   fitPending: false,
+  isFull: false,
   mount: null
 }
 
@@ -271,6 +272,18 @@ export default {
         fitBoard(state)
         context.redraw()
         return { id: state.id, view: state.view }
+      }
+    },
+
+    {
+      id: 'draft.full',
+      label: 'Board over the whole window',
+      // args: {on?} — true covers the editor window, false docks it; none flips
+      run(context, options) {
+        state.isFull = options?.on === undefined ? !state.isFull : !!options.on
+        state.fitPending = true
+        context.redraw()
+        return { id: state.id, isFull: state.isFull }
       }
     },
 

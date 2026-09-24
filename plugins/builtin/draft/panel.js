@@ -32,6 +32,7 @@ export function renderPanel(ui, context, state, commit) {
     ui.button('Image', () => addAndEdit(context, state, commit, 'image')),
     ui.button('Group', () => addAndEdit(context, state, commit, 'group')),
     ui.spacer(),
+    ui.button(state.isFull ? 'Dock' : 'Full', () => context.run('draft.full', { on: !state.isFull })),
     ui.button('Fit', () => { fitBoard(state); context.redraw() })
   ], { pad: true })
 
@@ -43,6 +44,8 @@ export function renderPanel(ui, context, state, commit) {
   ].filter(Boolean))
   // The stack must fill the panel body, or the stage has no height to flex into.
   panel.style.height = '100%'
+  // Full covers the whole editor window, so a big board is read without a crop.
+  if (state.isFull) panel.style.cssText += ';position:fixed;inset:0;z-index:1000;background:#101014'
   return panel
 }
 

@@ -25,7 +25,7 @@ export const namedNodes = new WeakMap()
 /**
  * What is hanging off a model's named nodes right now.
  *
- * holder -> Map(node name -> { model, group }). This record is the whole reason
+ * holder -> Map(attachment name -> { model, node, group }). This record is the whole reason
  * setting the same attachment twice is a move rather than a rebuild: a plugin
  * keeping a body's weapon in step with its inventory writes the same file name
  * sixty times a second, and rebuilding a scene graph at that rate is a stutter
@@ -184,13 +184,16 @@ function attachmentOf(value, where) {
 function removeStaleAttachments(record, declared, where, release) {
   for (const [name, entry] of [...record]) {
     const wanted = attachmentOf(declared?.[name], `${where}.attachments.${name}`)
-    if (wanted && wanted.model === entry.model) continue
+    if (wanted && wanted.model === entry.model && nodeNameOf(name, wanted) === entry.node) continue
     entry.group.userData.stale = true
     entry.group.parent?.remove(entry.group)
     release(entry.group)
     record.delete(name)
   }
 }
+
+/** The node an attachment hangs off: its `node`, or else its own name. */
+const nodeNameOf = (name, spec) => spec.node ?? name
 
 /** Put the attachment at the position the declaration gives for the node. */
 function positionAttachment(entry, spec, where, name) {
@@ -218,11 +221,12 @@ function showChain(node, holder) {
  * exists from the first frame is the simplest way to hold it.
  */
 function createAttachment(holder, name, spec, record, nodes, where) {
-  const node = nodeNamed(nodes, name)
+  const nodeName = nodeNameOf(name, spec)
+  const node = nodeNamed(nodes, nodeName)
   if (!node) {
     // Once, by name. This is written every frame, and a message that repeats
     // sixty times a second is a console nobody reads.
-    reportOnce(`[render] ${where}: no node named "${name}" to attach "${spec.model}" to`)
+    reportOnce(`[render] ${where}: no node named "${nodeName}" to attach "${spec.model}" to`)
     return null
   }
   // A pruned node is not in the graph, and an attachment under one draws
@@ -232,7 +236,7 @@ function createAttachment(holder, name, spec, record, nodes, where) {
   const group = new THREE.Group()
   group.rotation.order = 'YXZ'
   node.add(group)
-  const entry = { model: spec.model, group }
+  const entry = { model: spec.model, node: nodeName, group }
   record.set(name, entry)
   loadAttachment(holder, group, spec.model)
   return entry
@@ -257,7 +261,10 @@ function applyEachAttachment(holder, declared, record, nodes, where) {
  * Hang models off a model's named nodes, and take off what is no longer wanted.
  *
  *   entity.attachments = { weaponMount: 'counter-strike/models/ak47.glb' }
+ *   entity.attachments = { potion1: { model: 'potion.glb', node: 'Hips', position: [0.2, 0, 0] } }
  *
+ * The key names the attachment. It is also the node, unless the entry gives
+ * `node`, so several models can hang off one node under different names.
  * A character is exported with an empty node at the right hand, and what goes in
  * that hand changes as the game runs — so it is a declaration, read on sync,
  * alongside `pose` and `anchor`. It belongs here rather than in a plugin because

@@ -116,3 +116,18 @@ test('a write that races another is refused and reported', async () => {
   documents.set('draft-race', { ...stored, revision: 'written-by-someone-else' })
   await assert.rejects(() => run(context, 'draft.add', { id: 'race', kind: 'text', text: 'B' }), /Revision conflict/)
 })
+
+test('fit puts every box on screen, even when the board is wider than the panel', async () => {
+  const { fitBoard, nodeBox, docFromPlan } = await import('../plugins/builtin/draft/model.js')
+  const doc = docFromPlan({ title: 'wide', nodes: [['left', 'note', 'a', [40, 40]], ['right', 'note', 'b', [1600, 900]]], edges: [] })
+  const state = { doc, stageSize: { width: 400, height: 300 }, view: null }
+  fitBoard(state)
+  for (const node of doc.nodes) {
+    const box = nodeBox(node)
+    const left = state.view.x + box.x * state.view.zoom
+    const right = state.view.x + (box.x + box.w) * state.view.zoom
+    const top = state.view.y + box.y * state.view.zoom
+    const bottom = state.view.y + (box.y + box.h) * state.view.zoom
+    assert.ok(left >= 0 && right <= 400 && top >= 0 && bottom <= 300, `${node.id} is inside the panel`)
+  }
+})

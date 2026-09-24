@@ -320,6 +320,13 @@ export default {
         cam.amount = Math.max(0, cam.amount - seconds * 2)
       }
     }
+  }, {
+    phase: 'frame',
+    run(world, seconds, context) {
+      const cam = context.camera
+      if (context.view.mode !== 'third-person' || !cam.target || !context.loop) return
+      placeChaseEyeForFrame(cam, context.view, context.loop.blend)
+    }
   }],
 
   commands: [{
@@ -478,34 +485,62 @@ function thirdPerson(cam, view, seconds, context) {
   // Snapped on the first step, so a level does not open with the camera flying
   // in from wherever the editor left it.
   if (!cam.focus) cam.focus = { ...wanted }
+  cam.focusBefore = { ...cam.focus }
   cam.focus.x += (wanted.x - cam.focus.x) * k
   cam.focus.y += (wanted.y - cam.focus.y) * k
   cam.focus.z += (wanted.z - cam.focus.z) * k
 
   // The angle lives on the view, not in the rule, so anything that wants to
   // swing the camera round writes view.yaw and this reads it back.
-  const pitch = clamp(view.pitch ?? CHASE_PITCH, -MAX_PITCH, MAX_PITCH)
-  const yaw = wrapAngle(view.yaw || 0)
-  const distance = Math.max(0, rule.distance ?? CHASE_DISTANCE)
-
-  // The eye is the focus minus the distance along forward — see the angle
-  // convention at the top of this file, which is where these signs come from.
-  const flat = Math.cos(pitch)
-  view.pitch = pitch
-  view.yaw = yaw
-  view.x = cam.focus.x + Math.sin(yaw) * flat * distance
-  view.y = cam.focus.y - Math.sin(pitch) * distance
-  view.z = cam.focus.z + Math.cos(yaw) * flat * distance
+  view.pitch = clamp(view.pitch ?? CHASE_PITCH, -MAX_PITCH, MAX_PITCH)
+  view.yaw = wrapAngle(view.yaw || 0)
 
   // A knock moves the camera here, not the aim. The camera is a thing out in
   // the world in third person, and turning it instead would swing the whole
   // picture about the player rather than jolt it.
+  cam.knock = { x: 0, y: 0, z: 0 }
   if (cam.amount > 0) {
-    view.x += context.random.range(-cam.amount, cam.amount)
-    view.y += context.random.range(-cam.amount, cam.amount)
-    view.z += context.random.range(-cam.amount, cam.amount)
+    cam.knock = {
+      x: context.random.range(-cam.amount, cam.amount),
+      y: context.random.range(-cam.amount, cam.amount),
+      z: context.random.range(-cam.amount, cam.amount)
+    }
     cam.amount = Math.max(0, cam.amount - seconds * 2)
   }
+  placeChaseEye(cam, view, cam.focus)
+}
+
+/**
+ * Put the chase eye behind a focus point, at the view's angle and the rule's
+ * distance, plus this step's knock.
+ *
+ * The eye is the focus minus the distance along forward — see the angle
+ * convention at the top of this file, which is where these signs come from.
+ */
+function placeChaseEye(cam, view, focus) {
+  const distance = Math.max(0, cam.rule.distance ?? CHASE_DISTANCE)
+  const flat = Math.cos(view.pitch)
+  view.x = focus.x + Math.sin(view.yaw) * flat * distance + cam.knock.x
+  view.y = focus.y - Math.sin(view.pitch) * distance + cam.knock.y
+  view.z = focus.z + Math.cos(view.yaw) * flat * distance + cam.knock.z
+}
+
+/**
+ * Place the chase eye for the frame being drawn, not the last fixed step.
+ *
+ * The renderer draws each body `blend` of the way between its last two steps.
+ * An eye placed only on the fixed step moves in steps under a body that moves
+ * smoothly, so on a display faster than the step the body shakes on screen.
+ * The focus is blended the same way, so the two move together.
+ */
+function placeChaseEyeForFrame(cam, view, blend) {
+  if (!cam.focus || !cam.focusBefore) return
+  const focus = {
+    x: cam.focusBefore.x + (cam.focus.x - cam.focusBefore.x) * blend,
+    y: cam.focusBefore.y + (cam.focus.y - cam.focusBefore.y) * blend,
+    z: cam.focusBefore.z + (cam.focus.z - cam.focusBefore.z) * blend
+  }
+  placeChaseEye(cam, view, focus)
 }
 
 /**
@@ -630,6 +665,7 @@ function forget(cam) {
   cam.appliedPitch = 0
   cam.eyeHeight = null
   cam.focus = null
+  cam.focusBefore = null
   cam.dip = 0
   cam.bobEffort = 0
   cam.wasGrounded = false

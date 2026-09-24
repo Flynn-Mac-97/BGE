@@ -32,7 +32,7 @@ commands. Both see the other's change.
 - `draft.add {kind?, text?, at?, ...}` — add a box; answers with its id.
 - `draft.set {node, text?, kind?, at?, w?, h?, colour?}` — change one box.
 - `draft.connect {from, to, text?}` · `draft.label {edge, text}` — draw and label an arrow.
-- `draft.remove {node?|edge?}` · `draft.open {id}` · `draft.fit` · `draft.list` · `draft.panel`.
+- `draft.remove {node?|edge?}` · `draft.open {id}` · `draft.fit` (frames every box) · `draft.full {on?}` (the board covers the whole window) · `draft.list` · `draft.panel`.
 
 Every command takes `id` to name a draft other than the open one, so one
 headless call is enough on its own.

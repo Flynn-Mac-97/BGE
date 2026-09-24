@@ -3,12 +3,12 @@
  *
  * A keyline is a dark line of CONSTANT SCREEN WIDTH round a silhouette; a
  * contact shadow is a soft ellipse under it; a ground ring is a coloured band
- * on the floor round its feet. The first two belong on the things a player
- * tracks — the characters, the enemies, the pickups — and on nothing else: a
- * line round every tuft of grass is edge detail, not readability. "Has moved
+ * on the floor round its feet. A shadow belongs on the things a player tracks —
+ * the characters, the enemies, the pickups — and on nothing else. "Has moved
  * since it appeared" is the renderer's own answer to which is which, read off
- * the record merging already keeps, and any mesh overrides it by declaring
- * `keyline` in pixels or `shadow` in metres.
+ * the record merging already keeps. A keyline is off by default; a mesh asks
+ * for one by declaring `keyline` in pixels, and `shadow` in metres overrides
+ * the shadow.
  *
  * The ring is handed out differently: it names ONE actor. It answers "which one
  * is mine" in a crowd where a silhouette cannot, and a hundred of them mark
@@ -30,7 +30,9 @@ import { makeGroundRings } from './ground-ring.js'
  */
 export function makeReadability() {
   return {
-    keyline: 2.2,               // screen pixels
+    // Screen pixels. 0: a keyline is an effect a type asks for with
+    // `mesh.keyline`, not a default on everything that moves.
+    keyline: 0,
     keylineColour: '#1d1418',
     shadow: true,
     shadowColour: '#0d1409',

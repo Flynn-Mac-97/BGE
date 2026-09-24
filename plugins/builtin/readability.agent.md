@@ -11,8 +11,8 @@ materials are never touched. This plugin owns them; the renderer only holds the
 
 | mark | what it is | who gets it |
 |---|---|---|
-| `keyline` | a dark line of constant **screen width** round a silhouette | anything that has moved since it appeared |
-| `contactShadow` | one soft ellipse on the ground | the same |
+| `keyline` | a dark line of constant **screen width** round a silhouette | only a mesh that declares `keyline`; off by default |
+| `contactShadow` | one soft ellipse on the ground | anything that has moved since it appeared |
 | `groundRing` | a coloured band on the floor | the actor the rule names |
 
 ## Declaring one
@@ -37,7 +37,7 @@ A level overrides the rule per entity, on `mesh`:
 Written on `renderer.readability`, or `context.readability`, in place:
 
 ```js
-context.readability.keyline = 3          // screen pixels
+context.readability.keyline = 3          // screen pixels for every moving thing; default 0
 context.readability.shadow = false       // all contact shadows
 context.readability.ring = 'player'      // 'followed' | entity id | type name | false
 context.readability.groundY = 0          // where the floor is

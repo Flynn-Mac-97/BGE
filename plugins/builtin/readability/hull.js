@@ -94,6 +94,10 @@ function meshInObjectSpace(node, toLocal, point, relative) {
 function appendMesh(node, positions, indices, toLocal, point, relative) {
   // A hull already hanging off this object is not part of its shape.
   if (node.userData.keyline) return
+  // The hull is a plain mesh baked once from rest positions. A skinned mesh is
+  // drawn where its bones put it, so its rest shape (often a T-pose) would be
+  // outlined standing beside the posed body.
+  if (node.isSkinnedMesh) return
   const mesh = meshInObjectSpace(node, toLocal, point, relative)
   if (!mesh) return
   // A mesh wound inside out is already an outline, modelled into the file as an

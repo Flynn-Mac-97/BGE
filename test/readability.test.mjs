@@ -60,6 +60,11 @@ test('an entity that never moved and declares nothing gets no keyline', async ()
   assert.ok(!frame.objectFor(still).children.some(child => child.userData.keyline === true))
 })
 
+test('a keyline is opt-in: the default width for a moving thing is zero', async () => {
+  const frame = await withReadability()
+  assert.equal(frame.readability.keyline, 0)
+})
+
 test('declaring keyline 0 turns one entity\'s outline off', async () => {
   const frame = await withReadability()
   const actor = body('actor', { box: [1, 1, 1], keyline: 0 })

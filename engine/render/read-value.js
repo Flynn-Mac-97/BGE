@@ -47,10 +47,11 @@ export function readIntensity(value, where) {
  * Sway, kick and a weapon's fit in a fist all arrive every frame, so the name of
  * what went wrong is built only when something actually did. A missing axis is
  * zero rather than a complaint: leaving `z` out of a shift that is only sideways
- * is how anybody would write it.
+ * is how anybody would write it. `[x, y, z]` is read as well as `{x, y, z}`,
+ * because the rest of a level writes positions as arrays.
  */
 const readAxis = (given, where, axis) => {
-  const value = given?.[axis]
+  const value = Array.isArray(given) ? given['xyz'.indexOf(axis)] : given?.[axis]
   if (value === undefined || value === null) return 0
   return Number.isFinite(value) ? value : declaredNumber(value, 0, `${where}.${axis}`)
 }

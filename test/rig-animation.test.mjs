@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { widenClip, applyClip } from '../plugins/builtin/rig-animation.js'
-import { buildClip, writeClip, skeletonFor, loopWindow, SKELETONS } from '../tools/lib/motion-clip.mjs'
+import { buildClip, writeClip, skeletonFor, loopWindow, closeQuaternionLoop, closeVectorLoop, SKELETONS } from '../tools/lib/motion-clip.mjs'
 import { withRestWorld, captureWorldTurns, planRetarget, neutralFor, multiply } from '../tools/lib/retarget.mjs'
 import { findMap, mapsFor, nodesOf } from '../tools/lib/rig-maps.mjs'
 import { guessMap } from '../tools/lib/rig-map-guess.mjs'
@@ -522,3 +522,23 @@ function clipSource() {
     root: [[0, 1, 0], [0, 1, 1], [0, 1, 2]]
   }
 }
+
+test('a closed loop ends where it starts: the last kept frame steps into the first like any other', () => {
+  // A turn about X that drifts 6 degrees over the window, so the pose it returns to is off.
+  const frames = Array.from({ length: 25 }, (_, frame) => {
+    const angle = (frame / 24) * (6 * Math.PI / 180)
+    return [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)]
+  })
+  const closed = closeQuaternionLoop(frames)
+  assert.equal(closed.length, 24, 'the closing frame is dropped')
+  const angleOf = quaternion => 2 * Math.asin(quaternion[0])
+  const seam = Math.abs(angleOf(closed[23]) - angleOf(closed[0]))
+  const step = Math.abs(angleOf(closed[1]) - angleOf(closed[0]))
+  assert.ok(seam < 1e-4, `the drift is taken out, so the last frame matches the first (${seam})`)
+  assert.ok(Math.abs(step) < 1e-4, 'a steady drift and nothing else leaves a still pose')
+})
+
+test('a closed loop of positions spreads the jump back to the start', () => {
+  const closed = closeVectorLoop([[0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0], [0, 4, 0]])
+  assert.deepEqual(closed, [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+})
