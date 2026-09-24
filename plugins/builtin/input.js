@@ -19,6 +19,9 @@ const ACTIONS = {
   fire:  ['KeyJ', 'KeyZ']
 }
 
+/** Whether any action is bound to this physical key. */
+const isBound = code => Object.values(ACTIONS).some(codes => codes.includes(code))
+
 export default {
   name: 'Keyboard Input',
 
@@ -31,6 +34,10 @@ export default {
     if (typeof addEventListener === 'function') {
       addEventListener('keydown', event => {
         if (editing(event.target)) return
+        // While a run plays, a key the game has bound is the game's alone: Tab
+        // must not also move focus onto an editor button, where the next Space
+        // would press it.
+        if (context.loop.running && isBound(event.code)) event.preventDefault()
         keys.press(event.code)
       })
       addEventListener('keyup', event => keys.release(event.code))
