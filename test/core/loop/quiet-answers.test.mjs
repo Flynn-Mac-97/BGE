@@ -16,7 +16,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { makeLoop } from '../../../engine/loop.js'
+import { makeLoop, FIXED_STEP } from '../../../engine/loop.js'
 import { makeWorld } from '../../../engine/world.js'
 import { buildIndex } from '../../../engine/project-index.mjs'
 import { tintProblems } from '../../../engine/index-invariants.js'
@@ -309,5 +309,159 @@ test('an untinted type over the same level says nothing, so a clean project stay
     assert.equal(fatal(problemsIn(index)).length, 0)
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+// --------------------------------------------- the clock's own answers
+
+test('behindSeconds is wall time minus engine time since the clock was last set', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.loop.resume({ steps: 600 })
+    driven.tick(1000)
+
+    // One second of wall time, five steps of engine time past the resumed count.
+    const engineSeconds = driven.loop.time - 600 * FIXED_STEP
+    const expected = Math.round((1 - engineSeconds) * 1000) / 1000
+    assert.equal(driven.loop.state.behindSeconds, expected)
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a window of exactly one second with no ticks reports zero ticks and a warning', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.starve(1000)
+
+    const state = driven.loop.state
+    assert.equal(state.ticksPerSecond, 0)
+    assert.equal(typeof state.warning, 'string', 'a run with no ticks is slow and must say so')
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a window still open reports no movement when no step ran since it opened', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.tick(1000)
+    driven.starve(2000)
+    assert.equal(driven.loop.state.gameSpeed, 0)
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a run at exactly half speed is not reported as slow', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    // Twenty-five steps before the window, five inside it, over one wall second.
+    driven.loop.step(25)
+    driven.tick(1000)
+    assert.deepEqual(driven.errors, [])
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a run at exactly half speed carries no warning', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.loop.step(25)
+    driven.tick(1000)
+    assert.equal(driven.loop.state.warning, undefined)
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a slow loop is reported again after the report interval', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    for (let index = 0; index < 11; index++) driven.tick(1000)
+    assert.equal(driven.errors.length, 2, 'once when the window first closes, once ten seconds later')
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a rate window closes on the first tick that fills it', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.tick(1000)
+    assert.equal(driven.errors.length, 1)
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a rate window stays open until a full window has passed', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.tick(1000)
+    driven.tick(500)
+    assert.equal(driven.loop.state.ticksPerSecond, 1, 'the half-full window is not a window yet')
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a closed window measures its own ticks and engine seconds', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.tick(1000)
+    driven.tick(1000)
+
+    const state = driven.loop.state
+    assert.equal(state.ticksPerSecond, 1)
+    assert.equal(state.gameSpeed, 0.083, 'five steps over the second the window measured')
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a frame that elapsed exactly one step runs that step', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.tick(1000 / 60)
+    assert.equal(driven.loop.steps, 1)
+  } finally {
+    driven.restore()
+  }
+})
+
+test('a frame never runs more than five catch-up steps', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    driven.tick(1000)
+    assert.equal(driven.loop.steps, 5, 'a quarter second of backlog, capped at MAX_CATCHUP')
+    assert.equal(driven.loop.blend, 1, 'and the backlog is dropped rather than drawn through')
+  } finally {
+    driven.restore()
+  }
+})
+
+test('stop leaves the loop not running', () => {
+  const driven = drivenLoop({ hidden: true })
+  try {
+    driven.loop.start()
+    assert.equal(driven.loop.running, true)
+    driven.loop.stop()
+    assert.equal(driven.loop.running, false)
+    assert.deepEqual(driven.loop.state, { driver: 'stopped' })
+  } finally {
+    driven.restore()
   }
 })
