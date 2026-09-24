@@ -212,10 +212,18 @@ const config = {
   passCurveEntities: 300
 }
 
-const project = flagValue('--project') || path.join(checkout, 'test', 'fixture-project')
+// The editor autosaves its world into the project's own level file, and this
+// harness spawns thousands of entities, so running against the repo's fixture
+// writes the benchmark scene into a committed level. Unless the caller named a
+// project, copy the fixture into the run's temp directory and work there.
+const runRoot = fs.mkdtempSync(path.join(tmpdir(), 'render-benchmark-'))
+const namedProject = flagValue('--project')
+const project = namedProject ? path.resolve(checkout, namedProject) : path.join(runRoot, 'project')
+if (!namedProject) fs.cpSync(path.join(checkout, 'test', 'fixture-project'), project, { recursive: true })
 const serverPort = await freePort()
 const debugPort = await freePort()
-const profile = fs.mkdtempSync(path.join(tmpdir(), 'render-benchmark-'))
+const profile = path.join(runRoot, 'profile')
+fs.mkdirSync(profile, { recursive: true })
 const client = `render-benchmark-${serverPort}`
 
 let server = null
@@ -343,7 +351,7 @@ try {
     /* gone */
   }
   try {
-    fs.rmSync(profile, { recursive: true, force: true })
+    fs.rmSync(runRoot, { recursive: true, force: true })
   } catch {
     /* Windows holds the profile briefly */
   }
