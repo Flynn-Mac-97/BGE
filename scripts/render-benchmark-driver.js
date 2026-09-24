@@ -491,27 +491,48 @@ async config => {
     passCurve: []
   }
 
+  /**
+   * Build one scene through the engine's own world surface.
+   *
+   * The measured loop and the show path share this, so what a caller looks at is
+   * the scene the numbers came from rather than a second copy that can drift.
+   */
+  async function buildScene(scene) {
+    if (scene.kind === 'retro2d') {
+      aimOrtho(16)
+      spawnSprites(scene.entities)
+      return
+    }
+    aimPerspective()
+    if (scene.unmergeable) spawnVariedMeshes(scene.entities, 'benchSurface')
+    else spawnMeshes(scene.entities, scene.material === 'standard' ? 'benchSurface' : 'benchMesh')
+    renderer.setSky('#8fa3bf')
+    renderer.setFog(0.012, '#8fa3bf')
+    renderer.setAmbient('#93a7c4', 0.5)
+    renderer.setSun([-0.4, -1, -0.3], '#fff2d8', 0.9)
+    if (scene.shadows) spawnShadowSun()
+    if (scene.probePasses) addProbePasses(scene.probePasses)
+    if (scene.post) await engine.run('post.chain', scene.post)
+  }
+
+  // Show mode: build one scene and leave it on screen, so a caller can look at
+  // what the numbers describe. It settles the post chain and the batching, then
+  // returns with the world still standing - a measurement would clear it.
+  if (config.show) {
+    const scene = config.scenes.find(entry => entry.name === config.show)
+    if (!scene) return { problem: `no scene named ${config.show}` }
+    await clearWorld()
+    registerTypes()
+    await buildScene(scene)
+    renderer.frameSize(config.viewport[0], config.viewport[1])
+    engine.bus.emit('world:changed')
+    await settle(scene.settle ?? 2000)
+    for (let frame = 0; frame < config.warmupFrames; frame++) runFrame()
+    return { shown: scene.name, entities: world.entities.length, environment: results.environment }
+  }
+
   for (const scene of config.scenes) {
-    const built = await runScene({
-      settle: scene.settle,
-      world: async () => {
-        if (scene.kind === 'retro2d') {
-          aimOrtho(16)
-          spawnSprites(scene.entities)
-        } else {
-          aimPerspective()
-          if (scene.unmergeable) spawnVariedMeshes(scene.entities, 'benchSurface')
-          else spawnMeshes(scene.entities, scene.material === 'standard' ? 'benchSurface' : 'benchMesh')
-          renderer.setSky('#8fa3bf')
-          renderer.setFog(0.012, '#8fa3bf')
-          renderer.setAmbient('#93a7c4', 0.5)
-          renderer.setSun([-0.4, -1, -0.3], '#fff2d8', 0.9)
-          if (scene.shadows) spawnShadowSun()
-          if (scene.probePasses) addProbePasses(scene.probePasses)
-          if (scene.post) await engine.run('post.chain', scene.post)
-        }
-      }
-    })
+    const built = await runScene({ settle: scene.settle, world: () => buildScene(scene) })
     results.scenes.push({ name: scene.name, kind: scene.kind, ...built })
   }
 

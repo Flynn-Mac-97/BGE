@@ -29,7 +29,8 @@
     "bench:check": "node scripts/check-render-benchmark.mjs",
     "check": "npm run format:check && npm run lint && npm run test:core && npm run check:structure",
     "audit": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit engine --config scripts/kernel-trellis.yaml",
-    "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit ."
+    "audit:all": "bash .pi/skills/trellis-audit/scripts/trellis.sh audit .",
+    "bench:show": "node scripts/render-benchmark.mjs --show aaa"
   },
   "dependencies": {
     "@dimforge/rapier2d-deterministic-compat": "^0.20.0",

@@ -197,6 +197,9 @@ const wantsBaseline = argumentsFrom.includes('--write-baseline')
 
 const config = {
   viewport: [1280, 720],
+  // `--show <scene>` builds that scene and leaves it on screen instead of
+  // measuring, and `--screenshot <file>` captures it and exits.
+  show: flagValue('--show') || null,
   frames: Number(flagValue('--frames') || 90),
   warmupFrames: Number(flagValue('--warmup') || 60),
   scenes: [
@@ -246,7 +249,9 @@ try {
   chrome = spawn(
     browser,
     [
-      '--headless=new',
+      // A visible window only when a caller asked to look at a scene; headless is
+      // the default so a measurement never depends on a display.
+      ...(config.show ? [] : ['--headless=new']),
       '--ignore-gpu-blocklist',
       '--enable-unsafe-webgpu',
       // Exposes `window.gc`, so a reported heap is measured after a collection
@@ -260,7 +265,10 @@ try {
       `--window-size=${config.viewport[0]},${config.viewport[1]}`,
       `http://localhost:${serverPort}/?client=${encodeURIComponent(client)}`
     ],
-    { stdio: 'ignore', windowsHide: true }
+    // `windowsHide` maps to CREATE_NO_WINDOW, which hides a GUI app's window too.
+    // That is fine for a measurement and fatal for `--show`, which exists to be
+    // looked at, and a hidden tab does not draw either.
+    { stdio: 'ignore', windowsHide: !config.show }
   )
   try {
     recordLaneBrowser(checkout, {
@@ -271,7 +279,7 @@ try {
       profile,
       serves: checkout,
       chrome: browser,
-      headless: true,
+      headless: !config.show,
       startedAt: new Date().toISOString()
     })
   } catch {
@@ -292,6 +300,24 @@ try {
   const driver = fs.readFileSync(driverFile, 'utf8')
   results = await page.evaluate(`(${driver})(${JSON.stringify(config)})`)
   results.problem = null
+
+  if (config.show) {
+    await page.call('Page.enable')
+    const screenshot = flagValue('--screenshot')
+    if (screenshot) {
+      const shot = await page.call('Page.captureScreenshot', { format: 'png' })
+      fs.writeFileSync(path.resolve(screenshot), Buffer.from(shot.data, 'base64'))
+      console.log(`render-benchmark: wrote the ${config.show} scene to ${screenshot}`)
+    } else {
+      console.log(
+        `render-benchmark: showing the ${config.show} scene (${results.entities} entities). ` +
+          'Close the window or press Ctrl+C when you are done.'
+      )
+      // The window stays until the caller closes it, so the finally that would
+      // stop the browser and the dev server is deliberately never reached.
+      await new Promise(() => {})
+    }
+  }
 } catch (error) {
   failure = error
 } finally {
@@ -322,6 +348,10 @@ try {
     /* Windows holds the profile briefly */
   }
 }
+
+// Show mode has no tables to write: it either held the window open above or
+// wrote a screenshot, and the browser and dev server are already stopped.
+if (config.show) process.exit(0)
 
 results.measuredAt = new Date().toISOString()
 results.checkout = checkout
