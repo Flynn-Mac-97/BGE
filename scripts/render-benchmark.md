@@ -20,7 +20,7 @@ npm run bench:baseline   # re-record the baseline from a run (only when a change
 3. Runs `scripts/render-benchmark-driver.js` inside the page. It builds a
    retro-2D scene, a mid scene and an AAA-ish scene through `world.spawn`, then
    two curves: entities 1 → 100 → 1,000 → 10,000, and added passes 1 → 10 → 50.
-4. Wraps the live pass records with timers and drives `loop.step(0)` per frame —
+4. Reads the kernel's own per-pass costs and drives `loop.step(0)` per frame —
    a stopped clock, so every frame is a settled still frame.
 5. Writes the JSON and the report.
 
@@ -29,7 +29,8 @@ npm run bench:baseline   # re-record the baseline from a run (only when a change
 - Total frame time, split into plugin frame systems, entity sync, and the draw.
 - Kernel stages: entity sync, the `frame` pass's setup, the graph executor's own
   bookkeeping, and the draw's tail.
-- Every pass's `extract`, `prepare` and `execute`, by pass name.
+- Every pass's `extract`, `prepare` and `execute`, by pass name, from the graph
+  executor's own timing. The pass curve prices the clock reads that timing makes.
 - `stats`, the target pool's `created`, and the JS heap.
 
 ## What it cannot report

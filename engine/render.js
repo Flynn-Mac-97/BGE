@@ -428,7 +428,15 @@ export async function makeRenderer(canvas, view, viewport, options = {}) {
       return state.activeCamera()
     },
     get stats() {
-      return { ...state.stats }
+      return {
+        ...state.stats,
+        // The clock the per-pass costs are measured with. The resolution is the
+        // host's; the benchmark reports the measured quantum.
+        passClock: state.graph.clock,
+        // The last frame's cost per pass, as a snapshot: the graph keeps the live
+        // records and rewrites them on the next frame.
+        passes: state.graph.costs.map(cost => ({ ...cost }))
+      }
     },
     /**
      * 'ready' while the device draws, 'lost' while frames are skipped until it

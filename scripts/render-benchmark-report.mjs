@@ -68,13 +68,14 @@ function entityTable(curve) {
 
 function passCurveTable(curve) {
   const rows = [
-    '| added passes | live passes | executor ms | executor overhead ms | overhead µs/pass | frame ms | kernel share | heap MB |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |'
+    '| added passes | live passes | executor ms | executor overhead ms | overhead µs/pass | timing cost ms | clock reads | frame ms | kernel share | heap MB |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'
   ]
   for (const entry of curve) {
     rows.push(
       `| ${entry.probePasses} | ${entry.passes.length} | ${number(entry.executorMs)} | ${number(entry.executorOverheadMs)} | ` +
-        `${((entry.executorOverheadMs ?? 0) * 1000 / Math.max(1, entry.probePasses)).toFixed(2)} | ${number(entry.stepMs)} | ` +
+        `${((entry.executorOverheadMs ?? 0) * 1000 / Math.max(1, entry.probePasses)).toFixed(2)} | ` +
+        `${number(entry.timingCostMs, 4)} | ${entry.passClockReads} | ${number(entry.stepMs)} | ` +
         `${percent(entry.kernelShare)} | ${entry.heapMB} |`
     )
   }
@@ -127,10 +128,17 @@ function findings(results) {
   if (passes.length) {
     const last = passes[passes.length - 1]
     const share = last.stepMs ? (last.executorOverheadMs ?? 0) / last.stepMs : null
+    const timingShare = last.stepMs ? (last.timingCostMs ?? 0) / last.stepMs : null
     lines.push(
       `- **Pass curve**: at ${last.probePasses} added passes the frame takes ${number(last.stepMs)} ms and the ` +
         `executor's own bookkeeping is ${number(last.executorOverheadMs)} ms of it (${percent(share)}); the rest is ` +
         `the passes drawing. The kernel's share of a frame falls as passes are added.`
+    )
+    lines.push(
+      `- **Pass curve, the timing's own cost**: the kernel read the clock ${last.passClockReads} times at ` +
+        `${last.probePasses} passes, which costs ${number(last.timingCostMs, 4)} ms (${percent(timingShare)} of the ` +
+        `frame) at the measured ${number(results.environment.clockCallMs, 6)} ms a read. The executor overhead ` +
+        `includes it rather than hiding it in a pass.`
     )
   }
 
@@ -158,8 +166,8 @@ Measured ${results.measuredAt} on ${results.environment.gpu?.renderer ?? 'an unk
 ${results.environment.frames} frames after ${results.environment.warmupFrames} warmup frames.
 
 The harness runs the real renderer in a hidden Chrome with a real GPU. Scenes are
-built through the engine's own world surface, the live pass records are wrapped
-with timers in place, and frames are driven through \`loop.step(0)\` — a stopped
+built through the engine's own world surface, the kernel's own per-pass costs are read
+frame by frame, and frames are driven through \`loop.step(0)\` — a stopped
 clock, so every frame is a settled still frame.
 
 ## What is measured
@@ -172,7 +180,12 @@ clock, so every frame is a settled still frame.
   callback), and the draw's tail after \`graph.run\`. The entity walk is the scene
   pass's \`extract\`, so it is reported per pass rather than as kernel work.
 - **Per-pass work**: each pass's \`extract\`, \`prepare\` and \`execute\`, attributed
-  by pass name.
+  by pass name. The numbers come from the graph executor's own timing, not from
+  wrapping the pass records, so the executor's clock reads are inside the
+  executor overhead rather than hidden in a pass.
+- **The timing's own cost**: the executor reads the clock twice per timed stage.
+  The pass curve prices those reads (\`clockReads\` times the measured cost of one
+  read), so the measurement's overhead is reported next to what it measures.
 - \`stats\` (draw calls, triangles, merged, batches, materials), the target pool's
   \`created\`, and the JS heap size.
 
@@ -201,6 +214,7 @@ clock, so every frame is a settled still frame.
 | backend | ${results.environment.backend?.name ?? '—'} (webgpu: ${results.environment.backend?.webgpu ?? '—'}, timestamp query: ${results.environment.backend?.timestampQuery ?? '—'}) |
 | device pixel ratio | ${results.environment.devicePixelRatio} |
 | measured clock quantum | ${number(results.environment.timerResolutionMs, 4)} ms |
+| measured clock call cost | ${number(results.environment.clockCallMs, 6)} ms |
 | pass names at boot | ${results.environment.passNames.join(', ')} |
 
 ## Scenes

@@ -22,14 +22,34 @@
  * The executor holds no scene, no entity list and no plugin data. It runs three
  * loops over the live passes, so its work is O(passes) and the same for a world
  * of one entity and a world of ten thousand. The sorted order, the resource
- * targets and the frame record are reused until the pass set changes, so a
- * steady frame allocates nothing.
+ * targets, the frame record and the per-pass cost records are reused until the
+ * pass set changes, so a steady frame allocates nothing.
+ *
+ * The executor times each pass's extract, prepare and execute, and reports the
+ * last frame's three costs per pass through `costs`. `clock` names the clock and
+ * `clockReads` says how many times the frame read it, so the timing's own cost
+ * is visible rather than assumed.
  */
 import { reportOnce } from './report.js'
 import { descriptorKey, makeTargetPool } from './target-pool.js'
 
 // Shared empty lists: most passes declare no edges and no resources.
 const EMPTY = []
+
+/**
+ * The clock every pass cost is measured with.
+ *
+ * `performance.now()` is the one wall clock the browser and node share. A
+ * browser clamps it to a coarse quantum — about 0.1 ms on a page that is not
+ * cross-origin isolated — so a pass shorter than the quantum reads as zero or
+ * as the quantum. `stats.clock` names the source so a reader never has to
+ * guess which clock a number came from; the benchmark reports the measured
+ * quantum.
+ */
+const PASS_CLOCK = 'performance.now()'
+
+/** The clock, unless a caller injects one so a test can attribute time exactly. */
+const defaultClock = () => performance.now()
 
 function normalise(record) {
   return {
@@ -329,9 +349,17 @@ export function makePassGraph(options = {}) {
   // The graph holds no renderer, so clearing a pass depth is a call the frame
   // supplies. A pass that does not ask for it never reaches this.
   const clearDepth = options.clearDepth ?? (() => {})
+  // Injected so a test can drive time exactly and prove attribution without a
+  // stopwatch.
+  const now = options.now ?? defaultClock
   const records = new Map()
 
   let order = []
+  // One cost record per live pass, parallel to `order` and rebuilt with it. The
+  // executor writes the last frame's milliseconds into the same objects, so the
+  // steady path allocates nothing.
+  let passCosts = []
+  let clockReads = 0
   let slots = []
   let resourceSlot = new Map()
   let dirty = true
@@ -369,6 +397,7 @@ export function makePassGraph(options = {}) {
       return false
     })
     order = selectLive(topological(supported, report)).filter(pass => pass.enabled)
+    passCosts = order.map(pass => ({ name: pass.name, extractMs: 0, prepareMs: 0, executeMs: 0 }))
     const plan = planTargets(order, declaredResources(records))
     slots = plan.slots
     resourceSlot = plan.resourceSlot
@@ -424,6 +453,7 @@ export function makePassGraph(options = {}) {
    */
   function extract() {
     ensureBuilt()
+    clockReads = 0
     for (let i = 0; i < order.length; i++) {
       const pass = order[i]
       if (!pass.extract) continue
@@ -431,11 +461,15 @@ export function makePassGraph(options = {}) {
       // next, and the passes after it still run. The guard is written out
       // rather than wrapped in a callback, because a callback would allocate
       // on every pass of every steady frame.
+      const startedAt = now()
+      clockReads++
       try {
         pass.extract(frame)
       } catch (error) {
         report(passFailure(pass, error))
       }
+      passCosts[i].extractMs = now() - startedAt
+      clockReads++
     }
     extracted = true
   }
@@ -455,20 +489,28 @@ export function makePassGraph(options = {}) {
     for (let i = 0; i < order.length; i++) {
       const pass = order[i]
       if (!pass.prepare) continue
+      const startedAt = now()
+      clockReads++
       try {
         pass.prepare(frame)
       } catch (error) {
         report(passFailure(pass, error))
       }
+      passCosts[i].prepareMs = now() - startedAt
+      clockReads++
     }
     for (let i = 0; i < order.length; i++) {
       const pass = order[i]
+      const startedAt = now()
+      clockReads++
       try {
         if (pass.depth === 'clear') clearDepth()
         pass.execute(frame, targets)
       } catch (error) {
         report(passFailure(pass, error))
       }
+      passCosts[i].executeMs = now() - startedAt
+      clockReads++
     }
   }
 
@@ -522,6 +564,26 @@ export function makePassGraph(options = {}) {
     get passes() {
       if (dirty) rebuild()
       return order
+    },
+    /**
+     * The last frame's cost per pass, one reused record per live pass.
+     *
+     * Each record is `{ name, extractMs, prepareMs, executeMs }`. A stage the
+     * pass does not declare stays zero. These are the records the executor
+     * writes, so a caller that holds one across frames holds a live number;
+     * read the list after a frame.
+     */
+    get costs() {
+      if (dirty) rebuild()
+      return passCosts
+    },
+    /** The clock the pass costs are measured with. */
+    get clock() {
+      return PASS_CLOCK
+    },
+    /** How many times the last frame read the clock, so its own cost is visible. */
+    get clockReads() {
+      return clockReads
     },
     get rebuilds() {
       return rebuildCount

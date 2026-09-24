@@ -182,17 +182,22 @@ const EXPECTED_BUDGET = {
     programs: 0,
     gpuMs: null,
     post: 'none',
-    cpuMs: 0
+    cpuMs: 0,
+    passClock: 'performance.now()',
+    passes: ['frame', 'clear', 'scene', 'ui', 'present']
   }
 }
 
 /** The per-frame work the default frame is observed to cost. */
 function readBudget(frame, cardDraws) {
+  const stats = frame.stats
   return {
     passNames: frame.graph.passes.map(pass => pass.name),
     cardDraws,
     targets: frame.graph.pool.created,
-    stats: { ...frame.stats }
+    // The per-pass cost is a live number, so the budget records which passes cost
+    // something rather than what they cost.
+    stats: { ...stats, passes: stats.passes.map(pass => pass.name) }
   }
 }
 

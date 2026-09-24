@@ -8,7 +8,7 @@
  * back.
  *
  * Nothing here changes the kernel. It builds worlds through the engine's own
- * `world` surface, wraps the live pass records to time them, and drives fixed
+ * `world` surface, reads the kernel's own per-pass costs, and drives fixed
  * frames through `loop.step(0)` — a stopped clock, so every frame is a settled
  * still frame. The one kernel-adjacent write is the wrapper on
  * `renderer.graph.run`, and it only adds a timer around the call.
@@ -36,7 +36,6 @@ async config => {
   // The samples for one measured phase. The wrappers below write here only
   // while `measuring` is true, so warmup frames cost nothing and add nothing.
   let measuring = false
-  let frameCallbackMilliseconds = 0
   const samples = { step: [], draw: [], executor: [], callback: [] }
   const perPass = new Map()
   const perPlugin = new Map()
@@ -83,48 +82,42 @@ async config => {
     }
   }
 
-  /** Wrap one pass callback in place, once, so the record's identity is kept. */
-  function timedCallback(passName, stage, original) {
-    if (!original || original.instrumented) return original
-    const wrapped = (...args) => {
-      if (!measuring) return original(...args)
-      const started = now()
-      try {
-        return original(...args)
-      } finally {
-        const spent = now() - started
-        frameCallbackMilliseconds += spent
-        bucketFor(passName)[stage].push(spent)
-      }
+  /**
+   * Read the kernel's per-pass cost for the frame just run.
+   *
+   * The executor times each pass's extract, prepare and execute; this copies the
+   * numbers into the samples the report reads. Nothing here wraps a pass, and a
+   * stage the pass does not declare is left out of its bucket.
+   */
+  function readPassCosts() {
+    let callbackMs = 0
+    const ordered = graph.passes
+    const costs = renderer.stats.passes
+    for (let at = 0; at < costs.length; at++) {
+      const pass = ordered[at]
+      const cost = costs[at]
+      const bucket = bucketFor(cost.name)
+      if (pass.extract) bucket.extract.push(cost.extractMs)
+      if (pass.prepare) bucket.prepare.push(cost.prepareMs)
+      bucket.execute.push(cost.executeMs)
+      callbackMs += cost.extractMs + cost.prepareMs + cost.executeMs
     }
-    wrapped.instrumented = true
-    return wrapped
+    samples.callback.push(callbackMs)
   }
 
-  /**
-   * Time the executor, the entity sync and the draw, and every pass callback.
-   *
-   * Wrapping a record in place rather than re-adding it keeps its edges, its
-   * target and its position in the order exactly as the kernel built them.
-   */
+  /** Time the executor and the draw. The per-pass costs come from the kernel. */
   function instrument() {
     instrumentFrameSystems()
-    for (const pass of graph.passes) {
-      if (pass.extract) pass.extract = timedCallback(pass.name, 'extract', pass.extract)
-      if (pass.prepare) pass.prepare = timedCallback(pass.name, 'prepare', pass.prepare)
-      pass.execute = timedCallback(pass.name, 'execute', pass.execute)
-    }
     if (!graph.run.instrumented) {
       const original = graph.run
       const wrapped = (camera, target, width, height) => {
         if (!measuring) return original(camera, target, width, height)
-        frameCallbackMilliseconds = 0
         const started = now()
         try {
           return original(camera, target, width, height)
         } finally {
           samples.executor.push(now() - started)
-          samples.callback.push(frameCallbackMilliseconds)
+          readPassCosts()
         }
       }
       wrapped.instrumented = true
@@ -158,7 +151,6 @@ async config => {
     for (const key of Object.keys(samples)) samples[key].length = 0
     perPass.clear()
     perPlugin.clear()
-    frameCallbackMilliseconds = 0
   }
 
   /** Read the counters that do not need a frame to settle. */
@@ -190,6 +182,7 @@ async config => {
     const callbackMs = median(samples.callback)
     const overheadMs = medianOfDifferences(samples.executor, samples.callback)
     const frameSystemsMs = median(samples.step.map((value, at) => value - (samples.draw[at] ?? 0)))
+    const timingCostMs = round(graph.clockReads * pageClock.callMs)
 
     const passes = []
     for (const [name, bucket] of perPass) {
@@ -227,6 +220,8 @@ async config => {
       kernelTotalMs: round(kernelTotalMs),
       passWorkMs: round(callbackMs - setupMs),
       kernelShare: stepMs ? round(kernelTotalMs / stepMs) : null,
+      passClockReads: graph.clockReads,
+      timingCostMs,
       passes,
       frameSystems
     }
@@ -432,22 +427,32 @@ async config => {
   // -------------------------------------------------------------------- run
 
   /**
-   * The smallest non-zero step the page's clock can report.
+   * The page clock's quantum and the cost of one read.
    *
    * Chrome clamps `performance.now()` to a coarse quantum on a page that is not
    * cross-origin isolated, so every stage shorter than the quantum reads as the
-   * quantum or as zero. The report states it rather than pretending the small
-   * numbers are finer than they are.
+   * quantum or as zero. The kernel carries its per-pass costs on that clock, so
+   * this prices both the quantum and a read: the timing's own cost is reported
+   * rather than assumed. The loop's subtraction and comparison are counted in
+   * the read cost, so it is an upper bound.
    */
-  function timerResolutionMs() {
+  function measureClock() {
     let smallest = Infinity
-    for (let at = 0; at < 200000; at++) {
-      const started = now()
-      const step = now() - started
+    const count = 200000
+    const startedAt = now()
+    for (let read = 0; read < count; read++) {
+      const first = now()
+      const step = now() - first
       if (step > 0 && step < smallest) smallest = step
     }
-    return Number.isFinite(smallest) ? smallest : null
+    const elapsed = now() - startedAt
+    return {
+      resolutionMs: Number.isFinite(smallest) ? smallest : null,
+      callMs: elapsed / (count * 2 + 2)
+    }
   }
+
+  const pageClock = measureClock()
 
   const gpuContext = (() => {
     try {
@@ -473,7 +478,8 @@ async config => {
       backend: renderer.backend
         ? { name: renderer.backend.name, webgpu: renderer.backend.webgpu, timestampQuery: renderer.backend.has('timestamp-query') }
         : null,
-      timerResolutionMs: timerResolutionMs(),
+      timerResolutionMs: pageClock.resolutionMs,
+      clockCallMs: pageClock.callMs,
       viewport: config.viewport,
       frames: config.frames,
       warmupFrames: config.warmupFrames,

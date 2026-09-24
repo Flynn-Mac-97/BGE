@@ -5,7 +5,7 @@
  * bottleneck. The kernel is the pass graph's executor and the frame's setup; a
  * pass is everything a draw does, and the entity walk is one of them. This starts a dev server and
  * a hidden Chrome with a real GPU, builds three scenes through the engine's own
- * world surface, wraps the live pass records with timers, drives fixed frames on
+ * world surface, reads the kernel's own per-pass costs, drives fixed frames on
  * a stopped clock, and writes the numbers to `agent-runs/benchmark-results.json`
  * and `agent-runs/benchmark-report.md`.
  *

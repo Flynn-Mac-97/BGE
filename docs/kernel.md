@@ -304,6 +304,36 @@ record is the camera and the viewport only. Earlier versions passed an unused
 `sink` to `extract`; nothing read it and no pass handed another pass data
 through it, so it was removed.
 
+## Per-pass statistics
+
+The graph executor times each live pass's `extract`, `prepare` and `execute`, and
+reports the last frame's cost by pass name. A caller reads it; nothing has to
+wrap a pass to find the slow one.
+
+```
+renderer.stats.passClock          // 'performance.now()'
+renderer.stats.passes             // [{ name, extractMs, prepareMs, executeMs }]
+graph.clock                       // the same clock name
+graph.clockReads                  // clock reads the last frame made
+```
+
+Each record is one of the live passes, in run order, and a stage the pass does
+not declare is zero. The records are reused across frames: the executor
+overwrites the three numbers in place, so a steady frame allocates nothing and a
+caller reads the same list after each frame rather than a new one.
+
+The clock is `performance.now()`. That is the one wall clock the browser and node
+share, and its resolution is the host's. Chrome clamps it to a coarse quantum,
+about 0.1 ms on a page that is not cross-origin isolated, so a pass shorter than
+the quantum reads as zero or as the quantum. `clockReads` is the number of times
+the frame read the clock (two per timed stage). The render benchmark measures the
+cost of one read and reports the timing's own cost at each pass count, so the
+measurement's overhead is visible rather than folded into the numbers it
+produces.
+
+The executor measures the passes it already runs rather than adding a pass, so
+the kernel's pass set is unchanged.
+
 ## Losing the device
 
 A GPU reset, a driver update or a backgrounded tab takes the graphics device
