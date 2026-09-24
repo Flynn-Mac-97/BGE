@@ -43,6 +43,26 @@ export function makeCamera(state) {
     updateCamera()
   }
 
+  /**
+   * Take a new device pixel ratio.
+   *
+   * The drawing buffer, the camera built against it and the renderer's pooled
+   * targets all follow; the CSS viewport keeps its size, so input and
+   * world-to-screen mapping stay put. A window moved to a display with a
+   * different ratio does not always fire a resize, so this is called on its own.
+   */
+  function setPixelRatio(ratio) {
+    // Matches the cap at init: above two, the buffer costs memory and bandwidth
+    // for pixels no screen shows.
+    const wanted = Math.min(Math.max(1, Number(ratio) || 1), 2)
+    if (wanted === state.pixelRatio) return
+    state.pixelRatio = wanted
+    state.renderer.setPixelRatio(wanted)
+    state.renderer.setSize(state.viewport.width, state.viewport.height, false)
+    updateCamera()
+    state.graph?.setPixelRatio?.(wanted)
+  }
+
   /** Whether the session's view is the flat orthographic one. */
   const flat = () => state.view.mode === 'ortho'
   /** The camera the current view mode draws through. */
@@ -102,4 +122,5 @@ export function makeCamera(state) {
   state.toNDC = toNDC
   state.resize = resize
   state.frameSize = frameSize
+  state.setPixelRatio = setPixelRatio
 }

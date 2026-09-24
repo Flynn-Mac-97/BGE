@@ -84,3 +84,30 @@ test('a resource is sized by its descriptor scale', () => {
   assert.equal(graph.targets.get('half').width, 160)
   assert.equal(graph.targets.get('half').height, 90)
 })
+
+test('a removed pass gives its transient target back to the pool', () => {
+  const graph = makePassGraph({ report: noop })
+  graph.add({ name: 'present', reads: ['plate'], execute: noop })
+  graph.run(null, null, 64, 64)
+  const before = graph.pool.created
+
+  graph.add({ name: 'post', writes: ['plate'], target: { format: 'half-float' }, execute: noop })
+  graph.run(null, null, 64, 64)
+  assert.equal(graph.pool.created, before + 1, 'the transient target is made')
+
+  graph.remove('post')
+  graph.run(null, null, 64, 64)
+  assert.equal(graph.pool.created, before, 'removing the pass gives the descriptor back')
+})
+
+test('a target descriptor with a format the pool cannot build is reported', () => {
+  const said = []
+  const graph = makePassGraph({ report: message => said.push(message) })
+  graph.add({ name: 'produce', writes: ['plate'], target: { format: 'float16' }, execute: noop })
+  graph.add({ name: 'consume', reads: ['plate'], execute: noop })
+  graph.run(null, null, 8, 8)
+
+  assert.equal(said.length, 1, 'the unknown format is reported once')
+  assert.match(said[0], /no format called "float16"/)
+  assert.ok(graph.targets.get('plate'), 'the pass still gets a target to draw into')
+})

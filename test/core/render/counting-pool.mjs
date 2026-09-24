@@ -1,7 +1,7 @@
 /**
  * A target pool wrapped to count the calls the pass graph makes to it.
  *
- * `created` says how many targets the pool has made; the acquire count says
+ * `created` says how many targets the pool holds; the acquire count says
  * whether the steady path asked for a target at all. A frame that allocates
  * nothing makes no acquire call after its first, whatever the pass set does
  * afterwards. Wrapping rather than editing the pool keeps the pool's own

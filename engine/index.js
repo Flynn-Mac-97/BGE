@@ -193,19 +193,38 @@ async function boot() {
   /** Keep asking for the next frame while the world is stopped. */
   const idle = () => {
     if (!alive) return
-    paint()
+    // Ask for the next frame before drawing: one throw in a paint must not be
+    // the last paint, which is what left a stopped world unrepainted forever.
     requestAnimationFrame(idle)
+    paint()
   }
   idle()
   const hiddenPaint = setInterval(() => {
     if (alive && document.hidden) paint()
   }, 100)
 
+  // A window moved to a display with a different pixel ratio does not always
+  // fire a resize, so the drawing buffer would keep the old ratio. Watch the
+  // ratio itself and re-apply it; the buffer, the camera and the pooled targets
+  // follow through the renderer.
+  let ratioWatch = null
+  function onPixelRatioChange() {
+    context.renderer.setPixelRatio(devicePixelRatio)
+    watchPixelRatio()
+  }
+  function watchPixelRatio() {
+    ratioWatch?.removeEventListener('change', onPixelRatioChange)
+    ratioWatch = matchMedia(`(resolution: ${devicePixelRatio}dppx)`)
+    ratioWatch.addEventListener('change', onPixelRatioChange)
+  }
+  watchPixelRatio()
+
   if (import.meta.hot) {
     import.meta.hot.on('vite:ws:disconnect', () => {
       if (!alive) return
       alive = false
       clearInterval(hiddenPaint)
+      ratioWatch?.removeEventListener('change', onPixelRatioChange)
       loop.stop()
       context.renderer.release()
       document.getElementById('app').innerHTML =

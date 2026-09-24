@@ -246,8 +246,8 @@ async config => {
       window.gc()
       window.gc()
     }
-    // The pool's total, not this scene's delta: a target created for one scene
-    // is reused by the next, so the total is what shows the pool working.
+    // How many targets the pool holds for this pass set: one made for a scene is
+    // reused by the next, so the count shows the pool working.
     measured.targetsCreated = graph.pool.created
     measured.graphRebuilds = graph.rebuilds
     measured.heapMB =

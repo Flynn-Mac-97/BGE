@@ -3,8 +3,8 @@
  *
  * This is the anchor the rest of the shrink rests on: if the kernel ever grows
  * a hard dependency on a plugin, every later step is built on a boot that needs
- * one. Turning every registered plugin off and still loading, stepping and
- * hashing is the whole claim.
+ * one. Turning every registered plugin off and still loading, stepping, drawing
+ * and hashing is the whole claim.
  *
  * The disabled list is read from the plugin files rather than written out, so
  * the test keeps meaning as plugins are added or removed.
@@ -16,6 +16,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { CHECKOUT, temporaryProject } from '../../fixture-project.mjs'
 import { startWorldInNode } from '../../../engine/start-world-node.mjs'
+import { makeRenderer } from '../../../engine/render.js'
 import { stateHash } from '../../../engine/world.js'
 
 /** Every plugin definition the finder would register, read from the files on disk. */
@@ -66,11 +67,11 @@ function dependentsFirst(definitions) {
     .map(definition => definition.name)
 }
 
-test('the kernel boots and steps with every plugin disabled', async () => {
+/** A project with one moving entity and every builtin plugin disabled. */
+async function bareProject() {
   const disabled = dependentsFirst(await builtinDefinitions())
   assert.ok(disabled.length > 0, 'the disabled list comes from the plugins on disk')
-
-  const project = await temporaryProject({
+  return temporaryProject({
     'game.json': { title: 'bare-boot', startLevel: 'main', plugins: { disabled } },
     'levels/main.json': { entities: [{ type: 'mover', at: [0, 0, 0] }] },
     // A type that writes a field every step, so the hash has something real to
@@ -81,7 +82,10 @@ test('the kernel boots and steps with every plugin disabled', async () => {
 }
 `
   })
+}
 
+test('the kernel boots and steps with every plugin disabled', async () => {
+  const project = await bareProject()
   try {
     const { context, engine } = await startWorldInNode({ root: CHECKOUT, project })
     const started = engine.snapshot()
@@ -96,6 +100,40 @@ test('the kernel boots and steps with every plugin disabled', async () => {
     assert.notEqual(stateHash(context.world), before, 'a step changed the world')
 
     assert.deepEqual(engine.snapshot().errors, [], 'the step logged no error')
+  } finally {
+    await fs.rm(project, { recursive: true, force: true })
+  }
+})
+
+test('the kernel draws its default graph through the real executor with every plugin disabled', async () => {
+  const project = await bareProject()
+  try {
+    const { context } = await startWorldInNode({ root: CHECKOUT, project })
+    // The browser builds this frame at `attachScreen`; doing the same here means
+    // the default graph and its executor are the thing under test, not the null
+    // renderer's pass-shaped stand-in.
+    const frame = await makeRenderer(null, context.view, context.viewport)
+    context.renderer = frame
+
+    // A recording device: record each pass as the executor reaches it, and each
+    // card call the passes make.
+    const executed = []
+    for (const pass of frame.graph.passes) {
+      const execute = pass.execute
+      pass.execute = (record, targets) => {
+        executed.push(pass.name)
+        return execute(record, targets)
+      }
+    }
+    const card = []
+    frame.threeRenderer.clear = () => card.push('clear')
+    frame.threeRenderer.render = scene => card.push(scene === frame.scene ? 'world' : 'other')
+
+    frame.draw(context.world)
+
+    assert.deepEqual(executed, ['frame', 'clear', 'scene', 'ui', 'present'], 'every default pass executed')
+    assert.deepEqual(card, ['clear', 'world'], 'the device cleared and drew the world')
+    assert.equal(frame.stats.entities, 1, 'the scene pass walked the level')
   } finally {
     await fs.rm(project, { recursive: true, force: true })
   }

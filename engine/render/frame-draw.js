@@ -12,6 +12,7 @@
  */
 import * as THREE from 'three/webgpu'
 import { makePassGraph } from './graph.js'
+import { reportOnce } from './report.js'
 
 export function makeFrameDraw(state) {
   /**
@@ -48,7 +49,15 @@ export function makeFrameDraw(state) {
 
   // A pass that declares `depth: 'clear'` empties the depth buffer before it
   // draws. The graph holds no renderer, so the one call is supplied here.
-  const graph = makePassGraph({ clearDepth: () => state.renderer.clearDepth() })
+  //
+  // `hasFeature` is the device's own answer, so a pass that declares a feature
+  // this device lacks is dropped before it runs. `pixelRatio` sizes a target to
+  // the drawing buffer rather than to the CSS viewport.
+  const graph = makePassGraph({
+    clearDepth: () => state.renderer.clearDepth(),
+    hasFeature: state.hasFeature,
+    pixelRatio: state.pixelRatio
+  })
   state.graph = graph
 
   /** The core world draw: the scene straight to the frame. */
@@ -136,49 +145,64 @@ export function makeFrameDraw(state) {
     return false
   }
 
-  /**
-   * Draw one frame from a world: the graph's passes in order, then the counters.
-   *
-   * A call with no world reuses the one the last `sync` stored, and that sync
-   * already ran the extract, so a sync-then-draw pair walks the world once.
-   */
-  function draw(world = graph.frame.world, blend = graph.frame.blend ?? 1) {
-    const startedAt = performance.now()
-    const camera = state.readyCamera()
-    state.renderer.info.reset()
-    // The scene pass's extract reads these. A pass set with no scene extract
-    // never reaches the walk; the fields cost one store either way.
-    graph.frame.world = world
-    graph.frame.blend = blend
-
-    graph.run(camera, state.renderer.getRenderTarget(), state.viewport.width, state.viewport.height)
-
-    // Whether a post pass runs. An indexed walk keeps the steady frame
-    // allocation free.
+  /** Whether a post pass draws this frame. An indexed walk allocates nothing. */
+  function drawsPost() {
     const ordered = graph.passes
-    stats.post = 'none'
-    for (let at = 0; at < ordered.length; at++) {
-      if (ordered[at].name === 'post') {
-        stats.post = 'drawing'
-        break
-      }
-    }
-    // A headless frame has no card to draw into. The passes still run, so a
-    // plugin's draw and the frame handed to it can be exercised with no GL, but
-    // nothing is submitted and no card time is reported.
-    if (state.headless) return
+    for (let at = 0; at < ordered.length; at++) if (ordered[at].name === 'post') return true
+    return false
+  }
+
+  /**
+   * Copy what the card reports into `stats`, for a frame that has a card.
+   *
+   * GPU time is resolved without waiting: the answer lands a frame or two later
+   * and is read off `info` then. Awaiting here would stall the thread on the
+   * card every frame, which would change the very thing being measured.
+   */
+  function readCounters(startedAt) {
     stats.cpuMs = performance.now() - startedAt
     stats.drawCalls = state.renderer.info.render.drawCalls
     stats.triangles = state.renderer.info.render.triangles
     stats.textures = state.renderer.info.memory.textures
     stats.geometries = state.renderer.info.memory.geometries
     stats.programs = state.renderer.info.programs?.length || 0
-    // Resolved without waiting: the answer lands a frame or two later and is
-    // read off `info` then. Awaiting here would stall the thread on the card
-    // every frame, which would change the very thing being measured.
     if (state.renderer.backend?.trackTimestamp) {
       state.renderer.resolveTimestampsAsync('render').catch(() => {})
       stats.gpuMs = state.renderer.info.render.timestamp || null
+    }
+  }
+
+  /**
+   * Draw one frame from a world: the graph's passes in order, then the counters.
+   *
+   * A call with no world reuses the one the last `sync` stored, and that sync
+   * already ran the extract, so a sync-then-draw pair walks the world once.
+   *
+   * A throw outside the passes — a camera that will not build, a device call
+   * that fails — is reported and the frame returns. The graph already contains
+   * a pass that throws, so this is the outer boundary that keeps the draw from
+   * reaching the loop: a half-drawn frame is a frame, a stopped loop is not.
+   */
+  function draw(world = graph.frame.world, blend = graph.frame.blend ?? 1) {
+    const startedAt = performance.now()
+    try {
+      const camera = state.readyCamera()
+      state.renderer.info.reset()
+      // The scene pass's extract reads these. A pass set with no scene extract
+      // never reaches the walk; the fields cost one store either way.
+      graph.frame.world = world
+      graph.frame.blend = blend
+
+      graph.run(camera, state.renderer.getRenderTarget(), state.viewport.width, state.viewport.height)
+
+      stats.post = drawsPost() ? 'drawing' : 'none'
+      // A headless frame has no card to draw into. The passes still run, so a
+      // plugin's draw and the frame handed to it can be exercised with no GL, but
+      // nothing is submitted and no card time is reported.
+      if (state.headless) return
+      readCounters(startedAt)
+    } catch (error) {
+      reportOnce(`[render] draw stopped — ${error?.message || error}`)
     }
   }
 

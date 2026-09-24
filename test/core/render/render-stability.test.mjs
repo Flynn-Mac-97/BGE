@@ -13,6 +13,8 @@ import assert from 'node:assert/strict'
 import * as THREE from 'three/webgpu'
 import { makePassGraph } from '../../../engine/render/graph.js'
 import { makeRenderer } from '../../../engine/render.js'
+import { clearReported } from '../../../engine/render/report.js'
+import { makeLoop } from '../../../engine/loop.js'
 import { solidGeometry } from '../../../engine/render/geometry-cache.js'
 import { cachedTexture, tiledTexture } from '../../../engine/render/texture-cache.js'
 import { cachedModel, modelCache, forgetModel } from '../../../engine/render/model-cache.js'
@@ -99,39 +101,86 @@ test('disabling and enabling a pass returns the graph to its baseline', () => {
   assert.equal(graph.rebuilds, baseline.rebuilds + 2, 'the off and on each rebuilt once, and no more')
 })
 
-test('a pass that throws leaves the graph able to run the next frame', () => {
-  const graph = makePassGraph({ report: noop })
-  const ran = []
-  let broken = true
-  graph.add({ name: 'before', execute: () => ran.push('before') })
-  graph.add({
+test('a pass that throws is reported once and the rest of the frame still runs', () => {
+  // The default channel is the renderer's one history of said messages, which
+  // is what makes it "once". Clear it so this test's message is its own.
+  clearReported()
+  const said = []
+  const originalError = console.error
+  console.error = message => said.push(String(message))
+
+  try {
+    const graph = makePassGraph()
+    const ran = []
+    let broken = true
+    graph.add({ name: 'before', execute: () => ran.push('before') })
+    graph.add({
+      name: 'broken',
+      execute: () => {
+        if (broken) throw new Error('a broken pass')
+        ran.push('broken')
+      }
+    })
+    graph.add({ name: 'after', execute: () => ran.push('after') })
+
+    const order = graph.passes
+    const frame = graph.frame
+    const rebuilds = graph.rebuilds
+    const created = graph.pool.created
+
+    // A pass that throws must not stop the frame: the passes around it still
+    // run, so the loop that draws the frame keeps ticking.
+    graph.run(null, null, 8, 8)
+    assert.deepEqual(ran, ['before', 'after'], 'the passes after the throw still ran')
+    assert.equal(said.length, 1, 'the throw is reported')
+    assert.match(said[0], /"broken" threw/)
+    assert.match(said[0], /a broken pass/)
+
+    // Report once: a pass that throws on every frame must not fill the console.
+    graph.run(null, null, 8, 8)
+    assert.equal(said.length, 1, 'the same throw is not said twice')
+
+    broken = false
+    ran.length = 0
+    graph.run(null, null, 8, 8)
+
+    assert.deepEqual(ran, ['before', 'broken', 'after'], 'the next frame ran every pass, in order')
+    assert.equal(graph.passes, order, 'the order survived the throw')
+    assert.equal(graph.frame, frame, 'the frame record survived the throw')
+    assert.equal(graph.rebuilds, rebuilds, 'the throw did not force a rebuild')
+    assert.equal(graph.pool.created, created, 'the throw made no target')
+  } finally {
+    console.error = originalError
+  }
+})
+
+test('a pass that throws every frame does not stop the loop', async () => {
+  const frame = await makeRenderer(null, ORTHO, viewport())
+  const completed = []
+  frame.graph.add({ name: 'probe', after: ['scene'], before: ['ui'], execute: () => completed.push('probe') })
+  frame.graph.add({
     name: 'broken',
+    after: ['probe'],
+    before: ['ui'],
     execute: () => {
-      if (broken) throw new Error('a broken pass')
-      ran.push('broken')
+      throw new Error('always broken')
     }
   })
-  graph.add({ name: 'after', execute: () => ran.push('after') })
 
-  const order = graph.passes
-  const frame = graph.frame
-  const rebuilds = graph.rebuilds
-  const created = graph.pool.created
+  const loop = makeLoop({ onFixed: () => {}, onFrame: () => frame.draw({ entities: [] }) })
+  for (let i = 0; i < 300; i++) loop.step(1)
 
-  // The error reaches the caller, because a frame that quietly half-drew is the
-  // failure this engine refuses. What is contained is the graph's own state.
-  assert.throws(() => graph.run(null, null, 8, 8), /a broken pass/)
-  assert.deepEqual(ran, ['before'], 'the passes after the throw did not run')
+  assert.equal(loop.steps, 300, 'the loop ran every step')
+  assert.equal(completed.length, 300, 'every frame completed the pass before the broken one')
+})
 
-  broken = false
-  ran.length = 0
-  graph.run(null, null, 8, 8)
-
-  assert.deepEqual(ran, ['before', 'broken', 'after'], 'the next frame ran every pass, in order')
-  assert.equal(graph.passes, order, 'the order survived the throw')
-  assert.equal(graph.frame, frame, 'the frame record survived the throw')
-  assert.equal(graph.rebuilds, rebuilds, 'the throw did not force a rebuild')
-  assert.equal(graph.pool.created, created, 'the throw made no target')
+test('a throw outside the passes is reported and does not reach the caller', async () => {
+  const frame = await makeRenderer(null, ORTHO, viewport())
+  // The device call the frame makes before any pass runs.
+  frame.threeRenderer.info.reset = () => {
+    throw new Error('the device went away')
+  }
+  assert.doesNotThrow(() => frame.draw({ entities: [] }), 'the loop calling draw must not see the throw')
 })
 
 test('dispose frees a plugin object and its children, and the sweep frees a dropped entity', async () => {
@@ -247,3 +296,20 @@ function withImageDocument(run) {
     else globalThis.document = saved
   }
 }
+
+test('a new device pixel ratio resizes the pooled targets and is recorded', async () => {
+  const frame = await makeRenderer(null, ORTHO, viewport())
+  frame.graph.add({ name: 'produce', writes: ['plate'], target: { format: 'half-float' }, execute: noop })
+  frame.graph.add({ name: 'consume', reads: ['plate'], execute: noop })
+  frame.draw({ entities: [] })
+
+  const target = frame.graph.targets.get('plate')
+  assert.equal(frame.pixelRatio, 1)
+  assert.equal(target.width, 320, 'the target starts at the drawing buffer size')
+
+  frame.setPixelRatio(2)
+  assert.equal(frame.pixelRatio, 2, 'the new ratio is recorded')
+  assert.equal(target.width, 640, 'the pooled target follows the drawing buffer')
+  assert.equal(target.height, 360)
+  assert.deepEqual(frame.size, { w: 320, h: 180 }, 'the CSS viewport keeps its size')
+})

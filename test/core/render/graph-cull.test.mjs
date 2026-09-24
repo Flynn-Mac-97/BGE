@@ -6,6 +6,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { makePassGraph } from '../../../engine/render/graph.js'
+import { makeRenderer } from '../../../engine/render.js'
 
 const noop = () => {}
 const names = graph => graph.passes.map(pass => pass.name)
@@ -97,6 +98,37 @@ test('disable means a core pass does not run and its neighbours still do', () =>
   graph.disable('scene')
   graph.run(null, null, 8, 8)
   assert.deepEqual(ran, ['clear', 'present'])
+})
+
+test('the frame graph asks the device before it runs a pass that requires a feature', async () => {
+  const frame = await makeRenderer(null, { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }, { width: 320, height: 180 })
+  // The headless renderer's own answer is that it has nothing. Overriding it
+  // stands in for a device report, so the graph is proved to read the device
+  // rather than a default.
+  frame.threeRenderer.hasFeature = name => name === 'timestamp-query'
+  const ran = []
+  frame.graph.add({
+    name: 'needsTimestamp',
+    after: ['scene'],
+    before: ['ui'],
+    requires: ['timestamp-query'],
+    execute: () => ran.push('needsTimestamp')
+  })
+  frame.graph.add({
+    name: 'needsCompute',
+    before: ['ui'],
+    requires: ['compute'],
+    execute: () => ran.push('needsCompute')
+  })
+
+  frame.draw({ entities: [] })
+
+  assert.ok(
+    frame.graph.passes.some(pass => pass.name === 'needsTimestamp'),
+    'a pass the device has is kept'
+  )
+  assert.ok(!frame.graph.passes.some(pass => pass.name === 'needsCompute'), 'a pass the device lacks is dropped')
+  assert.deepEqual(ran, ['needsTimestamp'], 'only the kept pass ran')
 })
 
 test('a pass whose required feature is missing is dropped', () => {

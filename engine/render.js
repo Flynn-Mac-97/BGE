@@ -173,6 +173,9 @@ export async function makeRenderer(canvas, view, viewport) {
   // question and answers neither "is this shader heavy" nor "how many of these
   // can I draw".
   const headless = !canvas
+  // The ratio the drawing buffer uses. A headless world has no screen, so its
+  // buffer is the viewport, one pixel per pixel.
+  const initialPixelRatio = headless ? 1 : Math.min(devicePixelRatio, 2)
   const renderer = headless
     ? headlessRenderer()
     : new THREE.WebGPURenderer({
@@ -192,7 +195,7 @@ export async function makeRenderer(canvas, view, viewport) {
     renderer.info.autoReset = false
   } else {
     await renderer.init()
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+    renderer.setPixelRatio(initialPixelRatio)
     setMaxAnisotropy(renderer.getMaxAnisotropy())
     // The frame is several passes over one target, so clearing is this file's
     // job rather than three's — and the counters have to survive every pass to
@@ -209,6 +212,21 @@ export async function makeRenderer(canvas, view, viewport) {
     // The node renderer dropped the soft variant and falls back to this one with
     // a warning. Asking for it directly says what is actually drawn.
     renderer.shadowMap.type = THREE.PCFShadowMap
+  }
+
+  /**
+   * Whether the device reports a named optional feature.
+   *
+   * The graph asks this before it runs a pass that declares `requires`, so a
+   * pass this device cannot run is dropped rather than failing at draw. The
+   * surface's `backend.has` is the same answer, from the same call.
+   */
+  const deviceHasFeature = name => {
+    try {
+      return renderer.hasFeature(name) === true
+    } catch {
+      return false
+    }
   }
 
   const scene = new THREE.Scene()
@@ -231,6 +249,9 @@ export async function makeRenderer(canvas, view, viewport) {
     viewport,
     headless,
     renderer,
+    // The device's own feature answer, and the ratio its drawing buffer uses.
+    hasFeature: deviceHasFeature,
+    pixelRatio: initialPixelRatio,
     scene,
     meshes: new Map(), // entity id -> the object standing for it
     /**
@@ -326,13 +347,7 @@ export async function makeRenderer(canvas, view, viewport) {
       return {
         name: renderer.backend?.constructor?.name || 'unknown',
         webgpu: !renderer.backend?.isWebGLBackend,
-        has: name => {
-          try {
-            return renderer.hasFeature(name) === true
-          } catch {
-            return false
-          }
-        }
+        has: deviceHasFeature
       }
     },
     /** 'loading' | 'ready' | 'failed' | null — so a capture can wait for a
@@ -363,6 +378,12 @@ export async function makeRenderer(canvas, view, viewport) {
 
     resize: state.resize,
     frameSize: state.frameSize,
+    /** The ratio the drawing buffer uses. */
+    get pixelRatio() {
+      return state.pixelRatio
+    },
+    /** Take a new ratio: the buffer, the camera and the pooled targets follow it. */
+    setPixelRatio: state.setPixelRatio,
     forgetDrawRecords: state.forgetDrawRecords,
 
     /**

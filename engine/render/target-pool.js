@@ -5,6 +5,10 @@
  * and only one allocator can see both. A target is made once, handed out by
  * `acquire`, and put back by `release`; a resize sizes every pooled target once
  * instead of per frame. A steady frame creates nothing.
+ *
+ * The pool also holds the device pixel ratio, because a target's size is the
+ * drawing buffer's size: a screen-sized target must follow the ratio or it
+ * draws at the wrong resolution after the window moves to another display.
  */
 import * as THREE from 'three/webgpu'
 
@@ -14,6 +18,9 @@ const TYPES = {
   'half-float': THREE.HalfFloatType,
   float: THREE.FloatType
 }
+
+/** A stated ratio, or one, because a target of zero pixels is not a target. */
+const usableRatio = value => (Number.isFinite(value) && value > 0 ? value : 1)
 
 /** One string for one descriptor, so equal descriptors share one target. */
 export function descriptorKey(descriptor = {}) {
@@ -26,32 +33,39 @@ export function descriptorKey(descriptor = {}) {
   ].join('|')
 }
 
-export function makeTargetPool() {
+export function makeTargetPool(options = {}) {
+  // A format this pool cannot build is reported rather than silently drawn as
+  // the default, so a pass that asked for float cannot appear to have got it.
+  const report = options.report ?? (() => {})
   // Descriptor key -> targets free to be handed out again.
   const free = new Map()
-  // Every target the pool made, so one resize sizes all of them.
+  // Every target the pool holds, so one resize sizes all of them and a dropped
+  // descriptor can give its memory back.
   const entries = []
   let width = 1
   let height = 1
-  let created = 0
+  let pixelRatio = usableRatio(options.pixelRatio)
 
   function sizeFor(scale) {
     return {
-      w: Math.max(1, Math.round(width * scale)),
-      h: Math.max(1, Math.round(height * scale))
+      w: Math.max(1, Math.round(width * scale * pixelRatio)),
+      h: Math.max(1, Math.round(height * scale * pixelRatio))
     }
   }
 
   function create(descriptor) {
     const scale = descriptor.scale ?? DEFAULT.scale
     const size = sizeFor(scale)
+    const format = descriptor.format ?? DEFAULT.format
+    if (!TYPES[format]) {
+      report(`[render] target: no format called ${JSON.stringify(format)} — ${DEFAULT.format} stands in`)
+    }
     const target = new THREE.RenderTarget(size.w, size.h, {
-      type: TYPES[descriptor.format] ?? TYPES[DEFAULT.format],
+      type: TYPES[format] ?? TYPES[DEFAULT.format],
       samples: descriptor.samples ?? DEFAULT.samples,
       depthBuffer: descriptor.depth !== false,
       stencilBuffer: descriptor.stencil === true
     })
-    created++
     entries.push({ target, key: descriptorKey(descriptor), scale })
     return target
   }
@@ -86,6 +100,34 @@ export function makeTargetPool() {
     }
   }
 
+  /** Take a new device ratio and size every held target to match. */
+  function setPixelRatio(ratio) {
+    const wanted = usableRatio(ratio)
+    if (wanted === pixelRatio) return
+    pixelRatio = wanted
+    resize(width, height)
+  }
+
+  /**
+   * Dispose every target whose descriptor key is not in `referencedKeys`.
+   *
+   * A pass a plugin removed no longer names its target, and leaving the
+   * descriptor in place would hold the GPU memory for the life of the page.
+   */
+  function disposeUnused(referencedKeys) {
+    for (const entry of entries.slice()) {
+      if (referencedKeys.has(entry.key)) continue
+      const list = free.get(entry.key)
+      if (list) {
+        const at = list.indexOf(entry.target)
+        if (at >= 0) list.splice(at, 1)
+        if (!list.length) free.delete(entry.key)
+      }
+      entry.target.dispose()
+      entries.splice(entries.indexOf(entry), 1)
+    }
+  }
+
   function dispose() {
     for (const entry of entries) entry.target.dispose()
     entries.length = 0
@@ -96,11 +138,13 @@ export function makeTargetPool() {
     acquire,
     release,
     resize,
+    setPixelRatio,
+    disposeUnused,
     dispose,
     key: descriptorKey,
-    /** How many targets the pool has made. A steady frame adds none. */
+    /** How many targets the pool holds, live or free. A steady frame adds none. */
     get created() {
-      return created
+      return entries.length
     }
   }
 }

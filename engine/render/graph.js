@@ -242,9 +242,16 @@ function planTargets(ordered) {
   return { slots, resourceSlot }
 }
 
+/** One sentence for a pass that threw, so every guard reports it the same way. */
+function passFailure(pass, error) {
+  return `[render] graph: "${pass.name}" threw — ${error?.message || error}`
+}
+
 export function makePassGraph(options = {}) {
   const report = options.report ?? reportOnce
-  const pool = options.pool ?? makeTargetPool()
+  // The pool reports a target format it cannot build, and takes the device
+  // ratio so a screen-sized target follows the drawing buffer.
+  const pool = options.pool ?? makeTargetPool({ report, pixelRatio: options.pixelRatio })
   const hasFeature = options.hasFeature ?? (() => true)
   // The graph holds no renderer, so clearing a pass depth is a call the frame
   // supplies. A pass that does not ask for it never reaches this.
@@ -310,6 +317,9 @@ export function makePassGraph(options = {}) {
     const plan = planTargets(order)
     slots = plan.slots
     resourceSlot = plan.resourceSlot
+    // A pass a plugin removed no longer names its target; releasing the
+    // descriptor here is what stops a toggled-off plugin holding GPU memory.
+    pool.disposeUnused?.(new Set(slots.map(slot => slot.key)))
     targetsReady = false
     dirty = false
     extracted = false
@@ -340,7 +350,19 @@ export function makePassGraph(options = {}) {
    */
   function extract() {
     ensureBuilt()
-    for (let i = 0; i < order.length; i++) if (order[i].extract) order[i].extract(frame, sink)
+    for (let i = 0; i < order.length; i++) {
+      const pass = order[i]
+      if (!pass.extract) continue
+      // A pass that throws is skipped for this frame and tried again on the
+      // next, and the passes after it still run. The guard is written out
+      // rather than wrapped in a callback, because a callback would allocate
+      // on every pass of every steady frame.
+      try {
+        pass.extract(frame, sink)
+      } catch (error) {
+        report(passFailure(pass, error))
+      }
+    }
     extracted = true
   }
 
@@ -356,10 +378,23 @@ export function makePassGraph(options = {}) {
     // the world again.
     if (!extracted) extract()
     extracted = false
-    for (let i = 0; i < order.length; i++) if (order[i].prepare) order[i].prepare(frame)
     for (let i = 0; i < order.length; i++) {
-      if (order[i].depth === 'clear') clearDepth()
-      order[i].execute(frame, targets)
+      const pass = order[i]
+      if (!pass.prepare) continue
+      try {
+        pass.prepare(frame)
+      } catch (error) {
+        report(passFailure(pass, error))
+      }
+    }
+    for (let i = 0; i < order.length; i++) {
+      const pass = order[i]
+      try {
+        if (pass.depth === 'clear') clearDepth()
+        pass.execute(frame, targets)
+      } catch (error) {
+        report(passFailure(pass, error))
+      }
     }
   }
 
@@ -422,6 +457,10 @@ export function makePassGraph(options = {}) {
     frame,
     targets,
     pool,
+    /** Take a new device pixel ratio; the pooled targets are resized to it. */
+    setPixelRatio(ratio) {
+      pool.setPixelRatio?.(ratio)
+    },
     resize(width, height) {
       targetWidth = width
       targetHeight = height
