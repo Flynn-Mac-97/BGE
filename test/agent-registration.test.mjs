@@ -117,3 +117,46 @@ test('no manifest block registers the always-on category alone', async () => {
   assert.ok(written.includes('.claude/skills/glass-alpha/SKILL.md'))
   assert.ok(!written.includes('.claude/skills/glass-bravo/SKILL.md'))
 })
+
+/** A plugin source carrying the folder category the opt-out guard keys on. */
+const pluginWith = (name, folderCategory) => `export default { name: '${name}', category: '${folderCategory}' }\n`
+
+/** A guide that opted out of the listing and kept nothing a listing carries. */
+const optedOut = name => `---\nskill: none\n---\n\n# ${name}\n\n- One rule about ${name}.\n`
+
+/** One plugin and its guide, added to a checkout the fixture already built. */
+async function addPlugin(root, name, folderCategory, guideText) {
+  await fs.writeFile(path.join(root, `plugins/builtin/${name}.js`), pluginWith(name, folderCategory))
+  await fs.writeFile(path.join(root, `plugins/builtin/${name}.agent.md`), guideText)
+  await writeGeneratedAgentFiles(root, 'project')
+}
+
+const problemsFor = async (root, name) =>
+  (await agentRegistrationProblems(root, 'project')).filter(problem => problem.file.endsWith(`${name}.agent.md`))
+
+test('agent tooling that opts out of the listing is a failure, not a decision', async () => {
+  const root = await checkout({ alpha: 'core' }, { core: true })
+  await addPlugin(root, 'tool', 'agents', optedOut('tool'))
+
+  const problems = await problemsFor(root, 'tool')
+  assert.equal(problems.length, 1, 'agent tooling that no listing carries is reported')
+  assert.equal(problems[0].warning, undefined, 'and it fails the check rather than warning about it')
+  assert.equal(await skillText(root, 'tool'), null, 'and no listing was written for it')
+})
+
+test('an editor plugin opting out is a decision, and stays quiet', async () => {
+  const root = await checkout({ alpha: 'core' }, { core: true })
+  await addPlugin(root, 'panel', 'editor', optedOut('panel'))
+
+  assert.deepEqual(await agentRegistrationProblems(root, 'project'), [], 'an opt-out outside agent tooling is quiet')
+})
+
+test('a guide that opts out and keeps a description says the words reach nothing', async () => {
+  const root = await checkout({ alpha: 'core' }, { core: true })
+  await addPlugin(root, 'panel', 'editor', `---\ndescription: Panel does one thing.\nskill: none\n---\n\n# Panel\n`)
+
+  const problems = await problemsFor(root, 'panel')
+  assert.equal(problems.length, 1, 'the text is read before the opt-out returns')
+  assert.equal(problems[0].warning, true, 'dead text is a warning, not a failure')
+  assert.match(problems[0].why, /reach nothing/)
+})

@@ -312,6 +312,11 @@ export async function pluginGuides(root, projectPath, { detail = true } = {}) {
           // problem to report, and throwing here would end the whole check.
           if (text === null) return null
           const pluginName = source?.match(/export\s+default\s+\{[\s\S]*?\bname:\s*['"]([^'"]+)['"]/m)?.[1] || stem
+          // The folder category decides whether a guide is tooling an agent is
+          // expected to reach for, which is what makes an opt-out a defect
+          // rather than a decision. Read from the source like the name above.
+          const pluginCategory =
+            source?.match(/export\s+default\s+\{[\s\S]*?\bcategory:\s*['"]([^'"]+)['"]/m)?.[1] || null
           return {
             scope: place.scope,
             stem,
@@ -320,6 +325,7 @@ export async function pluginGuides(root, projectPath, { detail = true } = {}) {
             sourceFromRoot: `${place.fromRoot}/${stem}.js`,
             hasSource: source !== null,
             plugin: pluginName,
+            pluginCategory,
             enabled: !disabled.has(pluginName),
             // The type names this plugin contributes, read from the same source
             // the loader will run. The index reads the generated catalog built
@@ -649,8 +655,13 @@ function guideProblems(guide, { enabled, projectPath }) {
   }
 
   // An opt-out is a decision, not a broken declaration: the guide still
-  // arrives in a packet when the task names the plugin.
-  if (!listedForAgents(guide)) return problems
+  // arrives in a packet when the task names the plugin. The two exceptions are
+  // read here rather than below, because after this return nothing about the
+  // guide is looked at again.
+  if (!listedForAgents(guide)) {
+    problems.push(...optOutProblems(guide, { description, triggers }))
+    return problems
+  }
   // So is a category this checkout keeps out of the listing. The rest of these
   // checks are about a registered listing, and this guide is not in one.
   if (!enabled.has(categoryOf(guide))) return problems
@@ -673,16 +684,6 @@ function guideProblems(guide, { enabled, projectPath }) {
     })
   }
 
-  // A guide is registered under its own stem unless it says `skill: none`, so
-  // a description or a trigger word on one that opted out is dead text.
-  if (!listedForAgents(guide) && (description || triggers)) {
-    problems.push({
-      warning: true,
-      file: guide.fileFromRoot,
-      why: `declares ${description ? 'a description' : 'trigger words'} and \`skill: none\`, so it is in no listing and the words reach nothing. Drop one of the two`
-    })
-  }
-
   // The description is the only thing that decides whether a skill is found,
   // and a derived one can only say what the plugin is. A guide worth reaching
   // for says when to reach for it, in its own words.
@@ -701,6 +702,39 @@ function guideProblems(guide, { enabled, projectPath }) {
       warning: true,
       file: guide.fileFromRoot,
       why: `has no plugin at ${guide.sourceFromRoot} and declares no match, so no task ever pulls it in. Add a match line, or the plugin`
+    })
+  }
+
+  return problems
+}
+
+/**
+ * What a guide that opted out of the listing still gets wrong.
+ *
+ * Read before `guideProblems` returns, because an opt-out is otherwise the end
+ * of the subject. Both of these are about text that only a listing can deliver
+ * - the words reach an agent through the session listing and nowhere else.
+ */
+function optOutProblems(guide, { description, triggers }) {
+  const problems = []
+
+  // Agent tooling exists to be reached for, and this is the one folder category
+  // whose whole job is an agent. An opt-out leaves it in the CLI alone: a
+  // harness that picks skills by description never learns the tool is there, so
+  // the work ships and no agent finds it. A visual or editor plugin opting out
+  // is a decision about who reads it; an agents plugin doing so is a defect.
+  if (guide.pluginCategory === 'agents') {
+    problems.push({
+      file: guide.fileFromRoot,
+      why: 'is agent tooling that opts out of the listing with `skill: none`, so a harness that picks skills by description never learns it exists. Declare a category, or the work ships for no agent'
+    })
+  }
+
+  if (description || triggers) {
+    problems.push({
+      warning: true,
+      file: guide.fileFromRoot,
+      why: `declares ${description ? 'a description' : 'trigger words'} and \`skill: none\`, so it is in no listing and the words reach nothing. Drop one of the two`
     })
   }
 
