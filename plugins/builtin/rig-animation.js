@@ -21,8 +21,20 @@
  * A clip is a file, so it loads asynchronously and an entity holds its last
  * pose until it lands. A headless run that must be identical every time calls
  * `rig.load` first — see the guide.
+ *
+ * A layer plays a second clip on some nodes only, over the first — an arm
+ * drawing a sword while the legs keep running. The type names node groups in
+ * `rig.masks`, and game code asks for one:
+ *
+ *   rig: { ..., masks: { upper: ['Spine', 'LeftArm', ...] }, layerFade: 0.12 }
+ *   entity.rigLayer = { clip: 'draw', mask: 'upper' }   // null to let go
+ *
+ * The layer fades in and out over `layerFade` seconds. `entity.rigLayerDone`
+ * is true once a clip that plays once has reached its end.
  */
 import { assetPath } from '../../engine/asset-path.js'
+import { framesAt, mixInto } from './rig-animation/sample.js'
+import { applyLayer } from './rig-animation/layer.js'
 
 /** file -> { status, clip, error }. Clip files are immutable, so one cache serves every world. */
 const clips = new Map()
@@ -87,6 +99,7 @@ export default {
         }
 
         applyClip(entity, clip, rig)
+        applyLayer(entity, rig, seconds, layerFile => read(state.context, layerFile).clip)
       }
     }
   }],
@@ -262,23 +275,8 @@ export function widenClip(raw, file) {
 
 /** Write this moment of the clip onto the entity. */
 export function applyClip(entity, clip, rig) {
-  const position = entity._rigTime * clip.framesPerSecond
-  const last = clip.count - 1
-  let first = Math.floor(position)
-  let second, blend
-
-  if (clip.loop) {
-    first = ((first % clip.count) + clip.count) % clip.count
-    second = (first + 1) % clip.count
-    blend = position - Math.floor(position)
-  } else if (first >= last) {
-    first = second = last
-    blend = 0
-    entity.rigDone = true
-  } else {
-    second = first + 1
-    blend = position - first
-  }
+  const { first, second, blend, isDone } = framesAt(clip, entity._rigTime)
+  if (isDone) entity.rigDone = true
 
   const pose = poseFor(entity, clip)
   const a = clip.rotations[first]
@@ -334,25 +332,4 @@ function poseFor(entity, clip) {
   entity.pose = pose
   entity._rigPoseFor = clip
   return pose
-}
-
-/**
- * Blend two frames of one node into the pose, normalised.
- *
- * Straight interpolation, not slerp: neighbouring frames of a capture are a
- * fraction of a degree apart, where the two answers differ by less than the
- * rounding in the file. The sign flip is not optional — two quaternions that
- * name the same rotation with opposite signs interpolate the long way round.
- */
-function mixInto(into, a, b, at, blend) {
-  const dot = a[at] * b[at] + a[at + 1] * b[at + 1] + a[at + 2] * b[at + 2] + a[at + 3] * b[at + 3]
-  const sign = dot < 0 ? -1 : 1
-  let length = 0
-  for (let axis = 0; axis < 4; axis++) {
-    const value = a[at + axis] + (b[at + axis] * sign - a[at + axis]) * blend
-    into[axis] = value
-    length += value * value
-  }
-  length = Math.sqrt(length) || 1
-  for (let axis = 0; axis < 4; axis++) into[axis] /= length
 }

@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { widenClip, applyClip } from '../plugins/builtin/rig-animation.js'
+import { applyLayer } from '../plugins/builtin/rig-animation/layer.js'
 import { buildClip, writeClip, skeletonFor, loopWindow, closeQuaternionLoop, closeVectorLoop, SKELETONS } from '../tools/lib/motion-clip.mjs'
 import { withRestWorld, captureWorldTurns, planRetarget, neutralFor, multiply } from '../tools/lib/retarget.mjs'
 import { findMap, mapsFor, nodesOf } from '../tools/lib/rig-maps.mjs'
@@ -541,4 +542,48 @@ test('a closed loop ends where it starts: the last kept frame steps into the fir
 test('a closed loop of positions spreads the jump back to the start', () => {
   const closed = closeVectorLoop([[0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0], [0, 4, 0]])
   assert.deepEqual(closed, [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+})
+
+// ------------------------------------------------------------------ layers
+/** A clip that holds the head turned half round about Y and the hips half round about X. */
+const WAVE = widenClip({
+  name: 'wave',
+  framesPerSecond: 10,
+  loop: false,
+  nodes: ['hips', 'head'],
+  rotations: [[1, 0, 0, 0, 0, 1, 0, 0], [1, 0, 0, 0, 0, 1, 0, 0]]
+}, 'wave')
+const LAYERED_RIG = { clips: { wave: 'wave.json' }, masks: { upper: ['head'] }, layerFade: 0.1 }
+const clipOf = file => (file === 'wave.json' ? WAVE : null)
+
+/** The base clip at rest, then the layer stepped `steps` times of 1/60 s. */
+function layered(steps, rigLayer = { clip: 'wave', mask: 'upper' }) {
+  const entity = at(0)
+  entity.rigLayer = rigLayer
+  for (let step = 0; step < steps; step++) applyLayer(entity, LAYERED_RIG, 1 / 60, clipOf)
+  return entity
+}
+
+test('a layer turns only the nodes in its mask, once faded in', () => {
+  const entity = layered(12)
+  assert.deepEqual(entity.pose.head.map(Math.abs), [0, 1, 0, 0], 'the head plays the layer')
+  assert.deepEqual(entity.pose.hips, [0, 0, 0, 1], 'the hips keep the base clip')
+})
+
+test('a layer fades in: part way in, the node is between the base and the layer', () => {
+  const entity = layered(3)
+  const turn = Math.abs(entity.pose.head[1])
+  assert.ok(turn > 0.1 && turn < 0.95, `half faded, the head is part way round (${turn})`)
+})
+
+test('a layer that plays once says when it is done, and fades out when let go', () => {
+  const entity = layered(12)
+  assert.equal(entity.rigLayerDone, true, 'a two-frame clip at 10 fps is done after 0.2 s')
+  entity.rigLayer = null
+  for (let step = 0; step < 12; step++) {
+    applyClip(entity, CLIP, {})
+    applyLayer(entity, LAYERED_RIG, 1 / 60, clipOf)
+  }
+  assert.deepEqual(entity.pose.head, [0, 0, 0, 1], 'faded out, the head is back on the base clip')
+  assert.equal(entity._rigLayer, null, 'and the layer is gone')
 })
