@@ -185,3 +185,20 @@ test('a playing frame that only moves an entity reaches its place step', async (
   frame.sync(world, 0.5)
   assert.equal(places, 1)
 })
+
+test('an entity that has moved keeps taking the full pass after it settles', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  let draws = 0
+  frame.marks.register('probe', { draw: () => draws++ })
+  const entity = box('a')
+  const world = { entities: [entity] }
+  settle(frame, world)
+
+  entity.x = 5
+  frame.sync(world)
+  settle(frame, world, 60)
+
+  draws = 0
+  frame.sync(world)
+  assert.equal(draws, 1, 'an entity that once moved is never answered by the quiet scan')
+})

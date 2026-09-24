@@ -78,6 +78,48 @@ test('fifty full-size passes fit under the ceiling, and a runaway pass set is cu
   assert.ok(heavy.pool.usage.targets < 120, 'the targets past the ceiling were culled')
 })
 
+test('a pass with a refused target is culled, and one with a target still runs', () => {
+  const graph = makePassGraph({ report: noop })
+  const ran = []
+  // Enough distinct full-size targets to pass the ceiling, so the last of them
+  // is refused. Each pass records the target it was handed.
+  for (let index = 0; index < 120; index++) {
+    graph.add({
+      name: `probe${index}`,
+      always: true,
+      writes: [`colour${index}`],
+      target: { format: 'half-float', scale: 1 + index / 1000 },
+      execute: (frame, targets) => ran.push({ name: `probe${index}`, target: targets.get(`colour${index}`) })
+    })
+  }
+  // One reader of the first resource, which got a target, and one of the last,
+  // which did not.
+  graph.add({
+    name: 'firstReader',
+    always: true,
+    reads: ['colour0'],
+    execute: (frame, targets) => ran.push({ name: 'firstReader', target: targets.get('colour0') })
+  })
+  graph.add({
+    name: 'lastReader',
+    always: true,
+    reads: ['colour119'],
+    execute: (frame, targets) => ran.push({ name: 'lastReader', target: targets.get('colour119') })
+  })
+
+  graph.run(null, null, 1280, 720)
+
+  assert.ok(
+    ran.some(entry => entry.name === 'firstReader'),
+    'a pass whose resources all have targets still runs'
+  )
+  assert.ok(!ran.some(entry => entry.name === 'lastReader'), 'a pass reading a refused target is culled')
+  assert.ok(
+    ran.every(entry => entry.target !== null),
+    'no pass ever runs without a target'
+  )
+})
+
 test('release drops the pooled targets and clears the texture and model caches', async () => {
   const renderer = await makeRenderer(null, VIEW, { width: 64, height: 64 })
   renderer.graph.add({ name: 'plate', writes: ['plate'], target: { format: 'half-float' }, execute: noop })

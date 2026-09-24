@@ -48,6 +48,12 @@ test('a pass-set change rebuilds, and an unchanged set does not', () => {
   assert.equal(graph.rebuilds, settled + 1)
 })
 
+test('an empty graph still builds once before it answers', () => {
+  const graph = makePassGraph({ report: noop })
+  graph.passes
+  assert.equal(graph.rebuilds, 1, 'the order is built once, even with no passes to order')
+})
+
 test('one extract and one execute per pass, whatever the world holds', () => {
   const graph = makePassGraph({ report: noop })
   const work = []

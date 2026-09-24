@@ -91,3 +91,31 @@ test('extract is handed the one frame record and no second argument', () => {
   assert.equal(args[0][0], graph.frame, 'and it is the one frame record')
   assert.equal(graph.frame.camera, 'camera')
 })
+
+test('an extract before the first draw is not culled for want of a target', () => {
+  const graph = makePassGraph({ report: noop })
+  let extracts = 0
+  graph.add({
+    name: 'producer',
+    writes: ['x'],
+    target: { format: 'half-float' },
+    extract: () => extracts++,
+    execute: noop
+  })
+  graph.add({ name: 'reader', reads: ['x'], execute: noop })
+
+  graph.extract()
+
+  assert.equal(extracts, 1, 'targets are acquired by a run, not by an extract, so nothing may be culled yet')
+})
+
+test('only a pass that declares a clear depth empties it', () => {
+  const steps = []
+  const graph = makePassGraph({ report: noop, clearDepth: () => steps.push('clear') })
+  graph.add({ name: 'overlay', depth: 'clear', execute: () => steps.push('overlay') })
+  graph.add({ name: 'plain', execute: () => steps.push('plain') })
+
+  graph.run(null, null, 8, 8)
+
+  assert.deepEqual(steps, ['clear', 'overlay', 'plain'], 'the clear happens before the pass that asked for it')
+})

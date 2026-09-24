@@ -20,6 +20,7 @@ import { cachedTexture, tiledTexture } from '../../../engine/render/texture-cach
 import { cachedModel, modelCache, forgetModel } from '../../../engine/render/model-cache.js'
 import { makeCountingPool } from './counting-pool.mjs'
 import { withImageDocument } from './image-document.mjs'
+import { captureConsoleError } from './report-capture.mjs'
 
 const noop = () => {}
 const ORTHO = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
@@ -175,13 +176,39 @@ test('a pass that throws every frame does not stop the loop', async () => {
   assert.equal(completed.length, 300, 'every frame completed the pass before the broken one')
 })
 
-test('a throw outside the passes is reported and does not reach the caller', async () => {
+test('a pass that throws a bare message is reported with that message', () => {
+  clearReported()
+  const graph = makePassGraph()
+  const failure = { message: 'bare failure' }
+  graph.add({
+    name: 'broken',
+    execute: () => {
+      throw failure
+    }
+  })
+  const said = captureConsoleError(() => graph.run(null, null, 8, 8))
+  assert.ok(
+    said.some(line => line.includes('bare failure')),
+    'a thrown value that is not an Error still names what went wrong'
+  )
+})
+
+test('a throw outside the passes is reported by its message and does not reach the caller', async () => {
+  clearReported()
   const frame = await makeRenderer(null, ORTHO, viewport())
-  // The device call the frame makes before any pass runs.
+  // The device call the frame makes before any pass runs, throwing a value that
+  // is not an Error so the report has to read its message.
+  const failure = { message: 'the device went away' }
   frame.threeRenderer.info.reset = () => {
-    throw new Error('the device went away')
+    throw failure
   }
-  assert.doesNotThrow(() => frame.draw({ entities: [] }), 'the loop calling draw must not see the throw')
+  const said = captureConsoleError(() => {
+    assert.doesNotThrow(() => frame.draw({ entities: [] }), 'the loop calling draw must not see the throw')
+  })
+  assert.ok(
+    said.some(line => line.includes('the device went away')),
+    'the report names what the device said'
+  )
 })
 
 test('dispose frees a plugin object and its children, and the sweep frees a dropped entity', async () => {

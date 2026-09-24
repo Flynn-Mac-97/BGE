@@ -17,6 +17,8 @@ import assert from 'node:assert/strict'
 import { makeRenderer } from '../../../engine/render.js'
 import { makeBus } from '../../../engine/bus.js'
 import { makeLog } from '../../../engine/inspect.js'
+import { clearReported } from '../../../engine/render/report.js'
+import { captureConsoleError } from './report-capture.mjs'
 
 const VIEW = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
 const VIEWPORT = { width: 320, height: 180 }
@@ -188,4 +190,85 @@ test('a lost WebGPU device reports once, and an uncaptured error is not a loss',
   assert.equal(frame.deviceState, 'ready')
   frame.draw(game)
   assert.equal(device.draws.length, drewBefore + 1, 'a frame drew again')
+})
+
+test('an injected device is drawn on, so the shadow map is enabled and three stays out of clearing', async () => {
+  const device = stubDevice()
+  const frame = await makeRenderer(null, VIEW, VIEWPORT, { device })
+  assert.equal(frame.threeRenderer.shadowMap.enabled, true, 'a real device has shadows switched on')
+  assert.equal(frame.threeRenderer.autoClear, false, 'the kernel clears the frame, not three')
+  assert.equal(frame.threeRenderer.info.autoReset, false, 'the counters survive every pass')
+})
+
+test('the device lost flag three reads follows the loss and the restore', async () => {
+  const device = stubDevice()
+  const frame = await makeRenderer(null, VIEW, VIEWPORT, { device })
+
+  frame.deviceLost({})
+  assert.equal(frame.threeRenderer._isDeviceLost, true, 'three is told the device is lost')
+
+  frame.deviceRestored()
+  assert.equal(frame.threeRenderer._isDeviceLost, false, 'and told again when it comes back')
+})
+
+test('a restore resizes the drawing buffer without touching the page', async () => {
+  const device = stubDevice()
+  const sizes = []
+  device.setSize = (...args) => sizes.push(args)
+  const frame = await makeRenderer(null, VIEW, VIEWPORT, { device })
+
+  frame.deviceLost({})
+  frame.deviceRestored()
+
+  assert.deepEqual(sizes.at(-1), [320, 180, false], 'the restore does not ask three to write the canvas style')
+})
+
+test('a WebGL context loss carries the browser status message', async () => {
+  const device = stubDevice()
+  const canvas = stubCanvas()
+  const bus = makeBus()
+  const losses = []
+  bus.on('device:lost', loss => losses.push(loss))
+  await makeRenderer(canvas, VIEW, VIEWPORT, { device, bus })
+
+  canvas.fire('webglcontextlost', { preventDefault() {}, statusMessage: 'gpu hung' })
+
+  assert.equal(losses.length, 1, 'the loss reached the bus')
+  assert.equal(losses[0].message, 'gpu hung', 'the browser message is passed on, not replaced')
+})
+
+test('an uncaptured GPU error with no detail is reported with the default words', async () => {
+  clearReported()
+  const device = stubDevice()
+  await makeRenderer(null, VIEW, VIEWPORT, { device })
+
+  const said = captureConsoleError(() => device.onError({}))
+
+  assert.ok(
+    said.some(line => line.includes('uncaptured GPU error — no message')),
+    `the report fills in every missing field, got ${JSON.stringify(said)}`
+  )
+})
+
+test('the backend reports its own name and whether it is WebGPU', async () => {
+  const webgpu = stubDevice()
+  webgpu.backend = { constructor: { name: 'TestBackend' } }
+  const webgpuFrame = await makeRenderer(null, VIEW, VIEWPORT, { device: webgpu })
+  assert.equal(webgpuFrame.backend.name, 'TestBackend', 'the backend names itself')
+  assert.equal(webgpuFrame.backend.webgpu, true, 'a backend with no WebGL marker is WebGPU')
+
+  const webgl = stubDevice()
+  webgl.backend = { isWebGLBackend: true, constructor: { name: 'WebGLBackend' } }
+  const webglFrame = await makeRenderer(null, VIEW, VIEWPORT, { device: webgl })
+  assert.equal(webglFrame.backend.webgpu, false, 'the WebGL fallback is not WebGPU')
+})
+
+test('a feature check that throws answers no', async () => {
+  const device = stubDevice()
+  device.hasFeature = () => {
+    throw new Error('the device cannot answer')
+  }
+  const frame = await makeRenderer(null, VIEW, VIEWPORT, { device })
+
+  assert.equal(frame.backend.has('compute'), false, 'a feature the device cannot confirm is absent')
 })

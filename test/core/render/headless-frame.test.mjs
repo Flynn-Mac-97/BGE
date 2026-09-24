@@ -50,3 +50,26 @@ test('entities that hold still merge into batches, and a moving one leaves its b
   frame.sync(world)
   assert.equal(frame.stats.merged, 7, 'a moved entity is not merged while it moves')
 })
+
+test('a frame with no canvas reports no shadow map and no optional device feature', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  assert.equal(frame.shadowMap.enabled, false, 'a headless frame does not enable a shadow map')
+
+  frame.graph.add({ name: 'needsCompute', requires: ['compute'], execute: () => {} })
+  assert.ok(
+    !frame.graph.passes.some(pass => pass.name === 'needsCompute'),
+    'a headless device has no optional feature to offer'
+  )
+})
+
+test('a headless renderer leaves three its own clearing and counter reset off', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  assert.equal(frame.threeRenderer.autoClear, false, 'the kernel clears the frame, not three')
+  assert.equal(frame.threeRenderer.info.autoReset, false, 'the counters survive every pass')
+})
+
+test('the scene never refreshes its own matrices', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  assert.equal(frame.scene.matrixWorldAutoUpdate, false, 'the frame refreshes world matrices once')
+  assert.equal(frame.scene.matrixAutoUpdate, false, 'the scene matrix never changes')
+})

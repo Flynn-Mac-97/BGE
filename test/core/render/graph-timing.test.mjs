@@ -99,3 +99,14 @@ test('the clock reads the frame makes are counted, and the clock is named', () =
   assert.equal(graph.clockReads, 6, 'two reads for each of three timed stages')
   assert.equal(graph.clock, 'performance.now()', 'the stats name the clock')
 })
+
+test('a later extract is timed from where the clock was, not from zero', () => {
+  const clock = makeTestClock()
+  const graph = makePassGraph({ report: noop, now: clock.now })
+  graph.add({ name: 'first', extract: () => clock.advance(5), execute: noop })
+  graph.add({ name: 'second', extract: () => clock.advance(2), execute: noop })
+  graph.run(null, null, 8, 8)
+
+  const second = graph.costs.find(cost => cost.name === 'second')
+  assert.equal(second.extractMs, 2, 'the cost is the time the pass took, not the clock reading')
+})

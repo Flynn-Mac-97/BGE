@@ -7,7 +7,10 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import * as THREE from 'three/webgpu'
 import { makeRenderer } from '../../../engine/render.js'
+import { clearReported } from '../../../engine/render/report.js'
+import { captureConsoleError } from './report-capture.mjs'
 
 const VIEW = { mode: 'ortho', x: 0, y: 0, z: 0, zoom: 1 }
 const VIEWPORT = { width: 320, height: 180 }
@@ -109,4 +112,88 @@ test('changing only the sun colour does not reset its direction', async () => {
   assert.deepEqual(sun.position.toArray(), before, 'the direction is untouched')
   assert.ok(close(sun.intensity, 0.5))
   assert.equal(sun.color.getHexString(), 'ff0000')
+})
+
+test('a sun direction that was left out is not reported', async () => {
+  clearReported()
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  const said = captureConsoleError(() => frame.setSun(undefined, 1, '#ffffff'))
+  assert.deepEqual(said, [], 'omitting the direction is a normal call, not a mistake')
+})
+
+/** A frame with one casting directional light, drawn once so its shadow is remembered. */
+async function castingLightFrame() {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  const light = new THREE.DirectionalLight()
+  light.castShadow = true
+  frame.scene.add(light)
+  const world = { entities: [] }
+  frame.draw(world)
+  light.shadow.needsUpdate = false
+  frame.draw(world)
+  return { frame, light, world }
+}
+
+test('the shadow map is redrawn when the sun moves on any axis', async () => {
+  for (const axis of ['x', 'y', 'z']) {
+    const { frame, light, world } = await castingLightFrame()
+    assert.equal(light.shadow.needsUpdate, false, 'an unchanged frame keeps the map it already has')
+
+    light.position[axis] += 2
+    frame.draw(world)
+    assert.equal(light.shadow.needsUpdate, true, `a move on ${axis} redraws the map`)
+  }
+})
+
+test('the shadow map is redrawn when the thing the sun points at moves', async () => {
+  for (const axis of ['x', 'y', 'z']) {
+    const { frame, light, world } = await castingLightFrame()
+
+    light.target.position[axis] += 3
+    frame.draw(world)
+    assert.equal(light.shadow.needsUpdate, true, `a target move on ${axis} redraws the map`)
+  }
+})
+
+test('the shadow map is redrawn when the shadow camera box changes', async () => {
+  for (const field of ['left', 'right', 'top', 'bottom', 'near', 'far']) {
+    const { frame, light, world } = await castingLightFrame()
+
+    light.shadow.camera[field] += 1
+    frame.draw(world)
+    assert.equal(light.shadow.needsUpdate, true, `a change to ${field} redraws the map`)
+  }
+})
+
+test('the shadow map is redrawn when it is resized', async () => {
+  const { frame, light, world } = await castingLightFrame()
+
+  light.shadow.mapSize.width = 2048
+  frame.draw(world)
+  assert.equal(light.shadow.needsUpdate, true, 'a wider map is a different map')
+})
+
+test('a casting light has three its own shadow update switched off', async () => {
+  const { light } = await castingLightFrame()
+  assert.equal(light.shadow.autoUpdate, false, 'the kernel decides which frame redraws the map')
+})
+
+test('a light with no target is never treated as a moving target', async () => {
+  const { frame, light, world } = await castingLightFrame()
+  light.target = null
+  frame.draw(world)
+  light.shadow.needsUpdate = false
+
+  frame.draw(world)
+  assert.equal(light.shadow.needsUpdate, false, 'a light with nowhere to point has nothing that moves')
+})
+
+test('a shadow with no camera is never treated as a moving view', async () => {
+  const { frame, light, world } = await castingLightFrame()
+  light.shadow.camera = null
+  frame.draw(world)
+  light.shadow.needsUpdate = false
+
+  frame.draw(world)
+  assert.equal(light.shadow.needsUpdate, false, 'a shadow with no camera has no box to move')
 })

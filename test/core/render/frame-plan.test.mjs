@@ -10,7 +10,18 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { describeEntity, planFrame } from '../../../engine/frame-plan.js'
+import {
+  declaredNumber,
+  describeEntity,
+  entityDrawSize,
+  materialLook,
+  materialNameFor,
+  mergeSignature,
+  meshShape,
+  planFrame,
+  tilingOf
+} from '../../../engine/frame-plan.js'
+import { captureConsoleError } from './report-capture.mjs'
 
 const wall = extra => ({ id: 'wall', type: 'wall', x: 1, y: 2, z: 3, mesh: { box: [1, 1, 1], ...extra } })
 
@@ -72,4 +83,92 @@ test('planFrame counts every entity by the kind it draws as', () => {
   }
   assert.deepEqual(planFrame(world), { entities: 3, meshes: 2, sprites: 1 })
   assert.deepEqual(planFrame({}), { entities: 0, meshes: 0, sprites: 0 })
+})
+
+test('a number that was left out is not reported, even with a name for it', () => {
+  const said = captureConsoleError(() => {
+    assert.equal(declaredNumber(undefined, 1, 'wall.mesh.box[0]'), 1)
+    assert.equal(declaredNumber(null, 2, 'wall.mesh.box[1]'), 2)
+    assert.equal(declaredNumber(Infinity, 3, null), 3)
+  })
+  assert.deepEqual(said, [], 'a value that was never given is answered, not complained about')
+})
+
+test('a body of parts is measured from the boxes it lists', () => {
+  const shape = meshShape({ id: 'statue', type: 'statue', mesh: { parts: [{ box: [2, 4, 6] }] } })
+  assert.deepEqual(shape, { kind: 'parts', w: 2, h: 4, d: 6 })
+})
+
+test('a box declaration that asks for segments is divided that finely', () => {
+  const divided = meshShape({ type: 'wall', mesh: { box: [1, 1, 1], segments: 3 } })
+  const plain = meshShape({ type: 'wall', mesh: { box: [1, 1, 1] } })
+  assert.equal(divided.segments, 3)
+  assert.equal(plain.segments, 1, 'a wall with nothing declared wants four vertices')
+})
+
+test('a model file name is part of its look, so swapping the model rebuilds it', () => {
+  const first = describeEntity({ id: 'a', type: 'hero', mesh: { model: 'first.glb', box: [1, 1, 1] } })
+  const second = describeEntity({ id: 'b', type: 'hero', mesh: { model: 'second.glb', box: [1, 1, 1] } })
+  assert.notEqual(first.look, second.look)
+})
+
+test('a quad with only a width falls back to a one-metre height', () => {
+  const shape = meshShape({ type: 'billboard', mesh: { quad: [2] } })
+  assert.equal(shape.w, 2)
+  assert.equal(shape.h, 1, 'a missing quad height is a metre')
+})
+
+test('a box with a missing side falls back to a metre for that side', () => {
+  const shape = meshShape({ type: 'wall', mesh: { box: [4, null, 2] } })
+  assert.equal(shape.w, 4)
+  assert.equal(shape.h, 1, 'a missing box side is a metre')
+  assert.equal(shape.d, 2)
+})
+
+test('a sprite with no size of its own takes the collider box', () => {
+  const size = entityDrawSize({ id: 'p', type: 'player', sprite: { image: 'hero.png' }, collider: { box: [3, 4] } })
+  assert.deepEqual(size, { w: 3, h: 4, d: 0 })
+})
+
+test('an absolute tiling divides by the box it repeats across', () => {
+  const shape = { kind: 'box', w: 2, h: 4, d: 1 }
+  const material = materialLook({ type: 'wall' }, { texture: 'brick.png', tiling: [4, 8] }, shape)
+  assert.ok(material.startsWith('lambert|2,2'), `four repeats across 2 m is two per metre, got ${material}`)
+})
+
+test('a tiling array with a missing number falls back to one repeat on that axis', () => {
+  assert.deepEqual(tilingOf([4, undefined], { kind: 'box', w: 2, h: 4 }), [2, 0.25])
+})
+
+test('a quad with no declared tiling shows its picture once', () => {
+  const shape = { kind: 'quad', w: 2, h: 4 }
+  assert.deepEqual(tilingOf(undefined, shape), [0.5, 0.25])
+  assert.deepEqual(tilingOf(null, shape), [0.5, 0.25])
+})
+
+test('a null material falls back to the default instead of throwing', () => {
+  assert.equal(materialNameFor({ material: null }), 'lambert')
+})
+
+test('a material named by an object takes that name', () => {
+  assert.equal(materialNameFor({ material: { name: 'toon', steps: 5 } }), 'toon')
+})
+
+test('a material name that is not a string falls back to the default', () => {
+  assert.equal(materialNameFor({ material: { name: 5 } }), 'lambert')
+})
+
+test('two declarations that differ only in an object parameter get different material keys', () => {
+  const shape = { kind: 'box', w: 1, h: 1, d: 1 }
+  const first = materialLook({ type: 'wall' }, { texture: 'brick.png', shine: { amount: 1 } }, shape)
+  const second = materialLook({ type: 'wall' }, { texture: 'brick.png', shine: { amount: 2 } }, shape)
+  assert.notEqual(first, second, 'an object parameter has to be part of what makes a surface')
+})
+
+test('the stillness signature tells two entities apart by their depth', () => {
+  const described = { look: 'lambert|1,1' }
+  const turn = { x: 0, y: 0, z: 0 }
+  const first = mergeSignature({ x: 0, y: 0, z: 5, scale: 1 }, described, turn)
+  const second = mergeSignature({ x: 0, y: 0, z: 9, scale: 1 }, described, turn)
+  assert.notEqual(first, second)
 })

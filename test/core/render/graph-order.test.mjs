@@ -95,3 +95,19 @@ test('disable takes a pass out of the run without dropping its record', () => {
   graph.run(null, null, 8, 8)
   assert.equal(ran, 1)
 })
+
+test('a disabled pass still orders the passes around its label', () => {
+  const graph = makePassGraph({ report: noop })
+  graph.add({ name: 'b', after: ['a'], execute: noop })
+  graph.add({ name: 'keep', execute: noop })
+  graph.add({ name: 'a', execute: noop })
+  graph.disable('a')
+  assert.deepEqual(names(graph), ['keep', 'b'], 'b keeps the place its label gave it')
+})
+
+test('add refuses a record with no name and one with no execute', () => {
+  const graph = makePassGraph({ report: noop })
+  graph.add({ name: '', execute: noop })
+  graph.add({ name: 'no-execute' })
+  assert.deepEqual(names(graph), [], 'a record that cannot run is not added')
+})

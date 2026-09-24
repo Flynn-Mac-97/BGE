@@ -131,6 +131,24 @@ test('a mark that holds a moving entity keeps it off the moving scan', async () 
   assert.equal(moved, 0)
 })
 
+test('a mark whose holdsMoving answers no lets the moving scan follow the entity', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  let moved = 0
+  frame.marks.register('probe', {
+    blocksMerge: () => true,
+    holdsMoving: () => false,
+    draw: () => {},
+    move: () => moved++
+  })
+  const entity = box('a')
+  const world = { entities: [entity], drawnPlaceInto: blended }
+  settle(frame, world)
+
+  entity.x = 5
+  frame.sync(world, 0.5)
+  assert.equal(moved, 1, 'the moving scan answers an entity no mark is holding')
+})
+
 test('a model without a pose still syncs the frame', async () => {
   modelCache.set('ready-model.glb', { status: 'ready', scene: new THREE.Group(), waiting: [] })
   const frame = await makeRenderer(null, VIEW, VIEWPORT)

@@ -139,3 +139,17 @@ test('a pass whose required feature is missing is dropped', () => {
   graph.run(null, null, 8, 8)
   assert.deepEqual(ran, ['present'])
 })
+
+test('a pass that reads but writes nothing is dropped when it draws to its own target', () => {
+  const graph = makePassGraph({ report: noop })
+  const ran = []
+  graph.add({
+    name: 'sampler',
+    reads: ['x'],
+    target: { format: 'half-float' },
+    execute: () => ran.push('sampler')
+  })
+  graph.add({ name: 'present', execute: () => ran.push('present') })
+  graph.run(null, null, 8, 8)
+  assert.deepEqual(ran, ['present'], 'a pass with no writes survives only when something reads it')
+})

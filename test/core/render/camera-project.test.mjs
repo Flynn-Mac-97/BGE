@@ -36,13 +36,15 @@ const POINTS = [
   [8, -6, 0]
 ]
 
-/** A camera owner with just the fields `makeCamera` reads. */
+/** A camera owner with just the fields `makeCamera` reads, recording the sizes it is given. */
 function cameraStateFor(view) {
+  const sizes = []
   const state = {
     view,
     viewport: { ...VIEWPORT },
     canvas: { getBoundingClientRect: () => ({ ...VIEWPORT }) },
-    renderer: { setSize() {} }
+    renderer: { setSize: (...args) => sizes.push(args), setPixelRatio() {} },
+    sizes
   }
   makeCamera(state)
   return state
@@ -69,4 +71,31 @@ test('makeProjector and the Three camera agree on the same view and viewport', (
 
     assert.ok(checked > 0, `${view.mode} view had no point in front of the eye`)
   }
+})
+
+test('a point exactly one thousandth behind the eye is not in front', () => {
+  const view = { mode: 'perspective', x: 0, y: 0, z: 0.001, yaw: 0, pitch: 0 }
+  const projected = makeProjector(view, VIEWPORT).place(0, 0, 0)
+  assert.equal(projected.inFront, false)
+})
+
+test('resize takes the canvas size and never writes the canvas style', () => {
+  const state = cameraStateFor(VIEWS[0])
+  state.resize()
+  assert.deepEqual(state.viewport, { ...VIEWPORT }, 'the canvas size is the viewport')
+  assert.deepEqual(state.sizes, [[VIEWPORT.width, VIEWPORT.height, false]])
+})
+
+test('frameSize draws at a stated size and never writes the canvas style', () => {
+  const state = cameraStateFor(VIEWS[0])
+  state.frameSize(640, 360)
+  assert.deepEqual(state.viewport, { width: 640, height: 360 })
+  assert.deepEqual(state.sizes.at(-1), [640, 360, false])
+})
+
+test('a new pixel ratio resizes the drawing buffer without writing the canvas style', () => {
+  const state = cameraStateFor(VIEWS[0])
+  state.setPixelRatio(2)
+  assert.equal(state.pixelRatio, 2, 'the new ratio is recorded')
+  assert.deepEqual(state.sizes.at(-1), [VIEWPORT.width, VIEWPORT.height, false])
 })

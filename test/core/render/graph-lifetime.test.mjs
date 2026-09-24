@@ -92,6 +92,26 @@ test('a persistent resource comes back after a device restore', () => {
   assert.equal(graph.pool.created, 1, 'one target was rebuilt from the descriptor')
 })
 
+test('an extract after a device restore is not culled for a shortfall', () => {
+  const graph = makePassGraph({ report: noop })
+  let extracts = 0
+  graph.add({
+    name: 'producer',
+    writes: ['x'],
+    target: { format: 'half-float' },
+    extract: () => extracts++,
+    execute: noop
+  })
+  graph.add({ name: 'reader', reads: ['x'], execute: noop })
+  graph.run(null, null, 64, 64)
+  assert.equal(extracts, 1)
+
+  graph.recreateTargets()
+  graph.extract()
+
+  assert.equal(extracts, 2, 'a restore clears the shortfall, so the next extract still runs')
+})
+
 test('a persistent resource is released when nothing declares it any more', () => {
   const graph = makePassGraph({ report: noop })
   graph.add({ name: 'write', writes: ['history'], target: { lifetime: 'persistent' }, execute: noop })

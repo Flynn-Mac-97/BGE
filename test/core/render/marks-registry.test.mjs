@@ -32,6 +32,13 @@ test('the registry starts empty, because a mark belongs to a plugin', async () =
   assert.deepEqual(frame.marks.names, [])
 })
 
+test('register refuses a mark with no name and one with no draw', async () => {
+  const frame = await makeRenderer(null, VIEW, VIEWPORT)
+  frame.marks.register('', { draw: () => {} })
+  frame.marks.register('no-draw', {})
+  assert.deepEqual(frame.marks.names, [], 'a mark that cannot be named or drawn is not registered')
+})
+
 test('a mark is drawn once per mesh entity, and only for the entities it matches', async () => {
   const frame = await makeRenderer(null, VIEW, VIEWPORT)
   const visited = []
@@ -143,7 +150,8 @@ test('the core drives every frame hook a mark carries, without knowing its name'
 test('holds keeps a settled entity on the full pass, so a still world still reaches a mark', async () => {
   const cases = [
     ['no hook', {}, 0],
-    ['holds', { holds: () => true }, 6]
+    ['holds', { holds: () => true }, 6],
+    ['holds that answers no', { holds: () => false }, 0]
   ]
   for (const [label, hook, expected] of cases) {
     const frame = await makeRenderer(null, VIEW, VIEWPORT)
@@ -220,7 +228,8 @@ test('move follows an entity the moving scan placed, without a full pass', async
 test('blocksMerge keeps a mark-owned entity out of every batch', async () => {
   const cases = [
     ['plain', {}, 8],
-    ['blocksMerge', { blocksMerge: () => true }, 0]
+    ['blocksMerge', { blocksMerge: () => true }, 0],
+    ['blocksMerge that answers no', { blocksMerge: () => false }, 8]
   ]
   for (const [label, hook, expected] of cases) {
     const frame = await makeRenderer(null, VIEW, VIEWPORT)
