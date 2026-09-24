@@ -532,3 +532,5 @@
 {"id":"p391","resolved":true,"at":"2026-09-24T14:36:38.546Z","note":"input.js listens for pointerdown in the capture phase; test asserts it"}
 {"id":"p392","resolved":true,"at":"2026-09-24T14:36:38.658Z","note":"Game UI remounts a panel whose element is not connected; test in game-ui.test.mjs"}
 {"id":"p393","resolved":true,"at":"2026-09-24T14:36:38.768Z","note":"pickNode names the attachment and answers with the node it hangs from; ignore option passes through named attachments"}
+{"id":"p394","at":"2026-09-24T14:50:21.173Z","kind":"engine","what":"The 2D Transform tool only stood down in the '3d' view, not while a round played. Mouse Look's click block was its only guard, so with a selection left from editing, arrow keys nudged it, Delete removed it and F reframed the view mid-round."}
+{"id":"p394","resolved":true,"at":"2026-09-24T14:50:21.301Z","note":"tool-transform stands down while loop.running: clicks, menu, wheel and keys; test/tool-transform-play.test.mjs"}

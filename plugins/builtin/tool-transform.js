@@ -91,6 +91,10 @@ function attach(context) {
   // owns the viewport there, and this tool's overlay, drags and zoom stand
   // down until the view is ortho again.
   const in3d = () => context.view.mode === '3d'
+  // While a round plays, the mouse and keys are the game's. An arrow key that
+  // also nudged whatever was selected before play, or a Delete that removed
+  // it, is the editor acting on a world it does not own.
+  const standsDown = () => in3d() || context.loop.running
 
   // ---------------------------------------------------------------- overlay
   function paint() {
@@ -189,6 +193,7 @@ function attach(context) {
 
   // ---------------------------------------------------------------- input
   layer.addEventListener('pointerdown', event => {
+    if (context.loop.running) return
     const row = event.target.closest('[data-pick]')
     if (!row) return
     event.stopPropagation()
@@ -207,6 +212,7 @@ function attach(context) {
 
   viewport.addEventListener('contextmenu', event => {
     event.preventDefault()
+    if (context.loop.running) return
     const p = pt(event)
     const items = renderer.pick(world, p.x, p.y)
     menu = items.length ? { x: p.x, y: p.y, items } : null
@@ -214,7 +220,7 @@ function attach(context) {
   })
 
   viewport.addEventListener('pointerdown', event => {
-    if (in3d()) return
+    if (standsDown()) return
     if (event.button === 2) return
     if (menu) { menu = null; if (peek) { peek.opacity = 1; peek = null } }
     viewport.setPointerCapture(event.pointerId)
@@ -331,7 +337,7 @@ function attach(context) {
   viewport.addEventListener('pointercancel', end)
 
   viewport.addEventListener('wheel', event => {
-    if (in3d()) return
+    if (standsDown()) return
     event.preventDefault()
     const p = pt(event)
     const before = renderer.toWorld(p.x, p.y)
@@ -345,6 +351,7 @@ function attach(context) {
 
   addEventListener('keydown', event => {
     if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
+    if (context.loop.running) return
     mods.shift = event.shiftKey; mods.meta = event.metaKey || event.ctrlKey; mods.alt = event.altKey
     if (event.code === 'Space' && !space) { space = true; event.preventDefault() }
     if (event.key === 'Escape') { menu = null; paint() }
