@@ -11,6 +11,11 @@
  *   context.gameUi.show('inventory', { css, html: () => `<h1>${name}</h1>` })
  *   context.gameUi.hide('inventory')
  *
+ * An element marked `data-ui="name"` reports the pointer: `hovered(id)` is the
+ * name under it now, or null. A panel that lets clicks through still takes them
+ * on an element whose CSS says `pointer-events: auto`, so a slot can be grabbed
+ * while the game picks under the rest. The mouse buttons stay the game's input.
+ *
  * `html` is a string or a function, asked every drawn frame, so a panel shows
  * live values with nothing pushed at it. The DOM is written only when the
  * string changes. `read` answers with a panel's text, headless or not, which is
@@ -33,7 +38,7 @@ export default {
   about: 'HTML and CSS panels a game shows over its picture.',
 
   onLoad(context) {
-    /** id -> { html, css, isInteractive, element, root, written } */
+    /** id -> { html, css, isInteractive, element, root, written, hovered } */
     const panels = new Map()
     panelsOf.set(context, panels)
 
@@ -53,11 +58,14 @@ export default {
        */
       show(id, { html, css = '', isInteractive = false }) {
         remove(id)
-        panels.set(id, { html, css, isInteractive, element: null, root: null, written: null })
+        panels.set(id, { html, css, isInteractive, element: null, root: null, written: null, hovered: null })
       },
 
       hide: remove,
       isShowing: id => panels.has(id),
+
+      /** The `data-ui` name of the element under the pointer in a panel, or null. */
+      hovered: id => panels.get(id)?.hovered ?? null,
       shown: () => [...panels.keys()],
 
       /** A panel's text, or every panel's by id. What a headless run reads. */
@@ -118,6 +126,8 @@ function writePanel(context, id, panel) {
     // The overlay lets clicks through; an interactive panel takes them back.
     element.style.cssText = `position:absolute;inset:0;pointer-events:${panel.isInteractive ? 'auto' : 'none'}`
     panel.root = element.attachShadow({ mode: 'open' })
+    panel.root.addEventListener('pointerover', event => { panel.hovered = event.target.closest?.('[data-ui]')?.dataset.ui ?? null })
+    panel.root.addEventListener('pointerout', event => { if (!event.relatedTarget || !panel.root.contains(event.relatedTarget)) panel.hovered = null })
     panel.element = element
   }
   // Also when the page took it off since: a panel that still says it is showing

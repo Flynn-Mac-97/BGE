@@ -1,8 +1,8 @@
 ---
 skill: kimodo
-description: How to install and drive kimodo.cpp, the local text-to-motion model that makes rig clips. Use to generate a 3D animation from a written description, or to build or check the kimodo install.
-triggers: kimodo, text to motion, generate animation, generate motion, mocap from text, motion model, gguf motion, smplx, soma skeleton, unitree g1
-match: tools/make-rig-clip.mjs, tools/install-kimodo.mjs, tools/lib/motion-clip.mjs
+description: How to install and drive kimodo.cpp, the local text-to-motion model that makes rig clips. Use to generate a 3D animation from a written description, to watch takes and choose one, or to build or check the kimodo install.
+triggers: kimodo, motion takes, choose a take, text to motion, generate animation, generate motion, mocap from text, motion model, gguf motion, smplx, soma skeleton, unitree g1
+match: plugins/builtin/kimodo.js, plugins/builtin/kimodo/*.js, tools/make-rig-clip.mjs, tools/install-kimodo.mjs, tools/lib/motion-clip.mjs
 category: assets
 ---
 
@@ -25,6 +25,21 @@ node tools/install-kimodo.mjs --install    # clone, patch, build, fetch weights
 Needs git, cmake 3.25+, ninja, python and `hf` (`pip install ninja
 huggingface_hub` gives the last two — the old `huggingface-cli` name installs a
 shim that refuses to run). `go` is needed only for the demo server.
+
+## Takes
+
+Make several takes of one move as `take-<move>-<id>`, each with its own
+`--seed` or prompt. The same prompt, seed and frame count give the same motion.
+The **KIMODO** board in the top bar lists every clip under `assets/motion/`,
+plays the picked one on `models/<folder>.glb` in a view of its own, and shows
+its prompt. **Use as** copies the take over a clip beside it.
+
+- `kimodo.takes` — every clip, its prompt, frames and length. **Read** after a new take.
+- `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
+- `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
+
+A retarget of the stored motion by the clip's own name (`--source slash`)
+writes over a used take; keep the take's source, or use the take again.
 
 ## Detail
 

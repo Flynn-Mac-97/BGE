@@ -162,7 +162,7 @@ async function fromGenerator(settings) {
 
   // Stored in the project rather than scratch: the same motion can go onto any
   // model later, and generating it again costs minutes.
-  const workspace = path.join(CHECKOUT, settings.project, SOURCE_DIRECTORY, settings.name)
+  const workspace = path.resolve(CHECKOUT, settings.project, SOURCE_DIRECTORY, settings.name)
   fs.mkdirSync(workspace, { recursive: true })
   const promptFile = path.join(workspace, 'prompt.txt')
   fs.writeFileSync(promptFile, settings.prompt)
@@ -211,7 +211,7 @@ const run = (command, args, libraries) => new Promise((resolve, reject) => {
 
 export async function main(argv = process.argv.slice(2)) {
   const settings = options(argv)
-  const project = path.join(CHECKOUT, settings.project)
+  const project = path.resolve(CHECKOUT, settings.project)
   if (settings.source) settings.from = path.join(project, SOURCE_DIRECTORY, settings.source)
   if (!settings.prompt && !settings.from) throw new Error('--prompt is required, or --source <stored name>, or --from <directory>')
 
@@ -261,13 +261,13 @@ declare it on the type:
         }
   })
 
-  const out = settings.out || path.join(CHECKOUT, settings.project, 'assets', 'motion', `${settings.name}.json`)
+  const out = settings.out || path.resolve(CHECKOUT, settings.project, 'assets', 'motion', `${settings.name}.json`)
   writeClip(out, clip)
 
   console.log(`${path.relative(CHECKOUT, out).replaceAll('\\', '/')} — ${clip.rotations.length} frames, ${clip.nodes.length} nodes, ${skeleton}`)
   // A type names a clip the way it names a texture: relative to the project's
   // assets. An --out anywhere else has no such name and cannot be declared.
-  const reference = path.relative(path.join(CHECKOUT, settings.project, 'assets'), out).replaceAll('\\', '/')
+  const reference = path.relative(path.resolve(CHECKOUT, settings.project, 'assets'), out).replaceAll('\\', '/')
   if (reference.startsWith('..')) console.log(`\nnot under ${settings.project}/assets, so no type can name it`)
   else console.log(`\ndeclare it on the type:\n  rig: { clips: { ${settings.name}: '${reference}' } }`)
   return out

@@ -1,4 +1,4 @@
-<!--46dfb591-->
+<!--57da04da-->
 parsed from source
   plugin Transform Tool
   category editor
@@ -8,4 +8,4 @@ parsed from source
   edit.duplicate
   arguments view.frameSelection:;view.frameAll:;edit.duplicate:
   listens shell:ready
-  source 387 lines
+  source 394 lines

@@ -176,20 +176,43 @@ function attachmentOf(value, where) {
 }
 
 /**
- * Take off every attachment that changed file or is no longer wanted.
+ * Take off every attachment that moved node or is no longer wanted, and swap
+ * the file of one that only changed file.
  *
  * Removed before the replacement is put on, so a swap frees the node before the
  * thing replacing it wants it.
  */
-function removeStaleAttachments(record, declared, where, release) {
+function removeStaleAttachments(holder, record, declared, where, release) {
   for (const [name, entry] of [...record]) {
     const wanted = attachmentOf(declared?.[name], `${where}.attachments.${name}`)
-    if (wanted && wanted.model === entry.model && nodeNameOf(name, wanted) === entry.node) continue
+    const isSameNode = wanted && nodeNameOf(name, wanted) === entry.node
+    if (isSameNode && wanted.model === entry.model) continue
+    if (isSameNode) {
+      swapAttachmentModel(holder, entry, wanted.model, release)
+      continue
+    }
     entry.group.userData.stale = true
     entry.group.parent?.remove(entry.group)
     release(entry.group)
     record.delete(name)
   }
+}
+
+/**
+ * Load another file into an attachment's group, and take the old model out
+ * only when it lands: a bow drawn through a model per pull does not blink out
+ * while the next one loads.
+ */
+function swapAttachmentModel(holder, entry, file, release) {
+  entry.model = file
+  entry.group.userData.model = file
+  const shown = [...entry.group.children]
+  loadAttachment(holder, entry.group, file, () => {
+    for (const old of shown) {
+      entry.group.remove(old)
+      release(old)
+    }
+  })
 }
 
 /** The node an attachment hangs off: its `node`, or else its own name. */
@@ -237,6 +260,7 @@ function createAttachment(holder, name, spec, record, nodes, where) {
   group.rotation.order = 'YXZ'
   // So a pick that hits the attached model can say which attachment it was.
   group.userData.attachment = name
+  group.userData.model = spec.model
   node.add(group)
   const entry = { model: spec.model, node: nodeName, group }
   record.set(name, entry)
@@ -291,14 +315,17 @@ export function applyAttachments(holder, declared, release) {
   const where = holder.userData.model
   const record = held || new Map()
   if (!held) attachedModels.set(holder, record)
-  removeStaleAttachments(record, declared, where, release)
+  removeStaleAttachments(holder, record, declared, where, release)
 
   if (!declared) return
   applyEachAttachment(holder, declared, record, nodes, where)
 }
 
-/** Load one attachment model and add it to its group, unless either has gone stale first. */
-function loadAttachment(holder, group, file) {
+/**
+ * Load one attachment model and add it to its group, after `onLanded` if
+ * given, unless either has gone stale or the group wants another file by then.
+ */
+function loadAttachment(holder, group, file, onLanded) {
   cachedModel(
     file,
     loaded => {
@@ -306,7 +333,8 @@ function loadAttachment(holder, group, file) {
       // file was in the air — and the second body to want a model already in the
       // cache is answered before its group has been parented at all, so the flags
       // are the only honest test.
-      if (group.userData.stale || holder.userData.stale) return
+      if (group.userData.stale || holder.userData.stale || group.userData.model !== file) return
+      onLanded?.()
       const instance = cloneModel(loaded)
       // A holder marked `neverCull` is in front of the eye by construction, so
       // culling it against a frustum it is always inside costs a test per frame

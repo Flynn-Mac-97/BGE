@@ -9,6 +9,7 @@ category: presentation
 - `html` is a string or a function asked every drawn frame. The DOM is written only when the string changes.
 - `css` is scoped to the panel (a shadow root): it cannot style the editor, and the editor cannot style it.
 - A panel fills the viewport and lets clicks through unless `isInteractive` is true.
+- `data-ui="name"` on an element makes it report the pointer: `context.gameUi.hovered(id)` is the name under it, or null. Give it `pointer-events: auto` in CSS to take clicks in a panel that lets the rest through; the mouse buttons stay `context.input`'s.
 - `context.gameUi.asset('ui/portrait.png')` is the URL for an `<img src>`; a name is under `assets/`.
 - `gameui.read '"id"'` (or no id: all) answers with a panel's text. It works headless, so a test checks a panel with it.
 - `gameui.list` — the panels showing.

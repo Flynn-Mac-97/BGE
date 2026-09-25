@@ -40,3 +40,4 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 - `plugins/builtin/rig-animation.agent/checking.md` — every `rig.check` finding and how to read a compare sheet
 - `plugins/builtin/rig-animation.agent/retargeting.md` — how the retarget works, writing or fixing a bone map
 - `plugins/builtin/rig-animation.agent/making-a-clip.md` — clip file shape and tool flags
+- `plugins/builtin/rig-animation.agent/reach.md` — `entity.rigReach`: bend an arm onto a point after the pose

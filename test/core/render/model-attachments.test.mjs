@@ -62,3 +62,20 @@ test('a position written as [x, y, z] places the attachment, the same as {x, y, 
   const [group] = hungOff(bone('Hips'))
   assert.deepEqual([group.position.x, group.position.y, group.position.z], [0.1, 0.2, 0.3])
 })
+
+test('changing only the file keeps the old model shown until the new one lands', () => {
+  const { holder, bone } = holderWithBones()
+  const loading = { status: 'loading', scene: null, waiting: [] }
+  modelCache.set('potion-empty.glb', loading)
+  applyAttachments(holder, { potion: { model: 'potion.glb', node: 'Hips' } }, release)
+  const [group] = hungOff(bone('Hips'))
+  const shown = group.children[0]
+  applyAttachments(holder, { potion: { model: 'potion-empty.glb', node: 'Hips' } }, release)
+  assert.deepEqual(group.children, [shown], 'the old model is still shown while the new file loads')
+  loading.status = 'ready'
+  loading.scene = new THREE.Group()
+  for (const waiter of loading.waiting) waiter.onReady(loading.scene)
+  assert.equal(hungOff(bone('Hips'))[0], group, 'in the same group')
+  assert.equal(group.children.length, 1, 'and only the new model once it lands')
+  assert.notEqual(group.children[0], shown)
+})

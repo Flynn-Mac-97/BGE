@@ -1,4 +1,4 @@
-<!--003ef727-->
+<!--bd91efcd-->
 parsed from source
   plugin Game UI
   category game
@@ -8,4 +8,4 @@ parsed from source
   context gameUi
   systems frame
   listens level:loaded, play:stopped
-  source 129 lines
+  source 141 lines
