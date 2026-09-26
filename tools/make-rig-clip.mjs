@@ -16,6 +16,11 @@
  *   --generator <path to kmd-generate>   the binary the demo itself shells to
  *   --from <directory>               buffers already written, no generator at all
  *
+ * `--constraints <file.json>` holds hands, feet, poses or the ground path to
+ * given places, read from stored motion it names (tools/lib/motion-conditions.mjs
+ * has the file's shape). The binary door only: it writes the features and mask
+ * `kmd-generate --observed` reads beside the take.
+ *
  * kimodo is not part of this checkout and is never downloaded by it. Install it
  * with `node tools/install-kimodo.mjs` and this reads KIMODO_HOME for its paths.
  * `plugins/builtin/kimodo.agent.md` is the guide.
@@ -26,7 +31,8 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { buildClip, writeClip, readFloats, skeletonFor } from './lib/motion-clip.mjs'
 import { readModelSkeleton } from './lib/retarget.mjs'
-import { retargetSources, SOURCE_DIRECTORY } from './lib/retarget-clips.mjs'
+import { retargetSources, readSource, SOURCE_DIRECTORY } from './lib/retarget-clips.mjs'
+import { motionCondition } from './lib/motion-conditions.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const HOME = process.env.KIMODO_HOME || path.resolve(CHECKOUT, '..', 'kimodo.cpp')
@@ -45,6 +51,7 @@ const DEFAULTS = {
   server: null,
   generator: null,
   from: null,
+  constraints: null,
   motionGguf: null,
   textBundle: null,
   skeleton: null,
@@ -80,6 +87,7 @@ function options(argv) {
 /** The two raw buffers and how many frames and joints they hold. */
 async function generate(settings) {
   if (settings.from) return fromDirectory(settings.from, settings)
+  if (settings.constraints && settings.server) throw new Error('--constraints needs the kmd-generate binary, not --server')
   if (settings.server) return fromServer(settings)
   return fromGenerator(settings)
 }
@@ -169,9 +177,28 @@ async function fromGenerator(settings) {
 
   await run(generator, [
     motion, bundle, promptFile,
-    String(settings.frames), String(settings.steps), String(settings.seed), workspace
+    String(settings.frames), String(settings.steps), String(settings.seed), workspace,
+    ...(settings.constraints ? conditionArguments(settings, workspace) : [])
   ], path.join(path.dirname(generator), 'bin'))
   return fromDirectory(workspace, settings)
+}
+
+/**
+ * The `--observed` arguments for a constraint file, with the features, the
+ * mask and a copy of the file written beside the take.
+ */
+function conditionArguments(settings, workspace) {
+  const record = JSON.parse(fs.readFileSync(settings.constraints, 'utf8'))
+  if (record.template === settings.name) throw new Error(`--name ${settings.name} would write over its own template; name a new take`)
+  const template = readSource(path.resolve(CHECKOUT, settings.project, SOURCE_DIRECTORY, record.template))
+  const skeleton = settings.skeleton || skeletonFor(template.joints)
+  const condition = motionCondition({ skeleton, frames: settings.frames, framesPerSecond: settings.fps, template, record })
+  const observed = path.join(workspace, 'observed.f32')
+  const mask = path.join(workspace, 'mask.f32')
+  fs.writeFileSync(observed, Buffer.from(condition.observed.buffer))
+  fs.writeFileSync(mask, Buffer.from(condition.mask.buffer))
+  fs.writeFileSync(path.join(workspace, 'constraints.json'), JSON.stringify(record, null, 2) + '\n')
+  return ['--observed', observed, mask, String(condition.firstHeading)]
 }
 
 const get = async url => {

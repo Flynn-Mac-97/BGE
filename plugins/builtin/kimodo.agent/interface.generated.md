@@ -1,4 +1,4 @@
-<!--d09b3724-->
+<!--f80e9937-->
 parsed from source
   plugin Kimodo
   category editor
@@ -9,4 +9,4 @@ parsed from source
   kimodo.use
   kimodo.board
   arguments kimodo.panel:;kimodo.takes:;kimodo.view: options = {};kimodo.use: options = {};kimodo.board:
-  source 216 lines
+  source 225 lines

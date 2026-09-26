@@ -1,6 +1,7 @@
 import { makeProjector } from '../../../engine/camera-project.js'
 import { boundsOf, frameSubject } from './frame-facts.js'
 import { selectMarks, addHulls, markPalette, addClipping } from './describe-marks.js'
+import { rigFacts } from './rig-marks.js'
 import { projectEntities, screenCoverage, markedRelations, screenRegions, describeBetween, worldSpans, emptyBands, findSizeOutliers, findStackedEntities } from './describe-facts.js'
 export { simplifyHull } from './describe-marks.js'
 export { findSizeOutliers, findStackedEntities } from './describe-facts.js'
@@ -51,6 +52,7 @@ export function describe(context, options = {}) {
   }
 
   const listed = options.brief ? visible.filter(entry => entry.mark) : visible
+  const rigs = options.rig ? rigFacts(context, options, projector) : []
 
   return {
     ...(options.brief ? { brief: true, listedOnlyMarked: true } : {}),
@@ -63,6 +65,7 @@ export function describe(context, options = {}) {
     },
     viewport: { ...context.viewport },
     visible: listed,
+    ...(options.rig ? { rigs } : {}),
     counts: {
       visible: visible.length,
       offscreen: Object.values(offscreenByType).reduce((sum, n) => sum + n, 0),

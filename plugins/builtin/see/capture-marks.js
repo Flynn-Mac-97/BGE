@@ -1,4 +1,5 @@
 import { simplifyHull } from './describe.js'
+import { drawRig } from './rig-marks.js'
 
 export async function traceMarks(context, description) {
   try {
@@ -15,6 +16,8 @@ export async function traceMarks(context, description) {
 }
 
 export function annotateCapture(copy, pen, description, options, crop, silhouette) {
+  // The rig is in screen points of the whole frame, so it is drawn only on a frame that is not cropped.
+  if (description.rigs?.length && !crop) drawRig(copy, pen, description.rigs)
   if (options.marks !== false && !crop) {
     if (options.marks === 'tags') {
       const tag = Math.max(14, Math.round(copy.height / 45))

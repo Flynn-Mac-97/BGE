@@ -10,6 +10,13 @@
   and restart the desktop. `desktop capture` uses the same capture without
   needing an editor bridge connection. Captures do not change the game camera.
 
+- `see.curve` — a chart of engine curves (`context.curve`), headless or not. No
+  arguments lists every ease and preset. `{"curve":"pop"}` draws one, with
+  `duration`, `from`, `to` and `loop` as `context.curve` takes them; keys work
+  in place of a name. `{"curves":[...]}` overlays several to compare.
+  `{"group":"motion"}` draws a named sheet: `ui`, `motion`, `object`,
+  `effect`, `presets` or `eases`. A colour curve also paints its colours in a
+  strip under the chart.
 - `see.sketch '{...}'` — flat-colour frame from computed facts: marked
   entities fill their screen hull in their type's colour, the rest are
   rectangles. Headless it writes `agent-runs/see/<name>.png` + `.json`; in
@@ -45,7 +52,7 @@ keeps the current camera, saved in `<project>/views.json`, committed;
 `see.view` alone lists; `'{"go":"arena-south"}'` aims the LIVE camera,
 so the queries answer from that view too; `'{"aim":"you","back":3}'` aims it
 at an entity or type, framed the way subject shots frame, pulled `back` times
-out), `subject` (frame one entity; add `"alone": true` to hide the
+out), `rig: true` (draw the control rig over a scene frame: bones white, targets as rings in their kind's colour — reach green, lookAt blue, plant orange — joined to their bone, poles as diamonds joined to their joint; not drawn on a cropped `alone` frame), `subject` (frame one entity; add `"alone": true` to hide the
 rest — the studio: neutral light, no post, cropped to the drawn pixels, TRANSPARENT
 background by default, and UNMARKED, with `silhouette` giving the subject's
 traced outline in the crop's own coordinates; pass `background` with a colour

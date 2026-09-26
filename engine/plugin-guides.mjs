@@ -41,7 +41,7 @@ function guideFrontmatter(guide) {
     declared
       ?.match(/^match:\s*(.+)$/m)?.[1]
       ?.trim()
-      .split(/\s+/)
+      .split(/[\s,]+/)
       .filter(Boolean) || []
   const saidTriggers =
     declared
@@ -56,7 +56,7 @@ function guideFrontmatter(guide) {
  * The paths a guide applies to.
  *
  * A guide applies to its own plugin by default. A leading frontmatter `match:`
- * (space-separated paths) adds more — Plugin Master uses it to ride along with
+ * (paths split by spaces or commas, as triggers are) adds more — Plugin Master uses it to ride along with
  * every plugin task. `project/` is the one name for a file in the open project,
  * whatever the directory is called on disk, so guides declare
  * `match: project/**` and are right for every project.

@@ -52,11 +52,20 @@ async function readTakes(context) {
   return takes
 }
 
-const takeFor = clip => state.takes.find(take => take.clip === clip)
+/**
+ * The take for a clip, reading the takes again when it is not in the last list:
+ * a headless command is a new process, and a take made since is not listed yet.
+ */
+async function takeFor(context, clip) {
+  const listed = state.takes.find(take => take.clip === clip)
+  if (listed) return listed
+  state.takes = await readTakes(context)
+  return state.takes.find(take => take.clip === clip)
+}
 
 /** Show a take in the panel's view. A headless run has no view, and answers the take alone. */
 async function viewTake(context, clip) {
-  const take = takeFor(clip)
+  const take = await takeFor(context, clip)
   if (!take) throw new Error(`no clip ${clip} — run kimodo.takes`)
   state.chosen = clip
   state.target = null
@@ -67,7 +76,7 @@ async function viewTake(context, clip) {
 
 /** Copy the take's file over `<as>.json` beside it, so every type that plays `as` plays this take. */
 async function useTake(context, clip, as) {
-  const take = takeFor(clip)
+  const take = await takeFor(context, clip)
   if (!take) throw new Error(`no clip ${clip} — run kimodo.takes`)
   if (!/^[a-z0-9-]+$/.test(as ?? '')) throw new Error('"as" is a clip name: lower case, digits and dashes')
   if (as === take.name) return { clip, unchanged: true }
@@ -99,7 +108,7 @@ function closeBoard() {
 }
 
 function chosenRows(ui, context) {
-  const take = takeFor(state.chosen)
+  const take = state.takes.find(one => one.clip === state.chosen)
   if (!take) return [ui.text('Pick a take to play it.', { dim: true })]
   // A take is used as one of the clips beside it that is not itself a take.
   const targets = state.takes.filter(other => other.folder === take.folder && other.clip !== take.clip && !other.name.startsWith('take-'))

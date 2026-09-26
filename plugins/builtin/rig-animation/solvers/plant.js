@@ -3,7 +3,7 @@
  * it does not slide while the body turns, stops, or moves faster than the
  * clip's stride.
  *
- *   { kind: 'plant', nodes: [upLeg, leg, foot], lift?: 0.05, letGo?: 0.3, blend?: 0.1, weight?: 1 }
+ *   { kind: 'plant', nodes: [upLeg, leg, foot], pole?, lift?: 0.05, letGo?: 0.3, blend?: 0.1, weight?: 1 }
  *
  * The foot is down when the clip holds it within `lift` metres of its rest
  * height. It is then locked at that world point and the leg bends to it, until
@@ -11,12 +11,13 @@
  * takes over. A lock more than `letGo` metres from where the clip puts the
  * foot lets go the same way. A foot is planted again only once it has faded
  * back to the clip, where it already is: it never jumps to a new spot.
- * The foot keeps the turn the clip gives it, so it stays flat.
+ * The foot keeps the turn the clip gives it, so it stays flat. `pole`, any
+ * target shape, is where the knee points; left out, it keeps the clip's bend.
  *
  * Declared once on the type as `rig.constraints`, for every foot of the model.
  */
 import { placeOf, posedNames, turnNodeTo } from '../skeleton.js'
-import { modelPointOf, worldPointOf } from '../targets.js'
+import { modelPointOf, pointOf, worldPointOf } from '../targets.js'
 import { lengthOf, subtract } from '../turns.js'
 import { bendChain } from './reach.js'
 
@@ -36,7 +37,8 @@ export default function solvePlant(entity, skeleton, plant, { seconds, memory })
   memory.weight = eased(memory.weight ?? 0, memory.lock ? 1 : 0, seconds, plant.blend ?? 0.1)
   const weight = memory.weight * (plant.weight ?? 1)
   if (!memory.held || weight <= 0) return null
-  bendChain(skeleton, entity.pose, chain, modelPointOf(entity, memory.held), null, weight)
+  const pole = plant.pole ? pointOf(entity, skeleton, plant.pole) : null
+  bendChain(skeleton, entity.pose, chain, modelPointOf(entity, memory.held), pole, weight)
   turnNodeTo(skeleton, entity.pose, end, foot.turn, weight)
   return null
 }

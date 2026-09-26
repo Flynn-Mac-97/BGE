@@ -10,6 +10,7 @@
  *                 query verbs over the same facts — see/queries.js.
  *   see.sketch    a flat-colour frame drawn from those facts. Works everywhere.
  *   see.capture   the real rendered frame. Browser only.
+ *   see.curve     a chart of engine curves and presets. Works everywhere.
  *
  * Every image outlines each marked entity's screen hull in its type's
  * colour, and the JSON sidecar carries the legend — palette (type to hex),
@@ -25,6 +26,7 @@ import { occlusion, isolate, find, diff, camera, identify } from './see/queries.
 import { ray } from './see/ray.js'
 
 import { capture } from './see/capture.js'
+import { seeCurve } from './see/curve-command.js'
 import { captureEditor } from './see/editor.js'
 import { framesTaken, freeFrameName, describeAtDeclaredShape, concealOverlays, revealOverlays, needsRenderer, keepView, bindMarks, withSubject } from './see/frame-context.js'
 
@@ -176,6 +178,12 @@ export default {
       // this answers it from the pixel the renderer actually drew.
       label: 'Pixel at a point',
       run: (context, options) => identify(context, options || {})
+    },
+    {
+      id: 'see.curve',
+      label: 'Curves as a chart',
+      // args: {curve: name | keys, duration?, from?, to?, loop?} | {curves: [...]} | {group} | {} lists every name
+      run: (context, options = {}) => seeCurve(options)
     },
     {
       id: 'see.sketch',

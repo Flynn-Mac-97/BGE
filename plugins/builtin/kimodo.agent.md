@@ -1,8 +1,8 @@
 ---
 skill: kimodo
 description: How to install and drive kimodo.cpp, the local text-to-motion model that makes rig clips. Use to generate a 3D animation from a written description, to watch takes and choose one, or to build or check the kimodo install.
-triggers: kimodo, motion takes, choose a take, text to motion, generate animation, generate motion, mocap from text, motion model, gguf motion, smplx, soma skeleton, unitree g1
-match: plugins/builtin/kimodo.js, plugins/builtin/kimodo/*.js, tools/make-rig-clip.mjs, tools/install-kimodo.mjs, tools/lib/motion-clip.mjs
+triggers: kimodo, motion takes, choose a take, text to motion, generate animation, generate motion, mocap from text, motion model, gguf motion, smplx, soma skeleton, unitree g1, hand path, motion constraint, keyframe pose, regenerate clip, swing path
+match: plugins/builtin/kimodo.js, plugins/builtin/kimodo/*.js, tools/make-rig-clip.mjs, tools/install-kimodo.mjs, tools/lib/motion-clip.mjs, tools/lib/motion-conditions.mjs, tools/kimodo-constraints.patch
 category: assets
 ---
 
@@ -38,6 +38,22 @@ its prompt. **Use as** copies the take over a clip beside it.
 - `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
 - `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
 
+## Shape a move with constraints
+
+A clip that misses where a hand, foot or pose must be is generated again with
+constraints, not bent to fit at run time. Kimodo is told the points, so the
+body moves through them.
+
+1. Write a constraint file in `agent-runs/`: the stored take to read the body
+   from (`template`), and `joint` keys in the model's own space. A Worn Gear
+   action's `paths` keys go in as they are.
+2. `node tools/make-rig-clip.mjs --project <project> --prompt "<the take's prompt>" --name take-<move>-<id> --frames <the take's frames> --constraints <file> --onto models/<model>.glb --once`
+3. `run kimodo.use '{"clip":"motion/<model>/take-<move>-<id>.json","as":"<move>"}'`, then look at it (See).
+
+Measured on the arena slash, 60 frames, seed 0: the hand missed its three path
+keys by 27–89 cm unconstrained and 3–7 cm constrained. The file's shape and
+every kind are in `kimodo.agent/making-a-clip.md`.
+
 A retarget of the stored motion by the clip's own name (`--source slash`)
 writes over a used take; keep the take's source, or use the take again.
 
@@ -46,7 +62,7 @@ writes over a used take; keep the take's source, or use the take again.
 Read only the file your task needs.
 
 - `plugins/builtin/kimodo.agent/building-it.md` — installing and building kimodo.cpp
-- `plugins/builtin/kimodo.agent/making-a-clip.md` — generating a clip from a written description
+- `plugins/builtin/kimodo.agent/making-a-clip.md` — generating a clip from a written description, with hands, feet or poses held by constraints
 - `plugins/builtin/kimodo.agent/interfaces.md` — the command line and the library, and which to use
 - `plugins/builtin/kimodo.agent/skeletons.md` — the skeletons it knows and how to add one
 - `plugins/builtin/kimodo.agent/measured-walk.md` — measured numbers from a soma-rp-v1.1 walk

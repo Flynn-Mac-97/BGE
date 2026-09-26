@@ -2,9 +2,10 @@
  * Rig Animation: where a constraint's target is, in model space, and turning
  * points between model space and the world.
  *
- * A target is a point, in one of three shapes:
+ * A target is a point, in one of four shapes:
  *   { node, at? }        a point in that node's own space, its origin when `at` is left out
  *   { attachment, at? }  a point in that attachment's model space, where it hangs now
+ *   { model }            a point in model space: it turns with the entity, not with a bone
  *   { point }            a point in the world
  *
  * Model space is the model file's space; the entity's place, turn and scale
@@ -16,7 +17,7 @@ import { add, fromYawPitchRoll, inverse, rotate, scaled, subtract } from './turn
 
 /** Where a target is in model space, or null when it is not there yet. */
 export function pointOf(entity, skeleton, target) {
-  const shape = ['node', 'attachment', 'point'].find(key => target?.[key] !== undefined)
+  const shape = ['node', 'attachment', 'model', 'point'].find(key => target?.[key] !== undefined)
   return shape ? TARGETS[shape](entity, skeleton, target) : null
 }
 
@@ -56,6 +57,7 @@ const TARGETS = {
     const local = rotate(fromYawPitchRoll(x, y, z), scaled(target.at ?? [0, 0, 0], hung.scale ?? 1))
     return pointIn(skeleton, entity.pose, name, add(vectorOf(hung.position), local))
   },
+  model: (entity, skeleton, target) => target.model,
   point: (entity, skeleton, target) => modelPointOf(entity, target.point)
 }
 

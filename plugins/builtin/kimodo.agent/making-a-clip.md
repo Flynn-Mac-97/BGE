@@ -12,6 +12,42 @@ Three doors, in the order the tool tries them:
 | `--server http://127.0.0.1:8094` | the demo server, if one is running |
 | neither | the `kmd-generate` binary under `KIMODO_HOME` |
 
+## With constraints
+
+`--constraints <file.json>` holds a hand or foot at given points, a stored
+pose at given seconds, or a stored ground path. The model is told these, so
+the motion comes out through them rather than being bent to them after. It
+needs the binary door and the constraints patch (`install-kimodo.mjs` applies
+it).
+
+```json
+{
+  "template": "slash",
+  "scale": 1,
+  "constraints": [
+    { "kind": "pose", "at": [0] },
+    { "kind": "root" },
+    { "kind": "joint", "joint": "RightHand", "keys": [{ "at": 1, "value": [-0.5, 1.5, -0.05] }] }
+  ]
+}
+```
+
+- `template` is stored motion under `assets/motion/source/`. The body's place,
+  height and heading at each constrained frame are read from it, as upstream
+  Kimodo does. Name a new take with `--name`; the template is refused as its
+  own output.
+- `joint` is `LeftHand`, `RightHand`, `LeftFoot` or `RightFoot`. Its `keys`
+  are curve keys: `at` in seconds, `value` in the model's own space (metres,
+  +Z forward, feet at 0, no root motion). A Worn Gear path's keys fit as they
+  are. `scale` turns model metres into capture metres: capture hips height
+  over model hips height.
+- `pose` keeps the template's whole body at those seconds, to start or end on
+  a known stance. `root` keeps its ground path and heading on every frame.
+- Keys are exact only at their frames. Between keys the model is free.
+
+`tools/lib/motion-conditions.mjs` builds the features; the take's directory
+keeps `constraints.json`, `observed.f32` and `mask.f32` beside the motion.
+
 Other flags: `--frames 150 --steps 100 --seed 0 --model soma-rp-v1.1 --fps 30 --up z --scale 1 --map <file.json> --skeleton soma-30`. `--onto`, `--source` and the rest are in the Rig Animation guide's `making-a-clip.md`.
 The frame and step defaults are the demo server's own.
 

@@ -27,6 +27,7 @@ Read down; stop at the first row that answers.
 | **what is THAT thing, at this spot on screen** | `see.identify '{"at":[50,50]}'` | nothing; ID buffer, falls back to boxes |
 | what does a ray pass through, from a point or in a direction | `see.ray '{"at":[50,50]}'`, `'{"grid":[6,4]}'`, `'{"from":"you","direction":"down"}'` | nothing; works everywhere |
 | what is on screen — counts, positions, sizes, coverage, regions, overlaps, between | `see.describe` | nothing; works everywhere |
+| a rigged body's control rig — bones, and each constraint's end, target, joint and pole, as screen points | `see.describe '{"subject":"you","rig":true}'` | nothing; works everywhere |
 | which entities match predicates — type, region, size, depth, cut, occlusion, distance | `see.find` | nothing; works everywhere |
 | one entity in full — world box, screen box, cover, velocity, camera relation | `see.isolate` | nothing; may step the world once |
 | how much of X is visible, and who blocks it | `see.occlusion` | nothing; ID buffer or rays |

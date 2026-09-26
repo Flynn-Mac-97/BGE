@@ -21,6 +21,8 @@ import { applyLayer } from '../plugins/builtin/rig-animation/layer.js'
 import { widenSkeleton, placeOf } from '../plugins/builtin/rig-animation/skeleton.js'
 import { applyConstraints } from '../plugins/builtin/rig-animation/constraints.js'
 import { worldPointOf } from '../plugins/builtin/rig-animation/targets.js'
+import { constraintsForControls } from '../plugins/builtin/rig-animation/controls.js'
+import { rigView } from '../plugins/builtin/rig-animation/rig-view.js'
 import { rotate } from '../plugins/builtin/rig-animation/turns.js'
 import {
   buildClip,
@@ -870,6 +872,13 @@ test('reach takes a world point through the entity place and turn', () => {
   assert.ok(distance(hand, [0.3, 1.2, 0.2]) < 1e-3, `the hand is at ${hand.map(value => value.toFixed(3))}`)
 })
 
+test('reach takes a model point, which turns with the entity and no bone', () => {
+  const entity = { ...reachingArm({ model: [0.3, 1.2, 0.2] }), x: 2, y: 0, z: 0, yaw: Math.PI / 2 }
+  applyConstraints(entity, ARM_SKELETON, entity.rigConstraints, 1 / 60)
+  const hand = placeOf(ARM_SKELETON, entity.pose, 'hand').position
+  assert.ok(distance(hand, [0.3, 1.2, 0.2]) < 1e-3, `the hand is at ${hand.map(value => value.toFixed(3))}`)
+})
+
 test('reach at weight 0 leaves the pose as the clip wrote it', () => {
   const entity = reachingArm({ node: 'body', at: [0.3, 1.2, 0.2] }, { weight: 0 })
   const before = JSON.stringify(entity.pose)
@@ -958,4 +967,83 @@ test('lookAt points the node forward axis at the target, within its limit', () =
     Math.abs(turned - Math.PI / 6) < 1e-3,
     `a limit of 30 degrees stops it at 30 (${((turned * 180) / Math.PI).toFixed(1)})`
   )
+})
+
+// ------------------------------------------------------------------ controls
+
+const CONTROLS = {
+  hand: { kind: 'limb', nodes: ['arm', 'forearm', 'hand'], pole: { node: 'body', at: [0, 1.3, -1] } },
+  look: { kind: 'aim', node: 'head', limit: 40 }
+}
+
+test('a control request becomes its constraint, with the control pole unless the request names one', () => {
+  const target = { point: [1, 1, 1] }
+  const { constraints, refusals } = constraintsForControls(CONTROLS, {
+    hand: [
+      { target, weight: 1 },
+      { target, weight: 0.5, pole: { point: [0, 2, 0] } }
+    ],
+    look: { target, weight: 1 }
+  })
+  assert.deepEqual(refusals, [])
+  assert.deepEqual(
+    constraints.map(constraint => [
+      constraint.kind,
+      constraint.weight,
+      constraint.pole?.node ?? constraint.pole?.point ?? null
+    ]),
+    [
+      ['reach', 1, 'body'],
+      ['reach', 0.5, [0, 2, 0]],
+      ['lookAt', 1, null]
+    ]
+  )
+  assert.equal(constraints[2].limit, 40)
+})
+
+test('a control follows a path over time, fading in and out at its ends', () => {
+  const path = [
+    { at: 0, value: [0, 1, 0], ease: 'smooth' },
+    { at: 1, value: [0.4, 1.2, 0.2] }
+  ]
+  const request = { path, startedAt: 10, speed: 2 }
+  const middle = constraintsForControls(CONTROLS, { hand: request }, 10.25).constraints[0]
+  assert.deepEqual(middle.target, { model: [0.2, 1.1, 0.1] })
+  assert.equal(middle.weight, 1)
+  assert.equal(constraintsForControls(CONTROLS, { hand: request }, 10.5).constraints[0].weight, 0)
+  const inNode = constraintsForControls(CONTROLS, { hand: { ...request, node: 'body' } }, 10.25).constraints[0]
+  assert.equal(inNode.target.node, 'body')
+})
+
+test('a request for a control the type has not got is refused by name', () => {
+  const { constraints, refusals } = constraintsForControls(CONTROLS, {
+    tail: { target: { point: [0, 0, 0] }, weight: 1 }
+  })
+  assert.equal(constraints.length, 0)
+  assert.match(refusals[0], /no control "tail"; the type has hand, look/)
+})
+
+test('a limb control bends the arm through the pose, as a reach does', () => {
+  const entity = { id: 'reacher', pose: reachingArm({ node: 'body' }).pose }
+  const { constraints } = constraintsForControls(CONTROLS, {
+    hand: { target: { node: 'body', at: [0.3, 1.2, 0.2] }, weight: 1 }
+  })
+  applyConstraints(entity, ARM_SKELETON, constraints, 1 / 60)
+  const hand = placeOf(ARM_SKELETON, entity.pose, 'hand').position
+  assert.ok(distance(hand, [0.3, 1.2, 0.2]) < 1e-3)
+  assert.ok(
+    placeOf(ARM_SKELETON, entity.pose, 'forearm').position[2] < 0,
+    'the elbow points back, towards the control pole'
+  )
+})
+
+test('the rig view gives bones and each constraint in world points, after the solve', () => {
+  const entity = { ...reachingArm({ node: 'body', at: [0.3, 1.2, 0.2] }), x: 5, y: 0, z: 0 }
+  applyConstraints(entity, ARM_SKELETON, entity.rigConstraints, 1 / 60)
+  const view = rigView(entity, ARM_SKELETON, entity.rigConstraints)
+  assert.equal(view.bones.length, 2, 'upper arm to forearm, forearm to hand')
+  const [reach] = view.constraints
+  assert.equal(reach.kind, 'reach')
+  assert.ok(distance(reach.target, [5.3, 1.2, 0.2]) < 1e-6, 'the target is in the world, moved with the entity')
+  assert.ok(distance(reach.end, reach.target) < 1e-3, 'and the hand is on it')
 })

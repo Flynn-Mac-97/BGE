@@ -1,0 +1,184 @@
+diff --git a/include/kimodo/kimodo.hpp b/include/kimodo/kimodo.hpp
+index e774e5a..d90d318 100644
+--- a/include/kimodo/kimodo.hpp
++++ b/include/kimodo/kimodo.hpp
+@@ -22,6 +22,17 @@ struct motion_data {
+     std::vector<float> root_positions;
+ };
+ 
++// Motion features a generation must keep, as upstream Kimodo's constraints
++// build them: `observed` holds raw (not normalized) motion-representation rows,
++// [frames, 9 + 12 * joints], and `mask` has the same shape, 1 where a value is
++// kept and 0 where the model is free. `first_heading` is the body heading at
++// frame 0, in radians.
++struct motion_condition {
++    std::vector<float> observed;
++    std::vector<float> mask;
++    float first_heading = 0.F;
++};
++
+ struct prompt_segment {
+     std::string prompt;
+     unsigned frames = 0;
+@@ -38,6 +49,10 @@ public:
+     std::expected<motion_data, std::string> generate_text(
+         std::string_view utf8_prompt, unsigned frames, unsigned steps, std::uint64_t seed,
+         float text_cfg, float constraint_cfg) const;
++    std::expected<motion_data, std::string> generate_text_conditioned(
++        std::string_view utf8_prompt, const motion_condition &condition,
++        unsigned frames, unsigned steps, std::uint64_t seed,
++        float text_cfg, float constraint_cfg) const;
+     std::expected<motion_data, std::string> generate_text_sequence(
+         std::span<const prompt_segment> segments, unsigned transition_frames,
+         unsigned steps, std::uint64_t seed, float text_cfg, float constraint_cfg) const;
+@@ -45,6 +60,10 @@ public:
+     model(const model &) = delete;
+     model &operator=(const model &) = delete;
+ private:
++    std::expected<motion_data, std::string> generate_embedding_conditioned(
++        const std::array<float, embedding_width> &embedding, const motion_condition *condition,
++        unsigned frames, unsigned steps, std::uint64_t seed,
++        float text_cfg, float constraint_cfg) const;
+     struct impl;
+     explicit model(std::unique_ptr<impl> impl);
+     std::unique_ptr<impl> impl_;
+diff --git a/src/generate.cpp b/src/generate.cpp
+index 63ebd58..25f7cbd 100644
+--- a/src/generate.cpp
++++ b/src/generate.cpp
+@@ -3,6 +3,7 @@
+ #include <kimodo/kimodo.hpp>
+ 
+ #include <cstdlib>
++#include <cstring>
+ #include <filesystem>
+ #include <fstream>
+ #include <iostream>
+@@ -19,6 +20,16 @@ void write_f32(const std::filesystem::path &path, const std::vector<float> &valu
+               static_cast<std::streamsize>(values.size() * sizeof(float)));
+     if (!out) throw std::runtime_error("cannot write " + path.string());
+ }
++
++std::vector<float> read_f32(const std::filesystem::path &path) {
++    std::ifstream in(path, std::ios::binary);
++    if (!in) throw std::runtime_error("cannot open " + path.string());
++    const std::string bytes{std::istreambuf_iterator<char>(in), {}};
++    if (bytes.size() % sizeof(float)) throw std::runtime_error(path.string() + " is not whole float32 values");
++    std::vector<float> values(bytes.size() / sizeof(float));
++    std::memcpy(values.data(), bytes.data(), bytes.size());
++    return values;
++}
+ }
+ 
+ int main(int argc, char **argv) try {
+@@ -44,8 +55,9 @@ int main(int argc, char **argv) try {
+         std::cout << "generated " << motion->frames << " frames with " << motion->joints << " joints\n";
+         return 0;
+     }
+-    if (argc != 8) {
+-        std::cerr << "usage: " << argv[0] << " MOTION.gguf TEXT_BUNDLE PROMPT.txt FRAMES STEPS SEED OUTPUT_DIR\n"
++    const bool conditioned = argc == 12 && std::string_view(argv[8]) == "--observed";
++    if (argc != 8 && !conditioned) {
++        std::cerr << "usage: " << argv[0] << " MOTION.gguf TEXT_BUNDLE PROMPT.txt FRAMES STEPS SEED OUTPUT_DIR [--observed OBSERVED.f32 MASK.f32 FIRST_HEADING]\n"
+                   << "   or: " << argv[0] << " MOTION.gguf TEXT_BUNDLE --sequence TRANSITION STEPS SEED OUTPUT_DIR FRAME PROMPT.txt [FRAME PROMPT.txt ...]\n";
+         return 2;
+     }
+@@ -57,7 +69,12 @@ int main(int argc, char **argv) try {
+     const auto seed = static_cast<std::uint64_t>(std::stoull(argv[6]));
+     auto model = kimodo::model::load(argv[1], argv[2]);
+     if (!model) throw std::runtime_error(model.error());
+-    auto motion = (*model)->generate_text(prompt, frames, steps, seed, 2.F, 2.F);
++    // OBSERVED and MASK are raw float32 [FRAMES, motion_dim]: the features to
++    // keep, and 1 where each one is kept.
++    auto motion = conditioned
++        ? (*model)->generate_text_conditioned(prompt, {read_f32(argv[9]), read_f32(argv[10]), std::stof(argv[11])},
++                                              frames, steps, seed, 2.F, 2.F)
++        : (*model)->generate_text(prompt, frames, steps, seed, 2.F, 2.F);
+     if (!motion) throw std::runtime_error(motion.error());
+     const std::filesystem::path output(argv[7]);
+     std::filesystem::create_directories(output);
+diff --git a/src/model.cpp b/src/model.cpp
+index a3e5779..8afd950 100644
+--- a/src/model.cpp
++++ b/src/model.cpp
+@@ -59,9 +59,56 @@ std::expected<motion_data, std::string> model::generate_text(
+ #endif
+ }
+ 
++namespace {
++#ifdef KIMODO_HAVE_GGML
++// Raw observed features to the normalized space DDIM runs in, with the same
++// statistics decode uses: dims 0-4 are the global root, the rest the body.
++std::expected<std::vector<float>, std::string> normalized_observed(
++    const detail::ggml_motion_weights &weights, const detail::skeleton_spec &skeleton,
++    std::span<const float> observed) {
++    auto gm=weights.f32_values("stats.global_root.mean"), gs=weights.f32_values("stats.global_root.std");
++    auto bm=weights.f32_values("stats.body.mean"), bs=weights.f32_values("stats.body.std");
++    if (!gm || !gs || !bm || !bs) return std::unexpected("motion GGUF lacks normalization statistics");
++    const size_t motion_dim=skeleton.motion_dim(), body_dim=skeleton.body_dim();
++    std::vector<float> normalized(observed.begin(), observed.end());
++    for (size_t row=0; row<normalized.size()/motion_dim; ++row) {
++        auto *value=normalized.data()+row*motion_dim;
++        for (size_t d=0; d<5; ++d) value[d]=(value[d]-(*gm)[d])/std::sqrt((*gs)[d]*(*gs)[d]+1.e-5F);
++        for (size_t d=0; d<body_dim; ++d) value[5+d]=(value[5+d]-(*bm)[d])/std::sqrt((*bs)[d]*(*bs)[d]+1.e-5F);
++    }
++    return normalized;
++}
++#endif
++}
++
+ std::expected<motion_data, std::string> model::generate_embedding(
+     const std::array<float, embedding_width> &embedding, unsigned frames, unsigned steps,
+     std::uint64_t seed, float text_cfg, float constraint_cfg) const {
++    return generate_embedding_conditioned(embedding, nullptr, frames, steps, seed, text_cfg, constraint_cfg);
++}
++
++std::expected<motion_data, std::string> model::generate_text_conditioned(
++    std::string_view utf8_prompt, const motion_condition &condition, unsigned frames, unsigned steps,
++    std::uint64_t seed, float text_cfg, float constraint_cfg) const {
++#ifdef KIMODO_HAVE_GGML
++    if (!impl_->text) return std::unexpected("model was loaded without a native text bundle");
++    const size_t values=static_cast<size_t>(frames)*impl_->skeleton->motion_dim();
++    if (condition.observed.size()!=values || condition.mask.size()!=values)
++        return std::unexpected("condition must hold frames * motion_dim values, observed and mask alike");
++    for (float value : condition.observed) if (!std::isfinite(value)) return std::unexpected("condition contains a non-finite value");
++    if (!std::isfinite(condition.first_heading)) return std::unexpected("first heading must be finite");
++    auto embedding = impl_->text->encode(utf8_prompt);
++    if (!embedding) return std::unexpected(embedding.error());
++    return generate_embedding_conditioned(*embedding, &condition, frames, steps, seed, text_cfg, constraint_cfg);
++#else
++    (void) utf8_prompt; (void) condition; (void) frames; (void) steps; (void) seed; (void) text_cfg; (void) constraint_cfg;
++    return std::unexpected("Kimodo was built without GGML support");
++#endif
++}
++
++std::expected<motion_data, std::string> model::generate_embedding_conditioned(
++    const std::array<float, embedding_width> &embedding, const motion_condition *condition,
++    unsigned frames, unsigned steps, std::uint64_t seed, float text_cfg, float constraint_cfg) const {
+     if (frames == 0 || frames > 10000) return std::unexpected("frames must be in 1..10000");
+     if (steps == 0 || steps > 1000) return std::unexpected("diffusion_steps must be in 1..1000");
+     if (!std::isfinite(text_cfg) || !std::isfinite(constraint_cfg)) return std::unexpected("CFG weights must be finite");
+@@ -80,7 +127,14 @@ std::expected<motion_data, std::string> model::generate_embedding(
+     const size_t motion_dim=impl_->skeleton->motion_dim();
+     std::vector<float> noise(static_cast<size_t>(frames)*motion_dim);
+     for (float &value : noise) value = normal(rng);
+-    auto sampled = detail::sample_motion_from_noise(*impl_->weights, noise, embedding, frames, steps, text_cfg, constraint_cfg);
++    // The same noise with or without a condition, so one seed compares both.
++    auto sampled = [&]() -> std::expected<std::vector<float>, std::string> {
++        if (!condition) return detail::sample_motion_from_noise(*impl_->weights, noise, embedding, frames, steps, text_cfg, constraint_cfg);
++        auto observed = normalized_observed(*impl_->weights, *impl_->skeleton, condition->observed);
++        if (!observed) return std::unexpected(observed.error());
++        return detail::sample_motion_from_noise_conditioned(*impl_->weights, noise, embedding, *observed, condition->mask,
++                                                            condition->first_heading, frames, steps, text_cfg, constraint_cfg);
++    }();
+     if (!sampled) return std::unexpected(sampled.error());
+     auto global_mean=impl_->weights->f32_values("stats.global_root.mean"), global_std=impl_->weights->f32_values("stats.global_root.std");
+     auto body_mean=impl_->weights->f32_values("stats.body.mean"), body_std=impl_->weights->f32_values("stats.body.std");
+@@ -96,6 +150,7 @@ std::expected<motion_data, std::string> model::generate_embedding(
+     result.root_positions=std::move(decoded->root_positions);
+     return result;
+ #else
++    (void) embedding; (void) condition; (void) frames; (void) steps; (void) seed; (void) text_cfg; (void) constraint_cfg;
+     return std::unexpected("Kimodo was built without GGML support");
+ #endif
+ }

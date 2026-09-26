@@ -7,6 +7,7 @@
  * did not own and the loader names the owner from this order.
  */
 import { makeProjector } from './camera-project.js'
+import { makeCurve } from './curves.js'
 
 /**
  * Add the project commands and the two live readings to a world's context.
@@ -108,6 +109,15 @@ export function attachWorldSurface(context, { world, bus, editor, loop, importPr
      * @returns {object} The projector.
      */
     projector: () => makeProjector(context.view, context.viewport),
+    // Offered here for the same reason as the projector.
+    /**
+     * A curve through keys, or a named preset, eased between them: see engine/curves.js.
+     *
+     * @param {Array<{at: number, value: number|number[], ease?: string}>|string} source The keys, `at` rising, or a preset name.
+     * @param {{duration?: number, from?: number|number[], to?: number|number[], loop?: boolean}} [options] How to stretch and map it.
+     * @returns {object} `{ keys, duration, loop, valueAt(seconds) }`.
+     */
+    curve: (source, options) => makeCurve(source, options),
 
     // The deterministic runtime. Game code uses these instead of the wall clock,
     // Math.random and setTimeout — which is what makes simulate() repeatable.

@@ -1,5 +1,34 @@
 # Constraints
 
+## Controls
+
+A type names its controls once; game code moves them by name, never a bone.
+
+```js
+rig: {
+  controls: {
+    rightHand: { kind: 'limb', nodes: ['RightArm', 'RightForeArm', 'RightHand'], pole: { node: 'Spine2', at: [-0.45, -0.25, -0.5] } },
+    head: { kind: 'aim', node: 'Head', limit: 60 }
+  }
+}
+entity.rigControls = { ...entity.rigControls, rightHand: { target, weight: 1 } }
+```
+
+- `limb` becomes a `reach`, `aim` a `lookAt`. A pole in a body node's space makes the elbow or knee follow the body.
+- A request may name its own `pole`, and may be a list, solved in order on the same limb.
+- A request may follow a **path** instead of a target: curve keys of points (`context.curve` keys), in model space, or in `node`'s space when it names one. `startedAt` is the world time it starts, `speed` (1) scales it, and the control fades in and out over `fade` path seconds (0.15) at its ends. Set it once; Rig Animation moves along it each step.
+
+```js
+entity.rigControls = { ...entity.rigControls, rightHand: {
+  path: [{ at: 0, value: [-0.14, 1, 0.28], ease: 'quad-in' }, { at: 0.3, value: [0.05, 1.25, 0.6] }],
+  startedAt: context.time
+} }
+```
+- Set only the controls you own (spread the rest): two systems can move different controls.
+- `context.rigAnimation.rigOf(entity)` answers the rig in world points; See draws it with `rig: true`.
+
+## Constraints
+
 Constraints change the pose after the clip and the layer, in the fixed step.
 The type's `rig.constraints` hold for every entity of it (planted feet), and
 are solved first; then `entity.rigConstraints`, what game code asks for this
@@ -46,9 +75,10 @@ remember between steps gets its own `memory` record.
 |---|---|
 | `{ node, at? }` | a point in that node's own space |
 | `{ attachment, at? }` | a point in that attachment's model space, where it hangs now: a bow's string |
+| `{ model: [x, y, z] }` | a point in model space: it turns and moves with the entity, not with a bone. A swing path. |
 | `{ point: [x, y, z] }` | a point in the world |
 
 - `context.rigAnimation.pointOf(entity, target)` answers where any target is now, in model space: `{ node: 'RightHand' }` is the hand. A test checks a reach with it.
 - Ramp `weight` yourself; an empty list leaves the pose alone.
 - A constraint changes only nodes the clip poses.
-- Code: `plugins/builtin/rig-animation/constraints.js`, the solvers in `solvers/`, over `skeleton.js`, `targets.js` and `turns.js`.
+- Code: `plugins/builtin/rig-animation/constraints.js`, the solvers in `solvers/`, controls in `controls.js`, the drawn view in `rig-view.js`, over `skeleton.js`, `targets.js` and `turns.js`.

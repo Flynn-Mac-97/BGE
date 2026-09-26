@@ -40,8 +40,10 @@
  *   rig: { ..., skeleton: 'motion/hero.skeleton.json', constraints: [{ kind: 'plant', nodes: [...] }] }
  *   entity.rigConstraints = [{ kind: 'reach', nodes: [...], target: { node, at }, weight: 0.6 }]
  *
- * The type's constraints hold for every entity of it (planted feet); the
- * entity's are what game code asks for this step (a reach).
+ * The type's constraints hold for every entity of it (planted feet). Its
+ * `rig.controls` name limbs and aims, and game code moves them by name with
+ * `entity.rigControls` (rig-animation/controls.js); `entity.rigConstraints`
+ * names bones directly.
  *
  * See rig-animation/constraints.js for every kind and target.
  */
@@ -51,6 +53,8 @@ import { applyLayer } from './rig-animation/layer.js'
 import { widenSkeleton } from './rig-animation/skeleton.js'
 import { applyConstraints } from './rig-animation/constraints.js'
 import { pointOf } from './rig-animation/targets.js'
+import { constraintsForControls } from './rig-animation/controls.js'
+import { rigView } from './rig-animation/rig-view.js'
 import { makeOnceReporter } from '../../engine/report-once.js'
 
 /** file -> { status, value, error }: a clip or a skeleton. Both files are immutable, so one cache serves every world. */
@@ -97,6 +101,17 @@ export default {
         return skeleton && entity.pose ? pointOf(entity, skeleton, target) : null
       },
 
+      /**
+       * The rig as it stands this step, in world points: posed bones, and each
+       * constraint's end, target, joint and pole (rig-animation/rig-view.js).
+       * Null until the type's skeleton has loaded.
+       */
+      rigOf(entity) {
+        const file = entity._definition.rig?.skeleton
+        const skeleton = file && read(context, file, widenSkeleton).value
+        return skeleton && entity.pose ? rigView(entity, skeleton, entity._rigSolved ?? [], entity._rigMemory) : null
+      },
+
       /** Forget every loaded clip, so an edited file is read again. */
       forget: () => clips.clear()
     }
@@ -132,7 +147,7 @@ export default {
 
         applyClip(entity, clip, rig)
         applyLayer(entity, rig, seconds, layerFile => read(state.context, layerFile).value)
-        if (rig.constraints?.length || entity.rigConstraints?.length) constrain(state.context, entity, rig, seconds)
+        if (rig.constraints?.length || entity.rigControls || entity.rigConstraints?.length) constrain(state.context, entity, rig, seconds)
       }
     }
   }],
@@ -273,10 +288,9 @@ async function loadSkeleton(context, file) {
   const entry = read(context, file, widenSkeleton)
   if (entry.status === 'loading') await entry.waiting
   if (entry.status === 'failed') throw new Error(`rig skeleton ${file}: ${entry.error}`)
-  return entry.value
 }
 
-/** Solve the type's constraints, then the entity's, over its pose, once the type's skeleton has loaded. */
+/** Solve the type's constraints, its controls as asked, then the entity's, over its pose, once the skeleton has loaded. */
 function constrain(context, entity, rig, seconds) {
   if (!rig.skeleton) {
     reportOnce(`[rig] ${entity.type}: constraints need rig.skeleton — rig.retarget writes it and prints the line`)
@@ -284,7 +298,13 @@ function constrain(context, entity, rig, seconds) {
   }
   const skeleton = read(context, rig.skeleton, widenSkeleton).value
   if (!skeleton || !entity.pose) return
-  applyConstraints(entity, skeleton, [...(rig.constraints ?? []), ...(entity.rigConstraints ?? [])], seconds)
+  const controlled = constraintsForControls(rig.controls, entity.rigControls, context.time)
+  for (const refusal of controlled.refusals) reportOnce(`[rig] ${entity.type}: ${refusal}`)
+  // The type's own first (planted feet), then what game code moves by control, then by bone.
+  const constraints = [...(rig.constraints ?? []), ...controlled.constraints, ...(entity.rigConstraints ?? [])]
+  applyConstraints(entity, skeleton, constraints, seconds)
+  // Kept for rigOf, so a picture shows what this step solved.
+  entity._rigSolved = constraints
 }
 
 /**

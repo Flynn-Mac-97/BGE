@@ -26,7 +26,23 @@ const HOME = process.env.KIMODO_HOME || path.resolve(CHECKOUT, '..', 'kimodo.cpp
 const REPOSITORY = 'https://github.com/localai-org/kimodo.cpp'
 const DEFAULT_MODEL = 'soma-rp-v1.1'
 const WINDOWS = process.platform === 'win32'
-const PATCH = path.join(CHECKOUT, 'tools', 'kimodo-windows.patch')
+
+/**
+ * Patches applied to the clone, in order, each skipped when already applied.
+ *
+ * windows: upstream is written for Linux. Three files reach
+ * `std::runtime_error` through a header MSVC does not include for them, one
+ * passes a `std::filesystem::path` where a `const char *` is wanted, and one
+ * calls the Vulkan backend outside the guard that decides whether it was built.
+ *
+ * constraints: upstream reads no constraints. This adds
+ * `model::generate_text_conditioned` and `kmd-generate --observed`, which
+ * `tools/make-rig-clip.mjs --constraints` uses.
+ */
+const PATCHES = [
+  { name: 'windows', file: path.join(CHECKOUT, 'tools', 'kimodo-windows.patch'), isNeeded: WINDOWS },
+  { name: 'constraints', file: path.join(CHECKOUT, 'tools', 'kimodo-constraints.patch'), isNeeded: true }
+]
 
 /**
  * What a build needs, and what each one is for.
@@ -113,19 +129,13 @@ function cmake(args, cwd) {
   return run('cmd', ['/c', `"${script}" >nul && cmake ${args.join(' ')}`], cwd)
 }
 
-/**
- * Make the source build on Windows.
- *
- * Upstream is written for Linux: three files reach `std::runtime_error` through
- * a header MSVC does not include for them, one passes a `std::filesystem::path`
- * where a `const char *` is wanted, and one calls the Vulkan backend outside the
- * guard that decides whether it was built. Skipped when it is already applied.
- */
+/** Apply each needed patch in PATCHES that `git apply --check` accepts. */
 async function patch() {
-  if (!WINDOWS || !fs.existsSync(PATCH)) return
-  const clean = spawnSync('git', ['apply', '--check', PATCH], { cwd: HOME, windowsHide: true })
-  if (clean.status !== 0) { console.log('\nwindows patch: already applied, or refused — skipping'); return }
-  await run('git', ['apply', PATCH], HOME)
+  for (const one of PATCHES.filter(each => each.isNeeded)) {
+    const clean = spawnSync('git', ['apply', '--check', one.file], { cwd: HOME, windowsHide: true })
+    if (clean.status !== 0) { console.log(`\n${one.name} patch: already applied, or refused — skipping`); continue }
+    await run('git', ['apply', one.file], HOME)
+  }
 }
 
 async function install(model, vulkan) {
