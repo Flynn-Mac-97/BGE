@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { widenClip, applyClip } from '../plugins/builtin/rig-animation.js'
 import { applyLayer } from '../plugins/builtin/rig-animation/layer.js'
+import { applyCrossfade, crossfadeFrom } from '../plugins/builtin/rig-animation/crossfade.js'
 import { widenSkeleton, placeOf } from '../plugins/builtin/rig-animation/skeleton.js'
 import { applyConstraints } from '../plugins/builtin/rig-animation/constraints.js'
 import { worldPointOf } from '../plugins/builtin/rig-animation/targets.js'
@@ -1046,4 +1047,14 @@ test('the rig view gives bones and each constraint in world points, after the so
   assert.equal(reach.kind, 'reach')
   assert.ok(distance(reach.target, [5.3, 1.2, 0.2]) < 1e-6, 'the target is in the world, moved with the entity')
   assert.ok(distance(reach.end, reach.target) < 1e-3, 'and the hand is on it')
+})
+
+test('a new base clip fades in over the one left behind, then that one is dropped', () => {
+  // The clip left behind holds the head a half turn about X; the new one leaves it at rest.
+  const turned = widenClip({ name: 'turned', framesPerSecond: 10, loop: true, nodes: ['head'], rotations: [[1, 0, 0, 0], [1, 0, 0, 0]] }, 'turned')
+  const entity = { pose: { head: [0, 0, 0, 1] }, _rigFrom: crossfadeFrom('turned.json', 0) }
+  applyCrossfade(entity, { clipFade: 0.2 }, 0.1, () => turned)
+  assert.ok(Math.abs(entity.pose.head[0] - Math.SQRT1_2) < 1e-6, `halfway through the fade, the head is halfway round (${entity.pose.head[0]})`)
+  applyCrossfade(entity, { clipFade: 0.2 }, 0.1, () => turned)
+  assert.equal(entity._rigFrom, null, 'once faded, the old clip is let go')
 })

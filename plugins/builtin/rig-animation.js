@@ -50,6 +50,7 @@
 import { assetPath } from '../../engine/asset-path.js'
 import { framesAt, mixInto } from './rig-animation/sample.js'
 import { applyLayer } from './rig-animation/layer.js'
+import { applyCrossfade, crossfadeFrom } from './rig-animation/crossfade.js'
 import { widenSkeleton } from './rig-animation/skeleton.js'
 import { applyConstraints } from './rig-animation/constraints.js'
 import { pointOf } from './rig-animation/targets.js'
@@ -151,6 +152,7 @@ export default {
         if (!clip) continue
 
         if (entity._rigClipFile !== file) {
+          if (entity._rigClipFile) entity._rigFrom = crossfadeFrom(entity._rigClipFile, entity._rigTime)
           entity._rigClipFile = file
           entity._rigTime = 0
           entity._rigRootLast = null
@@ -160,6 +162,7 @@ export default {
         }
 
         applyClip(entity, clip, rig)
+        applyCrossfade(entity, rig, seconds, fromFile => read(state.context, fromFile).value)
         applyLayer(entity, rig, seconds, layerFile => read(state.context, layerFile).value)
         if (rig.constraints?.length || entity.rigControls || entity.rigConstraints?.length) constrain(state.context, entity, rig, seconds)
       }
