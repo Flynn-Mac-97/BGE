@@ -66,7 +66,9 @@ state     snapshot [--entities --log --plugins --commands --timers]
           check                exits 1 if anything is broken, nondeterministic,
                                or a plugin file that will not load, or if the
                                kernel fails format, lint, Trellis or Codemap
-                               (agents/code-style.md). A problem marked
+                               (agents/code-style.md). The same four run on
+                               the directories a game's game.json lists in
+                               "codeGate". A problem marked
                                "warning" is reported and exits 0
           test [files]         run only the core test areas the files call;
                                no files means the files git says changed
@@ -1141,8 +1143,12 @@ if (op === 'check') {
   // The kernel gate — format, lint, Trellis and Codemap — runs on every check,
   // so an agent that only runs `check` still meets `agents/code-style.md`.
   const { kernelGateProblems } = await import('../scripts/kernel-gate.mjs')
+  // The same four checks over the game's own code, for a project whose
+  // game.json names directories in `codeGate`.
+  const { projectGateProblems } = await import('../scripts/project-gate.mjs')
   const problems = [
     ...await kernelGateProblems(CHECKOUT),
+    ...await projectGateProblems(CHECKOUT, PROJECT),
     ...pluginProblems(failed),
     // Building without writing saves the serialized index characters and leaves
     // no half-fresh artifact for the `index` route or a boot to disagree with;

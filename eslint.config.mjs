@@ -120,8 +120,24 @@ const KERNEL_FILES = [
   'scripts/check-structure.mjs',
   'scripts/eslint-style-rules.mjs',
   'scripts/test-areas.mjs',
-  'scripts/test-mutants.mjs'
+  'scripts/test-mutants.mjs',
+  'scripts/project-gate.mjs'
 ]
+
+/**
+ * The style rules as one config block over `files`. The kernel uses it below,
+ * and `scripts/project-gate.mjs` uses it over a game's own code.
+ */
+export const styleConfig = files => ({
+  files,
+  languageOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    globals: { ...globals.browser, ...globals.node }
+  },
+  plugins: { style },
+  rules: { ...CLARITY_RULES, 'no-restricted-syntax': ['error', ...BANNED_SHAPES, BUS_CALL] }
+})
 
 export default [
   js.configs.recommended,
@@ -129,16 +145,7 @@ export default [
     files: ['eslint.config.mjs', 'prettier.config.mjs', 'scripts/**/*.mjs'],
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node }
   },
-  {
-    files: KERNEL_FILES,
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: { ...globals.browser, ...globals.node }
-    },
-    plugins: { style },
-    rules: { ...CLARITY_RULES, 'no-restricted-syntax': ['error', ...BANNED_SHAPES, BUS_CALL] }
-  },
+  styleConfig(KERNEL_FILES),
   {
     files: BUS_FILES,
     rules: { 'no-restricted-syntax': ['error', ...BANNED_SHAPES] }

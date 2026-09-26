@@ -304,6 +304,27 @@ test('a placement that keeps the invariant its type declares passes check', asyn
   assert.deepEqual(broken, [], 'a correct placement reports no invariant problem')
 })
 
+test('a game that lists codeGate fails check on its own code style', async () => {
+  // A game with no codeGate is not held to the rules: the fixture above passes.
+  const project = await temporaryProject(
+    {
+      'game.json': { title: 'gated', startLevel: 'main', codeGate: ['plugins'] },
+      'plugins/short-names.js': `/** A plugin with one name the style bans. */
+export default { name: 'Short Names', onLoad(ctx) { return ctx } }
+`,
+      'levels/main.json': { entities: [] }
+    },
+    'engine-code-gate-'
+  )
+  const result = run(['check', '--project', project])
+  const problems = JSON.parse(result.stdout).problems.filter(problem => problem.file === 'plugins/short-names.js')
+  assert.equal(result.code, 1, 'a style break in a gated directory fails check')
+  assert.ok(
+    problems.some(problem => /ctx/.test(problem.why)),
+    `the lint names the short name (${problems.map(problem => problem.why).join('; ')})`
+  )
+})
+
 test('invariantProblems: a placement that satisfies its type is silent', () => {
   const index = {
     types: { ground: { file: 'types/ground.js', invariant: { rule: 'topFaceAtY', value: 0 }, meshBox: [40, 1, 40] } },

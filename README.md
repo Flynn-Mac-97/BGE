@@ -49,7 +49,7 @@ called — in a URL, in a `match:` pattern, and in every path below.
 
 ```
 project/
-  game.json          entry point: title, startLevel, device, plugins off
+  game.json          entry point: title, startLevel, device, plugins off, codeGate
   types/             coin.js  player.js  bat.js       what things ARE and DO
   behaviours/        float.js  spin.js  patrol.js     one trait, shared by any type
   levels/            level1.json                      where things are placed
@@ -343,6 +343,11 @@ property of the project:
 { "title": "Platformer", "startLevel": "level1",
   "plugins": { "disabled": ["Physics 2D"] } }
 ```
+
+`"codeGate": ["plugins", "types", "tests"]` holds those directories to
+`agents/code-style.md`: `check` then runs Prettier, the style lint, Trellis
+(zero eroded functions, duplicated blocks and import cycles) and Codemap over
+them, as it does over the kernel.
 
 All three work from a terminal too:
 
