@@ -26,7 +26,8 @@
  *
  * Each control becomes a constraint (constraints.js): a limb a `reach`, an aim
  * a `lookAt`. A request names a target or a path, a weight (1 for a path) and
- * optionally a pole.
+ * optionally a pole; an aim request may name its own `forward` axis, for a
+ * held item that points another way than the control's default.
  */
 import { makeCurve } from '../../../engine/curves.js'
 
@@ -48,7 +49,7 @@ const CONSTRAINTS = {
   aim: (control, request) => ({
     kind: 'lookAt',
     node: control.node,
-    forward: control.forward,
+    forward: request.forward ?? control.forward,
     limit: control.limit,
     target: request.target,
     weight: request.weight

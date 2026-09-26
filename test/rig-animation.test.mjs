@@ -19,6 +19,7 @@ import { startWorldInNode } from '../engine/start-world-node.mjs'
 import { widenClip, applyClip } from '../plugins/builtin/rig-animation.js'
 import { applyLayer } from '../plugins/builtin/rig-animation/layer.js'
 import { applyCrossfade, crossfadeFrom } from '../plugins/builtin/rig-animation/crossfade.js'
+import { applyBlend, cycleRate } from '../plugins/builtin/rig-animation/blend.js'
 import { widenSkeleton, placeOf } from '../plugins/builtin/rig-animation/skeleton.js'
 import { applyConstraints } from '../plugins/builtin/rig-animation/constraints.js'
 import { worldPointOf } from '../plugins/builtin/rig-animation/targets.js'
@@ -1057,4 +1058,24 @@ test('a new base clip fades in over the one left behind, then that one is droppe
   assert.ok(Math.abs(entity.pose.head[0] - Math.SQRT1_2) < 1e-6, `halfway through the fade, the head is halfway round (${entity.pose.head[0]})`)
   applyCrossfade(entity, { clipFade: 0.2 }, 0.1, () => turned)
   assert.equal(entity._rigFrom, null, 'once faded, the old clip is let go')
+})
+
+test('a blend clip plays in step with the base, from its frame that matches the base start', () => {
+  const half = [Math.SQRT1_2, 0, 0, Math.SQRT1_2]
+  // Base: two frames, at rest then a quarter turn. Blend: four frames, its third at rest like the base's first.
+  const base = widenClip({ name: 'light', framesPerSecond: 10, loop: true, nodes: ['leg'], rotations: [[0, 0, 0, 1], half] }, 'light')
+  const heavy = widenClip({ name: 'heavy', framesPerSecond: 10, loop: true, nodes: ['leg'], rotations: [half, [1, 0, 0, 0], [0, 0, 0, 1], half] }, 'heavy')
+  const entity = { pose: { leg: [0, 0, 0, 1, 0, 0, 0] }, _rigTime: 0, rigBlend: { clip: 'heavy', weight: 1 } }
+  applyBlend(entity, base, heavy)
+  assert.deepEqual(entity.pose.leg.slice(0, 4).map(value => Number(value.toFixed(6))), [0, 0, 0, 1], 'the blend starts where its pose matches the base start')
+  entity.rigBlend.weight = 0.5
+  assert.equal(cycleRate(entity, base, heavy), 0.75, 'half blended, the shared cycle runs halfway between the two clips\' own paces')
+})
+
+test('an aim request may carry its own forward axis, over the control\'s', () => {
+  const controls = { blade: { kind: 'aim', node: 'hand', forward: [0, 0, 1], limit: 180 } }
+  const { constraints } = constraintsForControls(controls, { blade: { target: { model: [0, 1, 1] }, weight: 1, forward: [0.7, 0.7, 0] } })
+  assert.deepEqual(constraints[0].forward, [0.7, 0.7, 0])
+  const plain = constraintsForControls(controls, { blade: { target: { model: [0, 1, 1] }, weight: 1 } })
+  assert.deepEqual(plain.constraints[0].forward, [0, 0, 1])
 })

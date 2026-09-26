@@ -11,6 +11,7 @@
  *     "scale": 1.1,                  joint positions are multiplied by it (model metres to capture metres)
  *     "constraints": [
  *       { "kind": "pose", "at": [0, 1.73] },          the template's whole body at these seconds
+ *       { "kind": "pose", "at": [0, 1.9], "from": 0 }, its body at 0 s, held at both: start and end in one stance
  *       { "kind": "root" },                           the template's ground path and heading, every frame
  *       { "kind": "path", "heading": 0,               a ground path [x, z] as curve keys, every frame from the
  *         "keys": [{ "at": 0, "value": [0, 0] }, { "at": 3, "value": [0, 4.2] }] }   first key to the last
@@ -71,8 +72,9 @@ const LIMBS = {
 /** What each constraint kind fixes, given the condition being filled and the constraint. */
 const KINDS = {
   pose: (condition, constraint) => {
+    const [source] = constraint.from === undefined ? [null] : framesAt(condition, [constraint.from])
     for (const frame of framesAt(condition, constraint.at)) {
-      const posed = condition.posedAt(frame)
+      const posed = condition.posedAt(source ?? frame)
       keepPlacement(condition, frame, posed)
       posed.positions.forEach((position, joint) => keepPosition(condition, frame, joint, position, posed))
     }

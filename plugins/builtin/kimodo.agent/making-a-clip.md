@@ -47,6 +47,9 @@ it).
 - `path` keeps the ground point under the hips on a curve of `[x, z]` keys,
   every frame, with `heading` (radians, 0 faces +Z) if given. It needs no
   template. Use it to make a walk or run straight, at a known speed.
+- Word a load as something worn ("wearing a heavy backpack"), never
+  "carrying": carrying gives the hands a box to hold, and anything worn on a
+  forearm then lies flat across the belly.
 - Keep a path at 4 m/s or less. At 6 m/s the soma model floats the body
   0.2–0.4 m off the floor and hunches. Play a slower clip faster for a faster
   game speed: rate = game speed / clip speed.

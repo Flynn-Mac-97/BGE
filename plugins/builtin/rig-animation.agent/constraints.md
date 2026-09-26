@@ -15,7 +15,7 @@ entity.rigControls = { ...entity.rigControls, rightHand: { target, weight: 1 } }
 ```
 
 - `limb` becomes a `reach`, `aim` a `lookAt`. A pole in a body node's space makes the elbow or knee follow the body.
-- A request may name its own `pole`, and may be a list, solved in order on the same limb.
+- A request may name its own `pole`, and may be a list, solved in order on the same limb. An `aim` request may name its own `forward`: a hand aiming a held blade along the blade's axis.
 - A request may follow a **path** instead of a target: curve keys of points (`context.curve` keys), in model space, or in `node`'s space when it names one. `startedAt` is the world time it starts, `speed` (1) scales it, and the control fades in and out over `fade` path seconds (0.15) at its ends. Set it once; Rig Animation moves along it each step.
 
 ```js

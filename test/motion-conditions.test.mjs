@@ -67,3 +67,10 @@ test('a path keeps the ground point on its curve every frame, with no template',
   assert.equal(rowOf(condition.mask, 3).reduce((sum, value) => sum + value, 0), 4)
   assert.equal(condition.firstHeading, 0)
 })
+
+test('a pose from another moment holds that moment\'s body at every frame named', () => {
+  const template = stillTemplate(4, UNTURNED)
+  template.root.set([5, 0.9, 7], 0)
+  const condition = motionCondition({ skeleton: 'soma-30', frames: 4, framesPerSecond: 2, template, record: { constraints: [{ kind: 'pose', at: [1.5], from: 0 }] } })
+  assert.deepEqual(rowOf(condition.observed, 3).slice(0, 3).map(value => Number(value.toFixed(3))), [5, 0.9, 7])
+})
