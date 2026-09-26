@@ -226,6 +226,35 @@ function positionAttachment(entry, spec, where, name) {
   entry.group.rotation.set(rotation.x, rotation.y, rotation.z)
   entry.group.scale.setScalar(declaredNumber(spec.scale, 1, `${where}.attachments.${name}.scale`))
   entry.group.updateMatrix()
+  if ((spec.ghost ?? null) === (entry.group.userData.ghost ?? null)) return
+  entry.group.userData.ghost = spec.ghost ?? null
+  paintGhost(entry.group)
+}
+
+/** How much of what is behind a ghost shows through it. */
+const GHOST_OPACITY = 0.45
+
+/**
+ * Draw an attachment's meshes as its `ghost` colour, see-through and unlit, or
+ * with their own materials again when it has none: a preview of where a thing
+ * would go. One ghost material per group, so a new colour repaints it in place
+ * and a discard that disposes the holder's materials frees only its own.
+ */
+function paintGhost(group) {
+  const colour = group.userData.ghost
+  if (colour && !group.userData.ghostMaterial) {
+    group.userData.ghostMaterial = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: GHOST_OPACITY,
+      depthWrite: false
+    })
+  }
+  group.userData.ghostMaterial?.color.set(colour ?? '#ffffff')
+  group.traverse(node => {
+    if (!node.isMesh) return
+    node.userData.ownMaterial ??= node.material
+    node.material = colour ? group.userData.ghostMaterial : node.userData.ownMaterial
+  })
 }
 
 /**
@@ -288,9 +317,11 @@ function applyEachAttachment(holder, declared, record, nodes, where) {
  *
  *   entity.attachments = { weaponMount: 'counter-strike/models/ak47.glb' }
  *   entity.attachments = { potion1: { model: 'potion.glb', node: 'Hips', position: [0.2, 0, 0] } }
+ *   entity.attachments = { preview: { model: 'sword.glb', node: 'Spine', ghost: '#3080ff' } }
  *
  * The key names the attachment. It is also the node, unless the entry gives
  * `node`, so several models can hang off one node under different names.
+ * `ghost`, a colour, draws the model see-through and unlit in that colour.
  * A character is exported with an empty node at the right hand, and what goes in
  * that hand changes as the game runs — so it is a declaration, read on sync,
  * alongside `pose` and `anchor`. It belongs here rather than in a plugin because
@@ -345,6 +376,8 @@ function loadAttachment(holder, group, file, onLanded) {
           node.frustumCulled = false
         })
       group.add(instance)
+      // A ghost asked for before the file landed covers the model now it is here.
+      if (group.userData.ghost) paintGhost(group)
     },
     () => {
       // `cachedModel()` has already named the file on the console. An empty hand is the

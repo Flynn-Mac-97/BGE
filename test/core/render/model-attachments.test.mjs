@@ -79,3 +79,27 @@ test('changing only the file keeps the old model shown until the new one lands',
   assert.equal(group.children.length, 1, 'and only the new model once it lands')
   assert.notEqual(group.children[0], shown)
 })
+
+/** The materials of every mesh an attachment group draws. */
+const materialsIn = group => {
+  const found = []
+  group.traverse(node => node.isMesh && found.push(node.material))
+  return found
+}
+
+test('a ghost attachment draws see-through in its colour, and its own look comes back without it', () => {
+  const { holder, bone } = holderWithBones()
+  const solid = new THREE.MeshStandardMaterial()
+  const scene = new THREE.Group()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), solid))
+  modelCache.set('sword.glb', { status: 'ready', scene, waiting: [] })
+  applyAttachments(holder, { sword: { model: 'sword.glb', node: 'Hips', ghost: '#3080ff' } }, release)
+  const [group] = hungOff(bone('Hips'))
+  const [ghost] = materialsIn(group)
+  assert.ok(ghost.transparent && ghost.opacity < 1, 'see-through')
+  assert.equal(ghost.color.getHexString(), '3080ff', 'in its colour')
+  applyAttachments(holder, { sword: { model: 'sword.glb', node: 'Hips', ghost: '#ff3020' } }, release)
+  assert.equal(materialsIn(group)[0].color.getHexString(), 'ff3020', 'a new colour repaints it')
+  applyAttachments(holder, { sword: { model: 'sword.glb', node: 'Hips' } }, release)
+  assert.equal(materialsIn(group)[0].type, solid.type, 'with no ghost it is drawn solid again')
+})

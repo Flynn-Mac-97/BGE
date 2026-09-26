@@ -164,6 +164,23 @@ export default {
         context.input.release(firstCode(context, options.action))
         return { released: options.action }
       }
+    },
+    {
+      // With input.press, a terminal drags in a live tab: press, point, point again, release.
+      id: 'input.point',
+      label: 'Put the pointer over the game view',
+      inputSchema: {
+        type: 'object',
+        required: ['x', 'y'],
+        properties: {
+          x: { type: 'number', description: 'viewport pixels from the left' },
+          y: { type: 'number', description: 'viewport pixels from the top' }
+        }
+      },
+      run: (context, options) => {
+        context.input.pointAt(options.x, options.y)
+        return context.input.pointer()
+      }
     }
   ],
 
