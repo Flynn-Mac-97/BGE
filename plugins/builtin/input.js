@@ -70,6 +70,21 @@ function watchPointer(viewport, keys, pointer) {
 /** Whether any action is bound to this physical key. */
 const isBound = code => Object.values(ACTIONS).some(codes => codes.includes(code))
 
+/** The one argument `input.press` and `input.release` take. */
+const ACTION_ARGUMENT = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['action'],
+  properties: { action: { type: 'string', description: 'an action name, as input.actions lists it' } }
+}
+
+/** The first key an action is bound to, or an error that lists every action. */
+function firstCode(context, action) {
+  const [code] = context.input.codes(action)
+  if (!code) throw new Error(`no action "${action}" — try ${context.input.actions().join(', ')}`)
+  return code
+}
+
 export default {
   name: 'Keyboard Input',
 
@@ -128,6 +143,29 @@ export default {
       pointAt: (x, y) => Object.assign(pointer, { x, y, isOver: true })
     }
   },
+
+  // A terminal holds an action down in a live tab as a test does, so a held
+  // moment (a bow at full draw) can be looked at. Held until released.
+  commands: [
+    {
+      id: 'input.press',
+      label: 'Hold an action down',
+      inputSchema: ACTION_ARGUMENT,
+      run: (context, options) => {
+        context.input.press(firstCode(context, options.action))
+        return { held: options.action }
+      }
+    },
+    {
+      id: 'input.release',
+      label: 'Let an action go',
+      inputSchema: ACTION_ARGUMENT,
+      run: (context, options) => {
+        context.input.release(firstCode(context, options.action))
+        return { released: options.action }
+      }
+    }
+  ],
 
   systems: [{
     // Frame, not fixed: a frame is one look at the world, and a screen that read a

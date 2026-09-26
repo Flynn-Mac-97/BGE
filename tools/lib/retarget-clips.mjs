@@ -5,7 +5,9 @@
  * it can go onto any model later without generating it again. This reads each
  * source, finds the bone map that fits the model, retargets through the model's
  * rest pose, trims a looping clip to its best cycle, and writes
- * `assets/motion/<model name>/<name>.json`.
+ * `assets/motion/<model name>/<name>.json`, and the model's skeleton as
+ * `assets/motion/<model name>.skeleton.json`, which Rig Animation's constraints
+ * read. It is outside the clip folder, where every file is a clip.
  *
  * Used by `tools/make-rig-clip.mjs --model` and the `rig.retarget` command.
  */
@@ -57,6 +59,29 @@ export function modelFile(project, model) {
   return found
 }
 
+/**
+ * Write a model's skeleton as `assets/motion/<model name>.skeleton.json`: every
+ * node's parent and rest place, keyed by name. Answers the file as a type names it.
+ */
+export function writeSkeleton({ project, model }) {
+  const file = modelFile(project, model)
+  const nodes = readModelSkeleton(file)
+  const record = {
+    model: path.relative(path.join(project, 'assets'), file).split(path.sep).join('/'),
+    nodes: Object.fromEntries(nodes.map(node => [node.name, {
+      parent: node.parent >= 0 ? nodes[node.parent].name : null,
+      position: node.translation,
+      rotation: node.rotation,
+      scale: node.scale
+    }]))
+  }
+  const reference = `motion/${path.basename(file, path.extname(file))}.skeleton.json`
+  const out = path.join(project, 'assets', reference)
+  fs.mkdirSync(path.dirname(out), { recursive: true })
+  fs.writeFileSync(out, JSON.stringify(record, null, 2) + '\n')
+  return reference
+}
+
 /** Raw buffers from a source directory: rotations, root, frame and joint counts. */
 export function readSource(directory) {
   const rotationsFile = path.join(directory, 'local_rotations_xyzw.f32')
@@ -100,6 +125,7 @@ export function retargetSources({ project, model, clips = null, once = [], map =
     writeClip(path.join(project, 'assets', reference), clip)
     written.push({ name, file: reference, frames: clip.rotations.length, nodes: clip.nodes.length })
   }
+  const skeleton = writeSkeleton({ project, model })
   return {
     model: path.relative(path.join(project, 'assets'), file).split(path.sep).join('/'),
     rig: chosen.rig,
@@ -107,6 +133,6 @@ export function retargetSources({ project, model, clips = null, once = [], map =
     ...(chosen.guessed ? { guessed: `the bone map was guessed from node names; check ${mapReference(project, chosen)}`, unmatched: chosen.unmatched } : {}),
     facing: describeFacing(chosen.facing),
     written,
-    declare: { rig: { clips: Object.fromEntries(written.map(one => [one.name, one.file])), default: written[0].name, rootMotion: false } }
+    declare: { rig: { clips: Object.fromEntries(written.map(one => [one.name, one.file])), default: written[0].name, rootMotion: false, skeleton } }
   }
 }

@@ -22,6 +22,8 @@ category: gameplay
 | `pointer()` | the pointer over the game view, `{ x, y, isOver }` in viewport pixels — what `renderer.pickNode` takes |
 | `pointAt(x, y)` | put the pointer somewhere by hand, as a test does |
 
+- From a terminal: `run input.press '{"action":"gearAttack"}'` holds an action down in the live tab until `run input.release` with the same action. Use it to hold a moment still for `see.capture`.
+
 - Mouse buttons over the game view are key codes: `MouseLeft`, `MouseMiddle`, `MouseRight` (never `Mouse1`: the DOM numbers the middle button 1). Bind them like keys.
 - While a run plays, a key bound to an action does not also do its browser job (Tab does not move focus).
 

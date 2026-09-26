@@ -4,7 +4,8 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { anchorOffset, frameWindow, entityTint } from '../../../engine/render/entity-look.js'
+import { frameWindow, entityTint } from '../../../engine/render/entity-look.js'
+import { anchorOffset } from '../../../engine/frame-plan.js'
 import { captureConsoleError } from './report-capture.mjs'
 
 test('a mesh that declares no anchor is not moved and nothing is reported', () => {

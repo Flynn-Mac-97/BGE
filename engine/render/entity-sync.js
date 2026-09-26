@@ -7,10 +7,9 @@
  * that draws what changed, the sweep that drops what left, and the frame's
  * counts.
  */
-import { meshOf, totalScale, spinRadians, entityDrawSize } from '../frame-plan.js'
-import { anchorOffset, frameWindow } from './entity-look.js'
+import { anchorOffset, meshOf, totalScale, spinRadians, entityDrawSize } from '../frame-plan.js'
+import { frameWindow } from './entity-look.js'
 import { applyAttachments } from './model-nodes.js'
-import { applyReach } from './model-reach.js'
 import { makeEntityRecords } from './entity-record.js'
 import { makeEntityScans } from './entity-scan.js'
 
@@ -106,8 +105,6 @@ export function makeEntitySync(state) {
     // state as putting one on: a body that dropped its rifle stops declaring
     // one, and the hand has to empty.
     if (declared.model) applyAttachments(object, entity.attachments, state.release)
-    // After attachments, so a limb can reach for one where it hangs this frame.
-    if (declared.model && entity.rigReach) applyReach(object, entity.rigReach)
     // Depth decides what covers what, so there is nothing to order.
     object.renderOrder = 0
     record.simple = isSimpleMesh(declared)

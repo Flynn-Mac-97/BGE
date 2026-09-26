@@ -33,13 +33,30 @@
  *
  * The layer fades in and out over `layerFade` seconds. `entity.rigLayerDone`
  * is true once a clip that plays once has reached its end.
+ *
+ * Constraints change the pose last, in this same step: an arm reaching for a
+ * point. They need the model's skeleton, a file `rig.retarget` writes:
+ *
+ *   rig: { ..., skeleton: 'motion/hero.skeleton.json', constraints: [{ kind: 'plant', nodes: [...] }] }
+ *   entity.rigConstraints = [{ kind: 'reach', nodes: [...], target: { node, at }, weight: 0.6 }]
+ *
+ * The type's constraints hold for every entity of it (planted feet); the
+ * entity's are what game code asks for this step (a reach).
+ *
+ * See rig-animation/constraints.js for every kind and target.
  */
 import { assetPath } from '../../engine/asset-path.js'
 import { framesAt, mixInto } from './rig-animation/sample.js'
 import { applyLayer } from './rig-animation/layer.js'
+import { widenSkeleton } from './rig-animation/skeleton.js'
+import { applyConstraints } from './rig-animation/constraints.js'
+import { pointOf } from './rig-animation/targets.js'
+import { makeOnceReporter } from '../../engine/report-once.js'
 
-/** file -> { status, clip, error }. Clip files are immutable, so one cache serves every world. */
+/** file -> { status, value, error }: a clip or a skeleton. Both files are immutable, so one cache serves every world. */
 const clips = new Map()
+
+const reportOnce = makeOnceReporter().report
 
 /** world -> { context }, so a system can reach the file reader without a module-level context. */
 const worlds = new WeakMap()
@@ -53,19 +70,32 @@ export default {
 
     context.rigAnimation = {
       /** The clip if it is loaded, null while it loads or if it failed. */
-      clip: file => read(context, file).clip,
+      clip: file => read(context, file).value,
 
       /** Load one clip and answer when it is there. Throws with the file name if it is not. */
       async load(file) {
         const entry = read(context, file)
         if (entry.status === 'loading') await entry.waiting
         if (entry.status === 'failed') throw new Error(`rig clip ${file}: ${entry.error}`)
-        return entry.clip
+        return entry.value
       },
 
       /** Load every clip every type declares. What a test awaits before it simulates. */
-      loadDeclared: () => Promise.all(declaredClips(context.world)
-        .map(({ file }) => context.rigAnimation.load(file).then(() => file, error => error.message))),
+      loadDeclared: () => Promise.all([
+        ...declaredClips(context.world).map(({ file }) => context.rigAnimation.load(file).then(() => file, error => error.message)),
+        ...declaredSkeletons(context.world).map(file => loadSkeleton(context, file).then(() => file, error => error.message))
+      ]),
+
+      /**
+       * Where a constraint target is under the entity's pose now, in model
+       * space: `{ node: 'RightHand' }` is where the hand is. Null until the
+       * type's skeleton has loaded.
+       */
+      pointOf(entity, target) {
+        const file = entity._definition.rig?.skeleton
+        const skeleton = file && read(context, file, widenSkeleton).value
+        return skeleton && entity.pose ? pointOf(entity, skeleton, target) : null
+      },
 
       /** Forget every loaded clip, so an edited file is read again. */
       forget: () => clips.clear()
@@ -88,7 +118,7 @@ export default {
         // gives. Check the spelling against `rig.clips`.
         if (!file) continue
 
-        const clip = read(state.context, file).clip
+        const clip = read(state.context, file).value
         if (!clip) continue
 
         if (entity._rigClipFile !== file) {
@@ -101,7 +131,8 @@ export default {
         }
 
         applyClip(entity, clip, rig)
-        applyLayer(entity, rig, seconds, layerFile => read(state.context, layerFile).clip)
+        applyLayer(entity, rig, seconds, layerFile => read(state.context, layerFile).value)
+        if (rig.constraints?.length || entity.rigConstraints?.length) constrain(state.context, entity, rig, seconds)
       }
     }
   }],
@@ -112,7 +143,7 @@ export default {
       label: 'Rig clips by type',
       run: context => Object.fromEntries(declaredClips(context.world).map(({ type, name, file }) => {
         const entry = clips.get(assetPath(file))
-        const clip = entry?.clip
+        const clip = entry?.value
         return [`${type}.${name}`, clip
           ? `${file} — ${clip.count} frames @${clip.framesPerSecond}fps, ${clip.nodes.length} nodes${clip.loop ? '' : ', once'}`
           : `${file} — ${entry?.error ? 'failed: ' + entry.error : 'not loaded'}`]
@@ -140,6 +171,18 @@ export default {
         const done = (await clipShelf()).retargetSources({ project: context.host.project, ...options })
         clips.clear()
         return done
+      }
+    },
+    {
+      id: 'rig.skeleton',
+      label: 'Write a model skeleton',
+      // rig.retarget writes it too; this is for clips made before it did.
+      run: async (context, options = {}) => {
+        if (!context.host) return needsNode('rig.skeleton', options)
+        if (!options.model) return { error: 'name the model as a type does: {"model":"models/hero.glb"}' }
+        const skeleton = (await clipShelf()).writeSkeleton({ project: context.host.project, model: options.model })
+        clips.clear()
+        return { skeleton, declare: { rig: { skeleton } } }
       }
     },
     {
@@ -222,22 +265,45 @@ function declaredClips(world) {
   return found
 }
 
+/** Every skeleton file any type declares, once each. */
+const declaredSkeletons = world => [...new Set([...world.types.values()].map(definition => definition.rig?.skeleton).filter(Boolean))]
+
+/** Load one skeleton file and answer when it is there. */
+async function loadSkeleton(context, file) {
+  const entry = read(context, file, widenSkeleton)
+  if (entry.status === 'loading') await entry.waiting
+  if (entry.status === 'failed') throw new Error(`rig skeleton ${file}: ${entry.error}`)
+  return entry.value
+}
+
+/** Solve the type's constraints, then the entity's, over its pose, once the type's skeleton has loaded. */
+function constrain(context, entity, rig, seconds) {
+  if (!rig.skeleton) {
+    reportOnce(`[rig] ${entity.type}: constraints need rig.skeleton — rig.retarget writes it and prints the line`)
+    return
+  }
+  const skeleton = read(context, rig.skeleton, widenSkeleton).value
+  if (!skeleton || !entity.pose) return
+  applyConstraints(entity, skeleton, [...(rig.constraints ?? []), ...(entity.rigConstraints ?? [])], seconds)
+}
+
 /**
  * The cache entry for a file, starting the read the first time it is asked for.
+ * `widen` checks the parsed file and shapes it: a clip unless told otherwise.
  *
  * `context.files.read` is the one door that answers in the browser and in node,
  * so a clip loads the same way headless as it does on the page.
  */
-function read(context, file) {
+function read(context, file, widen = widenClip) {
   const path = assetPath(file)
   const found = clips.get(path)
   if (found) return found
 
-  const entry = { status: 'loading', clip: null, error: null, waiting: null }
+  const entry = { status: 'loading', value: null, error: null, waiting: null }
   clips.set(path, entry)
   entry.waiting = context.files.read(path)
     .then(text => {
-      entry.clip = widenClip(JSON.parse(text), file)
+      entry.value = widen(JSON.parse(text), file)
       entry.status = 'ready'
     })
     .catch(error => {

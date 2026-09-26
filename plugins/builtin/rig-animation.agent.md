@@ -30,7 +30,7 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 - Bone map: the game's `assets/motion/maps/<model>.json`, else `tools/lib/rig-maps`, else guessed from names and written there (`guessed` in the reply; read it).
 - Facing comes from the feet. Unmapped deforming bones follow the nearest mapped bone.
 
-- Type keys: `rig.clips` (name → file), `rig.default` (first clip), `rig.rootMotion` (false: the clip's travel is not added). Choose by assigning `entity.rigClip`; there is no `play()`.
+- Type keys: `rig.clips` (name → file), `rig.default` (first clip), `rig.rootMotion` (false: the clip's travel is not added), `rig.skeleton` (the file constraints need), `rig.constraints` (constraints every entity of the type keeps: planted feet). Choose by assigning `entity.rigClip`; there is no `play()`.
 
 - Clips load asynchronously (a headless test awaits `rig.load`). A playing clip owns `entity.pose`. Unknown names hold the last pose. Switching `rigClip` does not blend.
 - Layers: `rig.masks` names node lists; `entity.rigLayer = { clip, mask }` plays a clip on those nodes over the base, fading over `rig.layerFade` (0.12 s). `null` fades out; `rigLayerDone` marks a once clip's end. `speed` (default 1) plays it faster or slower; a new `startedAt` value plays the same clip again from its start.
@@ -40,4 +40,4 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 - `plugins/builtin/rig-animation.agent/checking.md` — every `rig.check` finding and how to read a compare sheet
 - `plugins/builtin/rig-animation.agent/retargeting.md` — how the retarget works, writing or fixing a bone map
 - `plugins/builtin/rig-animation.agent/making-a-clip.md` — clip file shape and tool flags
-- `plugins/builtin/rig-animation.agent/reach.md` — `entity.rigReach`: bend an arm onto a point after the pose
+- `plugins/builtin/rig-animation.agent/constraints.md` — `entity.rigConstraints`: IK and other pose changes after the clip, in the fixed step
