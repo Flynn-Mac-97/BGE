@@ -190,8 +190,8 @@ async function fromGenerator(settings) {
 function conditionArguments(settings, workspace) {
   const record = JSON.parse(fs.readFileSync(settings.constraints, 'utf8'))
   if (record.template === settings.name) throw new Error(`--name ${settings.name} would write over its own template; name a new take`)
-  const template = readSource(path.resolve(CHECKOUT, settings.project, SOURCE_DIRECTORY, record.template))
-  const skeleton = settings.skeleton || skeletonFor(template.joints)
+  const template = record.template ? readSource(path.resolve(CHECKOUT, settings.project, SOURCE_DIRECTORY, record.template)) : null
+  const skeleton = settings.skeleton || (template ? skeletonFor(template.joints) : 'soma-30')
   const condition = motionCondition({ skeleton, frames: settings.frames, framesPerSecond: settings.fps, template, record })
   const observed = path.join(workspace, 'observed.f32')
   const mask = path.join(workspace, 'mask.f32')

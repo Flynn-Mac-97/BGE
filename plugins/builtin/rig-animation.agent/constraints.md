@@ -63,7 +63,7 @@ did: the bow arm first, then the hand on its string.
 |---|---|
 | `reach` | bends three nodes (upper, lower, end) so the end touches `target`. Two-bone IK. `weight` 0 is the pose, 1 is touching. The joint keeps the side it bends to, unless `pole` (any target shape) names the side. A target past the limb's length is reached towards, straight-armed. |
 | `lookAt` | turns one `node` so its `forward` axis (its own +Z by default) points at `target`, at most `limit` degrees (70) from the pose. |
-| `plant` | a foot the clip holds within `lift` m (0.05) of its rest height stays where it touched the world; the leg bends to it. It lets go over `blend` s (0.1) when the clip lifts it, or when it is more than `letGo` m (0.3) from the clip's foot, and plants again once faded, so it never jumps. Stops sliding on turns and stops; a run whose clip stride does not match the speed still slides. |
+| `plant` | a foot the clip holds within `lift` m (0.05) of its rest height, and moves slower than `still` m/s (0.5) counting the clip's own travel, stays where it touched the world; the leg bends to it. It lets go over `blend` s (0.1) when the clip lifts it, or when it is more than `letGo` m (0.3) from the clip's foot, and plants again once faded, so it never jumps. Stops sliding on turns and stops. A foot the clip itself slides (a fast run) is left to the clip rather than locked and popped; move the body at `travelOf` so it does not slide. |
 
 Each kind is a file in `plugins/builtin/rig-animation/solvers/`. To add one,
 add a file and a line in `SOLVERS` in `constraints.js`. A solver that must

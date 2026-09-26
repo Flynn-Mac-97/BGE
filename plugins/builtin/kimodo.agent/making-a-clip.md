@@ -44,6 +44,12 @@ it).
 - `pose` keeps the template's whole body at those seconds, to start or end on
   a known stance. `root` keeps its ground path and heading on every frame.
 - Keys are exact only at their frames. Between keys the model is free.
+- `path` keeps the ground point under the hips on a curve of `[x, z]` keys,
+  every frame, with `heading` (radians, 0 faces +Z) if given. It needs no
+  template. Use it to make a walk or run straight, at a known speed.
+- Keep a path at 4 m/s or less. At 6 m/s the soma model floats the body
+  0.2–0.4 m off the floor and hunches. Play a slower clip faster for a faster
+  game speed: rate = game speed / clip speed.
 
 `tools/lib/motion-conditions.mjs` builds the features; the take's directory
 keeps `constraints.json`, `observed.f32` and `mask.f32` beside the motion.

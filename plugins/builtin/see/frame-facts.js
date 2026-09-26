@@ -21,6 +21,16 @@ export function yawOf(entity) {
   return (Number(declared) || 0) * Math.PI / 180
 }
 
+/**
+ * Where an entity's face points, in radians about Y, measured as `yawOf` is:
+ * 0 is -Z. A model whose type declares `mesh.faces: '+Z'` (a rigged character
+ * from `rig.retarget`) points its face +Z at yaw 0, so its face is a half turn
+ * from its yaw.
+ */
+export function facingOf(entity) {
+  return yawOf(entity) + (declared(entity, 'mesh')?.faces === '+Z' ? Math.PI : 0)
+}
+
 /** What the entity has, or what its definition declares when the entity has none. */
 function declared(entity, name) {
   return entity[name] || entity._definition?.[name]
@@ -142,7 +152,7 @@ export const SHOTS = {
 export function frameSubject(entity, bounds, shotName) {
   const shot = SHOTS[shotName] || SHOTS['three-quarter']
   const distance = Math.max(2, Math.max(bounds.w, bounds.h, bounds.l || 0) * shot.distance)
-  const facing = yawOf(entity)
+  const facing = facingOf(entity)
   // The eye is placed out along the shot's bearing; its yaw looks back.
   const azimuth = facing + shot.azimuth
   const flat = distance * Math.cos(-shot.pitch)
@@ -158,11 +168,11 @@ export function frameSubject(entity, bounds, shotName) {
 /**
  * Degrees between where `entity` points and where `other` stands, 0 meaning
  * dead-on. A nose points at -Z at yaw 0, the same convention the renderer
- * turns bodies by.
+ * turns bodies by, unless the type's mesh `faces: '+Z'` (facingOf).
  */
 export function facingOffset(entity, other) {
   const wanted = Math.atan2(-(other.x - entity.x), -((other.z || 0) - (entity.z || 0)))
-  const yaw = yawOf(entity)
+  const yaw = facingOf(entity)
   const off = Math.abs(((wanted - yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
   return { degreesOff: Math.round(off * 180 / Math.PI), facingIt: off < Math.PI / 6 }
 }

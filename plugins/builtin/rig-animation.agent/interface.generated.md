@@ -1,4 +1,4 @@
-<!--b9661fe7-->
+<!--884e459d-->
 parsed from source
   plugin Rig Animation
   category visuals
@@ -13,4 +13,4 @@ parsed from source
   arguments rig.clips:;rig.load:;rig.sources:;rig.retarget: options = {};rig.skeleton: options = {};rig.check: options = {};rig.compare: options = {};rig.play: { entity, clip }
   context rigAnimation
   systems fixed
-  source 424 lines
+  source 438 lines

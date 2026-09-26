@@ -9,7 +9,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { yawOf, facingOffset } from '../plugins/builtin/see/frame-facts.js'
+import { yawOf, facingOffset, frameSubject } from '../plugins/builtin/see/frame-facts.js'
 import { makeWorld } from '../engine/world.js'
 
 const DEGREE = Math.PI / 180
@@ -83,4 +83,13 @@ test('an array rotation survives a save', () => {
 test('every element of an array rotation is rounded', () => {
   const [entity] = saved([{ id: 'one', rotation: [10.00049, 20, 29.9996] }])
   assert.deepEqual(entity.rotation, [10, 20, 30])
+})
+
+test('a mesh that faces +Z is shot from +Z for its front, and faces what stands at +Z', () => {
+  const bounds = { w: 1, h: 2, l: 1 }
+  const plain = { x: 0, y: 0, z: 0, yaw: 0 }
+  const rigged = { x: 0, y: 0, z: 0, yaw: 0, _definition: { mesh: { faces: '+Z' } } }
+  assert.ok(frameSubject(plain, bounds, 'front').z < 0)
+  assert.ok(frameSubject(rigged, bounds, 'front').z > 0)
+  assert.equal(facingOffset(rigged, { x: 0, z: 5 }).facingIt, true)
 })

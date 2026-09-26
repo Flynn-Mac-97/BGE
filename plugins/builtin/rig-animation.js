@@ -112,6 +112,20 @@ export default {
         return skeleton && entity.pose ? rigView(entity, skeleton, entity._rigSolved ?? [], entity._rigMemory) : null
       },
 
+      /**
+       * Metres a second the named clip's root covers over the ground, from its
+       * first frame to its last: the speed to move the entity at so the feet
+       * do not slide. 0 while the clip loads or when it has no root.
+       */
+      travelOf(entity, name) {
+        const file = entity._definition.rig?.clips?.[name]
+        const clip = file && read(context, file).value
+        if (!clip?.root || clip.root.length < 2) return 0
+        const first = clip.root[0]
+        const last = clip.root.at(-1)
+        return Math.hypot(last[0] - first[0], last[2] - first[2]) / ((clip.root.length - 1) / clip.framesPerSecond)
+      },
+
       /** Forget every loaded clip, so an edited file is read again. */
       forget: () => clips.clear()
     }
@@ -142,7 +156,7 @@ export default {
           entity._rigRootLast = null
           entity.rigDone = false
         } else {
-          entity._rigTime += seconds
+          entity._rigTime += seconds * (entity.rigSpeed ?? 1)
         }
 
         applyClip(entity, clip, rig)

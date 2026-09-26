@@ -57,3 +57,13 @@ test('a joint key moves its whole chain there and keeps the turn of its base as 
 test('a key outside the generation is refused, naming its frame', () => {
   assert.throws(() => conditionOf([{ kind: 'pose', at: [2] }]), /frame 4, outside 0..3/)
 })
+
+test('a path keeps the ground point on its curve every frame, with no template', () => {
+  const condition = motionCondition({
+    skeleton: 'soma-30', frames: 4, framesPerSecond: 2, template: null,
+    record: { constraints: [{ kind: 'path', heading: 0, keys: [{ at: 0, value: [0, 0] }, { at: 1.5, value: [0, 3] }] }] }
+  })
+  assert.deepEqual([0, 1, 2, 3].map(frame => rowOf(condition.observed, frame)[2]), [0, 1, 2, 3])
+  assert.equal(rowOf(condition.mask, 3).reduce((sum, value) => sum + value, 0), 4)
+  assert.equal(condition.firstHeading, 0)
+})

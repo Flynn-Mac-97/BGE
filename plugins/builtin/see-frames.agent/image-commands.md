@@ -47,7 +47,8 @@
 Image options: `camera` (view field overrides; top-down map shot: high y,
 pitch -1.57), `shot` (a named angle with `subject`: `three-quarter` default,
 `front`, `back`, `side-left`, `side-right`, `top`, `low` — measured from the
-subject's facing), `view` (a saved camera by name — `see.view '{"save":"arena-south"}'`
+subject's facing; a model whose face points +Z at yaw 0 declares `mesh.faces: '+Z'`
+on its type, or front and back swap), `view` (a saved camera by name — `see.view '{"save":"arena-south"}'`
 keeps the current camera, saved in `<project>/views.json`, committed;
 `see.view` alone lists; `'{"go":"arena-south"}'` aims the LIVE camera,
 so the queries answer from that view too; `'{"aim":"you","back":3}'` aims it

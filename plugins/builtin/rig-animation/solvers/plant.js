@@ -3,10 +3,13 @@
  * it does not slide while the body turns, stops, or moves faster than the
  * clip's stride.
  *
- *   { kind: 'plant', nodes: [upLeg, leg, foot], pole?, lift?: 0.05, letGo?: 0.3, blend?: 0.1, weight?: 1 }
+ *   { kind: 'plant', nodes: [upLeg, leg, foot], pole?, lift?: 0.05, still?: 0.5, letGo?: 0.3, blend?: 0.1, weight?: 1 }
  *
  * The foot is down when the clip holds it within `lift` metres of its rest
- * height. It is then locked at that world point and the leg bends to it, until
+ * height and the clip itself moves it slower than `still` metres a second (the
+ * foot plus the clip's root travel, `entity.rigRoot`): a low foot the clip
+ * still slides, as a fast run's does, is left to the clip, since locking it
+ * and letting go makes the foot jump. It is then locked at that world point and the leg bends to it, until
  * the clip lifts it; then it lets go over `blend` seconds and the clip's foot
  * takes over. A lock more than `letGo` metres from where the clip puts the
  * foot lets go the same way. A foot is planted again only once it has faded
@@ -23,7 +26,7 @@ import { bendChain } from './reach.js'
 
 /**
  * Solve one plant over the entity's pose. `memory` is kept between steps for
- * this constraint: `{ lock, held, weight, restHeight }`. Answers why it could not, or null.
+ * this constraint: `{ lock, held, weight, restHeight, lastFoot }`. Answers why it could not, or null.
  */
 export default function solvePlant(entity, skeleton, plant, { seconds, memory }) {
   const chain = posedNames(skeleton, entity.pose, plant.nodes)
@@ -31,7 +34,8 @@ export default function solvePlant(entity, skeleton, plant, { seconds, memory })
   const end = chain[2]
   const foot = placeOf(skeleton, entity.pose, end)
   memory.restHeight ??= placeOf(skeleton, {}, end).position[1]
-  const isDown = foot.position[1] <= memory.restHeight + (plant.lift ?? 0.05)
+  const clipSpeed = clipFootSpeed(entity, memory, foot.position, seconds)
+  const isDown = foot.position[1] <= memory.restHeight + (plant.lift ?? 0.05) && clipSpeed < (plant.still ?? 0.5)
   memory.lock = nextLock(entity, memory, foot.position, isDown, plant.letGo ?? 0.3)
   if (memory.lock) memory.held = memory.lock
   memory.weight = eased(memory.weight ?? 0, memory.lock ? 1 : 0, seconds, plant.blend ?? 0.1)
@@ -41,6 +45,21 @@ export default function solvePlant(entity, skeleton, plant, { seconds, memory })
   bendChain(skeleton, entity.pose, chain, modelPointOf(entity, memory.held), pole, weight)
   turnNodeTo(skeleton, entity.pose, end, foot.turn, weight)
   return null
+}
+
+/**
+ * How fast the clip moves the foot, in metres a second: its place plus the
+ * clip's root travel, so a foot the clip holds still reads 0 whatever the body
+ * does. A step where the root jumps back (a loop starting again) reads 0.
+ */
+function clipFootSpeed(entity, memory, footAt, seconds) {
+  const root = entity.rigRoot ?? [0, 0, 0]
+  const inClip = [footAt[0] + root[0], footAt[1], footAt[2] + root[2]]
+  const last = memory.lastFoot
+  memory.lastFoot = inClip
+  if (!last || seconds <= 0) return 0
+  const moved = lengthOf(subtract(inClip, last))
+  return moved > 1 ? 0 : moved / seconds
 }
 
 /** The world point the foot is locked to this step, or null when it is free. */

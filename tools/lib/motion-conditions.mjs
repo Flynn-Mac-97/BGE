@@ -7,11 +7,13 @@
  * A constraint file is one record:
  *
  *   {
- *     "template": "slash",           stored motion the body placement is read from
+ *     "template": "slash",           stored motion the body placement is read from (only pose, root and joint need it)
  *     "scale": 1.1,                  joint positions are multiplied by it (model metres to capture metres)
  *     "constraints": [
  *       { "kind": "pose", "at": [0, 1.73] },          the template's whole body at these seconds
  *       { "kind": "root" },                           the template's ground path and heading, every frame
+ *       { "kind": "path", "heading": 0,               a ground path [x, z] as curve keys, every frame from the
+ *         "keys": [{ "at": 0, "value": [0, 0] }, { "at": 3, "value": [0, 4.2] }] }   first key to the last
  *       { "kind": "joint", "joint": "RightHand",      a hand or foot at these points
  *         "keys": [{ "at": 1, "value": [-0.5, 1.5, -0.05] }] }
  *     ]
@@ -23,12 +25,17 @@
  * space when its clips play without root motion, so a Worn Gear path's keys
  * are a joint constraint's keys once scaled.
  *
- * Upstream rules kept here: every constraint also fixes the ground point, the
+ * A `path` keeps the ground point under the hips on that curve, and the heading
+ * too when `heading` (radians, 0 faces +Z) is given: a walk that goes straight
+ * at the speed the game moves the body, so the feet do not slide.
+ *
+ * Upstream rules kept here: every constraint but `path` also fixes the ground point, the
  * hips height and the heading at its frames, read from the template. A joint
  * constraint fixes the positions of its chain (a hand and its middle finger
  * tip), moved together, and the template's turn of the hand itself.
  */
 import { SKELETONS } from './motion-clip.mjs'
+import { makeCurve } from '../../engine/curves.js'
 
 /** Per skeleton: the hips as [right, left], and each hand's and foot's chain, base first. */
 const LIMBS = {
@@ -73,6 +80,18 @@ const KINDS = {
   root: condition => {
     for (let frame = 0; frame < condition.frames; frame++) keepGround(condition, frame, condition.posedAt(frame))
   },
+  path: (condition, constraint) => {
+    const curve = makeCurve(constraint.keys)
+    const [first, last] = framesAt(condition, [constraint.keys[0].at, curve.duration])
+    for (let frame = first; frame <= last; frame++) {
+      const [x, z] = curve.valueAt(frame / condition.framesPerSecond)
+      keep(condition, frame, 0, x)
+      keep(condition, frame, 2, z)
+      if (constraint.heading === undefined) continue
+      keep(condition, frame, 3, Math.cos(constraint.heading))
+      keep(condition, frame, 4, Math.sin(constraint.heading))
+    }
+  },
   joint: (condition, constraint) => {
     const chain = LIMBS[condition.skeleton].chains[constraint.joint]
     if (!chain) throw new Error(`joint must be one of ${Object.keys(LIMBS[condition.skeleton].chains).join(', ')}`)
@@ -93,12 +112,13 @@ const KINDS = {
 /**
  * The condition for one generation: `{ observed, mask, firstHeading }`, the
  * first two float32 `[frames, 9 + 12 * joints]`. `template` is stored motion
- * (`readSource`) of the same skeleton; `frames` and `framesPerSecond` are the
- * generation's.
+ * (`readSource`) of the same skeleton, or null when no constraint reads one;
+ * `frames` and `framesPerSecond` are the generation's. The first heading is the
+ * template's at frame 0, else the first path heading, else 0.
  */
 export function motionCondition({ skeleton, frames, framesPerSecond, template, record }) {
   const names = SKELETONS[skeleton].names
-  if (template.joints !== names.length) throw new Error(`template has ${template.joints} joints, ${skeleton} has ${names.length}`)
+  if (template && template.joints !== names.length) throw new Error(`template has ${template.joints} joints, ${skeleton} has ${names.length}`)
   const width = 9 + 12 * names.length
   const posedFrames = new Map()
   const condition = {
@@ -111,6 +131,7 @@ export function motionCondition({ skeleton, frames, framesPerSecond, template, r
     observed: new Float32Array(frames * width),
     mask: new Float32Array(frames * width),
     posedAt: frame => {
+      if (!template) throw new Error('pose, root and joint constraints read a template: name one')
       if (frame >= template.frames) throw new Error(`frame ${frame} is past the template's ${template.frames}`)
       if (!posedFrames.has(frame)) posedFrames.set(frame, posedFrame(skeleton, template, frame))
       return posedFrames.get(frame)
@@ -121,7 +142,8 @@ export function motionCondition({ skeleton, frames, framesPerSecond, template, r
     if (!fill) throw new Error(`constraint kind "${constraint.kind}" is not one of ${Object.keys(KINDS).join(', ')}`)
     fill(condition, constraint)
   }
-  return { observed: condition.observed, mask: condition.mask, firstHeading: condition.posedAt(0).heading }
+  const pathHeading = record.constraints.find(constraint => constraint.kind === 'path')?.heading ?? 0
+  return { observed: condition.observed, mask: condition.mask, firstHeading: template ? condition.posedAt(0).heading : pathHeading }
 }
 
 /** Frame numbers for times in seconds, refused when one is outside the generation. */
