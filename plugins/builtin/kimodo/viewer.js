@@ -24,7 +24,11 @@
  * node, in its space in metres and radians. `guides(seconds)`, if given,
  * answers `[{ handle, keys, path, target }]` (designer.js `guidesAt`): the
  * viewer draws the path and keys, and a ring at `target` joined to the handle,
- * so a key the limb cannot reach shows as a gap.
+ * so a key the limb cannot reach shows as a gap. `body(seconds)`, if given,
+ * answers `{ target: { hips, chest, head, look }, reached: { hips, chest,
+ * head } }` or null (body-rig.js): the viewer draws the body keys as a white
+ * line through hips, chest and head with a look arrow, and the body as it is
+ * now as a blue line beside it.
  */
 import * as THREE from 'three/webgpu'
 import { cachedModel, cloneModel } from '../../../engine/render/model-cache.js'
@@ -36,6 +40,8 @@ const HOLD_SECONDS = 0.6
 const HANDLE_COLOURS = { selected: '#ffd84a', keyed: '#ff8a3d', free: '#4ad8ff' }
 /** Guide colours: the keys and the path between them, and where a handle is asked to be now. */
 const GUIDE_COLOURS = { path: '#ff8a3d', key: '#ff8a3d', target: '#ffffff' }
+/** Body line colours: where the body keys ask the spine to be, and where it is. */
+const BODY_COLOURS = { target: '#ffffff', reached: '#4ad8ff' }
 const TURN_PER_PIXEL = 0.01
 
 /** A node name as the glTF loader stores it: dots, colons, slashes and brackets dropped. */
@@ -219,6 +225,31 @@ export function mountViewer(stage) {
     }
   }
 
+  /** A line drawn over the body, made once and moved each frame. */
+  function overlayLine(colour) {
+    const line = new THREE.Line(new THREE.BufferGeometry(), overlayMaterial(THREE.LineBasicMaterial, colour))
+    line.renderOrder = 12
+    scene.add(line)
+    return line
+  }
+
+  const bodyLines = {
+    target: overlayLine(BODY_COLOURS.target),
+    look: overlayLine(BODY_COLOURS.target),
+    reached: overlayLine(BODY_COLOURS.reached)
+  }
+
+  /** Draw the session's body keys and the body as it is now, or hide both. */
+  function drawBody(session, seconds) {
+    const body = session?.body?.(seconds)
+    for (const line of Object.values(bodyLines)) line.visible = Boolean(body)
+    if (!body) return
+    const { target, reached } = body
+    bodyLines.target.geometry.setFromPoints([target.hips, target.chest, target.head].map(lifted))
+    bodyLines.look.geometry.setFromPoints(target.look.map(lifted))
+    bodyLines.reached.geometry.setFromPoints([reached.hips, reached.chest, reached.head].map(lifted))
+  }
+
   function hideGuides() {
     guideParts.signature = ''
     buildGuidePaths([])
@@ -264,6 +295,7 @@ export function mountViewer(stage) {
       const handles = session.handles()
       drawHandles(handles)
       drawGuides(session, seconds, handles)
+      drawBody(session, seconds)
       holdItem(session.hold)
     } else {
       pose(time / 1000 - view.startedAt)
@@ -380,6 +412,7 @@ export function mountViewer(stage) {
       view.session = null
       for (const mesh of handleMeshes.values()) mesh.visible = false
       hideGuides()
+      drawBody(null)
       holdItem(null)
     },
     dispose() {

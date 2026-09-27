@@ -10,7 +10,9 @@
 import { applyClip } from '../rig-animation.js'
 import { applyConstraints } from '../rig-animation/constraints.js'
 import { placeOf, widenSkeleton } from '../rig-animation/skeleton.js'
+import { restOf, rolesOf } from '../rig-animation/clip-reading.js'
 import { HANDLES, chainOf, guidesAt, newDesign, previewConstraints, withKey, withoutKey } from './designer.js'
+import { bodyReachedOf, bodyTargetAt } from './body-rig.js'
 
 const DEGREES = Math.PI / 180
 const STEP = 1 / 30
@@ -63,6 +65,8 @@ function clockOf(board) {
 export function sessionOf(board, redraw) {
   const skeleton = board.skeleton
   const handNode = chainOf(skeleton, 'RightHand')?.[2]
+  const rest = restOf(skeleton)
+  const roles = rolesOf(skeleton)
   return {
     model: board.design.model,
     clock: () => clockOf(board),
@@ -89,6 +93,10 @@ export function sessionOf(board, redraw) {
       guidesAt(board.design, seconds).map(guide =>
         board.dragged?.handle === guide.handle ? { ...guide, target: null } : guide
       ),
+    body(seconds) {
+      const target = bodyTargetAt(board.design, rest, seconds)
+      return target && board.entity.pose ? { target, reached: bodyReachedOf(skeleton, board.entity.pose, roles) } : null
+    },
     grab(handle) {
       board.time = clockOf(board)
       board.playFrom = null

@@ -10,6 +10,8 @@ import assert from 'node:assert/strict'
 
 import { widenSkeleton } from '../plugins/builtin/rig-animation/skeleton.js'
 import { POSES, keysOf, poseWords } from '../plugins/builtin/kimodo/poses.js'
+import { bodyTargetAt } from '../plugins/builtin/kimodo/body-rig.js'
+import { restOf } from '../plugins/builtin/rig-animation/clip-reading.js'
 
 const IDENTITY = [0, 0, 0, 1]
 const node = (parent, position) => ({ parent, position, rotation: IDENTITY, scale: 1 })
@@ -88,4 +90,14 @@ test('a body part becomes one body key: the hips drop, the torso leans, a mirror
     poseWords({ at: 0.7, pose: 'strike-down' }),
     /hips 15 cm low; torso 30° forward, 15° twisted left; head 15° down/
   )
+})
+
+test('the board draws a body key where it asks the spine to be: a forward lean carries the head ahead', () => {
+  const rest = restOf(SKELETON)
+  const design = { body: keysOf([{ at: 0, torso: { lean: 30 }, hips: { drop: 0.1 } }], SKELETON).body }
+  const target = bodyTargetAt(design, rest, 0)
+  assert.ok(Math.abs(target.hips[1] - (0.95 - 0.1)) < 0.01, 'the hips drop')
+  assert.ok(target.head[2] > 0.3, `the head leans ahead: ${target.head[2].toFixed(2)}`)
+  assert.ok(target.look[1][2] > target.look[0][2], 'the look points forward')
+  assert.equal(bodyTargetAt({ body: [] }, rest, 0), null)
 })
