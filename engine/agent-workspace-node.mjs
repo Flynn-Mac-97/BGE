@@ -188,6 +188,29 @@ async function loadJev() {
 }
 
 /**
+ * The game folder every named file is inside, or null.
+ *
+ * A game is a folder with a `game.json`. An agent names a game's file by its
+ * path and seldom passes `--project`, and a packet built for the untitled
+ * project matches none of the game's rule sets. Files in two games, or in no
+ * game, leave the open project as it is.
+ */
+function gameOfFiles(root, files = []) {
+  const games = new Set(files.map(file => gameAbove(path.resolve(root, file), root)))
+  const [only] = games
+  return games.size === 1 && only ? only : null
+}
+
+/** The nearest folder above `file` that holds a `game.json`, short of the checkout; null when there is none. */
+function gameAbove(file, root) {
+  for (let folder = path.dirname(file); folder !== path.dirname(folder); folder = path.dirname(folder)) {
+    if (folder === root) return null
+    if (fs.existsSync(path.join(folder, 'game.json'))) return folder
+  }
+  return null
+}
+
+/**
  * Build a packet for a request by reading the tree off disk.
  *
  * The read refuses any path that leaves the scope it named, so a request cannot
@@ -201,7 +224,7 @@ async function loadJev() {
  */
 export async function contextFromDisk(checkout, request, projectPath = 'project', interfaceText = null) {
   const root = path.resolve(checkout)
-  const project = path.resolve(root, projectPath)
+  const project = gameOfFiles(root, request.files) ?? path.resolve(root, projectPath)
   const read = (scope, file) => {
     const base = scope === 'engine' ? root : project
     const target = path.resolve(base, file)

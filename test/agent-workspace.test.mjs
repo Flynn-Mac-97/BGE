@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -493,5 +494,19 @@ test('agent context leaves Jev off by default and falls back to the plain packet
   } finally {
     if (beforeKey !== undefined) process.env.OPENROUTER_API_KEY = beforeKey
     if (beforeProxy !== undefined) process.env.OPENROUTER_PROXY_URL = beforeProxy
+  }
+})
+
+test('a file inside a game folder routes the packet to that game, with no --project', async () => {
+  const games = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-packet-game-'))
+  const game = path.join(games, 'brawler')
+  fs.mkdirSync(path.join(game, 'plugins'), { recursive: true })
+  fs.writeFileSync(path.join(game, 'game.json'), '{"title":"Brawler"}')
+  fs.writeFileSync(path.join(game, 'plugins', 'gear.js'), 'export default { name: "Gear" }\n')
+  try {
+    const packet = await contextFromDisk(ROOT, { task: 'polish the gear', files: [path.join(game, 'plugins', 'gear.js')] })
+    assert.ok(packet.nodes.some(node => node.id === 'game'), `the game rule set is in (${packet.nodes.map(node => node.id)})`)
+  } finally {
+    fs.rmSync(games, { recursive: true, force: true })
   }
 })

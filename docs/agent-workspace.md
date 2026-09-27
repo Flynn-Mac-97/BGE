@@ -125,8 +125,11 @@ conflict.
 **Before the first lane, read one packet.**
 
 ```sh
-node bin/engine.mjs agent.context <project>/plugins/probe.js --project <project>
+node bin/engine.mjs agent.context <project>/plugins/probe.js
 ```
+
+Files that are all inside one game folder (one with a `game.json`) build the
+packet for that game, with or without `--project`.
 
 Check the `lanes` list, not just that a packet came back. A packet with no
 matched rules is not an error — it returns successfully and looks like a full
