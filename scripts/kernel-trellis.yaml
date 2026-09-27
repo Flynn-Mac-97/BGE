@@ -11,6 +11,7 @@ source:
     - supervisor.mjs
     - supervisor-watch.mjs
     - supervisor-transport.mjs
+    - headless-jobs.mjs
     - agent-workspace-node.mjs
     - agent-workspace.js
     - agent-registration.mjs

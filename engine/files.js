@@ -20,7 +20,7 @@
  * this key; a page that stored nothing sends nothing and is treated as the
  * person's editor.
  */
-const clientName = () => {
+export const clientName = () => {
   try {
     return globalThis.sessionStorage?.getItem('engine:tab-id') || ''
   } catch {

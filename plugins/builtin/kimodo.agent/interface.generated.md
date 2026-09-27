@@ -1,4 +1,4 @@
-<!--f80e9937-->
+<!--9fde1560-->
 parsed from source
   plugin Kimodo
   category editor
@@ -6,7 +6,11 @@ parsed from source
   commands kimodo.panel
   kimodo.takes
   kimodo.view
+  kimodo.design
+  kimodo.designs
+  kimodo.save-design
+  kimodo.generate (Generate a take from a design, refuses without a host)
   kimodo.use
   kimodo.board
-  arguments kimodo.panel:;kimodo.takes:;kimodo.view: options = {};kimodo.use: options = {};kimodo.board:
-  source 225 lines
+  arguments kimodo.panel:;kimodo.takes:;kimodo.view: options = {};kimodo.design: options = {};kimodo.designs:;kimodo.save-design:;kimodo.generate: options = {};kimodo.use: options = {};kimodo.board:
+  source 410 lines

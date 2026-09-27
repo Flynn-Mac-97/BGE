@@ -113,7 +113,7 @@ export function supervisorEvent(state, id, event, detail) {
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
 
 /** Where one instance's output goes, so a startup failure can be read. */
-const instanceLogFile = (checkout, id) =>
+export const instanceLogFile = (checkout, id) =>
   path.join(process.env.ENGINE_STATE_ROOT || path.join(checkout, 'agent-runs'), 'supervisor', `${id}.log`)
 
 /** The next stable id for a kind, unique for the supervisor's life. */

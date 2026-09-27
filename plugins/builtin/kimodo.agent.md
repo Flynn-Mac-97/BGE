@@ -38,6 +38,31 @@ its prompt. **Use as** copies the take over a clip beside it.
 - `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
 - `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
 
+## Design a move on the board
+
+A person designs a move; an agent opens the board and generates it.
+**Design on this take** on the board, or `kimodo.design`, puts the model in
+design mode over a base take:
+
+- Drag a hand or foot handle in the view; it is keyed at the time shown.
+  Between keys the limb follows a curve, posed with the game's own reach solver.
+- The mouse wheel zooms. Dragging empty space turns the view.
+- **Move** holds the prompt, length, seed, loop, and whether the take starts
+  in the base take's first pose. **Hold** shows an item from
+  `assets/models/items/` in the right hand; it is for the preview only.
+- **Save** writes `assets/motion/designs/<name>.json` (record shape in
+  `plugins/builtin/kimodo/designer.js`). **Generate take** saves, then makes
+  `take-<name>` and plays it. From the page it runs in a headless engine the
+  supervisor starts (`engine/headless-job.js`, route `/api/headless-job`).
+- No keys and "starts in the base pose" off: the take comes from the words alone.
+
+- `kimodo.design '{"clip":"motion/fighter/idle.json"}'` — a new design on a take; `{"file":...}` opens a saved one.
+- `kimodo.designs` — the saved designs.
+- `node bin/engine.mjs --headless --project <project> run kimodo.generate '{"design":"assets/motion/designs/<name>.json"}'` — about two minutes for 60 frames.
+
+A lane page never writes files, so Save fails there; test saving in the editor.
+The base take must be one Kimodo made: its stored motion is the template.
+
 ## Shape a move with constraints
 
 A clip that misses where a hand, foot or pose must be is generated again with

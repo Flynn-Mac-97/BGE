@@ -24,6 +24,7 @@ import { PROJECT_PREFIX } from './asset-path.js'
 import { pluginGuides } from './plugin-guides.mjs'
 import { pluginInterfaceReader } from './plugin-interface.mjs'
 import { openPage } from './open-page.mjs'
+import { headlessJobState, startHeadlessJob } from './headless-jobs.mjs'
 import {
   ensureProject,
   isUntitled,
@@ -208,6 +209,17 @@ export function engineServerConfig({
       return { status: 200, body: await desktopCapture(Object.fromEntries(url.searchParams)) }
     },
     '/api/index': async () => ({ status: 200, body: await buildIndex() }),
+
+    // A command a page cannot run, such as one that starts a program, run by a
+    // headless engine the supervisor starts. POST starts it; GET ?job= polls it.
+    // A job writes files, so it follows the file routes' rule.
+    '/api/headless-job': async ({ url, req }) => {
+      if (req.method === 'GET') return { status: 200, body: await headlessJobState(ROOT, url.searchParams.get('job')) }
+      const refused = refusedFileWrite(req)
+      if (refused) return { status: 423, body: refused }
+      const { command, options } = await readBody(req)
+      return { status: 200, body: await startHeadlessJob({ checkout: ROOT, project: PROJECT, command, options }) }
+    },
 
     // Answers "is what I just wrote valid?" without a reload: broken imports,
     // unreadable levels, and anything that breaks determinism.
