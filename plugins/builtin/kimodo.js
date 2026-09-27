@@ -23,6 +23,7 @@
 import { mountViewer } from './kimodo/viewer.js'
 import { designRows, openBoard, sessionOf } from './kimodo/design-board.js'
 import { runHeadless } from '../../engine/headless-job.js'
+import { compareDesign, designFromPoses, poseMenu } from './kimodo/poser.js'
 
 const DESIGNS = 'assets/motion/designs'
 
@@ -393,6 +394,23 @@ export default {
           }
         return (await nodeHalf()).generateDesign(context.host, options.design)
       }
+    },
+    {
+      id: 'kimodo.poses',
+      label: 'Key poses by name',
+      run: () => poseMenu()
+    },
+    {
+      id: 'kimodo.pose',
+      label: 'Design a move from key poses',
+      // args: {"name":"chop","prompt":"a person chops down hard with a sword","model":"models/fighter.glb","base":"motion/fighter/idle.json","keys":[{"at":0,"pose":"guard"},{"at":0.5,"pose":"wind-up"}]}
+      run: (context, options = {}) => designFromPoses(context, options, DESIGNS)
+    },
+    {
+      id: 'kimodo.compare',
+      label: 'How close a take came to its key poses',
+      // args: {"design":"assets/motion/designs/chop.json"}, after kimodo.generate
+      run: (context, options = {}) => compareDesign(context, options)
     },
     {
       id: 'kimodo.use',

@@ -65,6 +65,14 @@ design mode over a base take:
 A lane page never writes files, so Save fails there; test saving in the editor.
 The base take must be one Kimodo made: its stored motion is the template.
 
+## Pose a move by name
+
+`kimodo.pose` writes a design from named key poses at times ("guard, wind-up
+at 0.5 s, strike-down at 0.9 s"), `kimodo.generate` makes it, and
+`kimodo.compare` says how close each key came in centimetres. A picture of a
+pose is read into the same terms. `kimodo.agent/posing.md` has the vocabulary
+and the dials.
+
 ## Shape a move with constraints
 
 A clip that misses where a hand, foot or pose must be is generated again with
@@ -89,6 +97,7 @@ writes over a used take; keep the take's source, or use the take again.
 Read only the file your task needs.
 
 - `plugins/builtin/kimodo.agent/building-it.md` — installing and building kimodo.cpp
+- `plugins/builtin/kimodo.agent/posing.md` — key poses by name, their dials, reading a picture into them, and kimodo.compare
 - `plugins/builtin/kimodo.agent/writing-a-prompt.md` — the prompt rules, and what upstream Kimodo does that this checkout does not use yet
 - `plugins/builtin/kimodo.agent/making-a-clip.md` — generating a clip from a written description, with hands, feet or poses held by constraints
 - `plugins/builtin/kimodo.agent/interfaces.md` — the command line and the library, and which to use

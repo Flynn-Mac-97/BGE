@@ -581,3 +581,4 @@
 {"id":"p404","resolved":true,"at":"2026-09-27T03:38:22.992Z","note":"a local constant is read; an imported table prints an unread row and check warns"}
 {"id":"p415","resolved":true,"at":"2026-09-27T03:42:18.654Z","note":"a lane may set: its page skips the save (notSaved: viewer); verified yaw posed with no file written"}
 {"id":"p416","resolved":true,"at":"2026-09-27T03:42:18.754Z","note":"not reproduced 2026-09-27: press then release with no step between still started the draw; the press is kept until the next step"}
+{"id":"p423","at":"2026-09-27T04:32:42.096Z","kind":"cli","what":"Filming a clip frame by frame in a lane: the lane's world runs in real time between CLI calls (about 0.25 s per call), so setting _rigTime then capturing lands late. Needed eval engine.loop.stop() and simulate by hand. No verb holds a lane's clock for a moment."}
