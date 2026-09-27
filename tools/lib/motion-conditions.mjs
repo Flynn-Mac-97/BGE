@@ -42,7 +42,9 @@
  * (positive turns the front toward +X, the body's left), then pitch about X
  * (positive tips forward and down), then roll about Z. `torso` places the
  * spine, neck, head and shoulders by turning the skeleton's own rest offsets
- * about the hips, and turns the chest; `head` turns the head. The points come
+ * about the hips, and turns the chest; `head` places the head where the torso
+ * carries it and turns it, holding the jaw and eyes where that turn puts them,
+ * as a hand constraint holds a finger tip. The points come
  * from the capture skeleton, not the model's, so a model whose chest is higher
  * does not ask the spine to stretch.
  */
@@ -56,6 +58,7 @@ const LIMBS = {
     torso: ['Spine1', 'Spine2', 'Chest', 'Neck1', 'Neck2', 'Head', 'LeftShoulder', 'LeftArm', 'RightShoulder', 'RightArm'],
     chest: 'Chest',
     head: 'Head',
+    face: ['Jaw', 'LeftEye', 'RightEye'],
     chains: {
       LeftFoot: ['LeftFoot', 'LeftToeBase'],
       RightFoot: ['RightFoot', 'RightToeBase'],
@@ -68,6 +71,7 @@ const LIMBS = {
     torso: ['spine1', 'spine2', 'spine3', 'neck', 'head', 'left_collar', 'left_shoulder', 'right_collar', 'right_shoulder'],
     chest: 'spine3',
     head: 'head',
+    face: [],
     chains: {
       LeftFoot: ['left_ankle', 'left_foot'],
       RightFoot: ['right_ankle', 'right_foot'],
@@ -141,16 +145,26 @@ const KINDS = {
         keep(condition, frame, 3, Math.cos(key.heading))
         keep(condition, frame, 4, Math.sin(key.heading))
       }
+      const rest = restPositions(condition.skeleton)
+      const torsoTurn = turnOf(key.torso ?? [])
+      // A rest point carried by a turn about a pivot, placed from `origin`.
+      const carried = (turn, joint, pivot, origin) =>
+        applied(turn, rest[joint].map((value, axis) => value - rest[pivot][axis])).map((value, axis) => value + origin[axis])
       if (key.torso) {
-        const turn = turnOf(key.torso)
-        const rest = restPositions(condition.skeleton)
-        for (const joint of limbs.torso.map(name => condition.names.indexOf(name))) {
-          const offset = applied(turn, rest[joint].map((value, axis) => value - rest[0][axis]))
-          keepPosition(condition, frame, joint, offset.map((value, axis) => value + hips[axis]), posed)
-        }
-        keepTurn(condition, frame, condition.names.indexOf(limbs.chest), turn)
+        for (const joint of limbs.torso.map(name => condition.names.indexOf(name)))
+          keepPosition(condition, frame, joint, carried(torsoTurn, joint, 0, hips), posed)
+        keepTurn(condition, frame, condition.names.indexOf(limbs.chest), torsoTurn)
       }
-      if (key.head) keepTurn(condition, frame, condition.names.indexOf(limbs.head), turnOf(key.head))
+      if (!key.head) continue
+      // Kimodo learned no head turn on its own; like a hand and its finger
+      // tip, the head's look is also held as the places of the jaw and eyes.
+      const head = condition.names.indexOf(limbs.head)
+      const headTurn = turnOf(key.head)
+      const headPoint = carried(torsoTurn, head, 0, hips)
+      keepPosition(condition, frame, head, headPoint, posed)
+      for (const joint of limbs.face.map(name => condition.names.indexOf(name)))
+        keepPosition(condition, frame, joint, carried(headTurn, joint, head, headPoint), posed)
+      keepTurn(condition, frame, head, headTurn)
     }
   }
 }
