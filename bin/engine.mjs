@@ -76,6 +76,7 @@ state     snapshot [--entities --log --plugins --commands --timers]
           snapshot '{"entities":["id","at"]}'                  the whole level
           commands '{"fields":["id"]}'                          every verb
 drive     select <id...>       set <id> <key> <value>
+          setLive <id> <key> <value>          the running world only, never saved
           spawn <type> ['{"at":[1,2,0]}']     destroy <id>
           run <command-id> [arg]              commands
 run       play    stop    simulate <seconds>    seed <n>

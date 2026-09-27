@@ -181,7 +181,8 @@ test('the lane role may drive its own world and is refused every file write', te
   // wiring.
   const lock = workLock(checkout(testContext, { browsers: [{ client: 'lane-a', port: 9400, pid: LIVE_PID }] }))
 
-  for (const operation of ['play', 'stop', 'simulate', 'seed']) {
+  // setLive poses the lane's own world and writes no file.
+  for (const operation of ['play', 'stop', 'simulate', 'seed', 'setLive']) {
     assert.equal(permits(lock, operation, 'lane').allowed, true, `a lane must be able to ${operation}`)
   }
   for (const operation of ['saveLevel', 'new.file', 'code.save', 'set', 'spawn', 'destroy']) {

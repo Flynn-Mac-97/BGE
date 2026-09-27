@@ -38,6 +38,18 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
     for (const failure of loader.failures()) activeLog.push('error', 'plugin', reasonFor(failure))
   }
 
+  /** Change one field or prop on an entity in the running world, and say the world changed. */
+  const changeEntity = (id, key, value) => {
+    const entity = world.byId(id)
+    if (!entity) throw new Error(`no entity "${id}"`)
+    if (key in entity.properties) {
+      entity.properties[key] = value
+      if (!entity.overrides.includes(key)) entity.overrides.push(key)
+    } else entity[key] = value
+    bus.emit('world:changed')
+    return entity
+  }
+
   const api = {
     snapshot(options = {}) {
       return projectSnapshot({ world, loader, loop, files, editor, view, log: activeLog, reload }, options)
@@ -163,16 +175,20 @@ export function makeInspect({ world, loader, loop, files, bus, editor, view, log
      * A save the editor skipped is named in the reply for the same reason.
      */
     async set(id, key, value) {
-      const entity = world.byId(id)
-      if (!entity) throw new Error(`no entity "${id}"`)
-      if (key in entity.properties) {
-        entity.properties[key] = value
-        if (!entity.overrides.includes(key)) entity.overrides.push(key)
-      } else entity[key] = value
-      bus.emit('world:changed')
+      const entity = changeEntity(id, key, value)
       const saved = await editor.saveLevel()
       const savedView = entityView(entity)
       return saved?.skipped ? { ...savedView, notSaved: saved.skipped } : savedView
+    },
+
+    /**
+     * Set a field or prop on an entity in the running world only, never saved.
+     *
+     * For posing a moment to look at, as a lane does: it writes no file, so the
+     * work lock lets it through where `set` is held.
+     */
+    setLive(id, key, value) {
+      return entityView(changeEntity(id, key, value))
     },
 
     /**
