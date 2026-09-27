@@ -4,12 +4,13 @@
  *
  *   {
  *     bones: [[from, to], ...],
- *     constraints: [{ kind, weight, end, target, joint?, pole? }, ...]
+ *     constraints: [{ kind, weight, end, target, joint?, pole?, trace? }, ...]
  *   }
  *
  * `end` is where the bone the constraint moves is now; `target` where it was
  * asked to go; `joint` the middle of a limb and `pole` where that joint was
- * asked to point. A plant's target is where its foot is locked. Points are
+ * asked to point. `trace` is the whole path a control follows, when it follows
+ * one. A plant's target is where its foot is locked. Points are
  * `[x, y, z]` in the world, after the constraints are solved.
  */
 import { placeOf, posedNames } from './skeleton.js'
@@ -34,6 +35,12 @@ function worldTarget(entity, skeleton, target) {
   return point ? worldPointOf(entity, point) : null
 }
 
+/** A constraint's path in the world, as `{ trace }`; nothing when it follows none. */
+function traceOf(entity, skeleton, constraint) {
+  if (!constraint.trace) return {}
+  return { trace: constraint.trace.map(target => worldTarget(entity, skeleton, target)).filter(Boolean) }
+}
+
 /** How each kind of constraint is shown, or null when it names bones the pose has not got. */
 const VIEWS = {
   reach(entity, skeleton, reach, memory, worldAt) {
@@ -45,7 +52,8 @@ const VIEWS = {
       end: worldAt(chain[2]),
       joint: worldAt(chain[1]),
       target: worldTarget(entity, skeleton, reach.target),
-      pole: worldTarget(entity, skeleton, reach.pole)
+      pole: worldTarget(entity, skeleton, reach.pole),
+      ...traceOf(entity, skeleton, reach)
     }
   },
   lookAt(entity, skeleton, look, memory, worldAt) {
@@ -55,7 +63,8 @@ const VIEWS = {
       kind: 'lookAt',
       weight: look.weight,
       end: worldAt(name),
-      target: worldTarget(entity, skeleton, look.target)
+      target: worldTarget(entity, skeleton, look.target),
+      ...traceOf(entity, skeleton, look)
     }
   },
   plant(entity, skeleton, plant, memory, worldAt) {

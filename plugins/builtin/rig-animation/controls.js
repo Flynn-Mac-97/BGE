@@ -20,7 +20,9 @@
  * one. `startedAt` is the world time the path starts; `speed` (1) runs it
  * faster or slower; the control takes the path over `fade` path seconds (0.15)
  * at its start and gives it back over the same at its end. A hand swinging a
- * weapon, a head following a flight, a foot tracing a step.
+ * weapon, a head following a flight, a foot tracing a step. The constraint
+ * carries the path's whole course as `trace`, targets in the path's space, so
+ * a picture can draw it (rig-view.js).
  *
  *   entity.rigControls = { rightHand: { path: [{ at: 0, value: [0, 1, 0.3], ease: 'quad-in' }, ...], startedAt: context.time } }
  *
@@ -34,8 +36,23 @@ import { makeCurve } from '../../../engine/curves.js'
 /** Path seconds a control takes to join its path, and to leave it. */
 const PATH_FADE = 0.15
 
-/** Each path's curve, made once: a path is plain keys in entity state, so a snapshot stays plain data. */
+/** Points a path's trace is drawn with (rig-view.js): enough that an eased curve reads as one. */
+const TRACE_POINTS = 32
+
+/** Each path's curve and trace, made once: a path is plain keys in entity state, so a snapshot stays plain data. */
 const pathCurves = new WeakMap()
+
+/** A path's curve and its whole course as points, made once per path. */
+function pathOf(keys) {
+  if (!pathCurves.has(keys)) {
+    const curve = makeCurve(keys)
+    const trace = Array.from({ length: TRACE_POINTS + 1 }, (_, index) =>
+      curve.valueAt((curve.duration * index) / TRACE_POINTS)
+    )
+    pathCurves.set(keys, { curve, trace })
+  }
+  return pathCurves.get(keys)
+}
 
 /** A control kind, as the constraint one request of it asks for. */
 const CONSTRAINTS = {
@@ -44,7 +61,8 @@ const CONSTRAINTS = {
     nodes: control.nodes,
     target: request.target,
     weight: request.weight,
-    pole: request.pole ?? control.pole ?? null
+    pole: request.pole ?? control.pole ?? null,
+    trace: request.trace ?? null
   }),
   aim: (control, request) => ({
     kind: 'lookAt',
@@ -52,7 +70,8 @@ const CONSTRAINTS = {
     forward: request.forward ?? control.forward,
     limit: control.limit,
     target: request.target,
-    weight: request.weight
+    weight: request.weight,
+    trace: request.trace ?? null
   })
 }
 
@@ -81,15 +100,14 @@ export function constraintsForControls(controls = {}, requests = {}, now = 0) {
 /** A request as it stands at `now`: one that follows a path has its target on the path and its weight faded. */
 function requestAt(request, now) {
   if (!request.path) return request
-  if (!pathCurves.has(request.path)) pathCurves.set(request.path, makeCurve(request.path))
-  const path = pathCurves.get(request.path)
+  const { curve, trace } = pathOf(request.path)
   const seconds = (now - request.startedAt) * (request.speed ?? 1)
-  const point = path.valueAt(seconds)
-  const target = request.node ? { node: request.node, at: point } : { model: point }
+  const targetAt = point => (request.node ? { node: request.node, at: point } : { model: point })
   return {
     ...request,
-    target,
-    weight: (request.weight ?? 1) * fadeOf(seconds, path.duration, request.fade ?? PATH_FADE)
+    target: targetAt(curve.valueAt(seconds)),
+    trace: trace.map(targetAt),
+    weight: (request.weight ?? 1) * fadeOf(seconds, curve.duration, request.fade ?? PATH_FADE)
   }
 }
 

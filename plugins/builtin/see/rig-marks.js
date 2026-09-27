@@ -8,8 +8,8 @@
  *
  * Drawn as: bones in white; a constraint's target as a ring in its kind's
  * colour, joined to where its bone is now; a pole as a diamond joined to the
- * joint it points; a planted foot's lock as a filled square. A ring's size
- * shows its weight.
+ * joint it points; a planted foot's lock as a filled square; a path a control
+ * follows as a thin line in its kind's colour. A ring's size shows its weight.
  */
 
 /** The colour of each constraint kind's marks. */
@@ -36,7 +36,8 @@ export function rigFacts(context, options, projector) {
         weight: round(shown.weight ?? 0),
         end: onScreen(shown.end),
         target: onScreen(shown.target),
-        ...(shown.joint ? { joint: onScreen(shown.joint), pole: onScreen(shown.pole) } : {})
+        ...(shown.joint ? { joint: onScreen(shown.joint), pole: onScreen(shown.pole) } : {}),
+        ...(shown.trace ? { trace: shown.trace.map(onScreen).filter(Boolean) } : {})
       }))
     }))
 }
@@ -60,6 +61,13 @@ function drawConstraint(pen, pixelsOf, shown, line) {
   pen.strokeStyle = RIG_COLOURS[shown.kind] ?? '#ffffff'
   pen.fillStyle = pen.strokeStyle
   pen.lineWidth = line
+  if (shown.trace?.length > 1) {
+    pen.globalAlpha = 0.7
+    pen.beginPath()
+    shown.trace.forEach((point, index) => pen[index ? 'lineTo' : 'moveTo'](...pixelsOf(point)))
+    pen.stroke()
+    pen.globalAlpha = 1
+  }
   if (shown.target && shown.end) {
     pen.setLineDash([line * 3, line * 2])
     segment(pen, pixelsOf(shown.end), pixelsOf(shown.target))
