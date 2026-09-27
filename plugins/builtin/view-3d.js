@@ -28,7 +28,7 @@
  * picking and toWorld resolve against it. This plugin supplies the missing
  * half: the input that moves it.
  */
-import { clamp } from './game-maths/vectors.js'
+import { clamp } from './game-maths/numbers.js'
 
 const LOOK_RADIANS = 0.005          // radians per pixel of drag
 const SPEED = 10                    // metres per second, base

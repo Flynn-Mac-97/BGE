@@ -12,7 +12,7 @@
 import { placeOf, posedNames, turnNodeTo } from '../skeleton.js'
 import { pointOf } from '../targets.js'
 import { multiply, rotate, turnBetween } from '../../game-maths/turns.js'
-import { scaled, subtract, unit } from '../../game-maths/vectors.js'
+import { scaled, subtract, unit } from '../../game-maths/space.js'
 
 const DEGREES = Math.PI / 180
 

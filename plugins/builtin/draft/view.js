@@ -10,7 +10,7 @@ import {
   addEdge, fitBoard, nodeBox, removeEdge, removeNode, wrapText,
   DEFAULT_WIDTH, FONT_SIZE, LINE_HEIGHT, PADDING
 } from './model.js'
-import { clamp } from '../game-maths/vectors.js'
+import { clamp } from '../game-maths/numbers.js'
 
 const BACKDROP = '#101014'
 const GRID = '#23232c'

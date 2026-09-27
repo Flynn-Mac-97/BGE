@@ -1,16 +1,8 @@
 /**
- * Game Maths: points and numbers as plain values. A point is `[x, y, z]`.
- * Every function answers a new value and changes none it is given.
+ * Game Maths in 3D: points as plain arrays `[x, y, z]`. Turns are turns.js;
+ * 2D points are plane.js. Every function answers a new array and changes none
+ * it is given.
  */
-
-/** Radians in one degree. */
-export const DEGREES = Math.PI / 180
-
-/** `value` held between `lowest` and `highest`. */
-export const clamp = (value, lowest, highest) => Math.min(highest, Math.max(lowest, value))
-
-/** The number `amount` of the way from `from` to `onto`. */
-export const lerp = (from, onto, amount) => from + (onto - from) * amount
 
 /** The sum of two points. */
 export const add = (first, second) => [first[0] + second[0], first[1] + second[1], first[2] + second[2]]

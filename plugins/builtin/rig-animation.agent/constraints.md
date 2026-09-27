@@ -81,4 +81,4 @@ remember between steps gets its own `memory` record.
 - `context.rigAnimation.pointOf(entity, target)` answers where any target is now, in model space: `{ node: 'RightHand' }` is the hand. A test checks a reach with it.
 - Ramp `weight` yourself; an empty list leaves the pose alone.
 - A constraint changes only nodes the clip poses.
-- Code: `plugins/builtin/rig-animation/constraints.js`, the solvers in `solvers/`, controls in `controls.js`, the drawn view in `rig-view.js`, over `skeleton.js`, `targets.js`, and Game Maths' `turns.js` and `vectors.js`.
+- Code: `plugins/builtin/rig-animation/constraints.js`, the solvers in `solvers/`, controls in `controls.js`, the drawn view in `rig-view.js`, over `skeleton.js`, `targets.js`, and Game Maths' `turns.js` and `space.js`.

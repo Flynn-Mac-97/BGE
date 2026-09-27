@@ -5,7 +5,7 @@
  * renderer turns a node and an attachment. Every function answers a new array
  * and changes none it is given.
  */
-import { cross, dot, unit } from './vectors.js'
+import { cross, dot, unit } from './space.js'
 
 /** The turn `first` then `second` applied inside it: `first * second`. */
 export const multiply = (first, second) => [

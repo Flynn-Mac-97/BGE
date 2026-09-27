@@ -20,7 +20,7 @@
  */
 
 import { asVector } from './shared/vector.js'
-import { clamp } from './game-maths/vectors.js'
+import { clamp } from './game-maths/numbers.js'
 
 /** Weight one: the heaviest hit a game should ever ask for. */
 const MOST_HOLD = 0.11      // seconds the world stops

@@ -11,7 +11,7 @@
  * painter rebuilds the same points a test computes, and neither stores state
  * the other could disagree with.
  */
-import { clamp } from '../game-maths/vectors.js'
+import { clamp } from '../game-maths/numbers.js'
 
 const MAX_BEAMS = 64
 const MAX_SEGMENTS = 48

@@ -3,7 +3,7 @@
  * its focus, placed again each drawn frame, and eased to a close shot and back.
  */
 import { MAX_PITCH, wrapAngle } from './angles.js'
-import { clamp } from '../game-maths/vectors.js'
+import { clamp } from '../game-maths/numbers.js'
 
 /**
  * Where a chase camera sits when the level does not say.

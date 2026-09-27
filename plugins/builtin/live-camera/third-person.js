@@ -5,7 +5,7 @@
  * left it, so the body holds still on screen at any refresh rate. Mouse turn and
  * wheel zoom are read on the same frame they are drawn.
  */
-import { clamp } from '../game-maths/vectors.js'
+import { clamp } from '../game-maths/numbers.js'
 
 /** Exactly 90 degrees makes the view basis degenerate. */
 const PITCH_LIMIT = 89 * Math.PI / 180

@@ -10,7 +10,7 @@
  * model file, before the entity's own place, turn and scale.
  */
 import { blendTurns, inverse, multiply, rotate } from '../game-maths/turns.js'
-import { add, scaled } from '../game-maths/vectors.js'
+import { add, scaled } from '../game-maths/space.js'
 
 /** A bone name as the glTF loader stores it: dots, colons, slashes and brackets dropped. */
 const plain = name => name.replace(/[[\].:/]/g, '')

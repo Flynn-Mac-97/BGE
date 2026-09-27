@@ -19,7 +19,7 @@
  */
 
 import { groupRegistry } from './spatial-hash/registry.js'
-import { clamp } from './game-maths/vectors.js'
+import { clamp } from './game-maths/numbers.js'
 
 /** Cells about twice a member's width: selective, and a neighbour walk is nine cells. */
 const DEFAULT_CELL_SIZE = 1.5
