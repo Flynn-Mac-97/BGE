@@ -12,9 +12,20 @@ import { applyConstraints } from '../rig-animation/constraints.js'
 import { placeOf, widenSkeleton } from '../rig-animation/skeleton.js'
 import { restOf, rolesOf } from '../rig-animation/clip-reading.js'
 import { HANDLES, chainOf, guidesAt, newDesign, previewConstraints, withKey, withoutKey } from './designer.js'
-import { bodyReachedOf, bodyTargetAt } from './body-rig.js'
+import {
+  BODY_HANDLES,
+  bodyChangeOf,
+  bodyHandlePoints,
+  bodyReachedOf,
+  bodyTargetAt,
+  withBodyKey,
+  withoutBodyField
+} from './body-rig.js'
 
 const DEGREES = Math.PI / 180
+
+/** The body key field each body handle sets. */
+const BODY_FIELDS = { Hips: 'height', Chest: 'torso', Head: 'head' }
 const STEP = 1 / 30
 
 /** The folder a model's clips and skeleton are named by: `models/fighter.glb` is `fighter`. */
@@ -67,6 +78,22 @@ export function sessionOf(board, redraw) {
   const handNode = chainOf(skeleton, 'RightHand')?.[2]
   const rest = restOf(skeleton)
   const roles = rolesOf(skeleton)
+  // A body handle is dropped on the board's time; its body key changes as it moves.
+  const bodyDropped = (handle, point) => {
+    const target = bodyHandleTarget(board.design, rest, board.time)
+    const key = (board.design.body ?? []).find(candidate => Math.abs(candidate.at - board.time) < 1e-6)
+    return withBodyKey(board.design, board.time, bodyChangeOf(handle, point, target, key))
+  }
+  const shownDesign = () =>
+    board.dragged && BODY_HANDLES[board.dragged.handle]
+      ? bodyDropped(board.dragged.handle, board.dragged.point)
+      : board.design
+  const bodyLook = handle =>
+    handle === board.selected
+      ? 'selected'
+      : (board.design.body ?? []).some(key => key[BODY_FIELDS[handle]] !== undefined)
+        ? 'keyed'
+        : 'free'
   return {
     model: board.design.model,
     clock: () => clockOf(board),
@@ -78,23 +105,31 @@ export function sessionOf(board, redraw) {
       return entity.pose
     },
     handles: () =>
-      Object.keys(HANDLES).flatMap(handle => {
-        const chain = chainOf(skeleton, handle)
-        if (!chain || !board.entity.pose) return []
-        const point =
-          board.dragged?.handle === handle
-            ? board.dragged.point
-            : placeOf(skeleton, board.entity.pose, chain[2]).position
-        const look = handle === board.selected ? 'selected' : board.design.keys[handle] ? 'keyed' : 'free'
-        return [{ handle, point, look }]
-      }),
+      Object.keys(HANDLES)
+        .flatMap(handle => {
+          const chain = chainOf(skeleton, handle)
+          if (!chain || !board.entity.pose) return []
+          const point =
+            board.dragged?.handle === handle
+              ? board.dragged.point
+              : placeOf(skeleton, board.entity.pose, chain[2]).position
+          const look = handle === board.selected ? 'selected' : board.design.keys[handle] ? 'keyed' : 'free'
+          return [{ handle, point, look }]
+        })
+        .concat(
+          Object.entries(bodyHandlePoints(shownDesign(), rest, clockOf(board))).map(([handle, point]) => ({
+            handle,
+            point: board.dragged?.handle === handle ? board.dragged.point : point,
+            look: bodyLook(handle)
+          }))
+        ),
     // The handle held by the pointer is its own target, so it has no guide target.
     guides: seconds =>
       guidesAt(board.design, seconds).map(guide =>
         board.dragged?.handle === guide.handle ? { ...guide, target: null } : guide
       ),
     body(seconds) {
-      const target = bodyTargetAt(board.design, rest, seconds)
+      const target = bodyTargetAt(shownDesign(), rest, seconds)
       return target && board.entity.pose ? { target, reached: bodyReachedOf(skeleton, board.entity.pose, roles) } : null
     },
     grab(handle) {
@@ -107,7 +142,9 @@ export function sessionOf(board, redraw) {
       board.dragged = { handle, point }
     },
     drop(handle, point) {
-      board.design = withKey(board.design, handle, board.time, point)
+      board.design = BODY_HANDLES[handle]
+        ? bodyDropped(handle, point)
+        : withKey(board.design, handle, board.time, point)
       board.dragged = null
       redraw()
     },
@@ -118,6 +155,11 @@ export function sessionOf(board, redraw) {
         : null
     }
   }
+}
+
+/** The body target a body handle is dropped against: the body keys at `seconds`, or rest before there are any. */
+function bodyHandleTarget(design, rest, seconds) {
+  return bodyTargetAt({ body: design.body?.length ? design.body : [{ at: 0 }] }, rest, seconds)
 }
 
 /** Three numbers from a field's text, `x y z`; the old ones when it is not three numbers. */
@@ -189,26 +231,39 @@ function timeRows(ui, board, redraw) {
 /** Rows for keys: which limb, its keys, and keying it where it is now. */
 function keyRows(ui, board, redraw) {
   const handle = board.selected
-  const keys = board.design.keys[handle] ?? []
+  const field = BODY_FIELDS[handle]
+  const keys = field
+    ? (board.design.body ?? []).filter(key => key[field] !== undefined)
+    : (board.design.keys[handle] ?? [])
+  const shown = key => (field ? [key[field]].flat() : key.value)
+  const removed = key =>
+    field ? withoutBodyField(board.design, key.at, field) : withoutKey(board.design, handle, key.at)
   return [
     ui.pick({
-      options: Object.keys(HANDLES).filter(name => chainOf(board.skeleton, name)),
+      options: [...Object.keys(HANDLES).filter(name => chainOf(board.skeleton, name)), ...Object.keys(BODY_HANDLES)],
       value: handle,
       onChange: name => {
         board.selected = name
       }
     }),
-    ui.text('Drag a handle in the view: it is keyed at the time shown. Orange handles have keys.', { dim: true }),
+    ui.text(
+      'Drag a handle in the view: it is keyed at the time shown. Orange handles have keys. Hips sets the height, Chest the lean, Head the look.',
+      { dim: true }
+    ),
     ui.list({
       items: keys,
       key: key => String(key.at),
       emptyText: `no keys on ${handle}`,
       row: key => [
         ui.label(`${key.at.toFixed(2)} s`),
-        ui.meta(key.value.map(value => value.toFixed(2)).join(' ')),
+        ui.meta(
+          shown(key)
+            .map(value => value.toFixed(2))
+            .join(' ')
+        ),
         ui.spacer(),
         ui.button('×', () => {
-          board.design = withoutKey(board.design, handle, key.at)
+          board.design = removed(key)
           redraw()
         })
       ],

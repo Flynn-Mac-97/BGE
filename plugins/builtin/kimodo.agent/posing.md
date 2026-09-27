@@ -23,6 +23,14 @@ $E run kimodo.compare '{"design":"assets/motion/designs/chop.json"}'
   degrees turned left), `torso: { lean, side, twist }` (degrees forward, to
   the left side, shoulders twisted left), `head: { turn, nod }` (degrees
   looking left, looking down). A hand's level word drops with the hips.
+- **On the board:** `kimodo.design '{"file":...}'` shows the body keys as a
+  white line through hips, chest and head with a look arrow, and the body as a
+  blue line; a gap is a miss. Drag the Hips handle (drawn behind the pelvis)
+  to set the height, Chest to lean, Head's arrow tip to aim the look. The
+  preview model does not follow body keys; the take does.
+- **Head keys hold the jaw and eyes too:** Kimodo learned no head turn by
+  itself, so a head key also places the jaw and eyes where the look puts them.
+  The head then follows within about 10° of pitch; its yaw can still drift.
 - **Hips height keeps legs straight:** with no `hips` key Kimodo tends to
   bend the knees. For a standing pose give `hips: { drop: -0.03 }`.
 - **Hand on the hip:** the arm reaches the hip bone with the hand at about
