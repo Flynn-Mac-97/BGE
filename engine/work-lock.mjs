@@ -194,6 +194,13 @@ export function roleOfClient(root, clientId) {
 }
 
 /**
+ * File-writing ops a lane may still run, because its page never saves: the
+ * level save skips on a viewer (world-project.js), so `set` only poses the
+ * lane's own world for a capture.
+ */
+const LANE_WORLD_OPS = new Set(['set'])
+
+/**
  * Whether one operation may run, for one caller.
  *
  * `role` comes from `roleOfClient`, never from the caller. A lane may play and
@@ -201,7 +208,7 @@ export function roleOfClient(root, clientId) {
  */
 export function permits(lock, operation, role = 'person') {
   if (role === 'lane') {
-    if (WRITES_A_FILE.has(operation)) {
+    if (WRITES_A_FILE.has(operation) && !LANE_WORLD_OPS.has(operation)) {
       return {
         allowed: false,
         why: `"${operation}" writes to the checkout, and a lane render page is a viewer. Its world is its own; the files are not.`
