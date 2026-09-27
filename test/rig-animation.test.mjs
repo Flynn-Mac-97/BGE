@@ -25,7 +25,7 @@ import { applyConstraints } from '../plugins/builtin/rig-animation/constraints.j
 import { worldPointOf } from '../plugins/builtin/rig-animation/targets.js'
 import { constraintsForControls } from '../plugins/builtin/rig-animation/controls.js'
 import { rigView } from '../plugins/builtin/rig-animation/rig-view.js'
-import { rotate } from '../plugins/builtin/rig-animation/turns.js'
+import { rotate } from '../plugins/builtin/game-maths/turns.js'
 import {
   buildClip,
   writeClip,

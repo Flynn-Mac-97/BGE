@@ -11,7 +11,8 @@
  */
 import { placeOf, posedNames, turnNodeTo } from '../skeleton.js'
 import { pointOf } from '../targets.js'
-import { add, dot, lengthOf, multiply, scaled, subtract, turnBetween, unit } from '../turns.js'
+import { multiply, turnBetween } from '../../game-maths/turns.js'
+import { add, dot, lengthOf, scaled, subtract, unit } from '../../game-maths/vectors.js'
 
 /** How far short of its full length a limb stops, so it never locks straight. */
 const LONGEST = 0.999

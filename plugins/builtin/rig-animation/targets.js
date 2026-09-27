@@ -13,7 +13,8 @@
  */
 import { anchorOffset, totalScale, turnRadians } from '../../../engine/frame-plan.js'
 import { pointIn } from './skeleton.js'
-import { add, fromYawPitchRoll, inverse, rotate, scaled, subtract } from './turns.js'
+import { fromYawPitchRoll, inverse, rotate } from '../game-maths/turns.js'
+import { add, scaled, subtract } from '../game-maths/vectors.js'
 
 /** Where a target is in model space, or null when it is not there yet. */
 export function pointOf(entity, skeleton, target) {

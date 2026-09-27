@@ -21,7 +21,7 @@
  */
 import { placeOf, posedNames, turnNodeTo } from '../skeleton.js'
 import { modelPointOf, pointOf, worldPointOf } from '../targets.js'
-import { lengthOf, subtract } from '../turns.js'
+import { lengthOf, subtract } from '../../game-maths/vectors.js'
 import { bendChain } from './reach.js'
 
 /**

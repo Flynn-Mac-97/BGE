@@ -9,7 +9,8 @@
  * first node has `parent: null`. Places are in model space: the space of the
  * model file, before the entity's own place, turn and scale.
  */
-import { add, blendTurns, inverse, multiply, rotate, scaled } from './turns.js'
+import { blendTurns, inverse, multiply, rotate } from '../game-maths/turns.js'
+import { add, scaled } from '../game-maths/vectors.js'
 
 /** A bone name as the glTF loader stores it: dots, colons, slashes and brackets dropped. */
 const plain = name => name.replace(/[[\].:/]/g, '')

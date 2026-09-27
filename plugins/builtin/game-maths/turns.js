@@ -1,9 +1,11 @@
 /**
- * Rig Animation: turns and points as plain arrays, for the pose solvers.
- *
- * A turn is a unit quaternion `[x, y, z, w]`; a point is `[x, y, z]`. Every
- * function answers a new array and changes none it is given.
+ * Game Maths: turns as plain arrays. A turn is a unit quaternion
+ * `[x, y, z, w]`; a point is `[x, y, z]`. A rotation `[x, y, z]` is Euler
+ * angles in radians, applied yaw (Y), then pitch (X), then roll (Z), as the
+ * renderer turns a node and an attachment. Every function answers a new array
+ * and changes none it is given.
  */
+import { cross, dot, unit } from './vectors.js'
 
 /** The turn `first` then `second` applied inside it: `first * second`. */
 export const multiply = (first, second) => [
@@ -22,32 +24,24 @@ export function rotate(turn, point) {
   return [moved[0], moved[1], moved[2]]
 }
 
-/** The turn of Euler angles in radians, applied yaw, then pitch, then roll: the renderer's YXZ. */
-export function fromYawPitchRoll(x, y, z) {
-  const half = angle => [Math.sin(angle / 2), Math.cos(angle / 2)]
-  const [sinX, cosX] = half(x)
-  const [sinY, cosY] = half(y)
-  const [sinZ, cosZ] = half(z)
-  return multiply(multiply([0, sinY, 0, cosY], [sinX, 0, 0, cosX]), [0, 0, sinZ, cosZ])
+/** The turn of `angle` radians about one axis: 0 x, 1 y, 2 z. */
+export function turnAbout(axis, angle) {
+  const turn = [0, 0, 0, Math.cos(angle / 2)]
+  turn[axis] = Math.sin(angle / 2)
+  return turn
 }
 
-/** The sum of two points. */
-export const add = (first, second) => [first[0] + second[0], first[1] + second[1], first[2] + second[2]]
+/** The turn of Euler angles in radians, applied yaw, then pitch, then roll: the renderer's YXZ. */
+export const fromYawPitchRoll = (x, y, z) => multiply(multiply(turnAbout(1, y), turnAbout(0, x)), turnAbout(2, z))
 
-/** The point from `second` to `first`. */
-export const subtract = (first, second) => [first[0] - second[0], first[1] - second[1], first[2] - second[2]]
-
-/** A point times a number. */
-export const scaled = (point, factor) => [point[0] * factor, point[1] * factor, point[2] * factor]
-
-/** The dot product of two points. */
-export const dot = (first, second) => first[0] * second[0] + first[1] * second[1] + first[2] * second[2]
-
-/** How long a point is from the origin. */
-export const lengthOf = point => Math.hypot(point[0], point[1], point[2])
-
-/** A point of length 1 the same way, or the zero point unchanged. */
-export const unit = point => scaled(point, 1 / (lengthOf(point) || 1))
+/** A unit turn as a rotation `[x, y, z]`, the inverse of fromYawPitchRoll. Straight up or down, roll is 0. */
+export function yawPitchRollOf([x, y, z, w]) {
+  const m23 = 2 * (y * z - w * x)
+  const pitch = Math.asin(-Math.max(-1, Math.min(1, m23)))
+  if (Math.abs(m23) > 0.9999999) return [pitch, Math.atan2(-2 * (x * z - w * y), 1 - 2 * (y * y + z * z)), 0]
+  const yaw = Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y))
+  return [pitch, yaw, Math.atan2(2 * (x * y + w * z), 1 - 2 * (x * x + z * z))]
+}
 
 /** The shortest turn that lays direction `from` along direction `onto`. */
 export function turnBetween(from, onto) {
@@ -59,12 +53,7 @@ export function turnBetween(from, onto) {
     const axis = Math.abs(start[0]) < 0.9 ? [0, -start[2], start[1]] : [-start[2], 0, start[0]]
     return [...unit(axis), 0]
   }
-  const cross = [
-    start[1] * end[2] - start[2] * end[1],
-    start[2] * end[0] - start[0] * end[2],
-    start[0] * end[1] - start[1] * end[0]
-  ]
-  const turn = [...cross, 1 + cosine]
+  const turn = [...cross(start, end), 1 + cosine]
   const size = Math.hypot(...turn)
   return turn.map(value => value / size)
 }
