@@ -16,6 +16,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
 import { endProcess, processIsAlive, readServerRegistry, recordServer, forgetServer } from './project-servers.mjs'
+import { devServerEnvironment } from './project-servers.mjs'
 import {
   activatePage,
   closePage,
@@ -215,7 +216,7 @@ async function startDevServer(state, id, request, logPath) {
   state.opening.add(`server:${port}`)
   const child = spawnDetached(process.execPath, [vite], {
     cwd: serves,
-    env: { ...process.env, ENGINE_PORT: String(port), ENGINE_NO_OPEN: '1' },
+    env: devServerEnvironment(port, request.project),
     logPath
   })
   const entry = {

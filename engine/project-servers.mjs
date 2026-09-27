@@ -419,3 +419,11 @@ export async function stopServers(checkout, port = null) {
     ok: refused.length === 0
   }
 }
+
+/** A dev server's environment: its port, no editor window, and the project it was asked to open. */
+export const devServerEnvironment = (port, project) => ({
+  ...process.env,
+  ENGINE_PORT: String(port),
+  ENGINE_NO_OPEN: '1',
+  ...(project ? { ENGINE_PROJECT: project } : {})
+})

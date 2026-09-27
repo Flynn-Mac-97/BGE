@@ -14,7 +14,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 
-import { processIsAlive } from '../engine/project-servers.mjs'
+import { devServerEnvironment, processIsAlive } from '../engine/project-servers.mjs'
 import {
   startSupervisor, supervisorAddress, askSupervisor, spawnInstance, stopInstance, chooseDevServer
 } from '../engine/supervisor.mjs'
@@ -890,4 +890,10 @@ test('the prover reads showing from the page, not from the port', async t => {
   assert.equal(byClient.get('two')?.showing, 'hidden', 'the tab behind it says it cannot')
   assert.equal(listed.instances.find(entry => entry.kind === 'dev-server')?.showing, undefined,
     'a dev server has no page, so it claims nothing')
+})
+
+test('a dev server opened for a project is started with that project', () => {
+  assert.equal(devServerEnvironment(5180, '../engine-projects/arena').ENGINE_PROJECT, '../engine-projects/arena')
+  assert.equal(devServerEnvironment(5180, null).ENGINE_PROJECT, process.env.ENGINE_PROJECT)
+  assert.equal(devServerEnvironment(5181, null).ENGINE_PORT, '5181')
 })
