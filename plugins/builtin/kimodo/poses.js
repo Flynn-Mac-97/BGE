@@ -9,12 +9,20 @@
  *         metres; forward is metres ahead of the chest (negative is behind);
  *         out is metres out from the shoulder line (negative crosses the body)
  *   foot  { forward, out }         on the floor; metres from under the hip
- * A key pose names any of `right`, `left` (hands) and `rightFoot`,
- * `leftFoot`. A limb it leaves out is free: Kimodo moves it as the prompt
- * says. Every length scales with the model's own rest pose
- * (rig-animation/clip-reading.js), written for a 1.7 m body.
+ * The body's place:
+ *   hips  { drop, turn }           drop is metres lower than standing (a crouch);
+ *         turn is degrees the whole body faces left (negative is right)
+ *   torso { lean, side, twist }    degrees from the hips: lean forward (negative
+ *         is back), lean to the left side, twist the shoulders to the left
+ *   head  { turn, nod }            degrees: look left, look down
+ * A key pose names any of `right`, `left` (hands), `rightFoot`, `leftFoot`,
+ * `hips`, `torso` and `head`. A part it leaves out is free: Kimodo moves it as
+ * the prompt says. A hand's level word drops with the hips. Every length
+ * scales with the model's own rest pose (rig-animation/clip-reading.js),
+ * written for a 1.7 m body.
  */
 import { restOf } from '../rig-animation/clip-reading.js'
+import { DEGREES } from '../game-maths/numbers.js'
 
 /** The body height the poses are written for. */
 const REFERENCE_HEIGHT = 1.7
@@ -44,14 +52,17 @@ export const POSES = {
     right: { level: 'waist', forward: 0.25, out: 0.02 },
     left: { level: 'waist', forward: 0.2, out: 0.02 },
     rightFoot: { forward: -0.1, out: 0.08 },
-    leftFoot: { forward: 0.1, out: 0.08 }
+    leftFoot: { forward: 0.1, out: 0.08 },
+    hips: { drop: 0.03 }
   },
   guard: {
     means: 'weapon hand chest high and forward, off hand in front, left foot leading',
     right: { level: 'chest', forward: 0.35, out: -0.05 },
     left: { level: 'chest', forward: 0.25, out: -0.08 },
     rightFoot: { forward: -0.15, out: 0.08 },
-    leftFoot: { forward: 0.18, out: 0.06 }
+    leftFoot: { forward: 0.18, out: 0.06 },
+    hips: { drop: 0.06, turn: -15 },
+    torso: { lean: 8 }
   },
   'high-guard': {
     means: 'weapon raised over the head, point back, off hand guarding the chest',
@@ -63,14 +74,20 @@ export const POSES = {
     right: { level: 'above-head', forward: -0.15, out: 0.12 },
     left: { level: 'shoulder', forward: 0.2, out: 0 },
     rightFoot: { forward: -0.2, out: 0.1 },
-    leftFoot: { forward: 0.2, out: 0.06 }
+    leftFoot: { forward: 0.2, out: 0.06 },
+    hips: { drop: 0.04 },
+    torso: { lean: -8, twist: -30 },
+    head: { turn: 25 }
   },
   'strike-down': {
     means: 'the end of a downward strike: weapon hand low and far forward',
     right: { level: 'waist', forward: 0.5, out: -0.08 },
     left: { level: 'waist', forward: 0.25, out: 0 },
     rightFoot: { forward: -0.25, out: 0.1 },
-    leftFoot: { forward: 0.3, out: 0.06 }
+    leftFoot: { forward: 0.3, out: 0.06 },
+    hips: { drop: 0.15 },
+    torso: { lean: 30, twist: 15 },
+    head: { nod: 15 }
   },
   thrust: {
     means: 'weapon hand driven straight forward at chest height, off hand back',
@@ -99,7 +116,9 @@ export const POSES = {
     right: { level: 'chest', forward: 0.65, out: -0.08 },
     left: { level: 'waist', forward: -0.2, out: 0.15 },
     rightFoot: { forward: 0.5, out: 0.08 },
-    leftFoot: { forward: -0.35, out: 0.08 }
+    leftFoot: { forward: -0.35, out: 0.08 },
+    hips: { drop: 0.2 },
+    torso: { lean: 15 }
   },
   'hands-up': {
     means: 'both arms raised high',
@@ -116,6 +135,9 @@ const LIMBS = [
   { name: 'leftFoot', handle: 'LeftFoot', side: 'left' }
 ]
 
+/** The body parts a key pose may set, besides its limbs. */
+const BODY = ['hips', 'torso', 'head']
+
 /** Which way X runs for a side: the model faces +Z, so its left is +X. */
 const SIDE_X = { left: 1, right: -1 }
 
@@ -124,31 +146,77 @@ export function keyPose(key) {
   const named = key.pose ? POSES[key.pose] : {}
   if (key.pose && !named) throw new Error(`no pose "${key.pose}" — try ${Object.keys(POSES).join(', ')}`)
   const base = key.mirror ? mirrored(named) : named
-  const limbs = Object.fromEntries(
-    LIMBS.map(limb => [limb.name, key[limb.name] ? { ...base[limb.name], ...key[limb.name] } : base[limb.name]])
+  const parts = Object.fromEntries(
+    [...LIMBS.map(limb => limb.name), ...BODY].map(name => [
+      name,
+      key[name] ? { ...base[name], ...key[name] } : base[name]
+    ])
   )
-  return Object.fromEntries(Object.entries(limbs).filter(([, place]) => place))
+  return Object.fromEntries(Object.entries(parts).filter(([, place]) => place))
 }
 
-/** A pose with its sides swapped. */
-const mirrored = pose => ({ right: pose.left, left: pose.right, rightFoot: pose.leftFoot, leftFoot: pose.rightFoot })
+/** A pose with its sides swapped: the limbs change places and every leftward angle turns right. */
+const mirrored = pose => ({
+  right: pose.left,
+  left: pose.right,
+  rightFoot: pose.leftFoot,
+  leftFoot: pose.rightFoot,
+  hips: pose.hips && { ...pose.hips, turn: -(pose.hips.turn ?? 0) },
+  torso: pose.torso && { ...pose.torso, side: -(pose.torso.side ?? 0), twist: -(pose.torso.twist ?? 0) },
+  head: pose.head && { ...pose.head, turn: -(pose.head.turn ?? 0) }
+})
 
-/** Where a limb's place is in model space, for a body whose rest pose is `rest`. */
-function pointOf(limb, place, rest) {
-  const scale = rest.head[1] / REFERENCE_HEIGHT
+const scaleOf = rest => rest.head[1] / REFERENCE_HEIGHT
+
+/** How far a pose drops the hips, in the model's metres. */
+const dropOf = (pose, rest) => (pose.hips?.drop ?? 0) * scaleOf(rest)
+
+/** Where a limb's place is in model space, for a body whose rest pose is `rest`, with the hips `drop` metres low. */
+function pointOf(limb, place, rest, drop) {
+  const scale = scaleOf(rest)
   const x = SIDE_X[limb.side]
   const isFoot = limb.name.endsWith('Foot')
   const root = isFoot ? rest[limb.side].hip : rest[limb.side].shoulder
   const across = root[0] + x * place.out * scale
   if (isFoot) return [across, rest[limb.side].foot[1], place.forward * scale]
-  const height = typeof place.level === 'number' ? place.level : LEVELS[place.level]?.(rest)
-  if (height === undefined)
+  const level = LEVELS[place.level]
+  if (typeof place.level !== 'number' && !level)
     throw new Error(`no hand level "${place.level}" — try ${Object.keys(LEVELS).join(', ')}, or a height in metres`)
+  const height = level ? level(rest) - drop : place.level
+  const shoulder = rest[limb.side].shoulder
   return withinReach(
     [across, height, rest.chest[2] + place.forward * scale],
-    rest[limb.side].shoulder,
+    [shoulder[0], shoulder[1] - drop, shoulder[2]],
     armLength(rest, limb.side)
   )
+}
+
+/** The torso's turn from the rest pose as [yaw, pitch, roll] radians: the body's turn plus the twist, the lean, the side lean. */
+function torsoTurnOf(pose) {
+  const torso = pose.torso ?? {}
+  const yaw = ((pose.hips?.turn ?? 0) + (torso.twist ?? 0)) * DEGREES
+  return [yaw, (torso.lean ?? 0) * DEGREES, -(torso.side ?? 0) * DEGREES]
+}
+
+const rounded = angles => angles.map(angle => Number(angle.toFixed(3)))
+
+/**
+ * The body key a pose asks for at `at`, for motion-conditions.mjs's `body`
+ * constraint: `{ at, height?, heading?, torso?, head? }`, or null when the
+ * pose sets no body part. The head's turn adds its own look to the torso's
+ * yaw and pitch, which is close enough at the angles a pose uses.
+ */
+function bodyKeyOf(pose, rest, at) {
+  if (!BODY.some(part => pose[part])) return null
+  const [yaw, pitch, roll] = torsoTurnOf(pose)
+  const head = pose.head && [yaw + (pose.head.turn ?? 0) * DEGREES, pitch + (pose.head.nod ?? 0) * DEGREES, roll]
+  return {
+    at,
+    ...(pose.hips ? { height: Number((rest.hips[1] - dropOf(pose, rest)).toFixed(3)) } : {}),
+    ...(pose.hips?.turn ? { heading: Number((pose.hips.turn * DEGREES).toFixed(3)) } : {}),
+    ...(pose.torso ? { torso: rounded([yaw, pitch, roll]) } : {}),
+    ...(head ? { head: rounded(head) } : {})
+  }
 }
 
 const armLength = (rest, side) =>
@@ -162,20 +230,26 @@ function withinReach(point, shoulder, length) {
   return shoulder.map((value, axis) => Number((value + offset[axis] * share).toFixed(3)))
 }
 
-/** The designer keys for a timeline of key poses: `{ RightHand: [{ at, value }], ... }`. */
+/**
+ * The designer keys for a timeline of key poses: `{ keys: { RightHand: [{ at,
+ * value, ease }], ... }, body: [{ at, height?, heading?, torso?, head? }] }`.
+ * A design stores both (designer.js).
+ */
 export function keysOf(timeline, skeleton) {
   const rest = restOf(skeleton)
   const keys = {}
+  const body = []
   for (const key of timeline) {
     const pose = keyPose(key)
+    const drop = dropOf(pose, rest)
     for (const limb of LIMBS.filter(candidate => pose[candidate.name])) {
-      keys[limb.handle] = [
-        ...(keys[limb.handle] ?? []),
-        { at: key.at, value: pointOf(limb, pose[limb.name], rest), ease: 'sine-in-out' }
-      ]
+      const limbKey = { at: key.at, value: pointOf(limb, pose[limb.name], rest, drop), ease: 'sine-in-out' }
+      keys[limb.handle] = [...(keys[limb.handle] ?? []), limbKey]
     }
+    const bodyKey = bodyKeyOf(pose, rest, key.at)
+    if (bodyKey) body.push(bodyKey)
   }
-  return keys
+  return { keys, body }
 }
 
 /** One key pose in words, as asked: what the agent or person meant it to be. */
@@ -184,11 +258,37 @@ export function poseWords(key) {
   const centimetres = metres => Math.round(Math.abs(metres) * 100)
   const along = metres => `${centimetres(metres)} cm ${metres >= 0 ? 'ahead' : 'behind'}`
   const aside = metres => `${centimetres(metres)} cm ${metres >= 0 ? 'out' : 'across'}`
-  const place = (name, spot) =>
-    name.endsWith('Foot')
-      ? `${name.replace('Foot', '')} foot ${along(spot.forward)}`
-      : `${name} hand ${typeof spot.level === 'number' ? `${spot.level} m up` : spot.level.replace('-', ' ')}, ${along(spot.forward)}, ${aside(spot.out)}`
+  const place = (name, spot) => {
+    if (PART_WORDS[name]) return PART_WORDS[name](spot)
+    if (name.endsWith('Foot')) return `${name.replace('Foot', '')} foot ${along(spot.forward)}`
+    return `${name} hand ${typeof spot.level === 'number' ? `${spot.level} m up` : spot.level.replace('-', ' ')}, ${along(spot.forward)}, ${aside(spot.out)}`
+  }
   return `${key.pose ?? 'custom'} at ${key.at} s: ${Object.entries(pose)
     .map(([name, spot]) => place(name, spot))
     .join('; ')}`
+}
+
+/** Each dial's words for a positive and a negative angle. */
+const DIAL_WORDS = {
+  hips: { turn: ['turned left', 'turned right'] },
+  torso: {
+    lean: ['forward', 'back'],
+    side: ['to the left side', 'to the right side'],
+    twist: ['twisted left', 'twisted right']
+  },
+  head: { turn: ['looking left', 'looking right'], nod: ['down', 'up'] }
+}
+
+/** A body part's set angles in words, `30° forward, 15° twisted left`. */
+const anglesOf = (part, spot) =>
+  Object.entries(DIAL_WORDS[part])
+    .filter(([dial]) => spot[dial])
+    .map(([dial, [positive, negative]]) => `${Math.abs(spot[dial])}° ${spot[dial] > 0 ? positive : negative}`)
+
+/** A body part of a key pose in words. */
+const PART_WORDS = {
+  hips: spot =>
+    `hips ${[...(spot.drop ? [`${Math.round(spot.drop * 100)} cm low`] : []), ...anglesOf('hips', spot)].join(', ') || 'level'}`,
+  torso: spot => `torso ${anglesOf('torso', spot).join(', ') || 'upright'}`,
+  head: spot => `head ${anglesOf('head', spot).join(', ') || 'level'}`
 }

@@ -41,6 +41,13 @@ it).
   +Z forward, feet at 0, no root motion). A Worn Gear path's keys fit as they
   are. `scale` turns model metres into capture metres: capture hips height
   over model hips height.
+- `body` keys hold the hips, spine and head: `{ at, height?, heading?,
+  torso?, head? }`. `height` is the hips in model metres, `heading` radians
+  (left positive), `torso` and `head` turns `[yaw, pitch, roll]` in radians
+  from the T-pose (yaw left, pitch forward and down). The spine, neck, head
+  and shoulder points come from Kimodo's own skeleton turned about the hips,
+  so a model with a higher chest does not stretch the spine. A body key wins
+  over the hips height and heading every other key reads from the template.
 - `pose` keeps the template's whole body at those seconds, to start or end on
   a known stance. `root` keeps its ground path and heading on every frame.
 - Keys are exact only at their frames. Between keys the model is free.

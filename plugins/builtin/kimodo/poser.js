@@ -6,7 +6,7 @@
  *
  * A request to `kimodo.pose`:
  *   { name, prompt, model, base, seconds?, seed?, keys: [{ at, pose?, mirror?,
- *     right?, left?, rightFoot?, leftFoot? }] }
+ *     right?, left?, rightFoot?, leftFoot?, hips?, torso?, head? }] }
  * `base` is a take Kimodo made on the model: its stored motion is the
  * template Kimodo reads the body from. The skeleton is the model's own,
  * `motion/<model name>.skeleton.json`.
@@ -34,7 +34,8 @@ async function skeletonOf(context, model) {
 export const poseMenu = () => ({
   poses: Object.fromEntries(Object.entries(POSES).map(([name, pose]) => [name, pose.means])),
   limbs:
-    'a key may set right, left (hands: { level, forward, out }) and rightFoot, leftFoot ({ forward, out }) over its pose; mirror swaps sides'
+    'a key may set right, left (hands: { level, forward, out }) and rightFoot, leftFoot ({ forward, out }) over its pose; mirror swaps sides',
+  body: 'a key may set hips { drop, turn }, torso { lean, side, twist } and head { turn, nod }: metres and degrees, left and forward positive'
 })
 
 /** kimodo.pose: the design for a timeline of key poses, written under `designs`. */
@@ -55,7 +56,7 @@ export async function designFromPoses(context, options, designs) {
     loop: false,
     // The key poses set the start, so the base take's first pose would only fight them.
     fromBase: false,
-    keys: keysOf(options.keys, skeleton),
+    ...keysOf(options.keys, skeleton),
     hold: null,
     poses: options.keys
   }

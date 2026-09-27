@@ -1,6 +1,6 @@
 # Posing a move by name
 
-Say the key poses; the poser turns them into Kimodo's hand and foot keys.
+Say the key poses; the poser turns them into Kimodo's hand, foot and body keys.
 
 ```sh
 E="node bin/engine.mjs --headless --project <game>"
@@ -19,8 +19,19 @@ $E run kimodo.compare '{"design":"assets/motion/designs/chop.json"}'
   `waist`, `low` or a height in metres; forward is metres ahead of the chest
   (negative behind); out is metres out from the shoulder line (negative
   crosses the body). A foot is `{ forward, out }` from under its hip.
+- **Body dials:** `hips: { drop, turn }` (metres lower, negative is taller;
+  degrees turned left), `torso: { lean, side, twist }` (degrees forward, to
+  the left side, shoulders twisted left), `head: { turn, nod }` (degrees
+  looking left, looking down). A hand's level word drops with the hips.
+- **Hips height keeps legs straight:** with no `hips` key Kimodo tends to
+  bend the knees. For a standing pose give `hips: { drop: -0.03 }`.
+- **Hand on the hip:** the arm reaches the hip bone with the hand at about
+  1.02 m, 5 cm in from the shoulder line: `{ "level": 1.02, "forward": -0.02,
+  "out": -0.05 }`. The `low` word is clamped to the arm's reach, which on a
+  T-pose rig is hip height.
 - **Free limbs:** a limb no key names is left to the prompt.
-- **`kimodo.compare`** gives each key's miss in centimetres, the take's pose
+- **`kimodo.compare`** gives each key's miss in centimetres, `bodyMisses`
+  (hips centimetres; lean, side, twist and turn degrees), the take's pose
   in words at each key (`rig.pose`) and its faults (`rig.faults`). Change the
   keys or the prompt and generate again until the misses and faults are small.
 - Keep key poses and the prompt telling one story; keys that fight the words

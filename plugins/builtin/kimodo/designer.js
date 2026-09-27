@@ -16,6 +16,7 @@
  *     seconds: 2, seed: 0, loop: false,
  *     fromBase: true,                   start the take in the base take's first pose
  *     keys: { RightHand: [{ at: 0.6, value: [x, y, z], ease: 'sine-in-out' }], ... },
+ *     body: [{ at, height?, heading?, torso?, head? }],   optional: hips, spine and head keys (kimodo/poses.js)
  *     hold: { model: 'models/items/sword.glb', position: [x, y, z], rotation: [x, y, z] } | null
  *   }
  *
@@ -110,8 +111,9 @@ export function previewConstraints(design, skeleton, seconds, dragged = null) {
 
 /**
  * The Kimodo constraint record for a design (motion-conditions.mjs): the base
- * take's first pose at the start when `fromBase`, and every keyed handle as a
- * joint constraint. `template` is the stored motion the base take came from.
+ * take's first pose at the start when `fromBase`, every keyed handle as a
+ * joint constraint, and the `body` keys as a body constraint. `template` is
+ * the stored motion the base take came from.
  */
 export function kimodoRecord(design, template) {
   const start = design.fromBase ? [{ kind: 'pose', at: [0], from: 0 }] : []
@@ -120,5 +122,6 @@ export function kimodoRecord(design, template) {
     joint,
     keys: keys.map(key => ({ at: key.at, value: key.value }))
   }))
-  return { template, constraints: [...start, ...joints] }
+  const body = design.body?.length ? [{ kind: 'body', keys: design.body }] : []
+  return { template, constraints: [...start, ...joints, ...body] }
 }

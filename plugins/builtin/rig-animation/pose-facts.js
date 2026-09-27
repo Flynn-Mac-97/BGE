@@ -28,6 +28,12 @@ function axesOf(frame) {
   return { left, front: unit(cross(left, [0, 1, 0])) }
 }
 
+/** How far a line across the body is turned left from +X, about Y, in radians. */
+const yawOf = across => Math.atan2(-across[2], across[0])
+
+/** An angle brought within -π..π. */
+const wrapped = angle => Math.atan2(Math.sin(angle), Math.cos(angle))
+
 /** How high a foot is over its rest height, from its ankle or toe, whichever is lower. */
 export const liftOf = (frame, rest, side) =>
   Math.min(
@@ -67,7 +73,9 @@ function weightOf(frame, planted) {
 }
 
 /**
- * The facts of one frame: `{ elbows, knees, hands, spine, feet, weight, words }`.
+ * The facts of one frame: `{ elbows, knees, hands, spine, crouch, turn, twist,
+ * feet, weight, words }`. `turn` is degrees the hips face left of +Z; `twist`
+ * is degrees the shoulders turn left of the hips.
  * `floor` is the clip's own floor (`floorOf`); a foot within PLANTED of it is planted.
  */
 export function poseFacts(frame, rest, floor = 0) {
@@ -94,6 +102,9 @@ export function poseFacts(frame, rest, floor = 0) {
     side: Math.round(Math.atan2(dot(spine, left), spine[1]) * DEGREES)
   }
   facts.crouch = centimetres(rest.hips[1] - frame.hips[1])
+  const hipsYaw = yawOf(subtract(frame.left.hip, frame.right.hip))
+  facts.turn = Math.round(hipsYaw * DEGREES)
+  facts.twist = Math.round(wrapped(yawOf(subtract(frame.left.shoulder, frame.right.shoulder)) - hipsYaw) * DEGREES)
   facts.weight = weightOf(frame, planted)
   facts.words = wordsOf(facts)
   return facts

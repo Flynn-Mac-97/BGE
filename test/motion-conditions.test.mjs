@@ -74,3 +74,26 @@ test('a pose from another moment holds that moment\'s body at every frame named'
   const condition = motionCondition({ skeleton: 'soma-30', frames: 4, framesPerSecond: 2, template, record: { constraints: [{ kind: 'pose', at: [1.5], from: 0 }] } })
   assert.deepEqual(rowOf(condition.observed, 3).slice(0, 3).map(value => Number(value.toFixed(3))), [5, 0.9, 7])
 })
+
+test('a body key sets the hips height and heading, and wins over a joint key listed after it', () => {
+  const condition = conditionOf([
+    { kind: 'body', keys: [{ at: 1, height: 0.7, heading: Math.PI / 2 }] },
+    { kind: 'joint', joint: 'RightHand', keys: [{ at: 1, value: [0.2, 1.3, 0.4] }] }
+  ])
+  const row = rowOf(condition.observed, 2)
+  assert.ok(Math.abs(row[1] - 0.7) < 1e-6)
+  assert.ok(Math.abs(positionOf(row, 'Hips')[1] - 0.7) < 1e-6)
+  assert.ok(Math.abs(Math.atan2(row[4], row[3]) - Math.PI / 2) < 1e-6)
+})
+
+test('a torso lean carries the spine and head forward from the hips, from the capture skeleton', () => {
+  const condition = conditionOf([{ kind: 'body', keys: [{ at: 1, height: 0.8, torso: [0, Math.PI / 2, 0], head: [0.5, 0, 0] }] }])
+  const row = rowOf(condition.observed, 2)
+  const [x, y, z] = positionOf(row, 'Head')
+  // Tipped a quarter forward, the head is as far ahead of the hips as it stood above them.
+  assert.ok(Math.abs(x) < 0.05 && Math.abs(y - 0.8) < 0.1 && z > 0.5, `head at ${[x, y, z].map(value => value.toFixed(2))}`)
+  const chestTurn = 5 + NAMES.length * 3 + NAMES.indexOf('Chest') * 6
+  assert.equal(rowOf(condition.mask, 2)[chestTurn], 1)
+  const headTurn = 5 + NAMES.length * 3 + NAMES.indexOf('Head') * 6
+  assert.ok(Math.abs(row[headTurn] - Math.cos(0.5)) < 1e-6)
+})

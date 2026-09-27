@@ -17,6 +17,9 @@
  *         "keys": [{ "at": 0, "value": [0, 0] }, { "at": 3, "value": [0, 4.2] }] }   first key to the last
  *       { "kind": "joint", "joint": "RightHand",      a hand or foot at these points
  *         "keys": [{ "at": 1, "value": [-0.5, 1.5, -0.05] }] }
+ *       { "kind": "body", "keys": [{ "at": 1,         the hips, spine and head at these times: any of
+ *         "height": 0.8, "heading": 0.3,              hips height in metres, body heading in radians,
+ *         "torso": [0.3, 0.5, 0], "head": [0.5, 0.3, 0] }] }   torso and head turns [yaw, pitch, roll]
  *     ]
  *   }
  *
@@ -34,6 +37,14 @@
  * hips height and the heading at its frames, read from the template. A joint
  * constraint fixes the positions of its chain (a hand and its middle finger
  * tip), moved together, and the template's turn of the hand itself.
+ *
+ * A `body` key's turns are from the rest T-pose, in radians: yaw about Y
+ * (positive turns the front toward +X, the body's left), then pitch about X
+ * (positive tips forward and down), then roll about Z. `torso` places the
+ * spine, neck, head and shoulders by turning the skeleton's own rest offsets
+ * about the hips, and turns the chest; `head` turns the head. The points come
+ * from the capture skeleton, not the model's, so a model whose chest is higher
+ * does not ask the spine to stretch.
  */
 import { SKELETONS } from './motion-clip.mjs'
 import { makeCurve } from '../../engine/curves.js'
@@ -42,6 +53,9 @@ import { makeCurve } from '../../engine/curves.js'
 const LIMBS = {
   'soma-30': {
     hips: ['RightLeg', 'LeftLeg'],
+    torso: ['Spine1', 'Spine2', 'Chest', 'Neck1', 'Neck2', 'Head', 'LeftShoulder', 'LeftArm', 'RightShoulder', 'RightArm'],
+    chest: 'Chest',
+    head: 'Head',
     chains: {
       LeftFoot: ['LeftFoot', 'LeftToeBase'],
       RightFoot: ['RightFoot', 'RightToeBase'],
@@ -51,6 +65,9 @@ const LIMBS = {
   },
   'smplx-22': {
     hips: ['right_hip', 'left_hip'],
+    torso: ['spine1', 'spine2', 'spine3', 'neck', 'head', 'left_collar', 'left_shoulder', 'right_collar', 'right_shoulder'],
+    chest: 'spine3',
+    head: 'head',
     chains: {
       LeftFoot: ['left_ankle', 'left_foot'],
       RightFoot: ['right_ankle', 'right_foot'],
@@ -108,8 +125,38 @@ const KINDS = {
       for (const joint of joints) keepPosition(condition, frame, joint, posed.positions[joint].map((value, axis) => value + shift[axis]), posed)
       keepTurn(condition, frame, joints[0], posed.turns[joints[0]])
     }
+  },
+  body: (condition, constraint) => {
+    const limbs = LIMBS[condition.skeleton]
+    if (!limbs.torso) throw new Error(`the ${condition.skeleton} skeleton has no body constraint`)
+    for (const key of constraint.keys) {
+      const [frame] = framesAt(condition, [key.at])
+      const posed = condition.posedAt(frame)
+      keepPlacement(condition, frame, posed)
+      const height = key.height === undefined ? posed.positions[0][1] : key.height * condition.scale
+      const hips = [posed.ground[0], height, posed.ground[1]]
+      keep(condition, frame, 1, height)
+      keepPosition(condition, frame, 0, hips, posed)
+      if (key.heading !== undefined) {
+        keep(condition, frame, 3, Math.cos(key.heading))
+        keep(condition, frame, 4, Math.sin(key.heading))
+      }
+      if (key.torso) {
+        const turn = turnOf(key.torso)
+        const rest = restPositions(condition.skeleton)
+        for (const joint of limbs.torso.map(name => condition.names.indexOf(name))) {
+          const offset = applied(turn, rest[joint].map((value, axis) => value - rest[0][axis]))
+          keepPosition(condition, frame, joint, offset.map((value, axis) => value + hips[axis]), posed)
+        }
+        keepTurn(condition, frame, condition.names.indexOf(limbs.chest), turn)
+      }
+      if (key.head) keepTurn(condition, frame, condition.names.indexOf(limbs.head), turnOf(key.head))
+    }
   }
 }
+
+/** Kinds filled after the rest, because every other kind sets the hips height and heading from the template at its frames. */
+const FILLED_LAST = new Set(['body'])
 
 /**
  * The condition for one generation: `{ observed, mask, firstHeading }`, the
@@ -139,7 +186,11 @@ export function motionCondition({ skeleton, frames, framesPerSecond, template, r
       return posedFrames.get(frame)
     }
   }
-  for (const constraint of record.constraints) {
+  const ordered = [
+    ...record.constraints.filter(constraint => !FILLED_LAST.has(constraint.kind)),
+    ...record.constraints.filter(constraint => FILLED_LAST.has(constraint.kind))
+  ]
+  for (const constraint of ordered) {
     const fill = KINDS[constraint.kind]
     if (!fill) throw new Error(`constraint kind "${constraint.kind}" is not one of ${Object.keys(KINDS).join(', ')}`)
     fill(condition, constraint)
@@ -217,6 +268,26 @@ function posedFrame(skeleton, template, frame) {
     ground: [positions[0][0], positions[0][2]],
     heading: Math.atan2(right[2] - left[2], -(right[0] - left[0]))
   }
+}
+
+/** Every joint's position in the rest T-pose, where each joint's turn is the identity: its offsets summed. */
+function restPositions(skeleton) {
+  const { parents, offsets } = SKELETONS[skeleton]
+  const positions = []
+  offsets.forEach((offset, joint) => {
+    const parent = parents[joint]
+    positions.push(parent < 0 ? [0, 0, 0] : offset.map((value, axis) => value + positions[parent][axis]))
+  })
+  return positions
+}
+
+/** A turn from [yaw, pitch, roll] in radians as a row-major 3×3 matrix: yaw about Y, then pitch about X, then roll about Z. */
+function turnOf([yaw = 0, pitch = 0, roll = 0]) {
+  const about = (angle, cells) => cells(Math.cos(angle), Math.sin(angle))
+  const aboutY = about(yaw, (cosine, sine) => [cosine, 0, sine, 0, 1, 0, -sine, 0, cosine])
+  const aboutX = about(pitch, (cosine, sine) => [1, 0, 0, 0, cosine, -sine, 0, sine, cosine])
+  const aboutZ = about(roll, (cosine, sine) => [cosine, -sine, 0, sine, cosine, 0, 0, 0, 1])
+  return product(product(aboutY, aboutX), aboutZ)
 }
 
 /** A unit quaternion [x, y, z, w] as a row-major 3×3 matrix. */
