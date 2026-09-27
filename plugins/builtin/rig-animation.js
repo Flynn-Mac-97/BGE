@@ -54,7 +54,7 @@ import { applyCrossfade, crossfadeFrom } from './rig-animation/crossfade.js'
 import { applyBlend, cycleRate } from './rig-animation/blend.js'
 import { widenSkeleton } from './rig-animation/skeleton.js'
 import { applyConstraints } from './rig-animation/constraints.js'
-import { pointOf } from './rig-animation/targets.js'
+import { pointOf, worldPointOf } from './rig-animation/targets.js'
 import { constraintsForControls } from './rig-animation/controls.js'
 import { rigView } from './rig-animation/rig-view.js'
 import { makeOnceReporter } from '../../engine/report-once.js'
@@ -101,6 +101,16 @@ export default {
         const file = entity._definition.rig?.skeleton
         const skeleton = file && read(context, file, widenSkeleton).value
         return skeleton && entity.pose ? pointOf(entity, skeleton, target) : null
+      },
+
+      /**
+       * Where a target is under the entity's pose now, in the world: `{ node,
+       * at }` is a point in a bone's space, as an attachment is hung. Null
+       * until the type's skeleton has loaded.
+       */
+      worldPointOf(entity, target) {
+        const point = context.rigAnimation.pointOf(entity, target)
+        return point ? worldPointOf(entity, point) : null
       },
 
       /**

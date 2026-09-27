@@ -25,6 +25,7 @@ Read down; stop at the first row that answers.
 | what is on screen — counts, positions, sizes, coverage, regions, overlaps, between | `see.describe` | nothing; works everywhere |
 | a rigged body's control rig — bones, and each constraint's end, target, joint and pole, as screen points | `see.describe '{"subject":"you","rig":true}'` | nothing; works everywhere |
 | which entities match predicates — type, region, size, depth, cut, occlusion, distance | `see.find` | nothing; works everywhere |
+| where a body's worn items (attachments) are on screen, and the pixel to point at | `see.worn '{"subject":"you"}'` | a rigged subject |
 | one entity in full — world box, screen box, cover, velocity, camera relation | `see.isolate` | nothing; may step the world once |
 | how much of X is visible, and who blocks it | `see.occlusion` | nothing; ID buffer or rays |
 | what changed over N steps — appeared, gone, moved, entered or left frame | `see.diff` | nothing; advances the world |

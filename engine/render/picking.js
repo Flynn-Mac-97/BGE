@@ -177,7 +177,27 @@ export function makePicking(state) {
     return raycaster.ray
   }
 
+  /**
+   * The middle of one attachment as drawn on an entity, in world space: the
+   * centre of the box round its meshes. A point pressed there lands on the
+   * item, where its hang point may be on an edge. Null when the entity or
+   * the attachment is not drawn, or its model has not loaded.
+   */
+  function attachmentMiddle(entity, name) {
+    const object = state.meshes.get(entity.id)
+    if (!object) return null
+    let group = null
+    object.traverse(node => {
+      if (!group && node.userData.attachment === name) group = node
+    })
+    if (!group) return null
+    state.scene.updateMatrixWorld()
+    const box = new THREE.Box3().setFromObject(group)
+    return box.isEmpty() ? null : box.getCenter(new THREE.Vector3()).toArray()
+  }
+
   state.rayHits = rayHits
+  state.attachmentMiddle = attachmentMiddle
   state.toScreen = toScreen
   state.toWorld = toWorld
   state.pick = pick

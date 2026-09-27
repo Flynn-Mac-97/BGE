@@ -607,6 +607,7 @@ export async function makeRenderer(canvas, view, viewport, options = {}) {
     toWorld: state.toWorld,
     pick: state.pick,
     pickNode: state.pickNode,
+    attachmentMiddle: state.attachmentMiddle,
     ray: state.ray,
 
     bounds: entityDrawSize,

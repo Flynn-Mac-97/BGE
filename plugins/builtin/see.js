@@ -19,6 +19,7 @@
  * the CLI. Frames are named by level name and a frame number, never by a
  * clock.
  */
+import { worn } from './see/worn.js'
 import { sketchPixels, sketchOnCanvas, writeFrameFiles, composeSheet, browserFiles } from './see/frame-sketch.js'
 import { describe } from './see/describe.js'
 import { resolveView, view } from './see/views.js'
@@ -155,6 +156,11 @@ export default {
       id: 'see.find',
       label: 'Matching entities',
       run: (context, options) => find(context, options || {})
+    },
+    {
+      id: 'see.worn',
+      label: 'Worn items on screen',
+      run: (context, options) => worn(context, options || {})
     },
     {
       id: 'see.diff',
