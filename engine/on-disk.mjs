@@ -117,7 +117,15 @@ export function writesRefusedHere() {
 }
 
 /**
- * Refuse every write while a lane holds the checkout.
+ * Project files the engine rebuilds from the others on every run, and a game
+ * leaves out of git. No lane builds against them, so a test run or an index
+ * build writes them while a lane works. Draft boards also sit in `.engine/`,
+ * and are work, so they are not here.
+ */
+const REBUILT_FILES = new Set(['.engine/index.json', '.engine/index.agent.json', '.engine/tests.json'])
+
+/**
+ * Refuse every write while a lane holds the checkout, except REBUILT_FILES.
  *
  * `vite.config.js` asks `permits` at the server's three doors. A headless world
  * reaches disk through none of them, so the same rule is registered here.
@@ -128,6 +136,7 @@ export function writesRefusedHere() {
  */
 export function refuseWritesWhileLanesWork(checkout) {
   return (file, scope) => {
+    if (scope === 'project' && REBUILT_FILES.has(String(file).replaceAll('\\', '/'))) return null
     const lock = workLock(checkout)
     if (!lock.locked) return null
     refusedWrites.push({ file, scope, why: lock.why })
