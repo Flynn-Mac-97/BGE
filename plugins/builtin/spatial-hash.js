@@ -19,6 +19,7 @@
  */
 
 import { groupRegistry } from './spatial-hash/registry.js'
+import { clamp } from './game-maths/vectors.js'
 
 /** Cells about twice a member's width: selective, and a neighbour walk is nine cells. */
 const DEFAULT_CELL_SIZE = 1.5
@@ -315,5 +316,4 @@ export default {
   }]
 }
 
-const clamp = (value, low, high) => Math.max(low, Math.min(high, value))
 const round = n => Math.round(n * 1000) / 1000

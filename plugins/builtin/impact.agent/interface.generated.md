@@ -1,4 +1,4 @@
-<!--0b6588e5-->
+<!--b5c45e37-->
 parsed from source
   plugin Impact
   category game
@@ -8,4 +8,4 @@ parsed from source
   context impact
   listens level:loaded
   emits impact {weight, hold, shake, at}
-  source 151 lines
+  source 150 lines

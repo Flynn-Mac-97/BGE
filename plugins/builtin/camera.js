@@ -93,7 +93,8 @@ const LANDING_FULL_DIP = 8     // the fall speed that earns the whole dip
 
 /** How far a unit of shake throws the aim when there is no picture to slide. */
 const SHAKE_RADIANS = 0.08
-import { MAX_PITCH, clamp, wrapAngle } from './camera/angles.js'
+import { MAX_PITCH, wrapAngle } from './camera/angles.js'
+import { clamp } from './game-maths/vectors.js'
 import { placeChaseEyeForFrame, thirdPerson } from './camera/chase.js'
 
 export default {

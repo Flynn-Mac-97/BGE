@@ -11,6 +11,7 @@
  * painter rebuilds the same points a test computes, and neither stores state
  * the other could disagree with.
  */
+import { clamp } from '../game-maths/vectors.js'
 
 const MAX_BEAMS = 64
 const MAX_SEGMENTS = 48
@@ -38,8 +39,6 @@ function readPoint(value) {
   }
   return null
 }
-
-const clamp = (value, least, most) => Math.min(most, Math.max(least, value))
 
 function number(value, fallback) {
   const amount = Number(value)

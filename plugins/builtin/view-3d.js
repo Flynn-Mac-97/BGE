@@ -28,6 +28,8 @@
  * picking and toWorld resolve against it. This plugin supplies the missing
  * half: the input that moves it.
  */
+import { clamp } from './game-maths/vectors.js'
+
 const LOOK_RADIANS = 0.005          // radians per pixel of drag
 const SPEED = 10                    // metres per second, base
 const BOOST = 3                     // how much faster Shift is
@@ -314,5 +316,4 @@ function moveAlongView(context, metres) {
 }
 
 // ------------------------------------------------------------------ small print
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n))
 const round = n => Math.round(n * 1000) / 1000

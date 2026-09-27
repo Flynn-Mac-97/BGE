@@ -20,6 +20,7 @@
  */
 
 import { asVector } from './shared/vector.js'
+import { clamp } from './game-maths/vectors.js'
 
 /** Weight one: the heaviest hit a game should ever ask for. */
 const MOST_HOLD = 0.11      // seconds the world stops
@@ -39,8 +40,6 @@ const state = { held: 0, shaken: 0, hits: 0, spentAt: -1, spent: 0 }
 
 /** Seconds of hold allowed per second of play. A third is generous and still safe. */
 const BUDGET = 0.34
-
-const clamp = (value, low, high) => Math.max(low, Math.min(high, value))
 
 export default {
   name: 'Impact',

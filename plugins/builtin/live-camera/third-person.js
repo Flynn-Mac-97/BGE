@@ -5,6 +5,7 @@
  * left it, so the body holds still on screen at any refresh rate. Mouse turn and
  * wheel zoom are read on the same frame they are drawn.
  */
+import { clamp } from '../game-maths/vectors.js'
 
 /** Exactly 90 degrees makes the view basis degenerate. */
 const PITCH_LIMIT = 89 * Math.PI / 180
@@ -95,5 +96,3 @@ function placeView(view, state, settings) {
   view.y = state.focus.y - Math.sin(state.pitch) * state.distance
   view.z = state.focus.z + Math.cos(state.yaw) * flat * state.distance - Math.sin(state.yaw) * settings.side
 }
-
-const clamp = (value, low, high) => Math.min(high, Math.max(low, value))

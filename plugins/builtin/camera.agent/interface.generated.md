@@ -1,4 +1,4 @@
-<!--6aea1fc6-->
+<!--47f7a3e3-->
 parsed from source
   plugin Game Camera
   category engine
@@ -7,4 +7,4 @@ parsed from source
   context camera
   systems fixed, frame
   listens level:loaded, play:started, play:stopped
-  source 601 lines
+  source 602 lines

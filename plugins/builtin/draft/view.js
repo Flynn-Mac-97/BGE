@@ -10,6 +10,7 @@ import {
   addEdge, fitBoard, nodeBox, removeEdge, removeNode, wrapText,
   DEFAULT_WIDTH, FONT_SIZE, LINE_HEIGHT, PADDING
 } from './model.js'
+import { clamp } from '../game-maths/vectors.js'
 
 const BACKDROP = '#101014'
 const GRID = '#23232c'
@@ -23,7 +24,6 @@ const GROUP_FILL = 'rgba(255,255,255,0.06)'
 
 const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 const font = (size, weight = '') => `${weight} ${size}px ${FONT}`
-const clamp = (value, low, high) => Math.min(high, Math.max(low, value))
 
 export function mountStage({ stage, canvas, state, actions }) {
   const pen = canvas.getContext('2d')
