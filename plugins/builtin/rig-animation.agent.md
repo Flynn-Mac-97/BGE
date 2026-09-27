@@ -39,6 +39,7 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 
 ## Detail
 
+- `plugins/builtin/rig-animation.agent/judging-a-clip.md` — `rig.pose` and `rig.faults`: a clip read in words and scored for slide, hover, pass-through, jitter, balance and loop pop
 - `plugins/builtin/rig-animation.agent/checking.md` — every `rig.check` finding and how to read a compare sheet
 - `plugins/builtin/rig-animation.agent/retargeting.md` — how the retarget works, writing or fixing a bone map
 - `plugins/builtin/rig-animation.agent/making-a-clip.md` — clip file shape and tool flags

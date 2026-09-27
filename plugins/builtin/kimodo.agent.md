@@ -36,6 +36,7 @@ plays the picked one on `models/<folder>.glb` in a view of its own, and shows
 its prompt. **Use as** copies the take over a clip beside it.
 
 - `kimodo.takes` — every clip, its prompt, frames and length. **Read** after a new take.
+- `rig.faults '{"file":"motion/<model>/take-<move>-<id>.json","skeleton":"motion/<model>.skeleton.json"}'` — judge a take before using it (Rig Animation's `judging-a-clip.md`).
 - `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
 - `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
 

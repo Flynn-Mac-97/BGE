@@ -57,6 +57,7 @@ import { applyConstraints } from './rig-animation/constraints.js'
 import { pointOf, worldPointOf } from './rig-animation/targets.js'
 import { constraintsForControls } from './rig-animation/controls.js'
 import { rigView } from './rig-animation/rig-view.js'
+import { faultsOfClip, poseOfClip } from './rig-animation/motion-review.js'
 import { makeOnceReporter } from '../../engine/report-once.js'
 
 /** file -> { status, value, error }: a clip or a skeleton. Both files are immutable, so one cache serves every world. */
@@ -66,6 +67,18 @@ const reportOnce = makeOnceReporter().report
 
 /** world -> { context }, so a system can reach the file reader without a module-level context. */
 const worlds = new WeakMap()
+
+/** What rig.pose and rig.faults take: a type's clip by name, or a clip file with its skeleton. */
+const REVIEW_ARGUMENTS = {
+  type: 'object',
+  properties: {
+    type: { type: 'string', description: 'a rigged type in the level, such as player' },
+    clip: { type: 'string', description: 'the clip name the type declares' },
+    file: { type: 'string', description: 'or a clip file under assets/, such as a take' },
+    skeleton: { type: 'string', description: 'the skeleton file a clip file is for' },
+    at: { type: 'number', description: 'rig.pose only: seconds into the clip' }
+  }
+}
 
 export default {
   name: 'Rig Animation',
@@ -184,6 +197,18 @@ export default {
   }],
 
   commands: [
+    {
+      id: 'rig.pose',
+      label: 'One moment of a clip in words',
+      inputSchema: REVIEW_ARGUMENTS,
+      run: (context, options = {}) => poseOfClip(context, options, (file, widen) => read(context, file, widen))
+    },
+    {
+      id: 'rig.faults',
+      label: 'What is wrong with a clip, measured',
+      inputSchema: REVIEW_ARGUMENTS,
+      run: (context, options = {}) => faultsOfClip(context, options, (file, widen) => read(context, file, widen))
+    },
     {
       id: 'rig.clips',
       label: 'Rig clips by type',
