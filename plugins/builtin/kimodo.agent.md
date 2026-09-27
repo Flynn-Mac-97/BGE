@@ -29,7 +29,8 @@ shim that refuses to run). `go` is needed only for the demo server.
 ## Takes
 
 Make several takes of one move as `take-<move>-<id>`, each with its own
-`--seed` or prompt. The same prompt, seed and frame count give the same motion.
+`--seed` or prompt. Write the prompt as `kimodo.agent/writing-a-prompt.md`
+says: "A person …", one or two actions, mid detail. The same prompt, seed and frame count give the same motion.
 The **KIMODO** board in the top bar lists every clip under `assets/motion/`,
 plays the picked one on `models/<folder>.glb` in a view of its own, and shows
 its prompt. **Use as** copies the take over a clip beside it.
@@ -87,6 +88,7 @@ writes over a used take; keep the take's source, or use the take again.
 Read only the file your task needs.
 
 - `plugins/builtin/kimodo.agent/building-it.md` — installing and building kimodo.cpp
+- `plugins/builtin/kimodo.agent/writing-a-prompt.md` — the prompt rules, and what upstream Kimodo does that this checkout does not use yet
 - `plugins/builtin/kimodo.agent/making-a-clip.md` — generating a clip from a written description, with hands, feet or poses held by constraints
 - `plugins/builtin/kimodo.agent/interfaces.md` — the command line and the library, and which to use
 - `plugins/builtin/kimodo.agent/skeletons.md` — the skeletons it knows and how to add one

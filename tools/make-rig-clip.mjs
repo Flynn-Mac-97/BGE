@@ -33,6 +33,7 @@ import { buildClip, writeClip, readFloats, skeletonFor } from './lib/motion-clip
 import { readModelSkeleton } from './lib/retarget.mjs'
 import { retargetSources, readSource, SOURCE_DIRECTORY } from './lib/retarget-clips.mjs'
 import { motionCondition } from './lib/motion-conditions.mjs'
+import { promptAdvice } from './lib/prompt-advice.mjs'
 
 const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const HOME = process.env.KIMODO_HOME || path.resolve(CHECKOUT, '..', 'kimodo.cpp')
@@ -241,6 +242,10 @@ export async function main(argv = process.argv.slice(2)) {
   const project = path.resolve(CHECKOUT, settings.project)
   if (settings.source) settings.from = path.join(project, SOURCE_DIRECTORY, settings.source)
   if (!settings.prompt && !settings.from) throw new Error('--prompt is required, or --source <stored name>, or --from <directory>')
+  // Printed before minutes of generation, so a poor prompt can be stopped and reworded.
+  if (settings.prompt && !settings.from) {
+    for (const advice of promptAdvice(settings.prompt, settings.frames / settings.fps)) console.warn(`[prompt] ${advice}`)
+  }
 
   if (settings.onto) {
     if (settings.from && !settings.source) throw new Error('--onto reads stored motion: use --source <name>, not --from')
