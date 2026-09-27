@@ -142,7 +142,8 @@ export function closeServer(server) {
 /** Start a detached process with its output in the instance log. */
 export function spawnDetached(command, args, { cwd, env, logPath }) {
   fs.mkdirSync(path.dirname(logPath), { recursive: true })
-  const log = fs.openSync(logPath, 'a')
+  // Written fresh: ids restart with the supervisor, and a job's answer is read from the end of its log.
+  const log = fs.openSync(logPath, 'w')
   try {
     const child = spawn(command, args, {
       cwd,

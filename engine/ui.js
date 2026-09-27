@@ -37,6 +37,84 @@ function makeElement(tag, className, attributes = {}) {
   return element
 }
 
+/**
+ * A button. `o.primary` marks the main action, `o.small` makes it compact,
+ * `o.title` is its hover text, and `o.confirm` makes it ask
+ * first: the first click shows `o.confirm` (such as "Delete?") and only a
+ * second click within three seconds runs `onClick`, for an action that
+ * cannot be undone.
+ */
+function confirmableButton(label, onClick, options = {}) {
+  const element = makeElement(
+    'button',
+    'u-btn' + (options.primary ? ' primary' : '') + (options.small ? ' small' : ''),
+    {
+      text: label,
+      title: options.title
+    }
+  )
+  let isAsking = false
+  element.addEventListener('click', event => {
+    if (!options.confirm || isAsking) {
+      onClick?.(event)
+      return
+    }
+    isAsking = true
+    element.textContent = options.confirm
+    element.classList.add('asking')
+    setTimeout(() => {
+      isAsking = false
+      element.textContent = label
+      element.classList.remove('asking')
+    }, 3000)
+  })
+  return element
+}
+
+/**
+ * A dropdown in a labelled row, `o.k` its label. `o.options` are strings
+ * or `{ value, label, disabled }`; `o.value` is the chosen value and
+ * `o.onChange(value)` is called with the new one.
+ */
+function selectRow(options, redraw) {
+  const element = makeElement('label', 'u-field')
+  append(element, [makeElement('span', 'u-k', { text: options.k ?? '' })])
+  const menu = makeElement('select', 'u-select')
+  for (const entry of options.options || []) {
+    const choice = typeof entry === 'string' ? { value: entry, label: entry } : entry
+    const item = makeElement('option', null, { text: choice.label ?? choice.value, value: choice.value })
+    if (choice.disabled) item.disabled = true
+    if (choice.value === options.value) item.selected = true
+    append(menu, [item])
+  }
+  menu.addEventListener('change', () => {
+    options.onChange?.(menu.value)
+    redraw()
+  })
+  append(element, [menu])
+  if (options.note) append(element, [makeElement('span', 'u-note', { text: options.note })])
+  return element
+}
+
+/**
+ * A grid cell's content: `o.media` (a node, such as ui.picture) above a
+ * title, a sub-line and a row of small `o.actions` buttons. Put it in
+ * ui.grid's `cell`; an action's click does not pick the cell.
+ */
+function card(options = {}) {
+  const element = makeElement('div', 'u-card')
+  if (options.media) append(element, [options.media])
+  if (options.title) append(element, [makeElement('span', 'u-tlabel', { text: options.title })])
+  if (options.sub) append(element, [makeElement('span', 'u-tsub', { text: options.sub })])
+  if (options.actions?.length) {
+    const actions = append(makeElement('div', 'u-card-actions'), options.actions)
+    // An action's click stays in the card; it does not pick the cell as well.
+    actions.addEventListener('click', event => event.stopPropagation())
+    append(element, [actions])
+  }
+  return element
+}
+
 /** Append children, skipping null and false. A string becomes a text node. */
 const append = (element, children) => {
   for (const child of [].concat(children || [])) {
@@ -151,8 +229,9 @@ export function makeUI(state, redraw) {
       return element
     },
 
-    button: (label, onClick, options = {}) =>
-      makeElement('button', 'u-btn' + (options.primary ? ' primary' : ''), { text: label, on: { click: onClick } }),
+    button: confirmableButton,
+    select: options => selectRow(options, redraw),
+    card,
 
     toggle(options = {}) {
       const isOn = options.value ?? (options.bind ? !!state[options.bind] : false)

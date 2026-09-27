@@ -17,11 +17,19 @@
  *         "keys": [{ "at": 0, "value": [0, 0] }, { "at": 3, "value": [0, 4.2] }] }   first key to the last
  *       { "kind": "joint", "joint": "RightHand",      a hand or foot at these points
  *         "keys": [{ "at": 1, "value": [-0.5, 1.5, -0.05] }] }
+ *       { "kind": "point", "joint": "RightElbow",     an elbow or knee at these points, its turn left free
+ *         "keys": [{ "at": 1, "value": [-0.3, 1.2, -0.1] }] }
  *       { "kind": "body", "keys": [{ "at": 1,         the hips, spine and head at these times: any of
  *         "height": 0.8, "heading": 0.3,              hips height in metres, body heading in radians,
+ *         "ground": [0.1, -0.05],                     the hips moved over the ground [x, z] in metres,
  *         "torso": [0.3, 0.5, 0], "head": [0.5, 0.3, 0] }] }   torso and head turns [yaw, pitch, roll]
  *     ]
  *   }
+ *
+ * A body key's `ground` moves the ground point at its frame, and every joint
+ * stored at that frame is stored from the moved point; a hand, foot, elbow or
+ * knee key's `value` is still measured from the template's ground point, so a
+ * foot keyed where it stands stays planted while the hips move.
  *
  * Times are seconds, as curve keys give them. A joint `value` is in the
  * capture's space with the hips' ground point as origin: metres, Y up, +Z the
@@ -59,6 +67,7 @@ const LIMBS = {
     chest: 'Chest',
     head: 'Head',
     face: ['Jaw', 'LeftEye', 'RightEye'],
+    points: { LeftElbow: 'LeftForeArm', RightElbow: 'RightForeArm', LeftKnee: 'LeftShin', RightKnee: 'RightShin' },
     chains: {
       LeftFoot: ['LeftFoot', 'LeftToeBase'],
       RightFoot: ['RightFoot', 'RightToeBase'],
@@ -72,6 +81,7 @@ const LIMBS = {
     chest: 'spine3',
     head: 'head',
     face: [],
+    points: { LeftElbow: 'left_elbow', RightElbow: 'right_elbow', LeftKnee: 'left_knee', RightKnee: 'right_knee' },
     chains: {
       LeftFoot: ['left_ankle', 'left_foot'],
       RightFoot: ['right_ankle', 'right_foot'],
@@ -124,10 +134,21 @@ const KINDS = {
       const posed = condition.posedAt(frame)
       keepPlacement(condition, frame, posed)
       const base = posed.positions[joints[0]]
-      const wanted = [key.value[0] * condition.scale + posed.ground[0], key.value[1] * condition.scale, key.value[2] * condition.scale + posed.ground[1]]
+      const wanted = placedFromTemplate(condition, key.value, posed)
       const shift = wanted.map((value, axis) => value - base[axis])
       for (const joint of joints) keepPosition(condition, frame, joint, posed.positions[joint].map((value, axis) => value + shift[axis]), posed)
       keepTurn(condition, frame, joints[0], posed.turns[joints[0]])
+    }
+  },
+  point: (condition, constraint) => {
+    const name = LIMBS[condition.skeleton].points?.[constraint.joint]
+    if (!name) throw new Error(`point joint must be one of ${Object.keys(LIMBS[condition.skeleton].points ?? {}).join(', ')}`)
+    const joint = condition.names.indexOf(name)
+    for (const key of constraint.keys) {
+      const [frame] = framesAt(condition, [key.at])
+      const posed = condition.posedAt(frame)
+      keepPlacement(condition, frame, posed)
+      keepPosition(condition, frame, joint, placedFromTemplate(condition, key.value, posed), posed)
     }
   },
   body: (condition, constraint) => {
@@ -169,6 +190,21 @@ const KINDS = {
   }
 }
 
+/** A key's model-space point in the world, measured from the template's own ground point at that frame. */
+function placedFromTemplate(condition, value, posed) {
+  const [x, z] = posed.templateGround ?? posed.ground
+  return [value[0] * condition.scale + x, value[1] * condition.scale, value[2] * condition.scale + z]
+}
+
+/** Each frame a body key moves the ground point at, and by how much in capture metres. */
+function groundShiftsOf(condition, record) {
+  const shifts = new Map()
+  for (const constraint of record.constraints.filter(one => one.kind === 'body'))
+    for (const key of constraint.keys.filter(one => one.ground))
+      shifts.set(framesAt(condition, [key.at])[0], key.ground.map(value => value * condition.scale))
+  return shifts
+}
+
 /** Kinds filled after the rest, because every other kind sets the hips height and heading from the template at its frames. */
 const FILLED_LAST = new Set(['body'])
 
@@ -196,10 +232,11 @@ export function motionCondition({ skeleton, frames, framesPerSecond, template, r
     posedAt: frame => {
       if (!template) throw new Error('pose, root and joint constraints read a template: name one')
       if (frame >= template.frames) throw new Error(`frame ${frame} is past the template's ${template.frames}`)
-      if (!posedFrames.has(frame)) posedFrames.set(frame, posedFrame(skeleton, template, frame))
+      if (!posedFrames.has(frame)) posedFrames.set(frame, shiftedGround(posedFrame(skeleton, template, frame), condition.groundShifts.get(frame)))
       return posedFrames.get(frame)
     }
   }
+  condition.groundShifts = groundShiftsOf(condition, record)
   const ordered = [
     ...record.constraints.filter(constraint => !FILLED_LAST.has(constraint.kind)),
     ...record.constraints.filter(constraint => FILLED_LAST.has(constraint.kind))
@@ -211,6 +248,12 @@ export function motionCondition({ skeleton, frames, framesPerSecond, template, r
   }
   const pathHeading = record.constraints.find(constraint => constraint.kind === 'path')?.heading ?? 0
   return { observed: condition.observed, mask: condition.mask, firstHeading: template ? condition.posedAt(0).heading : pathHeading }
+}
+
+/** A posed frame with its ground point moved by `shift`, keeping the template's own; the frame as it is with no shift. */
+function shiftedGround(posed, shift) {
+  if (!shift) return posed
+  return { ...posed, templateGround: posed.ground, ground: [posed.ground[0] + shift[0], posed.ground[1] + shift[1]] }
 }
 
 /** Frame numbers for times in seconds, refused when one is outside the generation. */

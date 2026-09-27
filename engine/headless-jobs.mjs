@@ -49,10 +49,17 @@ export async function startHeadlessJob({ checkout, project, command, options = {
 export async function headlessJobState(checkout, job) {
   const { instances } = await askSupervisor(checkout, 'GET', '/instances', null, LIST_TIMEOUT_MILLISECONDS)
   if (instances.some(entry => entry.id === job && entry.state !== 'gone')) return { state: 'running' }
-  const lines = readLog(instanceLogFile(checkout, job))
-    .split(/\r?\n/)
-    .filter(line => line.trim())
-  const answer = lines.findLast(line => line.startsWith('{'))
+  return finishedJobState(readLog(instanceLogFile(checkout, job)), job)
+}
+
+/**
+ * A finished job's state from its log: `{ state: 'done', answer }` when its
+ * last JSON line is an answer, else `{ state: 'failed', error }`.
+ */
+export function finishedJobState(log, job) {
+  const lines = log.split(/\r?\n/).filter(line => line.trim())
+  // A command answers a record or a list.
+  const answer = lines.findLast(line => line.startsWith('{') || line.startsWith('['))
   const parsed = answer ? parseAnswer(answer) : null
   if (parsed && !parsed.error) return { state: 'done', answer: parsed }
   return {

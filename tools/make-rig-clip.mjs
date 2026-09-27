@@ -16,6 +16,11 @@
  *   --generator <path to kmd-generate>   the binary the demo itself shells to
  *   --from <directory>               buffers already written, no generator at all
  *
+ * `--segments '[{"prompt":"a person walks forward","frames":60},{"prompt":"a person sits down","frames":90}]'`
+ * makes one take of several prompts in a row, each carrying on from where the
+ * last ended over `--transition` frames (kmd-generate `--sequence`). The binary
+ * door only, and without constraints.
+ *
  * `--constraints <file.json>` holds hands, feet, poses or the ground path to
  * given places, read from stored motion it names (tools/lib/motion-conditions.mjs
  * has the file's shape). The binary door only: it writes the features and mask
@@ -64,7 +69,10 @@ const DEFAULTS = {
   fps: 30,
   loop: true,
   up: 'y',
-  scale: 1
+  scale: 1,
+  segments: null,
+  // Frames each prompt blends into the next over; the upstream sequence default.
+  transition: 10
 }
 
 /** `--key value`, and `--once` and `--loop` for the one boolean. */
@@ -88,6 +96,7 @@ function options(argv) {
 /** The two raw buffers and how many frames and joints they hold. */
 async function generate(settings) {
   if (settings.from) return fromDirectory(settings.from, settings)
+  if (settings.segments && (settings.constraints || settings.server)) throw new Error('--segments needs the kmd-generate binary and no --constraints')
   if (settings.constraints && settings.server) throw new Error('--constraints needs the kmd-generate binary, not --server')
   if (settings.server) return fromServer(settings)
   return fromGenerator(settings)
@@ -176,12 +185,22 @@ async function fromGenerator(settings) {
   const promptFile = path.join(workspace, 'prompt.txt')
   fs.writeFileSync(promptFile, settings.prompt)
 
-  await run(generator, [
-    motion, bundle, promptFile,
-    String(settings.frames), String(settings.steps), String(settings.seed), workspace,
-    ...(settings.constraints ? conditionArguments(settings, workspace) : [])
-  ], path.join(path.dirname(generator), 'bin'))
+  const request = settings.segments
+    ? sequenceArguments(settings, workspace)
+    : [promptFile, String(settings.frames), String(settings.steps), String(settings.seed), workspace,
+        ...(settings.constraints ? conditionArguments(settings, workspace) : [])]
+  await run(generator, [motion, bundle, ...request], path.join(path.dirname(generator), 'bin'))
   return fromDirectory(workspace, settings)
+}
+
+/** The `--sequence` arguments for `--segments`, with each part's prompt written beside the take. */
+function sequenceArguments(settings, workspace) {
+  const parts = settings.segments.flatMap(({ prompt, frames }, index) => {
+    const file = path.join(workspace, `prompt-${index + 1}.txt`)
+    fs.writeFileSync(file, prompt)
+    return [String(frames), file]
+  })
+  return ['--sequence', String(settings.transition), String(settings.steps), String(settings.seed), workspace, ...parts]
 }
 
 /**
@@ -239,12 +258,20 @@ const run = (command, args, libraries) => new Promise((resolve, reject) => {
 
 export async function main(argv = process.argv.slice(2)) {
   const settings = options(argv)
+  if (settings.segments) {
+    settings.segments = JSON.parse(settings.segments)
+    // The take's prompt and length are its parts', read in order.
+    settings.prompt = settings.segments.map(segment => segment.prompt).join(' Then ')
+    settings.frames = settings.segments.reduce((sum, segment) => sum + segment.frames, 0)
+  }
   const project = path.resolve(CHECKOUT, settings.project)
   if (settings.source) settings.from = path.join(project, SOURCE_DIRECTORY, settings.source)
   if (!settings.prompt && !settings.from) throw new Error('--prompt is required, or --source <stored name>, or --from <directory>')
   // Printed before minutes of generation, so a poor prompt can be stopped and reworded.
   if (settings.prompt && !settings.from) {
-    for (const advice of promptAdvice(settings.prompt, settings.frames / settings.fps)) console.warn(`[prompt] ${advice}`)
+    const parts = settings.segments ?? [{ prompt: settings.prompt, frames: settings.frames }]
+    for (const part of parts)
+      for (const advice of promptAdvice(part.prompt, part.frames / settings.fps)) console.warn(`[prompt] ${advice}`)
   }
 
   if (settings.onto) {

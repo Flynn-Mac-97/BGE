@@ -4,19 +4,41 @@
  * record and what it means are in designer.js.
  *
  * `board` is the panel's design state, kept between draws:
- * `{ design, clip, skeleton, entity, time, playFrom, selected, dragged, items, note }`.
+ * `{ design, clip, skeleton, entity, time, playFrom, selected, dragged, free, items, rigs, takes, note }`.
+ * `rigs` are the project's models with a skeleton file; `takes` are the clips
+ * kimodo.takes lists, the base a design can start from; `poses` are the pose
+ * records Image Models wrote, `assets/poses/*.json`.
+ * `free` is each limb's end as the last preview frame had it before the keys
+ * moved it: the feet where the base take plants them, the hands where the body
+ * carries them.
  * `playFrom` is `{ wall, time }` while it plays, null while paused.
  */
 import { applyClip } from '../rig-animation.js'
 import { applyConstraints } from '../rig-animation/constraints.js'
 import { placeOf, widenSkeleton } from '../rig-animation/skeleton.js'
+import { add, dot, lengthOf, scaled, subtract, unit } from '../game-maths/space.js'
 import { restOf, rolesOf } from '../rig-animation/clip-reading.js'
-import { HANDLES, chainOf, guidesAt, newDesign, previewConstraints, withKey, withoutKey } from './designer.js'
+import {
+  HANDLES,
+  POLES,
+  chainOf,
+  guidesAt,
+  newDesign,
+  previewConstraints,
+  targetsAt,
+  withKey,
+  withoutKey
+} from './designer.js'
+
+export { newDesign }
 import {
   BODY_HANDLES,
   bodyChangeOf,
   bodyHandlePoints,
   bodyReachedOf,
+  poseBody,
+  footTurnsOf,
+  holdFootTurns,
   bodyTargetAt,
   withBodyKey,
   withoutBodyField
@@ -24,8 +46,14 @@ import {
 
 const DEGREES = Math.PI / 180
 
-/** The body key field each body handle sets. */
-const BODY_FIELDS = { Hips: 'height', Chest: 'torso', Head: 'head' }
+/** The body key fields each body handle sets. */
+const BODY_FIELDS = { Hips: ['height', 'ground'], Chest: ['torso'], Head: ['head'] }
+
+/** How far an elbow or knee target starts from its joint, in metres. */
+const POLE_REACH = 0.35
+
+/** Which way a limb bends when it is straight, as the model faces: knees forward, elbows back. */
+const STRAIGHT_BEND = { RightElbow: [0, 0, -1], LeftElbow: [0, 0, -1], RightKnee: [0, 0, 1], LeftKnee: [0, 0, 1] }
 const STEP = 1 / 30
 
 /** The folder a model's clips and skeleton are named by: `models/fighter.glb` is `fighter`. */
@@ -43,12 +71,20 @@ const isHoldable = file => /^assets\/models\/items\/[^/]+\.glb$/.test(file) && !
  * `design` is a stored design, or null to start one on `take`
  * (`{ clip, model, name }`, as kimodo.takes lists it).
  */
-export async function openBoard(context, { design, take }) {
+export async function openBoard(context, { design, take, takes = [] }) {
   const started =
     design ?? newDesign({ name: `${take.name.replace(/^take-/, '')}-design`, model: take.model, base: take.clip })
   const raw = JSON.parse(await context.files.read(`assets/motion/${folderOf(started.model)}.skeleton.json`))
   const tree = await context.files.tree()
+  const paths = new Set(tree.map(item => item.path))
   return {
+    rigs: [...paths]
+      .filter(file => /^assets\/models\/[^/]+\.glb$/.test(file))
+      .map(file => file.slice('assets/'.length))
+      .filter(model => paths.has(`assets/motion/${folderOf(model)}.skeleton.json`)),
+    takes: takes.filter(one => one.model),
+    poses: [...paths].filter(file => /^assets\/poses\/.+\.json$/.test(file)),
+    poseChosen: null,
     design: started,
     clip: await context.rigAnimation.load(started.base),
     skeleton: widenSkeleton(raw, `motion/${folderOf(started.model)}.skeleton.json`),
@@ -72,6 +108,100 @@ function clockOf(board) {
   return (board.playFrom.time + passed) % board.design.seconds
 }
 
+/** Each limb's end under `pose`: `{ limb: point }`, for the limbs the skeleton has. */
+function limbEnds(skeleton, pose) {
+  return Object.fromEntries(
+    Object.keys(HANDLES).flatMap(limb => {
+      const chain = chainOf(skeleton, limb)
+      return chain ? [[limb, placeOf(skeleton, pose, chain[2]).position]] : []
+    })
+  )
+}
+
+/** The foot nodes the skeleton has, by the designer's foot chains. */
+const footNodesOf = skeleton =>
+  ['RightFoot', 'LeftFoot'].flatMap(foot => {
+    const chain = chainOf(skeleton, foot)
+    return chain ? [chain[2]] : []
+  })
+
+/**
+ * Pose the board's model at `seconds`: the base take, then the body keys,
+ * then the limbs, then each foot turned as the take turns it. `shown` is the
+ * design as the pointer is changing it. Keeps each limb's free end on the
+ * board and answers the pose.
+ */
+function poseBoardAt(board, seconds, shown, rest, roles) {
+  const entity = board.entity
+  entity._rigTime = seconds
+  applyClip(entity, board.clip, {})
+  const planted = limbEnds(board.skeleton, entity.pose)
+  const footTurns = footTurnsOf(board.skeleton, entity.pose, footNodesOf(board.skeleton))
+  poseBody(board.skeleton, entity.pose, shown, seconds, rest, roles)
+  const carried = limbEnds(board.skeleton, entity.pose)
+  board.free = { ...carried, RightFoot: planted.RightFoot, LeftFoot: planted.LeftFoot, ...kneeTargets(board.skeleton, entity.pose) }
+  applyConstraints(
+    entity,
+    board.skeleton,
+    previewConstraints(board.design, board.skeleton, seconds, board.dragged, board.free),
+    STEP
+  )
+  holdFootTurns(board.skeleton, entity.pose, footTurns)
+  return entity.pose
+}
+
+/**
+ * A knee target in front of each knee, as the model faces, for a knee with no
+ * key: a leg straight or nearly so has no bend of its own to keep, and would
+ * fold sideways when the hips drop.
+ */
+function kneeTargets(skeleton, pose) {
+  return Object.fromEntries(
+    ['RightKnee', 'LeftKnee'].flatMap(knee => {
+      const chain = chainOf(skeleton, POLES[knee])
+      return chain ? [[knee, add(placeOf(skeleton, pose, chain[1]).position, scaled(STRAIGHT_BEND[knee], POLE_REACH))]] : []
+    })
+  )
+}
+
+/** Where an elbow or knee target is drawn before it is keyed: out from the joint the way the limb bends. */
+function poleRestPoint(skeleton, pose, pole) {
+  const chain = chainOf(skeleton, POLES[pole])
+  const [upper, joint, end] = chain.map(name => placeOf(skeleton, pose, name).position)
+  const along = unit(subtract(end, upper))
+  const across = subtract(subtract(joint, upper), scaled(along, dot(subtract(joint, upper), along)))
+  const bend = lengthOf(across) > 0.01 ? unit(across) : STRAIGHT_BEND[pole]
+  return add(joint, scaled(bend, POLE_REACH))
+}
+
+/**
+ * The design with `solved`: where the preview puts each elbow and knee at each
+ * of its target keys, which Kimodo is sent (designer.js kimodoRecord).
+ */
+export function withSolvedJoints(board) {
+  const rest = restOf(board.skeleton)
+  const roles = rolesOf(board.skeleton)
+  const solved = Object.fromEntries(
+    Object.entries(board.design.keys)
+      .filter(([pole]) => POLES[pole] && chainOf(board.skeleton, POLES[pole]))
+      .map(([pole, keys]) => [
+        pole,
+        keys.map(key => {
+          const pose = poseBoardAt(board, key.at, board.design, rest, roles)
+          const joint = placeOf(board.skeleton, pose, chainOf(board.skeleton, POLES[pole])[1]).position
+          return { at: key.at, value: joint.map(value => Number(value.toFixed(3))) }
+        })
+      ])
+  )
+  return { ...board.design, solved }
+}
+
+/** How a handle is drawn (viewer.js): picked first, then keyed, else free. */
+function lookOf(isSelected, isKeyed) {
+  if (isSelected) return 'selected'
+  return isKeyed ? 'keyed' : 'free'
+}
+
 /** The session viewer.js poses and draws from; `redraw` redraws the panel. */
 export function sessionOf(board, redraw) {
   const skeleton = board.skeleton
@@ -88,41 +218,45 @@ export function sessionOf(board, redraw) {
     board.dragged && BODY_HANDLES[board.dragged.handle]
       ? bodyDropped(board.dragged.handle, board.dragged.point)
       : board.design
-  const bodyLook = handle =>
-    handle === board.selected
-      ? 'selected'
-      : (board.design.body ?? []).some(key => key[BODY_FIELDS[handle]] !== undefined)
-        ? 'keyed'
-        : 'free'
+  const isBodyKeyed = handle =>
+    (board.design.body ?? []).some(key => BODY_FIELDS[handle].some(field => key[field] !== undefined))
+  const bodyLook = handle => lookOf(handle === board.selected, isBodyKeyed(handle))
+  const keyLook = handle => lookOf(handle === board.selected, Boolean(board.design.keys[handle]))
+  const draggedAt = (handle, point) => (board.dragged?.handle === handle ? board.dragged.point : point)
+  // An unkeyed pelvis ring is drawn where the take's hips are, which bob.
+  const hipsPoint = point => (isBodyKeyed('Hips') ? point : placeOf(skeleton, board.entity.pose, roles.hips).position)
   return {
     model: board.design.model,
     clock: () => clockOf(board),
-    poseAt(seconds) {
-      const entity = board.entity
-      entity._rigTime = seconds
-      applyClip(entity, board.clip, {})
-      applyConstraints(entity, skeleton, previewConstraints(board.design, skeleton, seconds, board.dragged), STEP)
-      return entity.pose
-    },
-    handles: () =>
-      Object.keys(HANDLES)
-        .flatMap(handle => {
-          const chain = chainOf(skeleton, handle)
-          if (!chain || !board.entity.pose) return []
-          const point =
-            board.dragged?.handle === handle
-              ? board.dragged.point
-              : placeOf(skeleton, board.entity.pose, chain[2]).position
-          const look = handle === board.selected ? 'selected' : board.design.keys[handle] ? 'keyed' : 'free'
-          return [{ handle, point, look }]
+    poseAt: seconds => poseBoardAt(board, seconds, shownDesign(), rest, roles),
+    handles() {
+      const pose = board.entity.pose
+      if (!pose) return []
+      const seconds = clockOf(board)
+      const asked = targetsAt(board.design, seconds)
+      const limbs = Object.keys(HANDLES)
+        .filter(handle => chainOf(skeleton, handle))
+        .map(handle => {
+          const point = placeOf(skeleton, pose, chainOf(skeleton, handle)[2]).position
+          return { handle, point: draggedAt(handle, point), look: keyLook(handle), shape: 'sphere' }
         })
-        .concat(
-          Object.entries(bodyHandlePoints(shownDesign(), rest, clockOf(board))).map(([handle, point]) => ({
-            handle,
-            point: board.dragged?.handle === handle ? board.dragged.point : point,
-            look: bodyLook(handle)
-          }))
-        ),
+      const poles = Object.keys(POLES)
+        .filter(pole => chainOf(skeleton, POLES[pole]))
+        .map(pole => ({
+          handle: pole,
+          point: draggedAt(pole, asked[pole] ?? board.free?.[pole] ?? poleRestPoint(skeleton, pose, pole)),
+          look: keyLook(pole),
+          shape: 'pole',
+          joint: placeOf(skeleton, pose, chainOf(skeleton, POLES[pole])[1]).position
+        }))
+      const body = Object.entries(bodyHandlePoints(shownDesign(), rest, seconds)).map(([handle, point]) => ({
+        handle,
+        point: draggedAt(handle, handle === 'Hips' ? hipsPoint(point) : point),
+        look: bodyLook(handle),
+        shape: handle === 'Hips' ? 'ring' : 'sphere'
+      }))
+      return [...limbs, ...poles, ...body]
+    },
     // The handle held by the pointer is its own target, so it has no guide target.
     guides: seconds =>
       guidesAt(board.design, seconds).map(guide =>
@@ -145,6 +279,8 @@ export function sessionOf(board, redraw) {
       board.design = BODY_HANDLES[handle]
         ? bodyDropped(handle, point)
         : withKey(board.design, handle, board.time, point)
+      // Moving the pelvis keys each foot where it stands, so Kimodo keeps it planted too.
+      if (handle === 'Hips') board.design = withPlantedFeet(board.design, board)
       board.dragged = null
       redraw()
     },
@@ -155,6 +291,15 @@ export function sessionOf(board, redraw) {
         : null
     }
   }
+}
+
+/** `design` with a key at the board's time for each foot that has none there, where the foot stands now. */
+function withPlantedFeet(design, board) {
+  const keyTime = Math.round(board.time * 30) / 30
+  return ['RightFoot', 'LeftFoot']
+    .filter(foot => board.free?.[foot])
+    .filter(foot => !(design.keys[foot] ?? []).some(key => Math.abs(key.at - keyTime) < 1e-6))
+    .reduce((planted, foot) => withKey(planted, foot, board.time, board.free[foot]), design)
 }
 
 /** The body target a body handle is dropped against: the body keys at `seconds`, or rest before there are any. */
@@ -169,6 +314,50 @@ function threeOf(text, old) {
     .split(/[\s,]+/)
     .map(Number)
   return numbers.length === 3 && numbers.every(Number.isFinite) ? numbers : old
+}
+
+/**
+ * Rows for what the take is made with: the Kimodo model, the rig it goes on,
+ * and where it starts. `kimodoModels` is kimodo.models' list, empty until it
+ * is read; `rebase(change)` reopens the board on another rig or base take.
+ */
+function kimodoRows(ui, board, kimodoModels, rebase) {
+  const design = board.design
+  const onRig = board.takes.filter(take => take.model === design.model)
+  const wordsOnly = 'words only'
+  const models = kimodoModels.length ? kimodoModels : [{ model: design.kimodoModel, about: '', isInstalled: true }]
+  const chosen = models.find(entry => entry.model === design.kimodoModel)
+  return [
+    ui.select({
+      k: 'model',
+      options: models.map(entry => ({
+        value: entry.model,
+        label: `${entry.model}${entry.about ? ` · ${entry.about}` : ''}${entry.isInstalled ? '' : ' (not installed)'}`,
+        disabled: !entry.isInstalled
+      })),
+      value: design.kimodoModel,
+      note: chosen?.isInstalled === false ? chosen.install : undefined,
+      onChange: model => {
+        board.design = { ...board.design, kimodoModel: model }
+      }
+    }),
+    ui.select({
+      k: 'rig',
+      options: board.rigs.map(model => ({ value: model, label: folderOf(model) })),
+      value: design.model,
+      onChange: model => rebase({ model })
+    }),
+    ui.select({
+      k: 'starts from',
+      options: [wordsOnly, ...onRig.map(take => take.name)],
+      value: design.fromBase ? onRig.find(take => take.clip === design.base)?.name : wordsOnly,
+      onChange: name => {
+        const take = onRig.find(one => one.name === name)
+        if (take) rebase({ base: take.clip, fromBase: true })
+        else board.design = { ...board.design, fromBase: false }
+      }
+    })
+  ]
 }
 
 /** Rows for the design's words and length. */
@@ -200,8 +389,13 @@ function settingRows(ui, board) {
       kind: 'number',
       onChange: value => set({ seed: Math.max(0, Math.round(value || 0)) })
     }),
-    ui.toggle({ label: 'loops', value: design.loop, onChange: value => set({ loop: value }) }),
-    ui.toggle({ label: 'starts in the base pose', value: design.fromBase, onChange: value => set({ fromBase: value }) })
+    ui.select({
+      k: 'takes',
+      options: ['1', '2', '3', '4', '5', '6', '7', '8'],
+      value: String(design.takes ?? 1),
+      onChange: value => set({ takes: Number(value) })
+    }),
+    ui.toggle({ label: 'loops', value: design.loop, onChange: value => set({ loop: value }) })
   ]
 }
 
@@ -228,26 +422,47 @@ function timeRows(ui, board, redraw) {
   ]
 }
 
+/** Rows that key a photo's pose (a pose record) at the board's time; none when there are no records. */
+function poseRecordRows(ui, board, keyPose) {
+  if (!board.poses.length) return []
+  const chosen = board.poseChosen ?? board.poses[0]
+  return [
+    ui.select({
+      k: 'photo pose',
+      options: board.poses.map(file => ({ value: file, label: file.replace(/^assets\/poses\//, '').replace(/\.json$/, '') })),
+      value: chosen,
+      onChange: file => {
+        board.poseChosen = file
+      }
+    }),
+    ui.button(`Key this pose at ${board.time.toFixed(2)} s`, () => keyPose(chosen))
+  ]
+}
+
 /** Rows for keys: which limb, its keys, and keying it where it is now. */
 function keyRows(ui, board, redraw) {
   const handle = board.selected
-  const field = BODY_FIELDS[handle]
-  const keys = field
-    ? (board.design.body ?? []).filter(key => key[field] !== undefined)
+  const fields = BODY_FIELDS[handle]
+  const keys = fields
+    ? (board.design.body ?? []).filter(key => fields.some(field => key[field] !== undefined))
     : (board.design.keys[handle] ?? [])
-  const shown = key => (field ? [key[field]].flat() : key.value)
+  const shown = key => (fields ? fields.flatMap(field => [key[field] ?? []].flat()) : key.value)
   const removed = key =>
-    field ? withoutBodyField(board.design, key.at, field) : withoutKey(board.design, handle, key.at)
+    fields
+      ? fields.reduce((design, field) => withoutBodyField(design, key.at, field), board.design)
+      : withoutKey(board.design, handle, key.at)
+  const hasLimb = name => chainOf(board.skeleton, HANDLES[name] ? name : POLES[name])
   return [
-    ui.pick({
-      options: [...Object.keys(HANDLES).filter(name => chainOf(board.skeleton, name)), ...Object.keys(BODY_HANDLES)],
+    ui.select({
+      k: 'control',
+      options: [...Object.keys(HANDLES), ...Object.keys(POLES)].filter(hasLimb).concat(Object.keys(BODY_HANDLES)),
       value: handle,
       onChange: name => {
         board.selected = name
       }
     }),
     ui.text(
-      'Drag a handle in the view: it is keyed at the time shown. Orange handles have keys. Hips sets the height, Chest the lean, Head the look.',
+      'Drag a handle in the view: it is keyed at the time shown. Orange handles have keys. The ring moves the pelvis and plants the feet; diamonds are elbow and knee targets; Chest sets the lean, Head the look.',
       { dim: true }
     ),
     ui.list({
@@ -286,7 +501,8 @@ function holdRows(ui, board) {
     }
   }
   return [
-    ui.pick({
+    ui.select({
+      k: 'item',
       options: ['nothing', ...board.items.map(file => file.split('/').pop().replace('.glb', ''))],
       value: hold ? hold.model.split('/').pop().replace('.glb', '') : 'nothing',
       onChange: name =>
@@ -309,17 +525,22 @@ function holdRows(ui, board) {
   ]
 }
 
-/** Every row of the design mode. `actions` is `{ save, generate, close }`; `redraw` redraws the panel. */
-export function designRows(ui, board, actions, redraw) {
+/**
+ * Every row of the design mode. `actions` is `{ save, generate, close, rebase, keyPose }`;
+ * `kimodoModels` is kimodo.models' list; `redraw` redraws the panel.
+ */
+export function designRows(ui, board, actions, redraw, kimodoModels = []) {
   const open = { open: true }
+  const takes = board.design.takes ?? 1
   return [
+    ui.fold('Kimodo', kimodoRows(ui, board, kimodoModels, actions.rebase), open),
     ui.fold('Move', settingRows(ui, board), open),
     ui.fold('Time', timeRows(ui, board, redraw), open),
-    ui.fold('Keys', keyRows(ui, board, redraw), open),
+    ui.fold('Keys', [...keyRows(ui, board, redraw), ...poseRecordRows(ui, board, actions.keyPose)], open),
     ui.fold('Hold (preview only)', holdRows(ui, board), open),
     ui.row([
       ui.button('Save', actions.save),
-      ui.button('Generate take', actions.generate, { primary: true }),
+      ui.button(takes > 1 ? `Generate ${takes} takes` : 'Generate take', actions.generate, { primary: true }),
       ui.spacer(),
       ui.button('Back to takes', actions.close)
     ]),

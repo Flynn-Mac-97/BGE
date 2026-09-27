@@ -14,11 +14,22 @@
  *     base: 'motion/fighter/idle.json', the take played under the keys; its stored motion is Kimodo's template
  *     prompt: 'a person chops down hard with a sword',
  *     seconds: 2, seed: 0, loop: false,
+ *     kimodoModel: 'soma-rp-v1.1',     the Kimodo motion model; its skeleton must be the rig's
+ *     takes: 1,                         how many takes one Generate makes, one per seed from `seed`
+ *     segments: [{ prompt, seconds }],  optional: several prompts in a row as one take, in
+ *                                       place of prompt and seconds; no keys are used with them
  *     fromBase: true,                   start the take in the base take's first pose
  *     keys: { RightHand: [{ at: 0.6, value: [x, y, z], ease: 'sine-in-out' }], ... },
- *     body: [{ at, height?, heading?, torso?, head? }],   optional: hips, spine and head keys (kimodo/poses.js)
+ *                                       hands, feet, and elbow and knee targets (POLES) by the same shape
+ *     solved: { RightElbow: [{ at, value: [x, y, z] }], ... },   where the preview put each elbow and
+ *                                       knee at its target keys; written on save, sent to Kimodo
+ *     body: [{ at, height?, ground?, heading?, torso?, head? }],   optional: hips, spine and head keys (kimodo/poses.js)
  *     hold: { model: 'models/items/sword.glb', position: [x, y, z], rotation: [x, y, z] } | null
  *   }
+ *
+ * An elbow or knee target is where that joint bends toward, as a pole is in
+ * any rig; Kimodo is sent where the joint then is. A foot with no key stays
+ * where the base take puts it, so moving the hips bends the legs.
  *
  * Points are model space: metres, the floor at 0, +Z the way the model faces.
  * `hold` is an item shown in the right hand, in the hand bone's space
@@ -34,12 +45,34 @@ export const HANDLES = {
   LeftFoot: ['LeftUpLeg', 'LeftLeg', 'LeftFoot']
 }
 
+/** Each elbow and knee target, and the limb it bends. */
+export const POLES = { RightElbow: 'RightHand', LeftElbow: 'LeftHand', RightKnee: 'RightFoot', LeftKnee: 'LeftFoot' }
+
+/** The limbs that stay where the base take plants them when nothing keys them. */
+const PLANTED = new Set(['RightFoot', 'LeftFoot'])
+
+/** The elbow or knee target that bends `limb`, or undefined. */
+const poleOf = limb => Object.keys(POLES).find(pole => POLES[pole] === limb)
+
 /** The ease a new key leaves with. */
 const KEY_EASE = 'sine-in-out'
 
 /** A new design over `base`, a take on `model`. */
 export function newDesign({ name = 'move', model, base }) {
-  return { name, model, base, prompt: '', seconds: 2, seed: 0, loop: false, fromBase: true, keys: {}, hold: null }
+  return {
+    name,
+    model,
+    base,
+    prompt: '',
+    seconds: 2,
+    seed: 0,
+    loop: false,
+    fromBase: true,
+    kimodoModel: 'soma-rp-v1.1',
+    takes: 1,
+    keys: {},
+    hold: null
+  }
 }
 
 /**
@@ -97,31 +130,40 @@ export function guidesAt(design, seconds) {
 }
 
 /**
- * The reach constraints that pose the preview at `seconds`, for the handles
- * the skeleton has: each keyed handle at its curve, and `dragged`
- * (`{ handle, point }`, or null) where the pointer holds it.
+ * The reach constraints that pose the preview at `seconds`, for the limbs
+ * the skeleton has. A limb reaches for its key curve, or for `dragged`
+ * (`{ handle, point }`, or null) where the pointer holds it; an unkeyed foot
+ * reaches for where `free` says it stands, and an unkeyed hand with a target
+ * for where it is. Each bends toward its elbow or knee target when it has one.
+ * `free` is `{ limb: point }`, each limb's end before the keys move it, and
+ * may name a default target for an elbow or knee with no key.
  */
-export function previewConstraints(design, skeleton, seconds, dragged = null) {
-  const targets = { ...targetsAt(design, seconds), ...(dragged ? { [dragged.handle]: dragged.point } : {}) }
-  return Object.entries(targets).flatMap(([handle, point]) => {
-    const nodes = chainOf(skeleton, handle)
-    return nodes ? [{ kind: 'reach', nodes, target: { model: point }, weight: 1 }] : []
+export function previewConstraints(design, skeleton, seconds, dragged = null, free = {}) {
+  // A body handle held by the pointer is posed by its body key (body-rig.js), not reached for.
+  const held = dragged && (HANDLES[dragged.handle] || POLES[dragged.handle]) ? { [dragged.handle]: dragged.point } : {}
+  const asked = { ...targetsAt(design, seconds), ...held }
+  return Object.keys(HANDLES).flatMap(limb => {
+    const nodes = chainOf(skeleton, limb)
+    const pole = asked[poleOf(limb)] ?? free[poleOf(limb)] ?? null
+    const target = asked[limb] ?? (PLANTED.has(limb) || asked[poleOf(limb)] ? free[limb] : null)
+    if (!nodes || !target) return []
+    return [{ kind: 'reach', nodes, target: { model: target }, weight: 1, pole: pole && { model: pole } }]
   })
 }
 
 /**
  * The Kimodo constraint record for a design (motion-conditions.mjs): the base
- * take's first pose at the start when `fromBase`, every keyed handle as a
- * joint constraint, and the `body` keys as a body constraint. `template` is
- * the stored motion the base take came from.
+ * take's first pose at the start when `fromBase`, every keyed hand and foot
+ * as a joint constraint, each solved elbow and knee as a point constraint,
+ * and the `body` keys as a body constraint. `template` is the stored motion
+ * the base take came from.
  */
 export function kimodoRecord(design, template) {
   const start = design.fromBase ? [{ kind: 'pose', at: [0], from: 0 }] : []
-  const joints = Object.entries(design.keys).map(([joint, keys]) => ({
-    kind: 'joint',
-    joint,
-    keys: keys.map(key => ({ at: key.at, value: key.value }))
-  }))
+  const joints = Object.entries(design.keys)
+    .filter(([joint]) => HANDLES[joint])
+    .map(([joint, keys]) => ({ kind: 'joint', joint, keys: keys.map(key => ({ at: key.at, value: key.value })) }))
+  const points = Object.entries(design.solved ?? {}).map(([joint, keys]) => ({ kind: 'point', joint, keys }))
   const body = design.body?.length ? [{ kind: 'body', keys: design.body }] : []
-  return { template, constraints: [...start, ...joints, ...body] }
+  return { template, constraints: [...start, ...joints, ...points, ...body] }
 }

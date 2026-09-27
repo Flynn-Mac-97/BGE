@@ -97,3 +97,22 @@ test('a torso lean carries the spine and head forward from the hips, from the ca
   const headTurn = 5 + NAMES.length * 3 + NAMES.indexOf('Head') * 6
   assert.ok(Math.abs(row[headTurn] - Math.cos(0.5)) < 1e-6)
 })
+
+test('a point key holds an elbow or knee at a place and leaves its turn free', () => {
+  const condition = conditionOf([{ kind: 'point', joint: 'LeftKnee', keys: [{ at: 1, value: [0.1, 0.5, 0.3] }] }])
+  const row = rowOf(condition.observed, 2)
+  assert.deepEqual(positionOf(row, 'LeftShin').map(value => Number(value.toFixed(4))), [0.1, 0.5, 0.3])
+  assert.equal(rowOf(condition.mask, 2).reduce((sum, value) => sum + value, 0), 5 + 3)
+})
+
+test('a body ground move shifts the ground point, and a foot keyed at that frame stays where it was keyed', () => {
+  const condition = conditionOf([
+    { kind: 'joint', joint: 'LeftFoot', keys: [{ at: 1, value: [0.1, 0.1, 0] }] },
+    { kind: 'body', keys: [{ at: 1, height: 0.7, ground: [0.2, -0.1] }] }
+  ])
+  const row = rowOf(condition.observed, 2)
+  assert.deepEqual([row[0], row[1], row[2]].map(value => Number(value.toFixed(4))), [1.2, 0.7, 1.9])
+  // Features are from the moved ground point; the foot's world place is the template's ground plus its key.
+  const foot = positionOf(row, 'LeftFoot')
+  assert.deepEqual([foot[0] + row[0], foot[1], foot[2] + row[2]].map(value => Number(value.toFixed(4))), [1.1, 0.1, 2])
+})

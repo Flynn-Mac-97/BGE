@@ -102,10 +102,10 @@ test('the board draws a body key where it asks the spine to be: a forward lean c
   assert.equal(bodyTargetAt({ body: [] }, rest, 0), null)
 })
 
-test('dragging a body handle writes a body key: hips height, chest lean, head look', () => {
+test('dragging a body handle writes a body key: hips height and ground place, chest lean, head look', () => {
   const rest = restOf(SKELETON)
   const target = bodyTargetAt({ body: [{ at: 0 }] }, rest, 0)
-  assert.deepEqual(bodyChangeOf('Hips', [0, 0.8, 0], target), { height: 0.8 })
+  assert.deepEqual(bodyChangeOf('Hips', [0.1, 0.8, -0.2], target), { height: 0.8, ground: [0.1, -0.2] })
   const ahead = [target.hips[0], target.hips[1] + 0.3, target.hips[2] + 0.3]
   assert.ok(
     Math.abs(bodyChangeOf('Chest', ahead, target).torso[1] - Math.PI / 4) < 0.01,

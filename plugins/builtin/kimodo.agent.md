@@ -26,6 +26,29 @@ Needs git, cmake 3.25+, ninja, python and `hf` (`pip install ninja
 huggingface_hub` gives the last two — the old `huggingface-cli` name installs a
 shim that refuses to run). `go` is needed only for the demo server.
 
+## The studio
+
+Make and design takes in **Kimodo Studio**, a project of Kimodo's own at
+`<projects folder>/kimodo-studio`, not in a game. **Open Kimodo Studio** on
+the board, or `kimodo.studio`, makes it on first use and opens it. Its model
+is `models/kimodo-mannequin.glb`: Kimodo's own soma-30 skeleton as flat grey
+boxes. It rests in soma's
+standing pose with its feet at 0, so the board shows the pose Kimodo made,
+not a retargeted copy. `kimodo.studio` in a studio that exists brings the
+mannequin up to date and retargets its takes onto it. Nine joints are renamed so the designer finds
+the limbs (soma's `LeftLeg` is the thigh; the mannequin's is the shin). Its
+bone map is `assets/motion/maps/kimodo-mannequin.json`. It starts with one
+take, `kimodo-idle`.
+
+**Copy to** on a chosen take, or `kimodo.copy`, gives a game the take's stored
+motion and retargets it onto every skinned model in the game's
+`assets/models/`. It refuses when the game has other stored motion of that
+name. The mannequin, the studio and the copy are in
+`plugins/builtin/kimodo/mannequin.mjs` and `studio.mjs`.
+
+- `kimodo.studio` — make the studio if it is missing, and open it.
+- `kimodo.copy '{"clip":"motion/kimodo-mannequin/take-a.json","game":"arena-brawler"}'` — run in the studio.
+
 ## Takes
 
 Make several takes of one move as `take-<move>-<id>`, each with its own
@@ -35,12 +58,24 @@ The **KIMODO** board in the top bar lists every clip under `assets/motion/`,
 plays the picked one on `models/<folder>.glb` in a view of its own, and shows
 its prompt. **Use as** copies the take over a clip beside it.
 
+The board lists takes as a grid of stills, each the take's middle pose;
+picking one plays it, and **Delete** (click twice) removes it.
+
 - `kimodo.takes` — every clip, its prompt, frames and length. **Read** after a new take.
+- `kimodo.delete '{"clip":"motion/<model>/take-a.json"}'` — delete a take and, unless another clip names it, its stored motion.
 - `rig.faults '{"file":"motion/<model>/take-<move>-<id>.json","skeleton":"motion/<model>.skeleton.json"}'` — judge a take before using it (Rig Animation's `judging-a-clip.md`).
 - `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
 - `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
 
 ## Design a move on the board
+
+**New move** on the board, or `kimodo.new`, opens a fresh design from words
+on the studio mannequin. Its **Kimodo** section picks the Kimodo model
+(`kimodo.models` lists all four and which are installed; the skeleton must
+match the rig), the rig (any model with a skeleton file) and the start: words
+only, or a take on that rig. A new rig clears the keys, which are points on
+the old one. **takes** makes that many takes per Generate, one per seed:
+`take-<name>-a`, `-b`, ...
 
 A person designs a move; an agent opens the board and generates it.
 **Design on this take** on the board, or `kimodo.design`, puts the model in
@@ -48,6 +83,21 @@ design mode over a base take:
 
 - Drag a hand or foot handle in the view; it is keyed at the time shown.
   Between keys the limb follows a curve, posed with the game's own reach solver.
+- The ring round the pelvis moves the hips anywhere (body `height` and
+  `ground`). Feet with no key stay planted and the legs bend; dropping the ring
+  keys each foot where it stands, so Kimodo plants it too. Every foot keeps
+  the turn the take gives it however the leg bends (`holdFootTurns`), as
+  Kimodo keeps a keyed foot's turn from the take.
+- The diamonds are elbow and knee targets (`RightElbow`, `LeftKnee`, ...): the
+  joint bends toward one. An unkeyed knee bends forward. **Save** writes where
+  each targeted joint then is as `solved`, sent to Kimodo as `point` keys.
+- **photo pose** in Keys keys a pose record from Image Models
+  (`assets/poses/*.json`) at the board's time: wrists and ankles as the hands
+  and feet, elbow and knee targets past each joint, the hips' height, the
+  chest's lean and the head's look, scaled to the rig's hips
+  (`kimodo/pose-keys.js`; `kimodo.key-pose '{"pose":"...","at":0.5}'`).
+- Chest and Head set the lean and the look (`body-rig.js` `poseBody`); a body
+  field no key sets is left alone.
 - The mouse wheel zooms. Dragging empty space turns the view.
 - **Move** holds the prompt, length, seed, loop, and whether the take starts
   in the base take's first pose. **Hold** shows an item from
@@ -60,6 +110,9 @@ design mode over a base take:
 
 - `kimodo.design '{"clip":"motion/fighter/idle.json"}'` — a new design on a take; `{"file":...}` opens a saved one.
 - `kimodo.designs` — the saved designs.
+- A design with `segments: [{ prompt, seconds }]` in place of `prompt` makes
+  one longer take of several prompts in a row (`writing-a-prompt.md`).
+  No keys are used with it.
 - `node bin/engine.mjs --headless --project <project> run kimodo.generate '{"design":"assets/motion/designs/<name>.json"}'` — about two minutes for 60 frames.
 
 A lane page never writes files, so Save fails there; test saving in the editor.

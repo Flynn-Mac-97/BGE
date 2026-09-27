@@ -20,6 +20,14 @@ minutes of generation are spent.
   use, videogame combat, dancing, and moods and styles. Sport-specific moves
   come out poorly.
 
+## A longer move: prompts in a row
+
+A take of several actions is several prompts in a row, each with its own
+length; Kimodo carries each on from where the last ended, over 10 frames
+(`make-rig-clip --segments`, a design's `segments`). Each part follows the
+rules above: one or two actions, at most 10 seconds. Give each part enough
+frames for its join. Keys and constraints are not used with a sequence.
+
 ## Constraints with a prompt
 
 - Never let a constraint fight the words: a hand held low while the prompt
@@ -31,9 +39,6 @@ minutes of generation are spent.
 
 - Full-body key poses from any pose, not only a stored take's frame.
 - A hand's or foot's turn as well as its place (wrist on a grip).
-- Several prompts in a row, each carrying on from where the last ended
-  (kimodo.cpp has these multi-prompt transitions). Give each prompt enough
-  frames for its join.
 - A weight between the text and the constraints when they pull apart.
 
 Sources: research.nvidia.com/labs/sil/projects/kimodo/docs/key_concepts/limitations.html

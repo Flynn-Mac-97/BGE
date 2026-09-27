@@ -11,14 +11,17 @@
  *   const viewer = mountViewer(stage)
  *   viewer.show({ model: 'models/hero.glb', clip })   // clip as widenClip returns it
  *   viewer.edit(session)                              // the designer: see below
+ *   await viewer.thumbnail({ model, clip })           // a still of the take's middle, as a PNG data URL
  *   viewer.dispose()
  *
  * In edit mode the panel poses the model and the viewer draws it with a
  * handle on each limb a person can move. `session` is
  * `{ model, poseAt(seconds), handles(), clock(), grab(handle), move(handle, point), drop(handle, point), hold }`:
  * `poseAt` answers a Rig Animation pose (node -> turn, or turn and place),
- * `handles()` answers `[{ handle, point, look }]` with `look` 'selected',
- * 'keyed' or 'free', and points are model space. A handle is dragged in the
+ * `handles()` answers `[{ handle, point, look, shape, joint? }]` with `look`
+ * 'selected', 'keyed' or 'free', `shape` 'sphere', 'ring' (a pelvis ring,
+ * lying flat) or 'pole' (an elbow or knee target, joined by a line to
+ * `joint`), and points are model space. A handle is dragged in the
  * plane that faces the camera; anywhere else a drag turns the view. `hold`,
  * `{ model, node, position, rotation }` or null, is an item shown in that
  * node, in its space in metres and radians. `guides(seconds)`, if given,
@@ -44,8 +47,64 @@ const GUIDE_COLOURS = { path: '#ff8a3d', key: '#ff8a3d', target: '#ffffff' }
 const BODY_COLOURS = { target: '#ffffff', reached: '#4ad8ff' }
 const TURN_PER_PIXEL = 0.01
 
+/** Each handle shape's geometry, made when a handle first needs it. */
+const HANDLE_SHAPES = {
+  sphere: () => new THREE.SphereGeometry(0.045, 16, 12),
+  ring: () => new THREE.TorusGeometry(0.17, 0.016, 8, 48).rotateX(Math.PI / 2),
+  pole: () => new THREE.OctahedronGeometry(0.04)
+}
+
 /** A node name as the glTF loader stores it: dots, colons, slashes and brackets dropped. */
 const plainName = name => name.replace(/[[\].:/]/g, '')
+
+/** A thumbnail's side in pixels. */
+const THUMBNAIL_SIZE = 128
+
+/** Every named node of a model, by its plain name. */
+function nodesOf(model) {
+  const nodes = new Map()
+  model.traverse(node => {
+    if (node.name) nodes.set(plainName(node.name), node)
+  })
+  return nodes
+}
+
+/** Pose `nodes` with `clip` at `seconds` into it. */
+function poseNodes(nodes, clip, seconds) {
+  const quaternion = [0, 0, 0, 1]
+  const { first, second, blend } = framesAt(clip, seconds)
+  for (let index = 0; index < clip.nodes.length; index++) {
+    const node = nodes.get(plainName(clip.nodes[index]))
+    if (!node) continue
+    mixInto(quaternion, clip.rotations[first], clip.rotations[second], index * 4, blend)
+    node.quaternion.fromArray(quaternion)
+  }
+  for (const [name, frames] of Object.entries(clip.positions || {})) nodes.get(plainName(name))?.position.fromArray(frames[first])
+}
+
+/** A model file, loaded once and cloned, as a promise. */
+const loadedModel = file => new Promise((resolve, reject) => cachedModel(file, loaded => resolve(cloneModel(loaded)), reject))
+
+/**
+ * RGBA read back from a render target as a PNG data URL: its rows put top
+ * first, and each channel turned from linear light to sRGB, which the canvas
+ * does for the view and a render target does not.
+ */
+function pngOf(pixels, size, isBottomFirst) {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const image = canvas.getContext('2d').createImageData(size, size)
+  for (let row = 0; row < size; row++) {
+    const from = (isBottomFirst ? size - 1 - row : row) * size * 4
+    for (let offset = 0; offset < size * 4; offset++) {
+      const value = pixels[from + offset]
+      image.data[row * size * 4 + offset] = offset % 4 === 3 ? 255 : Math.round(255 * (value / 255) ** (1 / 2.2))
+    }
+  }
+  canvas.getContext('2d').putImageData(image, 0, 0)
+  return canvas.toDataURL('image/png')
+}
 
 /** Mount a view in `stage`, an element the panel keeps between draws. */
 export function mountViewer(stage) {
@@ -77,10 +136,10 @@ export function mountViewer(stage) {
     session: null
   }
   const handleMeshes = new Map()
+  const poleLines = new Map()
   const guideParts = { signature: '', paths: new THREE.Group(), targets: new Map() }
   scene.add(guideParts.paths)
   const held = { file: null, mesh: null, node: null }
-  const quaternion = [0, 0, 0, 1]
 
   function placeCamera() {
     // Far enough that the whole body and a margin fit, in a tall view as well as a wide one.
@@ -105,17 +164,32 @@ export function mountViewer(stage) {
     if (!clip || !view.model) return
     const length = clip.count / clip.framesPerSecond
     // A clip that plays once is watched on repeat, with a pause on its last frame.
-    const at = clip.loop ? seconds : seconds % (length + HOLD_SECONDS)
-    const { first, second, blend } = framesAt(clip, at)
-    for (let index = 0; index < clip.nodes.length; index++) {
-      const node = view.nodes.get(plainName(clip.nodes[index]))
-      if (!node) continue
-      mixInto(quaternion, clip.rotations[first], clip.rotations[second], index * 4, blend)
-      node.quaternion.fromArray(quaternion)
-    }
-    for (const [name, frames] of Object.entries(clip.positions || {})) {
-      view.nodes.get(plainName(name))?.position.fromArray(frames[first])
-    }
+    poseNodes(view.nodes, clip, clip.loop ? seconds : seconds % (length + HOLD_SECONDS))
+  }
+
+  /** A still of `clip` on `model` at its middle, seen from the front and a little to the side. */
+  async function thumbnailOf({ model, clip }) {
+    if (!view.isReady) await renderer.init()
+    const figure = await loadedModel(model)
+    poseNodes(nodesOf(figure), clip, clip.count / clip.framesPerSecond / 2)
+    figure.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(figure)
+    const middle = box.getCenter(new THREE.Vector3())
+    const height = Math.max(box.max.y - box.min.y, 0.2)
+    const studio = new THREE.Scene()
+    studio.background = scene.background
+    studio.add(new THREE.HemisphereLight('#cfe6ee', '#1a2a30', 1.6), sun.clone(), figure)
+    const lens = new THREE.PerspectiveCamera(35, 1, 0.05, 50)
+    lens.position.set(middle.x + height * 1.1, middle.y + height * 0.25, middle.z + height * 2.2)
+    lens.lookAt(middle)
+    const target = new THREE.RenderTarget(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+    renderer.setRenderTarget(target)
+    renderer.render(studio, lens)
+    renderer.setRenderTarget(null)
+    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+    target.dispose()
+    // WebGL reads rows from the bottom; WebGPU from the top.
+    return pngOf(pixels, THUMBNAIL_SIZE, renderer.backend.isWebGLBackend === true)
   }
 
   /** Write a Rig Animation pose onto the model's nodes. */
@@ -128,26 +202,33 @@ export function mountViewer(stage) {
     }
   }
 
-  /** One sphere per handle, placed and coloured as the session says. */
+  /** A handle's mesh in its shape, made once; a pole target's comes with the line to its joint. */
+  function handleMeshOf(handle, shape) {
+    if (handleMeshes.has(handle)) return handleMeshes.get(handle)
+    const mesh = new THREE.Mesh(
+      HANDLE_SHAPES[shape](),
+      new THREE.MeshBasicMaterial({ depthTest: false, transparent: true })
+    )
+    mesh.renderOrder = 10
+    mesh.userData.handle = handle
+    handleMeshes.set(handle, mesh)
+    scene.add(mesh)
+    if (shape === 'pole') poleLines.set(handle, overlayLine(HANDLE_COLOURS.free))
+    return mesh
+  }
+
+  /** One mesh per handle, placed and coloured as the session says. */
   function drawHandles(handles) {
     const shown = new Set()
-    for (const { handle, point, look } of handles) {
+    for (const { handle, point, look, shape = 'sphere', joint } of handles) {
       shown.add(handle)
-      if (!handleMeshes.has(handle)) {
-        const mesh = new THREE.Mesh(
-          new THREE.SphereGeometry(0.045, 16, 12),
-          new THREE.MeshBasicMaterial({ depthTest: false, transparent: true })
-        )
-        mesh.renderOrder = 10
-        mesh.userData.handle = handle
-        handleMeshes.set(handle, mesh)
-        scene.add(mesh)
-      }
-      const mesh = handleMeshes.get(handle)
+      const mesh = handleMeshOf(handle, shape)
       mesh.material.color.set(HANDLE_COLOURS[look])
       mesh.position.set(point[0], point[1] + view.lift, point[2])
+      if (joint) poleLines.get(handle)?.geometry.setFromPoints([lifted(point), lifted(joint)])
     }
     for (const [handle, mesh] of handleMeshes) mesh.visible = shown.has(handle)
+    for (const [handle, line] of poleLines) line.visible = shown.has(handle)
   }
 
   /** A model-space point in the view, where the model stands lifted onto the grid. */
@@ -347,6 +428,12 @@ export function mountViewer(stage) {
     return hit && [hit.x, hit.y - view.lift, hit.z]
   }
 
+  /** Where the dragged handle is now: the pointer on the drag's plane, plus where on the handle it was grabbed. */
+  function handlePointOf(event, grab) {
+    const point = pointOnPlane(event, grab.plane)
+    return point && point.map((value, axis) => value + grab.offset[axis])
+  }
+
   let drag = null
   canvas.addEventListener(
     'wheel',
@@ -366,13 +453,17 @@ export function mountViewer(stage) {
     }
     const handle = hit.object.userData.handle
     const facing = camera.getWorldDirection(new THREE.Vector3())
-    drag = { handle, plane: new THREE.Plane().setFromNormalAndCoplanarPoint(facing, hit.object.position) }
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(facing, hit.object.position)
+    // Kept so a ring grabbed at its edge moves from where it was, not jumps its centre to the pointer.
+    const grabbed = pointOnPlane(event, plane) ?? [0, 0, 0]
+    const offset = [0, 1, 2].map(axis => hit.object.position.getComponent(axis) - (axis === 1 ? view.lift : 0) - grabbed[axis])
+    drag = { handle, plane, offset }
     view.session.grab(handle)
   })
   canvas.addEventListener('pointermove', event => {
     if (!drag) return
     if (drag.handle) {
-      const point = pointOnPlane(event, drag.plane)
+      const point = handlePointOf(event, drag)
       if (point) view.session?.move(drag.handle, point)
       return
     }
@@ -381,7 +472,7 @@ export function mountViewer(stage) {
   })
   canvas.addEventListener('pointerup', event => {
     if (drag?.handle) {
-      const point = pointOnPlane(event, drag.plane)
+      const point = handlePointOf(event, drag)
       if (point) view.session?.drop(drag.handle, point)
     }
     drag = null
@@ -411,10 +502,12 @@ export function mountViewer(stage) {
     stopEditing() {
       view.session = null
       for (const mesh of handleMeshes.values()) mesh.visible = false
+      for (const line of poleLines.values()) line.visible = false
       hideGuides()
       drawBody(null)
       holdItem(null)
     },
+    thumbnail: thumbnailOf,
     dispose() {
       resize.disconnect()
       renderer.setAnimationLoop(null)

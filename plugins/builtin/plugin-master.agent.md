@@ -11,7 +11,13 @@ category: core
 - One folder category: `engine`, `visuals`, `game`, `editor` or `agents`.
 - One skill category: `core`, `engine`, `gameplay`, `presentation`, `assets`, `authoring` or `harnesses`. `core` is listed for every agent; the rest register only where the checkout switches them on, so declare one and `check` stays quiet.
 - Fill contribution points: `panels` `tools` `commands` `fields` `importers` `systems` `menus`.
-- Compose panels from `ui.*`; never write markup.
+- Compose panels from `ui.*`; never write markup. The kit is `engine/ui.js`:
+  `stack` `row` `section` `fold` for layout; `text` `label` `meta` for words;
+  `field` `select` (a labelled dropdown) `toggle` `slider` `textarea`
+  `search` for input; `button` (`primary`, `small`, `confirm: 'Delete?'` for
+  a two-click action); `list` `grid` `card` (a grid cell with a picture,
+  title and action buttons) `tree`; `thumb` `preview` `picture` for images.
+  A widget the kit lacks goes into the kit, not into a plugin.
 - Give every action a command id; it works from a terminal too.
 - Shortcut: `key: 'ctrl+z'` on the command; the shell owns keydown.
 - Expose verbs and state through `context`; tests use `test.context`.

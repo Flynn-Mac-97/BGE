@@ -20,6 +20,30 @@ to include the desktop tabs and console. This captures Electron surfaces,
 requires the desktop host, and does not need Chrome or native computer tools.
 Use `see.capture` for the game canvas.
 
+## A GIF of something moving
+
+`see.gif` records part of the person's editor window as it plays and writes
+`agent-runs/see/<name>.gif`: one call, then send the file.
+
+```sh
+node bin/engine.mjs --headless run see.gif '{"panel":"kimodo","seconds":4,"name":"take-a","play":{"command":"kimodo.view","args":{"clip":"motion/kimodo-mannequin/take-a.json"}}}'
+```
+
+- From a terminal, call it `--headless`: the recorder runs in that node
+  process. Without it the page hands the work to a headless engine and the
+  terminal's 8-second wait for the page runs out, though the file is still
+  written.
+- `play` runs one page command just before recording, so the GIF starts as
+  the take starts.
+
+- `panel` is a panel id and records the canvas in it; `selector` is any CSS
+  selector; with neither it records the game view (`#viewport`).
+- `seconds` (3), `fps` (12), `width` (480 pixels at most). A frame's delay is
+  the time it really showed, so the GIF plays at the right speed.
+- It needs the editor window the supervisor opened (`supervisor.open
+  editor-browser`); it reaches it through that window's debugging port. The
+  panel must be open. The recorder is `see/gif-recording.mjs`.
+
 ## Detail
 
 Read only the file your task needs.

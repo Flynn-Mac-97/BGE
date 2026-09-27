@@ -13,22 +13,43 @@
  * A clip's model is `models/<folder>.glb`, the folder its clip is in, which is
  * where `make-rig-clip --onto` writes it.
  *
+ * Takes are made in the studio, a project of Kimodo's own (kimodo/studio.mjs)
+ * whose model is a mannequin of Kimodo's own skeleton, so no game is needed to
+ * make one. **Copy to game** puts a take on a game's models.
+ *
  *   run kimodo.takes                           every clip, its prompt and its length
  *   run kimodo.view '{"clip":"motion/hero/take-a.json"}'
  *   run kimodo.use '{"clip":"motion/hero/take-a.json","as":"slash"}'
  *   run kimodo.design '{"clip":"motion/hero/idle.json"}'   design on a take (the board)
+ *   run kimodo.new                                         design a new move, starting from words
+ *   run kimodo.models                                      the Kimodo models and which are installed
+ *   run kimodo.delete '{"clip":"motion/hero/take-a.json"}'  delete a take and its stored motion
+ *   run kimodo.key-pose '{"pose":"assets/poses/lunge.sam-3d-body.json","at":0.5}'   a photo's pose as keys
  *   run kimodo.designs                                     every saved design
+ *   run kimodo.studio                                      make the studio if it is missing, then open it
+ *   run kimodo.copy '{"clip":"motion/kimodo-mannequin/take-a.json","game":"arena-brawler"}'
  *   node bin/engine.mjs --headless run kimodo.generate '{"design":"assets/motion/designs/chop.json"}'
  */
 import { mountViewer } from './kimodo/viewer.js'
-import { designRows, openBoard, sessionOf } from './kimodo/design-board.js'
+import { designRows, newDesign, openBoard, sessionOf, withSolvedJoints } from './kimodo/design-board.js'
 import { runHeadless } from '../../engine/headless-job.js'
+import { withPoseKeys } from './kimodo/pose-keys.js'
+import { restOf } from './rig-animation/clip-reading.js'
 import { compareDesign, designFromPoses, poseMenu } from './kimodo/poser.js'
 
 const DESIGNS = 'assets/motion/designs'
 
 /** The node half, loaded only where a program can be started. */
 const nodeHalf = () => import('./kimodo/generate.mjs')
+
+/** The take-files half; node only, because the page removes no files. */
+const takeFilesHalf = () => import('./kimodo/take-files.mjs')
+
+/** The studio's half; node only, because it writes a .glb and retargets. */
+const studioHalf = () => import('./kimodo/studio.mjs')
+
+/** Kimodo's own project, in the projects folder, and the mannequin every take in it is on. */
+const STUDIO = { name: 'kimodo-studio', model: 'models/kimodo-mannequin.glb' }
 
 /** The command that generates a design at a terminal. Shown where the browser cannot. */
 const generateCommand = file =>
@@ -49,7 +70,13 @@ const state = {
   error: null,
   stage: null,
   viewer: null,
-  board: null
+  board: null,
+  games: [],
+  copyTo: null,
+  copyNote: null,
+  kimodoModels: [],
+  thumbnails: new Map(),
+  isDrawingThumbnails: false
 }
 
 /** One take as the panel lists it. */
@@ -77,6 +104,8 @@ async function readTakes(context) {
     const [, folder, name] = match
     const model = models.has(`assets/models/${folder}.glb`) ? `models/${folder}.glb` : null
     const raw = JSON.parse(await context.files.read(file))
+    // Bone maps and designs are in assets/motion/ too, and have no frames.
+    if (!raw.rotations) continue
     takes.push(takeRow({ clip: file.replace(/^assets\//, ''), folder, name, model, raw }))
   }
   return takes
@@ -99,6 +128,13 @@ async function viewTake(context, clip) {
   if (!take) throw new Error(`no clip ${clip} — run kimodo.takes`)
   state.chosen = clip
   state.target = null
+  // Playing a take leaves design mode; the side would still show the old design.
+  state.board = null
+  // Playing a take in the editor opens the board, so a take asked for is seen.
+  if (context.shell) {
+    state.isOpen = true
+    stageFor()
+  }
   if (state.viewer && take.model) state.viewer.show({ model: take.model, clip: await context.rigAnimation.load(clip) })
   context.redraw?.()
   return take
@@ -117,6 +153,63 @@ async function useTake(context, clip, as) {
   context.rigAnimation.forget()
   return { clip: written, from: clip }
 }
+
+/**
+ * Draw a still for each listed take that has none, one at a time, redrawing
+ * the grid as each lands. A take that cannot be drawn keeps its blank card.
+ */
+async function drawThumbnails(context) {
+  if (state.isDrawingThumbnails || !state.viewer) return
+  state.isDrawingThumbnails = true
+  try {
+    for (const take of state.takes.filter(one => one.model && !state.thumbnails.has(one.clip))) {
+      const picture = await state.viewer
+        .thumbnail({ model: take.model, clip: await context.rigAnimation.load(take.clip) })
+        .catch(() => null)
+      state.thumbnails.set(take.clip, picture)
+      context.redraw?.()
+    }
+  } finally {
+    state.isDrawingThumbnails = false
+  }
+}
+
+/** Delete a take, then list the takes again; a failure is shown under the grid. */
+async function deleteFromBoard(context, clip) {
+  try {
+    await context.run('kimodo.delete', { clip })
+    state.thumbnails.delete(clip)
+    if (state.chosen === clip) state.chosen = null
+    context.rigAnimation.forget()
+    await context.run('kimodo.takes')
+  } catch (error) {
+    state.error = String(error?.message || error)
+    context.redraw?.()
+  }
+}
+
+/** The takes as a grid of stills; picking one plays it, and each can be deleted. */
+function takeGrid(ui, context, shown) {
+  return ui.grid({
+    items: shown,
+    cols: 2,
+    key: take => take.clip,
+    selected: state.chosen,
+    emptyText: state.error || 'no clips under assets/motion/',
+    cell: take => [
+      ui.card({
+        media: state.thumbnails.get(take.clip) ? ui.picture(state.thumbnails.get(take.clip)) : ui.thumb('', { glyph: '…' }),
+        title: take.name,
+        sub: `${take.seconds} s · ${take.loop ? 'loops' : 'once'}`,
+        actions: [ui.button('Delete', () => deleteFromBoard(context, take.clip), { small: true, confirm: 'Delete?' })]
+      })
+    ],
+    onPick: take => context.run('kimodo.view', { clip: take.clip })
+  })
+}
+
+/** True when the open project is the studio: its takes are on the mannequin. */
+const isStudio = () => state.takes.some(take => take.model === STUDIO.model)
 
 // --------------------------------------------------------------------- panel
 
@@ -151,11 +244,12 @@ function chosenRows(ui, context) {
       { dim: true }
     ),
     ui.text('Use this take as:', { dim: true }),
-    ui.pick({
-      options: targets.map(other => other.name),
-      value: state.target,
+    ui.select({
+      k: 'clip',
+      options: [{ value: '', label: 'choose a clip' }, ...targets.map(other => other.name)],
+      value: state.target ?? '',
       onChange: name => {
-        state.target = name
+        state.target = name || null
       }
     }),
     ui.button(
@@ -165,7 +259,55 @@ function chosenRows(ui, context) {
       },
       { primary: Boolean(state.target) }
     ),
-    ...(take.model ? [ui.button('Design on this take', () => context.run('kimodo.design', { clip: take.clip }))] : [])
+    ...(take.model ? [ui.button('Design on this take', () => context.run('kimodo.design', { clip: take.clip }))] : []),
+    ...copyRows(ui, context, take)
+  ]
+}
+
+/** Outside the studio, the way into it; in any project with a rig, the way to design a new move. */
+function studioRows(ui, context) {
+  const newMove = state.takes.some(take => take.model)
+    ? [ui.button('New move', () => context.run('kimodo.new'), { primary: isStudio() })]
+    : []
+  if (isStudio()) return newMove
+  return [ui.button('Open Kimodo Studio', () => context.run('kimodo.studio'), { primary: !state.takes.length }), ...newMove]
+}
+
+/** Copy a take and say on the board what was written or why not; a button has no other place to answer. */
+async function copyFromBoard(context, clip, game) {
+  state.copyNote = `Copying to ${game}…`
+  context.redraw?.()
+  try {
+    const done = await context.run('kimodo.copy', { clip, game })
+    state.copyNote = done.error ?? `Wrote ${done.written.join(', ')}.`
+  } catch (error) {
+    state.copyNote = String(error?.message || error)
+  }
+  context.redraw?.()
+}
+
+/** In the studio, the rows that copy the chosen take into a game. */
+function copyRows(ui, context, take) {
+  if (!isStudio()) return []
+  const games = state.games.filter(name => name !== STUDIO.name)
+  return [
+    ui.text('Copy this take to a game:', { dim: true }),
+    ui.select({
+      k: 'game',
+      options: [{ value: '', label: 'choose a game' }, ...games],
+      value: state.copyTo ?? '',
+      onChange: name => {
+        state.copyTo = name || null
+      }
+    }),
+    ui.button(
+      state.copyTo ? `Copy to ${state.copyTo}` : 'Copy to…',
+      () => {
+        if (state.copyTo) copyFromBoard(context, take.clip, state.copyTo)
+      },
+      { primary: Boolean(state.copyTo) }
+    ),
+    ...(state.copyNote ? [ui.text(state.copyNote, { dim: true })] : [])
   ]
 }
 
@@ -173,12 +315,16 @@ function chosenRows(ui, context) {
 function designListRows(ui, context) {
   if (!state.designs.length) return []
   return [
-    ui.text('Designs:', { dim: true }),
-    ui.list({
-      items: state.designs,
-      key: file => file,
-      row: file => [ui.label(file.split('/').pop().replace('.json', ''))],
-      onPick: file => context.run('kimodo.design', { file })
+    ui.select({
+      k: 'design',
+      options: [
+        { value: '', label: 'open a saved design' },
+        ...state.designs.map(file => ({ value: file, label: file.split('/').pop().replace('.json', '') }))
+      ],
+      value: '',
+      onChange: file => {
+        if (file) context.run('kimodo.design', { file })
+      }
     })
   ]
 }
@@ -192,7 +338,8 @@ async function generateBoard(context) {
   if (state.isGenerating) return
   const { file } = await context.run('kimodo.save-design')
   state.isGenerating = true
-  state.board.note = 'Generating. Kimodo takes about two minutes for two seconds of motion.'
+  const takes = state.board.design.takes ?? 1
+  state.board.note = `Generating ${takes > 1 ? `${takes} takes` : 'the take'}. Kimodo takes about two minutes for two seconds of motion, per take.`
   context.redraw?.()
   try {
     const answer = context.host
@@ -213,8 +360,8 @@ async function generateBoard(context) {
 function designSide(ui, context) {
   const redraw = () => context.redraw?.()
   // A failed save or generate is shown on the board; a button has no other place to answer.
-  const noting = work => () =>
-    work().catch(error => {
+  const noting = work => change =>
+    work(change).catch(error => {
       // Generate closes the board once the take is made; a later failure has no board to show on.
       if (state.board) state.board.note = error.message
       redraw()
@@ -230,9 +377,41 @@ function designSide(ui, context) {
       state.board = null
       state.viewer?.stopEditing()
       redraw()
-    }
+    },
+    rebase: noting(change => rebaseBoard(context, change)),
+    keyPose: noting(pose => context.run('kimodo.key-pose', { pose }))
   }
-  return ui.stack(designRows(ui, state.board, actions, redraw), { pad: true })
+  return ui.stack(designRows(ui, state.board, actions, redraw, state.kimodoModels), { pad: true })
+}
+
+/**
+ * Open the board on `design`, its base take loaded, and pose it in the view.
+ * Reads the Kimodo models once, in the background, for the board's picker.
+ */
+async function openDesign(context, design, take = null) {
+  state.isOpen = true
+  stageFor()
+  state.board = await openBoard(context, { design, take, takes: state.takes })
+  state.viewer.edit(sessionOf(state.board, () => context.redraw?.()))
+  context.redraw?.()
+  if (!state.kimodoModels.length)
+    context.run('kimodo.models').then(models => {
+      state.kimodoModels = Array.isArray(models) ? models : []
+      context.redraw?.()
+    })
+}
+
+/**
+ * Reopen the board with the design changed to another rig or base take.
+ * Keys are points on the old rig, so a new rig starts the design without them.
+ */
+async function rebaseBoard(context, change) {
+  const design = state.board.design
+  const isNewRig = change.model && change.model !== design.model
+  const base = change.base ?? (isNewRig ? state.takes.find(take => take.model === change.model)?.clip : design.base)
+  if (!base) throw new Error(`no take on ${change.model} to start from; make one on that rig first`)
+  const cleared = isNewRig ? { keys: {}, body: [], solved: {} } : {}
+  await openDesign(context, { ...design, ...change, base, ...cleared })
 }
 
 function panel(ui, context) {
@@ -247,6 +426,7 @@ function panel(ui, context) {
     ? designSide(ui, context)
     : ui.stack(
         [
+          ...studioRows(ui, context),
           ...chosenRows(ui, context),
           ...designListRows(ui, context),
           ui.search({
@@ -258,14 +438,7 @@ function panel(ui, context) {
               context.redraw?.()
             }
           }),
-          ui.list({
-            items: shown,
-            key: take => take.clip,
-            selected: state.chosen,
-            emptyText: state.error || 'no clips under assets/motion/',
-            row: take => [ui.label(take.name), ui.spacer(), ui.meta(`${take.folder} · ${take.seconds}s`)],
-            onPick: take => context.run('kimodo.view', { clip: take.clip })
-          })
+          takeGrid(ui, context, shown)
         ],
         { pad: true }
       )
@@ -329,11 +502,13 @@ export default {
           state.designs = (await context.files.tree())
             .map(item => item.path)
             .filter(file => file.startsWith(`${DESIGNS}/`) && file.endsWith('.json'))
+          if (isStudio() && context.shell) state.games = (await context.run('project.list')).names ?? []
           state.error = null
         } catch (error) {
           state.error = String(error?.message || error)
         }
         context.redraw?.()
+        if (context.shell) drawThumbnails(context)
         return state.error ? { error: state.error } : { takes: state.takes }
       }
     },
@@ -354,13 +529,57 @@ export default {
         const take = design ? null : await takeFor(context, options.clip)
         if (!design && !take?.model)
           return { error: `no take ${options.clip} with a model to design on — run kimodo.takes` }
-        state.isOpen = true
-        stageFor()
-        state.board = await openBoard(context, { design, take })
-        state.viewer.edit(sessionOf(state.board, () => context.redraw?.()))
-        context.redraw?.()
+        await openDesign(context, design, take)
         return { designing: state.board.design.name, base: state.board.design.base }
       }
+    },
+    {
+      id: 'kimodo.new',
+      label: 'Design a new move',
+      // Starts from words: on the studio mannequin when there is one, else the first rig with a take.
+      run: async context => {
+        if (!context.shell) return { open: false, why: 'the design board needs the editor; a headless world has no panel' }
+        if (!state.takes.length) state.takes = await readTakes(context)
+        const onRig = state.takes.filter(take => take.model)
+        const take = onRig.find(one => one.model === STUDIO.model && one.name === 'kimodo-idle') ?? onRig[0]
+        if (!take) return { error: 'no take on a rig to design on: open Kimodo Studio, or retarget a clip onto a model' }
+        await openDesign(context, { ...newDesign({ name: 'new-move', model: take.model, base: take.clip }), fromBase: false })
+        return { designing: state.board.design.name, rig: take.model }
+      }
+    },
+    {
+      id: 'kimodo.key-pose',
+      label: "Key a photo's pose on the design",
+      // args: {"pose":"assets/poses/<image>.<model>.json","at":0.5,"person":0}; at is the board's time when left out
+      run: async (context, options = {}) => {
+        if (!state.board) return { error: 'no design is open: kimodo.design or kimodo.new first' }
+        const record = JSON.parse(await context.files.read(options.pose))
+        const seconds = options.at ?? state.board.time
+        state.board.design = withPoseKeys(state.board.design, record, {
+          seconds,
+          rest: restOf(state.board.skeleton),
+          person: options.person ?? 0
+        })
+        state.board.note = `Keyed ${options.pose} at ${seconds.toFixed(2)} s.`
+        context.redraw?.()
+        return { keyed: Object.keys(state.board.design.keys), at: seconds }
+      }
+    },
+    {
+      id: 'kimodo.delete',
+      label: 'Delete a take',
+      // args: {"clip":"motion/hero/take-a.json"}; removes the clip and, unless another clip names it, its stored motion
+      run: async (context, options = {}) =>
+        context.host
+          ? (await takeFilesHalf()).deleteTake(context.host.project, options.clip)
+          : runHeadless('kimodo.delete', options)
+    },
+    {
+      id: 'kimodo.models',
+      label: 'Kimodo models, and which are installed',
+      // Answers [{ model, skeleton, about, isInstalled, install }]; reading kimodo.cpp needs node.
+      run: async context =>
+        context.host ? (await nodeHalf()).kimodoModels(context.host.checkout) : runHeadless('kimodo.models')
     },
     {
       id: 'kimodo.designs',
@@ -376,6 +595,8 @@ export default {
       label: 'Save the design on the board',
       run: async context => {
         if (!state.board) return { error: 'no design is open: kimodo.design first' }
+        // Kimodo is sent where each elbow and knee is, so the design is saved with them solved.
+        state.board.design = withSolvedJoints(state.board)
         const file = `${DESIGNS}/${state.board.design.name}.json`
         await context.files.write(file, JSON.stringify(state.board.design, null, 2) + '\n')
         return { file }
@@ -393,6 +614,27 @@ export default {
             run: generateCommand(options.design)
           }
         return (await nodeHalf()).generateDesign(context.host, options.design)
+      }
+    },
+    {
+      id: 'kimodo.studio',
+      label: 'Open Kimodo Studio',
+      // Makes the studio when it is missing. Headless, it only makes it; the editor then opens it.
+      run: async context => {
+        if (context.host) return (await studioHalf()).makeStudio(context.host.checkout, STUDIO)
+        const made = await runHeadless('kimodo.studio')
+        await context.run('project.open', made.studio)
+        return made
+      }
+    },
+    {
+      id: 'kimodo.copy',
+      label: 'Copy a studio take to a game',
+      // args: {"clip":"motion/kimodo-mannequin/take-a.json","game":"arena-brawler"}; run in the studio
+      run: async (context, options = {}) => {
+        if (!options.clip || !options.game) return { error: 'name the take and the game: {"clip":"...","game":"..."}' }
+        if (context.host) return (await studioHalf()).copyTakeToGame(context.host.checkout, context.host.project, options)
+        return runHeadless('kimodo.copy', options)
       }
     },
     {

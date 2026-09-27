@@ -11,6 +11,8 @@
  *   see.sketch    a flat-colour frame drawn from those facts. Works everywhere.
  *   see.capture   the real rendered frame. Browser only.
  *   see.curve     a chart of engine curves and presets. Works everywhere.
+ *   see.gif       a GIF of part of the person's editor window as it plays,
+ *                 such as a panel's view (see/gif-recording.mjs).
  *
  * Every image outlines each marked entity's screen hull in its type's
  * colour, and the JSON sidecar carries the legend — palette (type to hex),
@@ -29,6 +31,10 @@ import { ray } from './see/ray.js'
 import { capture } from './see/capture.js'
 import { seeCurve } from './see/curve-command.js'
 import { captureEditor } from './see/editor.js'
+import { runHeadless } from '../../engine/headless-job.js'
+
+/** The GIF recorder, loaded only in node: it opens the window's debugging port. */
+const gifHalf = () => import('./see/gif-recording.mjs')
 import { framesTaken, freeFrameName, describeAtDeclaredShape, concealOverlays, revealOverlays, needsRenderer, keepView, bindMarks, withSubject } from './see/frame-context.js'
 
 /**
@@ -128,6 +134,32 @@ export default {
       label: 'Capture editor panels',
       inputSchema: { type: 'object', properties: { scope: { type: 'string', enum: ['editor', 'window'] }, name: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' } }, additionalProperties: false },
       run: (_context, options = {}) => captureEditor(options)
+    },
+    {
+      id: 'see.gif',
+      label: 'Record part of the editor as a GIF',
+      // args: {"panel":"kimodo","seconds":3} or {"selector":"#viewport"}, and fps, width, name; writes agent-runs/see/<name>.gif
+      inputSchema: {
+        type: 'object',
+        properties: {
+          panel: { type: 'string' },
+          selector: { type: 'string' },
+          seconds: { type: 'number', minimum: 0.5, maximum: 20 },
+          fps: { type: 'number', minimum: 1, maximum: 30 },
+          width: { type: 'number', minimum: 64, maximum: 1280 },
+          name: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' },
+          play: {
+            type: 'object',
+            properties: { command: { type: 'string' }, args: { type: 'object' } },
+            required: ['command'],
+            additionalProperties: false
+          }
+        },
+        additionalProperties: false
+      },
+      // The page cannot record itself; a headless engine records it through the window's debugging port.
+      run: async (context, options = {}) =>
+        context.host ? (await gifHalf()).recordGif(context.host.checkout, options) : runHeadless('see.gif', options)
     },
     {
       id: 'see.describe',

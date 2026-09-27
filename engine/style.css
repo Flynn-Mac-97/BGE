@@ -667,6 +667,38 @@ input:focus-visible {
   border-color: var(--ink);
 }
 
+.u-select {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font: 11px var(--mono);
+  padding: 2px 4px;
+}
+.u-select option {
+  background: var(--paper);
+  color: var(--ink);
+}
+.u-btn.small {
+  padding: 1px 6px;
+  font-size: 10px;
+}
+.u-btn.asking {
+  border-color: var(--mark);
+  color: var(--mark);
+}
+.u-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.u-card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
 .u-pick {
   display: flex;
   flex-wrap: wrap;
