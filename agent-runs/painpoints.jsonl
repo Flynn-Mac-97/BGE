@@ -578,3 +578,6 @@
 {"id":"p409","resolved":true,"at":"2026-09-27T03:34:42.685Z","note":"rebuilt files (.engine index and tests.json) pass the lock, so tests.run works while a lane is open; a person's play is still held by design"}
 {"id":"p422","resolved":true,"at":"2026-09-27T03:34:42.787Z","note":"see.worn answers each worn item's hang point, middle and input.point pixel"}
 {"id":"p414","resolved":true,"at":"2026-09-27T03:34:42.895Z","note":"not reproduced 2026-09-27: marks sit on the models in a headless lane capture"}
+{"id":"p404","resolved":true,"at":"2026-09-27T03:38:22.992Z","note":"a local constant is read; an imported table prints an unread row and check warns"}
+{"id":"p415","resolved":true,"at":"2026-09-27T03:42:18.654Z","note":"a lane may set: its page skips the save (notSaved: viewer); verified yaw posed with no file written"}
+{"id":"p416","resolved":true,"at":"2026-09-27T03:42:18.754Z","note":"not reproduced 2026-09-27: press then release with no step between still started the draw; the press is kept until the next step"}
