@@ -167,3 +167,18 @@ test('stored interfaces refresh after source edits and reuse unchanged files', a
     assert.equal(await transport.agentInterface('project', '../outside.js'), null)
   } finally { await fs.rm(project, { recursive: true, force: true }) }
 })
+
+test('a commands table in a constant is listed, and an imported one is named as unread', async () => {
+  const reader = await makeSourceReader()
+  const local = await reader.facts('plugins/builtin/probe.js', `const COMMANDS = [{ id: 'probe.run', label: 'Run', run: () => 1 }]
+export default { name: 'Probe', category: 'engine', commands: COMMANDS }
+`)
+  assert.deepEqual(local.commands.map(command => command.id), ['probe.run'])
+  assert.equal(local.unread, undefined)
+
+  const imported = await reader.facts('plugins/builtin/probe.js', `import { COMMANDS } from './probe/commands.js'
+export default { name: 'Probe', category: 'engine', commands: COMMANDS }
+`)
+  assert.deepEqual(imported.unread, ['commands'])
+  assert.match(interfaceBlock(imported, { file: 'plugins/builtin/probe.js' }), /unread commands: not an array written in the plugin file/)
+})

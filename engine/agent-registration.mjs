@@ -559,6 +559,26 @@ export async function writeGeneratedAgentFiles(root, projectPath) {
 }
 
 /**
+ * A warning for a plugin whose contribution table its generated interface
+ * could not read: imported, spread or built by a call. Plugin Master names
+ * those on an `unread` row; without this the interface lists no commands and
+ * nothing says why.
+ */
+function unreadTableWarning(file) {
+  if (!file.path.endsWith('interface.generated.md')) return []
+  const row = file.text.match(/^ {2}unread (.+)$/m)
+  if (!row) return []
+  const points = row[1].split(':')[0]
+  return [
+    {
+      warning: true,
+      file: file.source,
+      why: `its ${points} table is not an array written in the plugin file, so its generated interface lists none of it. Write the array in the plugin file, or in a constant declared there`
+    }
+  ]
+}
+
+/**
  * Generated files that no longer match their source.
  *
  * Failures, not warnings. The harness reads the skill listing once at session
@@ -590,6 +610,7 @@ export async function generatedFileProblems(root, projectPath, guides = null, sk
           : `${file.path} does not match ${file.source} it is generated from. Every agent reads the stale copy. Run "node bin/engine.mjs agent.skills" to write it — a dev server writes these at start-up only, so one already running will not`
     })
   }
+  problems.push(...files.flatMap(unreadTableWarning))
   const wanted = new Set(files.map(file => file.path))
   for (const skill of skillsOnDisk || (await generatedSkillsOnDisk(root))) {
     if (wanted.has(skill.path)) continue

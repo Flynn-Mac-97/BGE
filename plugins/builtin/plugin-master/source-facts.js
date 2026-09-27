@@ -200,12 +200,19 @@ const bodyOf = node => node?.type === 'method_definition' ? node.childForFieldNa
     : node?.type === 'pair' ? bodyOf(node.childForFieldName('value'))
       : undefined
 
-/** The object literal behind one `commands: [...]` entry, or undefined. */
-function commandEntries(object, point = 'commands') {
-  const value = object.get(point)
+/**
+ * The object literals of one contribution point's array: written in place,
+ * or a constant declared in the same file. Empty for anything else.
+ */
+function commandEntries(object, point, resolve) {
+  const value = resolve(object.get(point))
   if (value?.type !== 'array') return []
   return value.namedChildren.filter(child => child.type === 'object')
 }
+
+/** Contribution points whose value is not an array the parser can read: imported, spread or built by a call. */
+const unreadPoints = (object, points, resolve) =>
+  points.filter(point => object.has(point) && resolve(object.get(point))?.type !== 'array')
 
 /** Facts read straight out of the syntax tree. */
 function readFacts(tree) {
@@ -235,9 +242,12 @@ function readFacts(tree) {
 
   facts.contributes = {}
   for (const point of ['panels', 'tools', 'commands', 'fields', 'importers', 'systems', 'menus']) {
-    const value = declared.get(point)
+    const value = resolve(declared.get(point))
     if (value?.type === 'array' && value.namedChildren.length) facts.contributes[point] = value.namedChildren.length
   }
+  // A table the parser cannot read would print as none at all; it is named instead.
+  const unread = unreadPoints(declared, ['panels', 'tools', 'commands', 'fields', 'importers', 'systems', 'menus'], resolve)
+  if (unread.length) facts.unread = unread
 
   // What a command is called, the key it answers to, and whether its body
   // refuses where there is no host — the claim every headless-only plugin makes
@@ -260,11 +270,11 @@ function readFacts(tree) {
       refusesWithoutHost: /!\s*context\.host\b/.test(source) || /!\s*context\?\.host\b/.test(source)
     }
   }
-  facts.commands = commandEntries(declared).map(readCommand).filter(command => command.id)
-  facts.menus = commandEntries(declared, 'menus').map(readCommand).filter(command => command.id)
+  facts.commands = commandEntries(declared, 'commands', resolve).map(readCommand).filter(command => command.id)
+  facts.menus = commandEntries(declared, 'menus', resolve).map(readCommand).filter(command => command.id)
 
   facts.systems = (() => {
-    const value = declared.get('systems')
+    const value = resolve(declared.get('systems'))
     return value?.type === 'array'
       ? value.namedChildren.filter(child => child.type === 'object')
         .map(entry => textOf(keys(entry).get('phase'), names)).filter(Boolean)

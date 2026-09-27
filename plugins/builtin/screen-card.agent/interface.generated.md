@@ -1,4 +1,4 @@
-<!--73843f42-->
+<!--bfb2c286-->
 parsed from source
   plugin Screen Card
   category game

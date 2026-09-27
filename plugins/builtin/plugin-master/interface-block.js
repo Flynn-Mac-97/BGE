@@ -11,6 +11,9 @@
 /** Row labels, and the order they print in. Absent rows are left out. */
 const ROWS = ['provides', 'requires', 'needs']
 
+/** What an `unread` row says: the table is real, only this listing cannot show it. */
+export const UNREAD = 'not an array written in the plugin file, so not listed here; read the source'
+
 /** Contribution points other than commands, which get a row of their own. */
 const OTHER_POINTS = ['panels', 'tools', 'fields', 'importers', 'menus']
 
@@ -64,6 +67,7 @@ export function interfaceBlock(facts = {}, where = {}) {
   const callable = [...(facts.commands || []), ...(facts.menus || [])]
   const commands = callable.map(commandLine)
   if (commands.length) rows.push(['commands', commands[0]], ...commands.slice(1).map(line => ['', line]))
+  if (facts.unread?.length) rows.push(['unread', `${facts.unread.join(', ')}: ${UNREAD}`])
   // One row per kind, not per command: the label repeated for every command
   // costs more than the arguments it announces, and the id is what is read.
   const argumentLines = []
