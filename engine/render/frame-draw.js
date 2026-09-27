@@ -13,6 +13,7 @@
 import * as THREE from 'three/webgpu'
 import { makePassGraph } from './graph.js'
 import { reportOnce } from './report.js'
+import { bottomUpRows, regionAsRead } from './readback-rows.js'
 
 /** Builds the frame draw controller for one render state: the default graph and its stats. */
 export function makeFrameDraw(state) {
@@ -244,11 +245,20 @@ export function makeFrameDraw(state) {
     state.renderer.clear()
     await state.renderer.renderAsync(state.scene, camera)
     const read = region || { x: 0, y: 0, width: target.width, height: target.height }
+    // A WebGPU device reads rows top-down; the contract is GL's bottom-up.
+    const isTopDown = Boolean(state.renderer.backend?.device)
+    const asRead = regionAsRead(read, target.height, isTopDown)
     // Reading a target back is asynchronous on this renderer. The bytes are
     // returned rather than filled in, so they are copied into the caller's
     // buffer here and every caller awaits.
-    const pixels = await state.renderer.readRenderTargetPixelsAsync(target, read.x, read.y, read.width, read.height)
-    buffer.set(pixels.subarray(0, buffer.length))
+    const pixels = await state.renderer.readRenderTargetPixelsAsync(
+      target,
+      asRead.x,
+      asRead.y,
+      asRead.width,
+      asRead.height
+    )
+    buffer.set(bottomUpRows(pixels, read.width, read.height, isTopDown).subarray(0, buffer.length))
     state.renderer.setRenderTarget(keptTarget)
     state.renderer.setClearColor(keptColour, keptAlpha)
     return buffer
