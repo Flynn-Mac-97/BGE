@@ -90,6 +90,8 @@ const stateReport = entity => ({
   type: entity.type,
   state: entity.animationState ?? null,
   clip: entity._animationClip ?? null,
+  clipTime: Number((entity._rigTime ?? 0).toFixed(2)),
+  isClipDone: Boolean(entity.rigDone),
   inputs: entity.animationInputs ?? {},
   held: entity.heldItem ?? null
 })
