@@ -39,6 +39,7 @@ import { placeOf } from '../rig-animation/skeleton.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { add, scaled, subtract, unit } from '../game-maths/space.js'
 import { inverse, multiply, rotate, turnOnto } from '../game-maths/turns.js'
+import { chosenElbow } from './elbow-choice.js'
 
 const DEGREES = Math.PI / 180
 
@@ -46,12 +47,13 @@ const DEGREES = Math.PI / 180
 const LONGEST_STEP = 0.1
 
 /**
- * Where an elbow bends toward when the record names none: out, down and a
- * little forward from halfway between the shoulder and the hand, in the
- * chest's space. It follows the hand, so an arm swung across the body bends
- * its elbow out in front, not back through the chest.
+ * Where an elbow bends toward when the record names none: down, and a little
+ * out, from halfway between the shoulder and the hand, in the chest's space.
+ * It follows the hand, so an arm swung across the body bends its elbow out in
+ * front, not back through the chest, and a raised sword keeps its elbow
+ * under it; the wrist cocks to meet the grip.
  */
-const ELBOW_FOLLOWS = [0.35, -0.3, 0.1]
+const ELBOW_FOLLOWS = [0.2, -0.5, 0]
 
 /**
  * What a wrist on a grip may do (rig-animation/solvers/wrist.js): half its
@@ -79,17 +81,6 @@ function elbowPoleOf(record, side, chest, shoulder, hand) {
   return { model: add(halfway, rotate(chest.turn, mirrored(ELBOW_FOLLOWS, side))) }
 }
 
-/**
- * The pole for a hand on a grip: where the elbow is when the wrist is
- * straight, behind the hand along the way `handTurn` points it. The arm
- * then lines up with the grip, and the wrist bends as little as the reach
- * lets it, rather than folding back to meet the item.
- */
-function wristPoleOf(skeleton, handNode, hand, handTurn) {
-  const { position, rotation } = skeleton.nodes[handNode]
-  const forearmTurn = multiply(handTurn, inverse(rotation))
-  return { model: subtract(hand, rotate(forearmTurn, position)) }
-}
 
 /** The way the item points in the chest's space, a unit direction, by the guard's pitch and yaw. */
 function pointingIn(guard) {
@@ -180,8 +171,12 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, 
   const sockets = record.grip.sockets
   const itemTurn = itemTurnOf(record, chest.turn)
   const holdingTurn = multiply(itemTurn, sockets[record.hand].turn)
+  // On a grip each elbow goes where the wrist is easiest, down and clear of the chest (elbow-choice.js).
+  const gripPoleOf = (side, point, turn) => ({
+    model: chosenElbow({ skeleton, nodes: arm(side), shoulder: placeOf(skeleton, pose, arm(side)[0]).position, hand: point, handTurn: turn, chest, memory: (memory[`${side}Elbow`] ??= {}) })
+  })
   const holdingHand = [
-    { ...reachOf(record.hand, handPoint), pole: wristPoleOf(skeleton, roles[record.hand].hand, handPoint, holdingTurn) },
+    { ...reachOf(record.hand, handPoint), pole: gripPoleOf(record.hand, handPoint, holdingTurn) },
     { kind: 'orient', node: roles[record.hand].hand, aim: rotate(holdingTurn, [0, 0, 1]), upAim: rotate(holdingTurn, [0, 1, 0]), weight: strengthOf(record.hand) },
     { kind: 'wrist', node: roles[record.hand].hand, ...WRIST, weight: strengthOf(record.hand) }
   ]
@@ -198,7 +193,7 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, 
           kind: 'reach',
           nodes: arm(other),
           target: { node: roles[record.hand].hand, at: otherAt },
-          pole: wristPoleOf(skeleton, roles[other].hand, add(handPoint, rotate(holdingTurn, otherAt)), multiply(holdingTurn, otherTurn)),
+          pole: gripPoleOf(other, add(handPoint, rotate(holdingTurn, otherAt)), multiply(holdingTurn, otherTurn)),
           weight: strengthOf(other)
         },
         { kind: 'orient', node: roles[other].hand, aim: rotate(otherTurn, [0, 0, 1]), upAim: rotate(otherTurn, [0, 1, 0]), in: roles[record.hand].hand, weight: strengthOf(other) },
