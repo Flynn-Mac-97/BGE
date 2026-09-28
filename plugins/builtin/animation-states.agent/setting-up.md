@@ -23,3 +23,7 @@ Do the work; ask the person only what the takes cannot tell you.
 A new state: add it to `states` with its takes, then a transition in the
 right place (priority order: the first that matches wins). A new weapon: a
 model, a hold record, a set. Nothing else changes.
+
+A swing that must travel a set path (across the body, overhead) is made in
+Kimodo with the hand's keys on its design, not from words alone: words gave
+side swings; three RightHand keys brought the hand within 3–9 cm of its path.

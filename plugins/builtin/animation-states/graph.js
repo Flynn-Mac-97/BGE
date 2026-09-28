@@ -22,7 +22,8 @@
  *     actions: {
  *       attack: {
  *         clips: ['take-base-slash-sword-a'],   one picked each time it plays
- *         mask: 'upper',                         'upper' (above the hips), 'all', or a list of nodes
+ *         mask: 'upper',                         'upper' (above the hips), 'right-arm' or 'left-arm'
+ *                                                (the spine and one arm), 'all', or a list of nodes
  *         hold: { holding: 0, other: 1 },        how much each hand keeps its hold while it plays
  *         speed: 1
  *       }
@@ -71,6 +72,32 @@ export function actionOf(sets, name) {
 /** Every action name the on sets give, for the panel and the commands. */
 export const actionNames = sets => [...new Set(sets.flatMap(set => Object.keys(set.actions ?? {})))]
 
+/** The nodes from the hips' child up to the chest: the spine a one-arm layer turns with the arm. */
+function spineOf(skeleton, chest) {
+  const spine = []
+  for (let node = chest; skeleton.nodes[node]?.parent; node = skeleton.nodes[node].parent) spine.unshift(node)
+  return spine
+}
+
+/** Every node under `top`, and `top`. */
+function branchOf(skeleton, top) {
+  const parentOf = name => skeleton.nodes[name]?.parent ?? null
+  return Object.keys(skeleton.nodes).filter(name => {
+    for (let node = name; node; node = parentOf(node)) if (node === top) return true
+    return false
+  })
+}
+
+/**
+ * The spine and one arm, from the shoulder bone above the upper arm: a
+ * one-handed swing that leaves the other arm to the state.
+ */
+export function armMaskOf(skeleton, chest, upperArm) {
+  const shoulder = skeleton.nodes[upperArm]?.parent
+  const top = shoulder && shoulder !== chest ? shoulder : upperArm
+  return [...spineOf(skeleton, chest), ...branchOf(skeleton, top)]
+}
+
 /**
  * The nodes above the hips: the hips' child whose branch holds the chest, and
  * everything under it. A layer on these plays the arms and the spine and
@@ -80,8 +107,5 @@ export function upperBodyOf(skeleton, chest) {
   const parentOf = name => skeleton.nodes[name]?.parent ?? null
   let top = chest
   while (parentOf(top) && parentOf(parentOf(top))) top = parentOf(top)
-  return Object.keys(skeleton.nodes).filter(name => {
-    for (let node = name; node; node = parentOf(node)) if (node === top) return true
-    return false
-  })
+  return branchOf(skeleton, top)
 }

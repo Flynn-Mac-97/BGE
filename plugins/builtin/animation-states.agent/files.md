@@ -10,6 +10,6 @@ The full contracts are at the top of the code; this is where to look.
 - Scaffold names and the inputs its transitions read: `animation-states/scaffold.js`.
 - What `animation.graph` checks: `animation-states/report.js`.
 
-An action: `{ clips, mask: 'upper' | 'all' | [nodes], hold: { holding, other }, speed }`.
+An action: `{ clips, mask, hold: { holding, other }, speed }`; `mask` is 'upper', 'right-arm' or 'left-arm' (the spine and one arm, so a one-handed swing leaves the other arm to the state), 'all', or a list of nodes.
 While it plays, `acting` is an input the graph can read, so a transition can
 stop a sprint during an attack.

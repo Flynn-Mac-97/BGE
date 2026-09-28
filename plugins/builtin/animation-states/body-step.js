@@ -12,7 +12,7 @@
  */
 import { nextState, pickClip } from './machine.js'
 import { heldPose } from './held-items.js'
-import { actionOf, machineWith, upperBodyOf } from './graph.js'
+import { actionOf, armMaskOf, machineWith, upperBodyOf } from './graph.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { yawPitchRollOf } from '../game-maths/turns.js'
 
@@ -63,12 +63,21 @@ function stepMachine(entity, machine, random, setKey) {
   entity.rigRootTurn = Boolean(machine.states[entity.animationState]?.turns)
 }
 
-/** The mask nodes an action names: 'upper', 'all', or a list of nodes. Kept per skeleton, so a layer sees the same list each step. */
+/**
+ * The mask nodes an action names: 'upper', 'right-arm', 'left-arm', 'all', or
+ * a list of nodes. Kept per skeleton, so a layer sees the same list each step.
+ */
 const masks = new WeakMap()
 function maskOf(skeleton, mask) {
   if (Array.isArray(mask)) return mask
   if (!masks.has(skeleton)) {
-    masks.set(skeleton, { upper: upperBodyOf(skeleton, rolesOf(skeleton).chest), all: Object.keys(skeleton.nodes) })
+    const roles = rolesOf(skeleton)
+    masks.set(skeleton, {
+      upper: upperBodyOf(skeleton, roles.chest),
+      'right-arm': armMaskOf(skeleton, roles.chest, roles.right?.shoulder),
+      'left-arm': armMaskOf(skeleton, roles.chest, roles.left?.shoulder),
+      all: Object.keys(skeleton.nodes)
+    })
   }
   return masks.get(skeleton)[mask ?? 'upper']
 }
