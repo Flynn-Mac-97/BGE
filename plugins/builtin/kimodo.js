@@ -36,6 +36,9 @@ import { runHeadless } from '../../engine/headless-job.js'
 import { withPoseKeys } from './kimodo/pose-keys.js'
 import { restOf } from './rig-animation/clip-reading.js'
 import { compareDesign, designFromPoses, poseMenu } from './kimodo/poser.js'
+import { cutPreview, cutRows, openCut } from './kimodo/cut-board.js'
+import { ITEMS, editedRecord, holdFileOf, holdRows, holdSession, newHold } from './kimodo/hold-board.js'
+import { widenSkeleton } from './rig-animation/skeleton.js'
 
 const DESIGNS = 'assets/motion/designs'
 
@@ -76,7 +79,16 @@ const state = {
   copyNote: null,
   kimodoModels: [],
   thumbnails: new Map(),
-  isDrawingThumbnails: false
+  isDrawingThumbnails: false,
+  // The take list's scroll, kept because every redraw builds the side again.
+  sideScroll: 0,
+  // The take being cut on the cut board (kimodo/cut-board.js), or null.
+  cut: null,
+  // What the chosen take holds, and how (kimodo/hold-board.js).
+  hold: newHold(),
+  holdNote: '',
+  // The items with a hold record in the project, read when the takes are read.
+  items: []
 }
 
 /** One take as the panel lists it. */
@@ -136,8 +148,49 @@ async function viewTake(context, clip) {
     stageFor()
   }
   if (state.viewer && take.model) state.viewer.show({ model: take.model, clip: await context.rigAnimation.load(clip) })
+  if (state.viewer && take.model && state.hold.record) await holdOnView(context, take)
   context.redraw?.()
   return take
+}
+
+/** Hold `item` over `take`: its hold record read from its file, or nothing. */
+async function holdItem(context, take, item) {
+  const record = item === 'none' ? null : JSON.parse(await context.files.read(holdFileOf(item)))
+  state.hold = { item, record, edits: {} }
+  state.holdNote = ''
+  await holdOnView(context, take)
+  context.redraw?.()
+}
+
+/** Write the hold as the board shows it back to the item's file, and fold the grip edits into it. */
+async function saveHold(context) {
+  const record = editedRecord(state.hold)
+  const file = holdFileOf(state.hold.item)
+  await context.files.write(file, JSON.stringify(record, null, 2) + '\n')
+  state.hold = { ...state.hold, record, edits: {} }
+  state.holdNote = `Saved ${file}.`
+  context.redraw?.()
+}
+
+/** How long a take that plays once rests on its last frame before it plays again, as the viewer does. */
+const ONCE_REST_SECONDS = 0.6
+
+/** Play `take` in the view with the hold's item held over it, or plainly when it holds nothing. */
+async function holdOnView(context, take) {
+  const clip = await context.rigAnimation.load(take.clip)
+  if (!state.hold.record) {
+    state.viewer.show({ model: take.model, clip })
+    return
+  }
+  const skeletonFile = `motion/${take.folder}.skeleton.json`
+  const skeleton = widenSkeleton(JSON.parse(await context.files.read(`assets/${skeletonFile}`)), skeletonFile)
+  const started = performance.now() / 1000
+  const length = clip.count / clip.framesPerSecond
+  const clock = () => {
+    const passed = performance.now() / 1000 - started
+    return clip.loop ? passed : passed % (length + ONCE_REST_SECONDS)
+  }
+  state.viewer.edit(holdSession({ model: take.model, clip, skeleton, hold: state.hold, clock }))
 }
 
 /** Copy the take's file over `<as>.json` beside it, so every type that plays `as` plays this take. */
@@ -260,6 +313,19 @@ function chosenRows(ui, context) {
       { primary: Boolean(state.target) }
     ),
     ...(take.model ? [ui.button('Design on this take', () => context.run('kimodo.design', { clip: take.clip }))] : []),
+    ...(take.model ? [ui.button('Cut this take', () => cutFromBoard(context, take))] : []),
+    ...(take.model
+      ? holdRows(
+          ui,
+          state.hold,
+          state.items,
+          {
+            pickItem: item => holdItem(context, take, item).catch(error => (state.error = String(error?.message || error))),
+            save: () => saveHold(context)
+          },
+          state.holdNote
+        )
+      : []),
     ...copyRows(ui, context, take)
   ]
 }
@@ -414,6 +480,74 @@ async function rebaseBoard(context, change) {
   await openDesign(context, { ...design, ...change, base, ...cleared })
 }
 
+/** The side column: the design board, the cut board, or the list of takes. */
+function sideFor(ui, context, shown) {
+  if (state.board) return designSide(ui, context)
+  if (state.cut) return ui.stack(cutSide(ui, context), { pad: true })
+  return ui.stack(
+    [
+      ...studioRows(ui, context),
+      ...chosenRows(ui, context),
+      ...designListRows(ui, context),
+      ui.search({
+        value: state.filter,
+        placeholder: 'filter takes',
+        count: shown.length,
+        onChange: value => {
+          state.filter = value
+          context.redraw?.()
+        }
+      }),
+      ...(state.error && state.takes.length ? [ui.text(state.error, { dim: true })] : []),
+      takeGrid(ui, context, shown)
+    ],
+    { pad: true }
+  )
+}
+
+/** Load the whole take and open the cut board on it. A failure is shown on the take's rows. */
+async function cutFromBoard(context, take) {
+  try {
+    state.cut = openCut(take, await context.run('kimodo.full', { clip: take.clip }))
+    state.viewer?.show({ model: take.model, clip: state.cut.whole })
+  } catch (error) {
+    state.error = String(error?.message || error)
+  }
+  context.redraw?.()
+}
+
+/** The cut board's rows, with what each of its buttons does. */
+function cutSide(ui, context) {
+  const cut = state.cut
+  const show = (clip, at = null) => state.viewer?.show({ model: cut.model, clip, at })
+  const actions = {
+    showFrame: frame => show(cut.whole, frame / cut.whole.framesPerSecond),
+    showWhole: () => show(cut.whole),
+    showCut: () => show(cutPreview(cut)),
+    save: async () => {
+      cut.note = 'Saving…'
+      context.redraw?.()
+      try {
+        await context.run('kimodo.cut', { clip: cut.clip, first: cut.first, last: cut.last })
+        // The clip file changed under its old name, which the cache and the still both hold.
+        context.rigAnimation.forget()
+        state.thumbnails.delete(cut.clip)
+        state.cut = null
+        await context.run('kimodo.takes')
+        await context.run('kimodo.view', { clip: cut.clip })
+      } catch (error) {
+        cut.note = String(error?.message || error)
+        context.redraw?.()
+      }
+    },
+    close: async () => {
+      state.cut = null
+      await context.run('kimodo.view', { clip: cut.clip })
+    }
+  }
+  return cutRows(ui, cut, actions)
+}
+
 function panel(ui, context) {
   // Read once when the panel is first drawn; after that only Read or a use reads again.
   if (!state.hasRead) {
@@ -422,28 +556,14 @@ function panel(ui, context) {
   }
   const words = state.filter.toLowerCase()
   const shown = state.takes.filter(take => !words || `${take.clip} ${take.prompt}`.toLowerCase().includes(words))
-  const side = state.board
-    ? designSide(ui, context)
-    : ui.stack(
-        [
-          ...studioRows(ui, context),
-          ...chosenRows(ui, context),
-          ...designListRows(ui, context),
-          ui.search({
-            value: state.filter,
-            placeholder: 'filter takes',
-            count: shown.length,
-            onChange: value => {
-              state.filter = value
-              context.redraw?.()
-            }
-          }),
-          takeGrid(ui, context, shown)
-        ],
-        { pad: true }
-      )
+  const side = sideFor(ui, context, shown)
   // The side takes at most 40% so the view keeps room in a narrow dock.
   side.style.cssText += ';width:clamp(220px,40%,360px);flex:none;overflow:auto;height:100%'
+  if (!state.board && !state.cut) {
+    side.addEventListener('scroll', () => (state.sideScroll = side.scrollTop))
+    // A detached element cannot scroll, so the position is put back once it is drawn.
+    requestAnimationFrame(() => (side.scrollTop = state.sideScroll))
+  }
   const board = ui.row([ui.raw(stageFor()), side])
   // The row must fill the panel body, or the view has no height to fill.
   board.style.cssText += ';height:100%;align-items:stretch'
@@ -499,9 +619,11 @@ export default {
       run: async context => {
         try {
           state.takes = await readTakes(context)
-          state.designs = (await context.files.tree())
-            .map(item => item.path)
-            .filter(file => file.startsWith(`${DESIGNS}/`) && file.endsWith('.json'))
+          const paths = (await context.files.tree()).map(item => item.path)
+          state.designs = paths.filter(file => file.startsWith(`${DESIGNS}/`) && file.endsWith('.json'))
+          state.items = paths
+            .filter(file => file.startsWith(`${ITEMS}/`) && file.endsWith('.hold.json'))
+            .map(file => file.slice(ITEMS.length + 1, -'.hold.json'.length))
           if (isStudio() && context.shell) state.games = (await context.run('project.list')).names ?? []
           state.error = null
         } catch (error) {
@@ -573,6 +695,22 @@ export default {
         context.host
           ? (await takeFilesHalf()).deleteTake(context.host.project, options.clip)
           : runHeadless('kimodo.delete', options)
+    },
+    {
+      id: 'kimodo.full',
+      label: 'The whole take, to cut',
+      // args: {"clip":"motion/hero/take-a.json"}; answers { clip, frames, kept }, every frame Kimodo made
+      run: async (context, options = {}) =>
+        context.host ? (await takeFilesHalf()).fullTake(context.host.project, options.clip) : runHeadless('kimodo.full', options)
+    },
+    {
+      id: 'kimodo.cut',
+      label: 'Cut a take again',
+      // args: {"clip":"motion/hero/take-a.json","first":12,"last":57}; keeps capture frames first to last - 1
+      run: async (context, options = {}) =>
+        context.host
+          ? (await takeFilesHalf()).cutTake(context.host.project, options.clip, options.first, options.last)
+          : runHeadless('kimodo.cut', options)
     },
     {
       id: 'kimodo.models',

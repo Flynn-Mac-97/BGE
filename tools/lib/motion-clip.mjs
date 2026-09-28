@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { planRetarget, retargetFrame, captureWorldTurns, meanHeading, retargetOrder, neutralFor, multiply } from './retarget.mjs'
+import { planRetarget, retargetFrame, captureWorldTurns, headingOf, pointWithoutHeading, retargetOrder, neutralFor, multiply } from './retarget.mjs'
 
 /**
  * The skeletons kimodo.cpp emits: joint names, parent indices and bind-pose
@@ -46,7 +46,8 @@ const Z_UP_TO_Y_UP = [-Math.SQRT1_2, 0, 0, Math.SQRT1_2]
  * rig rests in a different pose and every frame needs the same correction.
  * `model` is a skeleton from `readModelSkeleton`. With it, the map is read by
  * `retarget.mjs`: each entry takes one joint, and rest poses decide the turn.
- * `cycle` keeps only the frames that loop best. `standing: false` measures the
+ * `cycle` keeps only the frames that loop best, or the `window`
+ * (`{ first, last }`, `last` not kept) a person chose. `standing: false` measures the
  * spine from the capture's straight bind rather than its standing stance.
  *
  * With a map, only the joints it names reach the clip — a rig with six hinges
@@ -56,7 +57,7 @@ export function buildClip({
   rotations, root, joints, frames,
   skeleton, map = null, upAxis = 'y', rootScale = 1,
   framesPerSecond = 30, loop = true, decimals = 4, name = 'clip', source = null,
-  model = null, cycle = false, standing = true
+  model = null, cycle = false, standing = true, window: chosenWindow = null
 }) {
   const names = SKELETONS[skeleton]?.names
   if (!names) throw new Error(`unknown skeleton ${skeleton} — one of ${Object.keys(SKELETONS).join(', ')}`)
@@ -80,7 +81,9 @@ export function buildClip({
     return upAxis === 'z' && index === 0 ? multiply(Z_UP_TO_Y_UP, turn) : turn
   }
   const readFrame = frame => names.map((_, index) => readJoint(frame, index))
-  const heading = model ? meanHeading(Array.from({ length: frames }, (_, frame) => readJoint(frame, 0))) : 0
+  // The first frame's heading: Kimodo starts every take facing forward and may
+  // turn during it, so a mean heading started a turning move askew.
+  const heading = model ? headingOf(readJoint(0, 0)) : 0
 
   for (let frame = 0; frame < frames; frame++) {
     const rootHeight = root ? (upAxis === 'z' ? root[frame * 3 + 2] : root[frame * 3 + 1]) * rootScale : null
@@ -108,26 +111,30 @@ export function buildClip({
     const position = upAxis === 'z'
       ? [root[at], root[at + 2], -root[at + 1]]
       : [root[at], root[at + 1], root[at + 2]]
-    outputRoot.push(position.map(value => round(value * rootScale)))
+    outputRoot.push(pointWithoutHeading(position, heading).map(value => round(value * rootScale)))
   }
 
-  const window = cycle ? loopWindow(outputRotations) : { first: 0, last: frames }
+  const window = chosenWindow ?? (cycle ? loopWindow(outputRotations) : { first: 0, last: frames })
   // A cycle's window ends one frame before the pose it returns to. That frame
-  // is kept only to close the loop, then dropped.
-  const loopRotations = cycle ? closeQuaternionLoop(outputRotations.slice(window.first, window.last + 1)) : outputRotations
-  const loopPositions = list => (cycle ? closeVectorLoop(list.slice(window.first, window.last + 1)) : list)
+  // is kept only to close the loop, then dropped. A clip that plays once keeps
+  // its window as it is.
+  const keptRotations = cycle
+    ? closeQuaternionLoop(outputRotations.slice(window.first, window.last + 1)).map(frame => frame.map(round))
+    : outputRotations.slice(window.first, window.last)
+  const keptPositions = list =>
+    cycle ? closeVectorLoop(list.slice(window.first, window.last + 1)).map(frame => frame.map(round)) : list.slice(window.first, window.last)
   return {
     name,
     framesPerSecond,
     loop,
     nodes: model ? [...plan, ...plan.followers].map(entry => entry.node) : wanted.map(one => one.node),
-    rotations: cycle ? loopRotations.map(frame => frame.map(round)) : loopRotations,
+    rotations: keptRotations,
     positions: Object.keys(outputPositions).length
-      ? Object.fromEntries(Object.entries(outputPositions).map(([node, list]) => [node, cycle ? loopPositions(list).map(frame => frame.map(round)) : list]))
+      ? Object.fromEntries(Object.entries(outputPositions).map(([node, list]) => [node, keptPositions(list)]))
       : null,
     root: outputRoot.length ? outputRoot.slice(window.first, window.last) : null,
     // The capture frames kept, so a clip frame can be matched to its source frame.
-    source: source && cycle ? { ...source, kept: [window.first, window.last] } : source
+    source: source && (cycle || chosenWindow) ? { ...source, kept: [window.first, window.last] } : source
   }
 }
 

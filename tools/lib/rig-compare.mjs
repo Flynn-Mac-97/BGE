@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SKELETONS } from './motion-clip.mjs'
-import { readModelSkeleton, captureWorldTurns, multiply, meanHeading, parentsFirst } from './retarget.mjs'
+import { readModelSkeleton, captureWorldTurns, multiply, headingOf, parentsFirst } from './retarget.mjs'
 import { readSource, modelFile } from './retarget-clips.mjs'
 
 export const COMPARE_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'rig-compare.py')
@@ -58,10 +58,9 @@ export function capturePose(source, skeleton, heading, facing, frame) {
 
 const pick = (pose, names) => Object.fromEntries(names.map(name => [name, pose[name]]))
 
-/** The capture's mean root facing, which the retarget removed. */
+/** The capture's root facing at its first frame, which the retarget removed. */
 export function captureHeading(source) {
-  return meanHeading(Array.from({ length: source.frames }, (_, frame) =>
-    Array.from(source.rotations.slice(frame * source.joints * 4, frame * source.joints * 4 + 4))))
+  return headingOf(Array.from(source.rotations.slice(0, 4)))
 }
 
 /** The clip frames to show: `frames` as given, or four spread evenly. */

@@ -170,3 +170,81 @@ test("a photo's pose keys the hands and feet, bends the knees its way, and keeps
     turned.keys[limb][0].value.forEach((value, axis) => assert.ok(Math.abs(value - keys[0].value[axis]) < 0.002, `${limb} faces forward`))
   }
 })
+
+test('a cut keeps exactly the frames chosen, and the whole take is still there to cut again', async () => {
+  const { cutTake, fullTake } = await import('../plugins/builtin/kimodo/take-files.mjs')
+  const take = 'motion/kimodo-mannequin/kimodo-idle.json'
+  const whole = fullTake(directory, take)
+  assert.equal(whole.clip.rotations.length, whole.frames, 'the whole take is every frame Kimodo made')
+  // A loop closes onto its last frame, so it plays last - first frames.
+  assert.deepEqual(cutTake(directory, take, 10, 70), { clip: take, frames: 60 })
+  assert.deepEqual(readJson(take).source.kept, [10, 70])
+  assert.equal(readJson(take).name, 'kimodo-idle')
+  assert.equal(fullTake(directory, take).clip.rotations.length, whole.frames)
+  assert.throws(() => cutTake(directory, take, 10, whole.frames), /within 0\.\./)
+})
+
+test('a held item locks each hand to its socket on the item, place and turn', async () => {
+  const { heldPose } = await import('../plugins/builtin/animation-states/held-items.js')
+  const { applyConstraints } = await import('../plugins/builtin/rig-animation/constraints.js')
+  const { widenSkeleton, placeOf } = await import('../plugins/builtin/rig-animation/skeleton.js')
+  const { widenClip, applyClip } = await import('../plugins/builtin/rig-animation.js')
+  const { multiply, rotate } = await import('../plugins/builtin/game-maths/turns.js')
+  const rig = widenSkeleton(skeleton, 'kimodo-mannequin.skeleton.json')
+  const idle = widenClip(clip, 'kimodo-idle.json')
+  const distanceOf = (first, second) => Math.hypot(...first.map((value, axis) => value - second[axis]))
+  const held = record => {
+    const entity = { id: 'held', pose: null, _rigTime: 0.3 }
+    applyClip(entity, idle, {})
+    const answer = heldPose({ record, skeleton: rig, pose: entity.pose, seconds: 0.3, memory: {} })
+    applyConstraints(entity, rig, answer.constraints, 1 / 60)
+    return { pose: entity.pose, attachment: answer.attachment }
+  }
+  const still = { stiffness: 0, damping: 0, sway: 0, swaySpeed: 0 }
+  const hilt = { turn: [0, 0, 1, 0] }
+  const greatsword = {
+    model: 'models/items/greatsword.glb',
+    hand: 'right',
+    points: { axis: [0, -1, 0], upAxis: [0, 0, 1], up: 'outward' },
+    grip: { sockets: { right: { ...hilt, position: [-0.1, -0.2, 0] }, left: { ...hilt, position: [0.1, -0.1, 0] } } },
+    guard: { distance: 0.25, height: -0.15, side: 0, pitch: 60, yaw: 0, roll: 0 },
+    motion: still
+  }
+  const { pose } = held(greatsword)
+  const chest = placeOf(rig, pose, 'Spine2')
+  const guard = [chest.position[0], chest.position[1] - 0.15, chest.position[2] + 0.25]
+  const right = placeOf(rig, pose, 'RightHand')
+  const handMiss = distanceOf(right.position, guard)
+  assert.ok(handMiss < 0.03, `the right hand is at the guard (off by ${handMiss.toFixed(3)} m)`)
+  // Where the item is, from the right hand and its socket; the left hand must be on the left socket, turned as it says.
+  const sockets = greatsword.grip.sockets
+  const itemTurn = multiply(right.turn, [0, 0, -1, 0])
+  const origin = right.position.map((value, axis) => value - rotate(itemTurn, sockets.right.position)[axis])
+  const leftSocket = origin.map((value, axis) => value + rotate(itemTurn, sockets.left.position)[axis])
+  const left = placeOf(rig, pose, 'LeftHand')
+  const leftMiss = distanceOf(left.position, leftSocket)
+  assert.ok(leftMiss < 0.03, `the left hand is on its socket (off by ${leftMiss.toFixed(3)} m)`)
+  const wanted = multiply(itemTurn, sockets.left.turn)
+  const alike = Math.abs(wanted.reduce((sum, value, axis) => sum + value * left.turn[axis], 0))
+  assert.ok(alike > 0.999, `the left hand is turned as its socket says (${alike.toFixed(4)})`)
+  const pitch = (60 * Math.PI) / 180
+  const pointing = rotate(chest.turn, [0, Math.sin(pitch), Math.cos(pitch)])
+  const blade = rotate(itemTurn, [0, -1, 0])
+  assert.ok(blade.reduce((sum, value, axis) => sum + value * pointing[axis], 0) > 0.999, 'the blade points by the pitch')
+
+  // A shield rides the forearm it is strapped to; the hand is still at the guard.
+  const shield = {
+    model: 'models/items/shield.glb',
+    hand: 'left',
+    grip: { mount: { on: 'forearm', position: [0.5, 0.066, 0], turn: [-0.5, -0.5, -0.5, 0.5] } },
+    elbow: [0.45, -0.6, 0.1],
+    guard: { distance: 0.3, height: 0.05, side: 0.12 },
+    motion: still
+  }
+  const strapped = held(shield)
+  assert.equal(strapped.attachment.node, 'LeftForeArm')
+  const shieldChest = placeOf(rig, strapped.pose, 'Spine2').position
+  const shieldGuard = [shieldChest[0] + 0.12, shieldChest[1] + 0.05, shieldChest[2] + 0.3]
+  const shieldMiss = distanceOf(placeOf(rig, strapped.pose, 'LeftHand').position, shieldGuard)
+  assert.ok(shieldMiss < 0.03, `the shield hand is at its guard (off by ${shieldMiss.toFixed(3)} m)`)
+})

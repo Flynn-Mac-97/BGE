@@ -82,3 +82,8 @@ test('Kimodo is sent each solved elbow and knee as a point, and no target as a j
   const kinds = kimodoRecord(keyed, 'idle').constraints.map(constraint => [constraint.kind, constraint.joint])
   assert.deepEqual(kinds, [['pose', undefined], ['point', 'RightElbow']])
 })
+
+test('a design that faces forward asks Kimodo for heading 0 at its first and last frame', () => {
+  const forward = kimodoRecord({ ...design, seconds: 3, fromBase: false, facesForward: true }, 'idle')
+  assert.deepEqual(forward.constraints, [{ kind: 'heading', keys: [{ at: 0, value: 0 }, { at: 89 / 30, value: 0 }] }])
+})

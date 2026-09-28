@@ -67,6 +67,27 @@ picking one plays it, and **Delete** (click twice) removes it.
 - `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
 - `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
 
+**hold** under a chosen take plays it with a sword, greatsword or shield held
+over it (`kimodo/hold-board.js`). The item is placed and aimed first (guard
+point from the chest, pitch, yaw, roll in the chest's space); each hand is
+then locked to its **socket** on the item, a place and a hand turn in the
+item's space, by a `reach` and an `orient`. A two-handed item has two
+sockets. A shield is a **mount** instead: it rides the forearm and the arm
+is posed by a reach and a pole. The grip sliders move each socket or the
+mount; **Save grip** writes `assets/models/items/<item>.grip.json`, which the
+board reads next time. A spring and sway move the item. The sliders are the settings a
+game would give those constraints; items are in the studio's
+`assets/models/items/`. Soma-30 has no finger bones, so a fist is not posed.
+
+A loop is cut where two poses match best, at least 24 frames apart; a slow
+move can come out as part of one step. **Cut this take** on the board shows
+the whole take with in and out sliders, plays the kept part, and saves it
+(`kimodo/cut-board.js`). The stored motion keeps every frame, so a take can
+be cut again.
+
+- `kimodo.full '{"clip":"motion/hero/take-a.json"}'` — every frame Kimodo made, and the cut it has now.
+- `kimodo.cut '{"clip":"motion/hero/take-a.json","first":12,"last":57}'` — keep capture frames 12 to 56; a loop goes back to frame 57.
+
 ## Design a move on the board
 
 **New move** on the board, or `kimodo.new`, opens a fresh design from words
@@ -107,6 +128,12 @@ design mode over a base take:
   `take-<name>` and plays it. From the page it runs in a headless engine the
   supervisor starts (`engine/headless-job.js`, route `/api/headless-job`).
 - No keys and "starts in the base pose" off: the take comes from the words alone.
+- `facesForward: true` in a design asks Kimodo for heading 0 at the first and
+  last frame (a `heading` constraint), so a take that turns while it plays
+  ends facing forward. Leave it off a turn move. Kimodo turns 5–70° in a take
+  without it.
+- The retarget removes the first frame's heading, where Kimodo faces forward,
+  and turns the root path by the same angle, so a walk goes straight ahead.
 
 - `kimodo.design '{"clip":"motion/fighter/idle.json"}'` — a new design on a take; `{"file":...}` opens a saved one.
 - `kimodo.designs` — the saved designs.

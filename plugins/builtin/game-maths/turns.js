@@ -69,3 +69,21 @@ export function blendTurns(from, onto, amount) {
   const size = Math.hypot(...mixed) || 1
   return mixed.map(value => value / size)
 }
+
+/**
+ * The turn that puts local axis `forward` along `aim`, then turns about `aim`
+ * until local axis `up` is as near `upAim` as it can be: a whole turn from two
+ * directions, as a camera or a hand on a hilt is placed. `up` is left where
+ * `forward` put it when `upAim` runs along `aim`.
+ */
+export function turnOnto(forward, up, aim, upAim) {
+  const pointed = turnBetween(forward, aim)
+  const axis = unit(aim)
+  const across = direction => direction.map((value, index) => value - axis[index] * dot(direction, axis))
+  const landed = across(rotate(pointed, up))
+  const wanted = across(upAim)
+  if (Math.hypot(...landed) < 1e-6 || Math.hypot(...wanted) < 1e-6) return pointed
+  // Opposite ups need a half turn about the aim; turnBetween would pick any axis across them.
+  const roll = dot(unit(landed), unit(wanted)) < -0.999999 ? [...axis, 0] : turnBetween(landed, wanted)
+  return multiply(roll, pointed)
+}

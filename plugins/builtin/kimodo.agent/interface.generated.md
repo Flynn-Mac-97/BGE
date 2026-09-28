@@ -1,4 +1,4 @@
-<!--a1c00184-->
+<!--40350419-->
 parsed from source
   plugin Kimodo
   category editor
@@ -10,6 +10,8 @@ parsed from source
   kimodo.new
   kimodo.key-pose
   kimodo.delete
+  kimodo.full
+  kimodo.cut
   kimodo.models
   kimodo.designs
   kimodo.save-design
@@ -21,5 +23,5 @@ parsed from source
   kimodo.compare
   kimodo.use
   kimodo.board
-  arguments kimodo.panel:;kimodo.takes:;kimodo.view: options = {};kimodo.design: options = {};kimodo.new:;kimodo.key-pose: options = {};kimodo.delete: options = {};kimodo.models:;kimodo.designs:;kimodo.save-design:;kimodo.generate: options = {};kimodo.studio:;kimodo.copy: options = {};kimodo.poses:;kimodo.pose: options = {};kimodo.compare: options = {};kimodo.use: options = {};kimodo.board:
-  source 670 lines
+  arguments kimodo.panel:;kimodo.takes:;kimodo.view: options = {};kimodo.design: options = {};kimodo.new:;kimodo.key-pose: options = {};kimodo.delete: options = {};kimodo.full: options = {};kimodo.cut: options = {};kimodo.models:;kimodo.designs:;kimodo.save-design:;kimodo.generate: options = {};kimodo.studio:;kimodo.copy: options = {};kimodo.poses:;kimodo.pose: options = {};kimodo.compare: options = {};kimodo.use: options = {};kimodo.board:
+  source 808 lines

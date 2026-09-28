@@ -15,6 +15,8 @@
  *       { "kind": "root" },                           the template's ground path and heading, every frame
  *       { "kind": "path", "heading": 0,               a ground path [x, z] as curve keys, every frame from the
  *         "keys": [{ "at": 0, "value": [0, 0] }, { "at": 3, "value": [0, 4.2] }] }   first key to the last
+ *       { "kind": "heading",                          the body heading in radians at these times, and
+ *         "keys": [{ "at": 0, "value": 0 }] }         nothing else: the ground point and pose stay free
  *       { "kind": "joint", "joint": "RightHand",      a hand or foot at these points
  *         "keys": [{ "at": 1, "value": [-0.5, 1.5, -0.05] }] }
  *       { "kind": "point", "joint": "RightElbow",     an elbow or knee at these points, its turn left free
@@ -123,6 +125,13 @@ const KINDS = {
       if (constraint.heading === undefined) continue
       keep(condition, frame, 3, Math.cos(constraint.heading))
       keep(condition, frame, 4, Math.sin(constraint.heading))
+    }
+  },
+  heading: (condition, constraint) => {
+    for (const key of constraint.keys) {
+      const [frame] = framesAt(condition, [key.at])
+      keep(condition, frame, 3, Math.cos(key.value))
+      keep(condition, frame, 4, Math.sin(key.value))
     }
   },
   joint: (condition, constraint) => {

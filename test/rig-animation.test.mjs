@@ -1079,3 +1079,26 @@ test('an aim request may carry its own forward axis, over the control\'s', () =>
   const plain = constraintsForControls(controls, { blade: { target: { model: [0, 1, 1] }, weight: 1 } })
   assert.deepEqual(plain.constraints[0].forward, [0, 0, 1])
 })
+
+test('a take that turns while it plays starts facing forward, and its path turns with the body', () => {
+  // The hips face 30 degrees left at the first frame and turn to 90; the root
+  // steps the way the first frame faces. A mean heading of 60 would start the
+  // clip askew, and an unturned path would leave the walk going sideways.
+  const soma = SKELETONS['soma-30']
+  const model = twistedCopyOf(soma)
+  const map = Object.fromEntries(soma.names.map(name => [name, { node: `bone-${name}` }]))
+  const frames = 5
+  const rotations = new Float32Array(frames * soma.names.length * 4)
+  for (let at = 3; at < rotations.length; at += 4) rotations[at] = 1
+  const start = Math.PI / 6
+  const root = []
+  for (let frame = 0; frame < frames; frame++) {
+    const angle = start + (frame / (frames - 1)) * (Math.PI / 3)
+    rotations.set([0, Math.sin(angle / 2), 0, Math.cos(angle / 2)], frame * soma.names.length * 4)
+    root.push(Math.sin(start) * frame * 0.5, 0.99, Math.cos(start) * frame * 0.5)
+  }
+  const clip = buildClip({ rotations, root: new Float32Array(root), joints: soma.names.length, frames, skeleton: 'soma-30', map, model, standing: false, cycle: false })
+  const [first, , , , last] = clip.root
+  assert.ok(Math.abs(last[0] - first[0]) < 1e-3, `the path goes straight ahead, not sideways (x moved ${last[0] - first[0]})`)
+  assert.ok(last[2] - first[2] > 1.9, 'the path goes forward along +Z')
+})

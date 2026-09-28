@@ -128,6 +128,7 @@ export function mountViewer(stage) {
     clip: null,
     nodes: new Map(),
     startedAt: 0,
+    heldAt: null,
     turn: Math.PI / 2,
     zoom: 1,
     height: 1.8,
@@ -364,7 +365,9 @@ export function mountViewer(stage) {
     const scale = node.getWorldScale(new THREE.Vector3()).x || 1
     held.mesh.scale.setScalar(1 / scale)
     held.mesh.position.set(...hold.position.map(value => value / scale))
-    held.mesh.rotation.set(...hold.rotation)
+    // A hold gives its turn as a rotation [x, y, z] (the design board) or a quaternion `turn` (the hold board).
+    if (hold.turn) held.mesh.quaternion.fromArray(hold.turn)
+    else held.mesh.rotation.set(...hold.rotation)
   }
 
   function frame(time) {
@@ -379,7 +382,7 @@ export function mountViewer(stage) {
       drawBody(session, seconds)
       holdItem(session.hold)
     } else {
-      pose(time / 1000 - view.startedAt)
+      pose(view.heldAt ?? time / 1000 - view.startedAt)
     }
     placeCamera()
     renderer.render(scene, camera)
@@ -487,11 +490,12 @@ export function mountViewer(stage) {
   })
 
   return {
-    /** Play `clip` on `model` from its start. */
-    show({ model, clip }) {
+    /** Play `clip` on `model` from its start, or hold it still at `at` seconds. */
+    show({ model, clip, at = null }) {
       this.stopEditing()
       useModel(model)
       view.clip = clip
+      view.heldAt = at
       view.startedAt = performance.now() / 1000
     },
     /** Pose and draw the designer's session instead of playing a take. */

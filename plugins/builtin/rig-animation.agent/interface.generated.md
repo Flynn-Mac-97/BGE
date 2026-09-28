@@ -1,4 +1,4 @@
-<!--f08e5c01-->
+<!--cc044dff-->
 parsed from source
   plugin Rig Animation
   category visuals
@@ -16,4 +16,4 @@ parsed from source
   input rig.pose: { type: 'object', properties: { type: { type: 'string', description: 'a rigged type in the level, such as player' }, clip: { type: 'string', description: 'the clip name the type declares' }, file: { type: 'string', description: 'or a clip file under assets/, such as a take' }, skeleton: { type: 'string', description: 'the skeleton file a clip file is for' }, at: { type: 'number', description: 'rig.pose only: seconds into the clip' } } };rig.faults: { type: 'object', properties: { type: { type: 'string', description: 'a rigged type in the level, such as player' }, clip: { type: 'string', description: 'the clip name the type declares' }, file: { type: 'string', description: 'or a clip file under assets/, such as a take' }, skeleton: { type: 'string', description: 'the skeleton file a clip file is for' }, at: { type: 'number', description: 'rig.pose only: seconds into the clip' } } }
   context rigAnimation
   systems fixed
-  source 480 lines
+  source 488 lines

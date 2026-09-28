@@ -19,6 +19,8 @@
  *     segments: [{ prompt, seconds }],  optional: several prompts in a row as one take, in
  *                                       place of prompt and seconds; no keys are used with them
  *     fromBase: true,                   start the take in the base take's first pose
+ *     facesForward: true,               optional: Kimodo keeps the body facing +Z at the first and last
+ *                                       frame, so a take that turns while it plays ends facing forward
  *     keys: { RightHand: [{ at: 0.6, value: [x, y, z], ease: 'sine-in-out' }], ... },
  *                                       hands, feet, and elbow and knee targets (POLES) by the same shape
  *     solved: { RightElbow: [{ at, value: [x, y, z] }], ... },   where the preview put each elbow and
@@ -165,5 +167,8 @@ export function kimodoRecord(design, template) {
     .map(([joint, keys]) => ({ kind: 'joint', joint, keys: keys.map(key => ({ at: key.at, value: key.value })) }))
   const points = Object.entries(design.solved ?? {}).map(([joint, keys]) => ({ kind: 'point', joint, keys }))
   const body = design.body?.length ? [{ kind: 'body', keys: design.body }] : []
-  return { template, constraints: [...start, ...joints, ...points, ...body] }
+  // The last frame is one before `seconds`, which is past the generation.
+  const lastFrame = Math.round(design.seconds * 30 - 1) / 30
+  const forward = design.facesForward ? [{ kind: 'heading', keys: [{ at: 0, value: 0 }, { at: lastFrame, value: 0 }] }] : []
+  return { template, constraints: [...start, ...joints, ...points, ...body, ...forward] }
 }

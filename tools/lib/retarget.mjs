@@ -69,7 +69,7 @@ function withoutHeading(turn, heading) {
 }
 
 /** The angle about Y that a turn faces +Z towards. */
-function headingOf(turn) {
+export function headingOf(turn) {
   const forward = rotate(turn, [0, 0, 1])
   return Math.atan2(forward[0], forward[2])
 }
@@ -324,16 +324,9 @@ export function captureWorldTurns(localTurns, skeleton, heading) {
   return world
 }
 
-/** The mean facing of a capture's root across all its frames. */
-export function meanHeading(rootTurns) {
-  let sine = 0
-  let cosine = 0
-  for (const turn of rootTurns) {
-    const heading = headingOf(turn)
-    sine += Math.sin(heading)
-    cosine += Math.cos(heading)
-  }
-  return Math.atan2(sine, cosine)
+/** A capture point turned by the removed heading, so the root path goes the way the body faces. */
+export function pointWithoutHeading(point, heading) {
+  return rotate([0, Math.sin(-heading / 2), 0, Math.cos(-heading / 2)], point)
 }
 
 /**

@@ -116,3 +116,10 @@ test('a body ground move shifts the ground point, and a foot keyed at that frame
   const foot = positionOf(row, 'LeftFoot')
   assert.deepEqual([foot[0] + row[0], foot[1], foot[2] + row[2]].map(value => Number(value.toFixed(4))), [1.1, 0.1, 2])
 })
+
+test('a heading key keeps only the heading at its frame, with no template', () => {
+  const { observed, mask } = motionCondition({ skeleton: 'soma-30', frames: 4, framesPerSecond: 2, template: null, record: { constraints: [{ kind: 'heading', keys: [{ at: 1.5, value: Math.PI / 2 }] }] } })
+  const kept = Array.from(mask).flatMap((value, slot) => (value ? [slot] : []))
+  assert.deepEqual(kept, [3 * WIDTH + 3, 3 * WIDTH + 4])
+  assert.ok(Math.abs(observed[3 * WIDTH + 3]) < 1e-6 && Math.abs(observed[3 * WIDTH + 4] - 1) < 1e-6, 'cos and sin of a quarter turn')
+})

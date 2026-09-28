@@ -95,6 +95,29 @@ export function readSource(directory) {
 }
 
 /**
+ * One stored motion built as a clip on a model, not written: `{ clip, chosen }`,
+ * `chosen` the bone map used. A loop is cut where it loops best unless
+ * `window` (`{ first, last }`, capture frames, `last` not kept) is given; `cycle`
+ * false keeps every frame, which is how a person sees the whole take to cut it.
+ */
+export function sourceClip({ project, model, name, loop = true, cycle = loop, window = null, map = null, framesPerSecond = 30 }) {
+  const file = modelFile(project, model)
+  const skeletonNodes = readModelSkeleton(file)
+  const directory = path.join(project, SOURCE_DIRECTORY, name)
+  const motion = readSource(directory)
+  const skeleton = skeletonFor(motion.joints)
+  if (!skeleton) throw new Error(`${name}: no known skeleton has ${motion.joints} joints`)
+  const modelName = path.basename(file, path.extname(file))
+  const chosen = map ? { rig: 'given', map, guessed: false } : findMap(skeleton, skeletonNodes, { project, modelName })
+  chosen.facing ??= planRetarget({ map: chosen.map, skeleton: SKELETONS[skeleton], model: skeletonNodes, neutral: neutralFor(skeleton) }).facing
+  const clip = buildClip({
+    ...motion, skeleton, map: chosen.map, model: skeletonNodes, cycle, loop, window, framesPerSecond, name,
+    source: { skeleton, prompt: readPrompt(directory), from: `${SOURCE_DIRECTORY}/${name}`, rig: chosen.rig, map: mapReference(project, chosen), facing: chosen.facing }
+  })
+  return { clip, chosen }
+}
+
+/**
  * Retarget named sources onto one model.
  *
  * `clips` is a list of source names, or all stored sources when left out.
@@ -103,27 +126,17 @@ export function readSource(directory) {
  */
 export function retargetSources({ project, model, clips = null, once = [], map = null, framesPerSecond = 30 }) {
   const file = modelFile(project, model)
-  const skeletonNodes = readModelSkeleton(file)
   const names = clips?.length ? clips : listSources(project).map(source => source.name)
   if (!names.length) throw new Error(`no stored motion in ${SOURCE_DIRECTORY} — generate some with tools/make-rig-clip.mjs --prompt`)
   const modelName = path.basename(file, path.extname(file))
   const written = []
   let chosen = null
   for (const name of names) {
-    const directory = path.join(project, SOURCE_DIRECTORY, name)
-    const motion = readSource(directory)
-    const skeleton = skeletonFor(motion.joints)
-    if (!skeleton) throw new Error(`${name}: no known skeleton has ${motion.joints} joints`)
-    chosen ||= map ? { rig: 'given', map, guessed: false } : findMap(skeleton, skeletonNodes, { project, modelName })
-    chosen.facing ??= planRetarget({ map: chosen.map, skeleton: SKELETONS[skeleton], model: skeletonNodes, neutral: neutralFor(skeleton) }).facing
-    const loop = !once.includes(name)
-    const clip = buildClip({
-      ...motion, skeleton, map: chosen.map, model: skeletonNodes, cycle: loop, loop, framesPerSecond, name,
-      source: { skeleton, prompt: readPrompt(directory), from: `${SOURCE_DIRECTORY}/${name}`, rig: chosen.rig, map: mapReference(project, chosen), facing: chosen.facing }
-    })
+    const built = sourceClip({ project, model, name, loop: !once.includes(name), map, framesPerSecond })
+    chosen ||= built.chosen
     const reference = `motion/${modelName}/${name}.json`
-    writeClip(path.join(project, 'assets', reference), clip)
-    written.push({ name, file: reference, frames: clip.rotations.length, nodes: clip.nodes.length })
+    writeClip(path.join(project, 'assets', reference), built.clip)
+    written.push({ name, file: reference, frames: built.clip.rotations.length, nodes: built.clip.nodes.length })
   }
   const skeleton = writeSkeleton({ project, model })
   return {

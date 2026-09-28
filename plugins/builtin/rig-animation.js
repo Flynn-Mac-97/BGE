@@ -126,6 +126,12 @@ export default {
         return point ? worldPointOf(entity, point) : null
       },
 
+      /** The type's skeleton (`rig.skeleton`), or null until it has loaded. */
+      skeletonOf(entity) {
+        const file = entity._definition.rig?.skeleton
+        return (file && read(context, file, widenSkeleton).value) ?? null
+      },
+
       /**
        * The rig as it stands this step, in world points: posed bones, and each
        * constraint's end, target, joint and pole (rig-animation/rig-view.js).
@@ -157,6 +163,8 @@ export default {
   },
 
   systems: [{
+    // Named, so a plugin that chooses the clip (Animation States) runs before it.
+    id: 'rig-animation',
     phase: 'fixed',
     run(world, seconds) {
       const state = worlds.get(world)

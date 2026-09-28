@@ -91,6 +91,9 @@ export function engineServerConfig({
     // the checkout, and slicing by the wrong root leaves an absolute path whose
     // own directories are then read as dot-directories.
     const base = full.startsWith(projectURL() + '/') ? projectURL() : PROJECT_ROOT_URL
+    // agent-runs/ is scratch with thousands of folders (browser profiles, run
+    // output); watching it held the server off its port for minutes.
+    if (full === `${PROJECT_ROOT_URL}/agent-runs` || full.startsWith(`${PROJECT_ROOT_URL}/agent-runs/`)) return false
     return !/(^|\/)\.[^/]/.test(full.slice(base.length))
   }
 
