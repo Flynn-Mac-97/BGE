@@ -10,7 +10,7 @@ import { clipFileOf, maskNodesOf } from './clip-names.js'
  * way. A node the clip also places (the hips) moves too, so a crouch in the
  * layer lowers the body and its feet stay on the floor.
  */
-function mixLayer(entity, clip, nodes, time, weight) {
+export function mixLayer(entity, clip, nodes, time, weight) {
   const { first, second, blend, isDone } = framesAt(clip, time)
   const sampled = [0, 0, 0, 1]
   for (const node of nodes) {

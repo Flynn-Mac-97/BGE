@@ -42,6 +42,21 @@ export function boardMotionOf(hold, record) {
 }
 
 /**
+ * The take a path action plays under its keys at `time` along `motion`, as
+ * the game plays it: `{ file, time }` in the take, or null. In a combo, the
+ * latest step that names a take keeps playing through the steps after it.
+ */
+export function legTakeOf(hold, motion, time) {
+  const actions = hold.set.record.actions
+  const steps = motion.steps ?? [{ name: hold.action, from: 0 }]
+  const step = steps.filter(each => each.from <= time && actions[each.name]?.clips?.length).at(-1)
+  if (!step) return null
+  const action = actions[step.name]
+  const folder = hold.set.record.folder
+  return { file: `${folder ? `${folder}/` : ''}${action.clips[0]}.json`, time: (time - step.from) * (action.speed ?? 1) }
+}
+
+/**
  * The picked track's keys; a path action's one list serves both tracks. A
  * track the action leaves out is made, still from start to end, so it can be
  * keyed.

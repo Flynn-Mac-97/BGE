@@ -22,7 +22,9 @@ import { FOLLOW, followOf, pathLineOf, recordAlong } from '../animation-states/g
 import { placeOf } from '../rig-animation/skeleton.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { liveSlider } from './live-slider.js'
-import { boardMotionOf, boardTimeOf, keyTimesOf, pathActionOf, pathRows } from './path-board.js'
+import { boardMotionOf, boardTimeOf, keyTimesOf, legTakeOf, pathActionOf, pathRows } from './path-board.js'
+import { mixLayer } from '../rig-animation/layer.js'
+import { upperBodyOf } from '../animation-states/graph.js'
 import { add } from '../game-maths/space.js'
 import { multiply, turnAbout } from '../game-maths/turns.js'
 
@@ -90,12 +92,17 @@ function keepLine(line, hold, record, motion, chest) {
 /**
  * A session the viewer draws (viewer.js `edit`): a take played on its model,
  * the board's item held over it. `hold` is read every frame, so a slider moves
- * the item as it is dragged.
+ * the item as it is dragged. `loadClip(file)` answers a promise of a clip, for
+ * the take a path action plays on the legs.
  */
-export function holdSession({ model, clip, skeleton, hold, clock }) {
+export function holdSession({ model, clip, skeleton, hold, clock, loadClip }) {
   const entity = { id: 'kimodo-hold', x: 0, y: 0, z: 0, yaw: 0, pose: null, _rigTime: 0 }
   const memory = {}
   const chestNode = rolesOf(skeleton).chest
+  const upper = upperBodyOf(skeleton, chestNode)
+  const lower = Object.keys(skeleton.nodes).filter(name => !upper.includes(name))
+  // Leg takes by file, loaded when an action first names one; null while it loads.
+  const takes = new Map()
   let hung = null
   // The drawn path, kept until its keys or the guard change, so the view does not rebuild it every frame.
   const line = { signature: '', guides: [] }
@@ -108,7 +115,16 @@ export function holdSession({ model, clip, skeleton, hold, clock }) {
       const record = editedRecord(hold)
       const acting = record && pathActionOf(hold)
       const motion = acting && boardMotionOf(hold, record)
-      const now = acting ? recordAlong(record, motion, boardTimeOf(hold, motion, seconds)) : record
+      const time = acting ? boardTimeOf(hold, motion, seconds) : 0
+      // The action's own take on the hips and legs, as the game plays it, once it has loaded.
+      const legs = acting && legTakeOf(hold, motion, time)
+      const legClip = legs && takes.get(legs.file)
+      if (legs && !takes.has(legs.file)) {
+        takes.set(legs.file, null)
+        loadClip(legs.file).then(loaded => takes.set(legs.file, loaded))
+      }
+      if (legClip) mixLayer(entity, legClip, lower, legs.time, 1)
+      const now = acting ? recordAlong(record, motion, time) : record
       const held = now && heldPose({ record: now, skeleton, pose: entity.pose, seconds, memory })
       hung = held?.attachment ?? null
       if (acting) keepLine(line, hold, record, motion, placeOf(skeleton, entity.pose, chestNode))

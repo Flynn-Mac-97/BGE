@@ -201,7 +201,7 @@ async function holdOnView(context, take) {
     const passed = performance.now() / 1000 - started
     return clip.loop ? passed : passed % (length + ONCE_REST_SECONDS)
   }
-  state.viewer.edit(holdSession({ model: take.model, clip, skeleton, hold: state.hold, clock }))
+  state.viewer.edit(holdSession({ model: take.model, clip, skeleton, hold: state.hold, clock, loadClip: file => context.rigAnimation.load(file) }))
 }
 
 /** Copy the take's file over `<as>.json` beside it, so every type that plays `as` plays this take. */
