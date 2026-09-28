@@ -114,7 +114,8 @@ function stepAction(entity, sets, skeleton, random, report) {
 
 /** Hold the entity's item this step, or let go of one it held. */
 function stepHold(entity, record, skeleton, machine, seconds) {
-  const weight = machine.states[entity.animationState]?.hold ?? 1
+  // `entity.holdWeight` (default 1) scales the whole hold: 0 shows the clip's own arms with the item still in the hand.
+  const weight = (machine.states[entity.animationState]?.hold ?? 1) * (entity.holdWeight ?? 1)
   const hands = entity._animationAction?.hands ?? {}
   const memory = (entity._heldMemory ??= {})
   const held = record && skeleton && entity.pose && heldPose({ record, skeleton, pose: entity.pose, seconds: entity._heldTime ?? 0, memory, weight, hands })
