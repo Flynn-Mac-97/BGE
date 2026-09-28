@@ -31,6 +31,7 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 - Facing comes from the feet. Unmapped deforming bones follow the nearest mapped bone.
 
 - Type keys: `rig.clips` (name → file), `rig.default` (first clip), `rig.rootMotion` (false: the clip's travel is not added), `rig.skeleton` (the file constraints need), `rig.constraints` (constraints every entity of the type keeps: planted feet), `rig.controls` (named limbs and aims game code moves with `entity.rigControls`). Choose by assigning `entity.rigClip`; there is no `play()`. `entity.rigSpeed` (default 1) plays the chosen clip faster or slower.
+- `entity.rigRootTurn = true` moves a once clip's turn of its root into `entity.yaw` as it plays and keeps the body square to it: a turn in place ends facing where it turned, with no snap (`rig-animation/root-turn.js`).
 - Move a body at the speed its clip travels, never at a number of your own: `context.rigAnimation.travelOf(entity, 'run')` is the clip's root speed in m/s (0 while it loads). Slow the body by a share and set `rigSpeed` to the same share, so the feet never slide.
 
 - Clips load asynchronously (a headless test awaits `rig.load`). A playing clip owns `entity.pose`. Unknown names hold the last pose. Switching `rigClip` crossfades from the old clip over `rig.clipFade` (0.2 s).

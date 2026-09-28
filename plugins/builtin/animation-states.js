@@ -56,6 +56,8 @@ function stepMachine(entity, machine, random) {
   const next = nextState(machine, entity.animationState, inputs)
   if (next !== entity.animationState) enter(entity, machine, next, random)
   if (entity._animationClip) entity.rigClip = entity._animationClip
+  // A turn in place: the clip's turn moves into the entity's facing (Rig Animation's root turn).
+  entity.rigRootTurn = Boolean(machine.states[entity.animationState]?.turns)
 }
 
 /** Hold the entity's item this step, or let go of one it held. */

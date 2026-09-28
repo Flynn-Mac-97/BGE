@@ -5,9 +5,14 @@
  * does not snap.
  */
 import { framesAt, mixInto } from './sample.js'
+import { multiply } from '../game-maths/turns.js'
 
-/** What `entity._rigFrom` holds when `file` stops being the base clip at clip time `time`. */
-export const crossfadeFrom = (file, time) => ({ file, time, weight: 1 })
+/**
+ * What `entity._rigFrom` holds when `file` stops being the base clip at clip
+ * time `time`. `rootTurn` is the turn root turn took off that clip's root
+ * (root-turn.js), taken off it again while it fades, or null.
+ */
+export const crossfadeFrom = (file, time, rootTurn = null) => ({ file, time, weight: 1, rootTurn })
 
 /**
  * Mix the clip left behind over the pose the new clip wrote, and step its time
@@ -30,7 +35,9 @@ export function applyCrossfade(entity, rig, seconds, clipOf) {
     const into = entity.pose[node]
     if (!into) return
     mixInto(sampled, clip.rotations[first], clip.rotations[second], index * 4, blend)
-    mixInto(into, into, sampled, 0, from.weight)
+    // The root is the first node; a turn that root turn moved into the entity's yaw stays off it.
+    const shown = index === 0 && from.rootTurn ? multiply(from.rootTurn, sampled) : sampled
+    mixInto(into, into, shown, 0, from.weight)
   })
   for (const node in clip.positions) {
     const into = entity.pose[node]

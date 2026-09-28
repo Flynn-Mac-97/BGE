@@ -18,7 +18,7 @@ animationStates: {
   states: {
     idle: { clips: ['idle-a', 'idle-b'] },        // one picked at random on entry
     walk: { clips: ['walk-a'] },
-    'turn-left': { clips: ['turn-left-a'], then: 'idle' },   // a once clip, then idle
+    'turn-left': { clips: ['turn-left-a'], then: 'idle', turns: true },   // once, then idle; the turn moves into entity.yaw
     dead: { clips: ['death-a'], hold: 0 }        // lets go of the held item
   },
   transitions: [                                 // priority order: the first that matches names the state

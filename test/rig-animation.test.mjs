@@ -1102,3 +1102,25 @@ test('a take that turns while it plays starts facing forward, and its path turns
   assert.ok(Math.abs(last[0] - first[0]) < 1e-3, `the path goes straight ahead, not sideways (x moved ${last[0] - first[0]})`)
   assert.ok(last[2] - first[2] > 1.9, 'the path goes forward along +Z')
 })
+
+test('root turn moves a clip\'s turn into the facing and keeps the body where it was drawn', async () => {
+  const { applyRootTurn, resetRootTurn } = await import('../plugins/builtin/rig-animation/root-turn.js')
+  const { applyClip } = await import('../plugins/builtin/rig-animation.js')
+  const { rotate } = await import('../plugins/builtin/game-maths/turns.js')
+  // The root turns a quarter to the left over ten frames, played once.
+  const rotations = Array.from({ length: 11 }, (_, frame) => {
+    const angle = ((frame / 10) * Math.PI) / 2
+    return [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)]
+  })
+  const clip = { nodes: ['hips'], rotations, count: 11, framesPerSecond: 10, loop: false, positions: null, root: null }
+  const entity = { id: 'turner', yaw: 0.3, pose: null, _rigTime: 0, rigRootTurn: true }
+  resetRootTurn(entity)
+  for (let frame = 0; frame <= 12; frame++) {
+    entity._rigTime = frame / 10
+    applyClip(entity, clip, {})
+    applyRootTurn(entity, clip)
+  }
+  assert.ok(Math.abs(entity.yaw - (0.3 + Math.PI / 2)) < 1e-3, `the facing turned a quarter (${entity.yaw})`)
+  const forward = rotate(entity.pose.hips.slice(0, 4), [0, 0, 1])
+  assert.ok(Math.abs(forward[0]) < 1e-3 && forward[2] > 0.999, 'the root is square to the new facing')
+})

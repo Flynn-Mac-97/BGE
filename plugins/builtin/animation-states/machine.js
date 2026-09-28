@@ -10,7 +10,8 @@
  *     states: {
  *       idle: { clips: ['idle-a', 'idle-b'] },       rig clip names; one is picked at random on entry
  *       walk: { clips: ['walk-a'] },
- *       'turn-left': { clips: ['turn-left-a'], then: 'idle' },   when a once clip ends, go to `then`
+ *       'turn-left': { clips: ['turn-left-a'], then: 'idle', turns: true },   when a once clip ends,
+ *                                                    go to `then`; `turns` moves the clip's turn into the facing
  *       dead: { clips: ['death-a'], hold: 0 }        `hold` 0 lets go of a held item here
  *     },
  *     transitions: [

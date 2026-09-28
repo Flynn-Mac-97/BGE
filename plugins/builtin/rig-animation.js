@@ -58,6 +58,7 @@ import { pointOf, worldPointOf } from './rig-animation/targets.js'
 import { constraintsForControls } from './rig-animation/controls.js'
 import { rigView } from './rig-animation/rig-view.js'
 import { faultsOfClip, poseOfClip } from './rig-animation/motion-review.js'
+import { applyRootTurn, resetRootTurn, rootTurnBack } from './rig-animation/root-turn.js'
 import { makeOnceReporter } from '../../engine/report-once.js'
 
 /** file -> { status, value, error }: a clip or a skeleton. Both files are immutable, so one cache serves every world. */
@@ -186,7 +187,8 @@ export default {
         const blendClip = blendFile ? read(state.context, blendFile).value : null
 
         if (entity._rigClipFile !== file) {
-          if (entity._rigClipFile) entity._rigFrom = crossfadeFrom(entity._rigClipFile, entity._rigTime)
+          if (entity._rigClipFile) entity._rigFrom = crossfadeFrom(entity._rigClipFile, entity._rigTime, rootTurnBack(entity))
+          resetRootTurn(entity)
           entity._rigClipFile = file
           entity._rigTime = 0
           entity._rigRootLast = null
@@ -196,6 +198,7 @@ export default {
         }
 
         applyClip(entity, clip, rig)
+        if (entity.rigRootTurn) applyRootTurn(entity, clip)
         applyBlend(entity, clip, blendClip)
         applyCrossfade(entity, rig, seconds, fromFile => read(state.context, fromFile).value)
         applyLayer(entity, rig, seconds, layerFile => read(state.context, layerFile).value)
