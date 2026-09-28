@@ -1,4 +1,4 @@
-<!--daf47ca0-->
+<!--995dba42-->
 parsed from source
   plugin Kimodo
   category editor
@@ -24,4 +24,4 @@ parsed from source
   kimodo.use
   kimodo.board
   arguments kimodo.panel:;kimodo.takes:;kimodo.view: options = {};kimodo.design: options = {};kimodo.new:;kimodo.key-pose: options = {};kimodo.delete: options = {};kimodo.full: options = {};kimodo.cut: options = {};kimodo.models:;kimodo.designs:;kimodo.save-design:;kimodo.generate: options = {};kimodo.studio:;kimodo.copy: options = {};kimodo.poses:;kimodo.pose: options = {};kimodo.compare: options = {};kimodo.use: options = {};kimodo.board:
-  source 821 lines
+  source 824 lines

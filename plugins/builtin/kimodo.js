@@ -148,6 +148,9 @@ async function viewTake(context, clip) {
     state.isOpen = true
     stageFor()
   }
+  // A take asked for is read from its file again: a headless generate, cut or bake in another process
+  // changes the file under the cache, and the view would play the old one.
+  context.rigAnimation.forget()
   if (state.viewer && take.model) state.viewer.show({ model: take.model, clip: await context.rigAnimation.load(clip) })
   if (state.viewer && take.model && state.hold.record) await holdOnView(context, take)
   context.redraw?.()

@@ -25,7 +25,7 @@ const turnAboutAxis = (axis, angle) => [...scaled(axis, Math.sin(angle / 2)), Ma
 const wrapped = angle => Math.atan2(Math.sin(angle), Math.cos(angle))
 
 /** Solve one wrist over the entity's pose. Answers why it could not, or null. */
-export default function solveWrist(entity, skeleton, wrist) {
+export default function solveWrist(entity, skeleton, wrist, { memory = {} } = {}) {
   const weight = Math.min(1, Math.max(0, Number(wrist.weight) || 0))
   if (weight === 0) return null
   const [name] = posedNames(skeleton, entity.pose, [wrist.node]) ?? []
@@ -38,11 +38,18 @@ export default function solveWrist(entity, skeleton, wrist) {
 
   const twistOf = turn => wrapped(2 * Math.atan2(dot(turn.slice(0, 3), axis), turn[3]))
   const deviation = multiply(local, inverse(rest))
+  // The twist is read on from the last step's, not wrapped to ±180°: a hand turning past 180° would
+  // otherwise flip the forearm's share from one side to the other in one step.
+  const wrappedTwist = twistOf(deviation)
+  const twist = memory.twist === undefined ? wrappedTwist : memory.twist + wrapped(wrappedTwist - memory.twist)
+  memory.twist = twist
   // The forearm rolls by its share about its own length; the hand turns back as much, so it stays where it was.
-  const roll = turnAboutAxis(axis, twistOf(deviation) * (wrist.share ?? 0.5) * weight)
+  const rollAngle = twist * (wrist.share ?? 0.5) * weight
+  const roll = turnAboutAxis(axis, rollAngle)
   const forearmTurn = multiply(entity.pose[forearm].slice(0, 4), roll)
   const left = multiply(inverse(roll), deviation)
-  const leftTwist = twistOf(left)
+  // A turn about the same axis shifts the twist by exactly its angle, so what is left needs no new wrap.
+  const leftTwist = twist - rollAngle
   const heldTwist = Math.max(-(wrist.twist ?? 70) * DEGREES, Math.min((wrist.twist ?? 70) * DEGREES, leftTwist))
   const swing = multiply(left, inverse(turnAboutAxis(axis, leftTwist)))
   const bend = 2 * Math.acos(Math.min(1, Math.abs(swing[3])))

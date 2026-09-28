@@ -64,7 +64,8 @@ picking one plays it, and **Delete** (click twice) removes it.
 - `kimodo.takes` — every clip, its prompt, frames and length. **Read** after a new take.
 - `kimodo.delete '{"clip":"motion/<model>/take-a.json"}'` — delete a take and, unless another clip names it, its stored motion.
 - `rig.faults '{"file":"motion/<model>/take-<move>-<id>.json","skeleton":"motion/<model>.skeleton.json"}'` — judge a take before using it (Rig Animation's `judging-a-clip.md`).
-- `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board.
+- `kimodo.view '{"clip":"motion/hero/take-slash-a.json"}'` — play one on the board. It reads the file again
+  each time, so a take changed by a headless run or a script shows as it is now.
 - `kimodo.use '{"clip":"motion/hero/take-slash-a.json","as":"slash"}'` — make it the clip.
 
 **hold** under a chosen take plays it with a sword, greatsword or shield held
