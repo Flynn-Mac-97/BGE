@@ -3,7 +3,8 @@
  *
  * It is not the game viewport. The model stands alone on a grid, seen from the
  * side, so a take is judged on the body alone, with no level, camera rule or
- * gear in the way. Drag turns the view about the model.
+ * gear in the way. Drag turns the view about the model and tilts it up and
+ * down; the wheel zooms in and out.
  *
  * A clip that plays once holds its last frame for HOLD_SECONDS and starts
  * again, so an attack can be watched over and over.
@@ -48,6 +49,10 @@ const GUIDE_COLOURS = { path: '#ff8a3d', key: '#ff8a3d', picked: '#ffd84a', tick
 /** Body line colours: where the body keys ask the spine to be, and where it is. */
 const BODY_COLOURS = { target: '#ffffff', reached: '#4ad8ff' }
 const TURN_PER_PIXEL = 0.01
+/** How far the wheel zooms: out to see a long swing whole, in to see the hands. */
+const ZOOM = { out: 0.4, in: 3 }
+/** How far an up-and-down drag tilts the view, in radians: a little from below to nearly straight down. */
+const TILT = { low: -0.3, high: 1.3 }
 
 /** Each handle shape's geometry, made when a handle first needs it. */
 const HANDLE_SHAPES = {
@@ -132,6 +137,7 @@ export function mountViewer(stage) {
     startedAt: 0,
     heldAt: null,
     turn: Math.PI / 2,
+    tilt: 0,
     zoom: 1,
     height: 1.8,
     lift: 0,
@@ -148,9 +154,10 @@ export function mountViewer(stage) {
     // Far enough that the whole body and a margin fit, in a tall view as well as a wide one.
     const halfView = Math.tan((camera.fov * Math.PI) / 360)
     const distance = (view.height * 0.7) / halfView / Math.min(camera.aspect, 1) / view.zoom
-    // Zoomed in, the view looks at the chest, where the hands work.
-    const lookHeight = view.height * (0.72 - 0.22 / view.zoom)
-    camera.position.set(Math.sin(view.turn) * distance, lookHeight + view.height * 0.1, Math.cos(view.turn) * distance)
+    // Zoomed in, the view looks at the chest, where the hands work; zoomed out, at the middle of the body.
+    const lookHeight = view.height * (0.72 - 0.22 / Math.max(view.zoom, 1))
+    const level = Math.cos(view.tilt) * distance
+    camera.position.set(Math.sin(view.turn) * level, lookHeight + view.height * 0.1 + Math.sin(view.tilt) * distance, Math.cos(view.turn) * level)
     camera.lookAt(0, lookHeight, 0)
   }
 
@@ -443,7 +450,7 @@ export function mountViewer(stage) {
     'wheel',
     event => {
       event.preventDefault()
-      view.zoom = Math.max(1, Math.min(3, view.zoom * Math.exp(-event.deltaY * 0.001)))
+      view.zoom = Math.max(ZOOM.out, Math.min(ZOOM.in, view.zoom * Math.exp(-event.deltaY * 0.001)))
     },
     { passive: false }
   )
@@ -452,7 +459,7 @@ export function mountViewer(stage) {
     const meshes = [...handleMeshes.values()].filter(mesh => mesh.visible)
     const hit = view.session && aim(event).intersectObjects(meshes)[0]
     if (!hit) {
-      drag = { turnFrom: event.clientX }
+      drag = { turnFrom: event.clientX, tiltFrom: event.clientY }
       return
     }
     const handle = hit.object.userData.handle
@@ -472,7 +479,9 @@ export function mountViewer(stage) {
       return
     }
     view.turn -= (event.clientX - drag.turnFrom) * TURN_PER_PIXEL
+    view.tilt = Math.max(TILT.low, Math.min(TILT.high, view.tilt + (event.clientY - drag.tiltFrom) * TURN_PER_PIXEL))
     drag.turnFrom = event.clientX
+    drag.tiltFrom = event.clientY
   })
   canvas.addEventListener('pointerup', event => {
     if (drag?.handle) {
