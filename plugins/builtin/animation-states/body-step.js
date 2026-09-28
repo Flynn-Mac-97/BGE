@@ -13,6 +13,7 @@
 import { nextState, pickClip } from './machine.js'
 import { heldPose } from './held-items.js'
 import { actionOf, armMaskOf, machineWith, upperBodyOf } from './graph.js'
+import { guardAt, guardCurveOf } from './guard-path.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { yawPitchRollOf } from '../game-maths/turns.js'
 
@@ -87,22 +88,26 @@ function maskOf(skeleton, mask) {
  * read) as a layer over the state, or end the one playing when its clip is
  * done. An action the on sets do not give is let go of, and said once.
  */
-function stepAction(entity, sets, skeleton, random, report) {
+function stepAction(entity, sets, skeleton, random, report, seconds) {
   const asked = entity.animationAction
   entity.animationAction = null
   const playing = entity._animationAction
-  if (playing && entity.rigLayerDone) {
+  if (playing?.path) playing.time += seconds
+  const isPathDone = playing?.path && playing.time > playing.path.at(-1).at
+  if (playing && (isPathDone || (!playing.path && entity.rigLayerDone))) {
     entity._animationAction = null
     entity.rigLayer = null
   }
   if (!asked || entity._animationAction || !skeleton) return
   const action = actionOf(sets, asked)
-  if (!action?.clips?.length) {
+  if (!action?.path?.length && !action?.clips?.length) {
     report(`no set that is on gives the action "${asked}"`)
     return
   }
+  // A path action moves the held item; its hands stay locked to the item unless it says otherwise.
+  entity._animationAction = { name: asked, hands: action.hold ?? {}, path: action.path ?? null, time: 0, curve: null }
+  if (!action.clips?.length) return
   entity._animationActionCount = (entity._animationActionCount ?? 0) + 1
-  entity._animationAction = { name: asked, hands: action.hold ?? {} }
   entity.rigLayer = {
     clip: action.clips[Math.min(action.clips.length - 1, Math.floor(random() * action.clips.length))],
     mask: maskOf(skeleton, action.mask),
@@ -112,13 +117,22 @@ function stepAction(entity, sets, skeleton, random, report) {
   entity.rigLayerDone = false
 }
 
+/** The hold record this step: during a path action, its guard moved along the path, with no spring or sway to lag it. */
+function recordNow(entity, record) {
+  const acting = entity._animationAction
+  if (!record || !acting?.path) return record
+  acting.curve ??= guardCurveOf(acting.path, record.guard)
+  return { ...record, guard: guardAt(acting.curve, acting.time), motion: { ...record.motion, stiffness: 0, sway: 0 } }
+}
+
 /** Hold the entity's item this step, or let go of one it held. */
 function stepHold(entity, record, skeleton, machine, seconds) {
   // `entity.holdWeight` (default 1) scales the whole hold: 0 shows the clip's own arms with the item still in the hand.
   const weight = (machine.states[entity.animationState]?.hold ?? 1) * (entity.holdWeight ?? 1)
   const hands = entity._animationAction?.hands ?? {}
   const memory = (entity._heldMemory ??= {})
-  const held = record && skeleton && entity.pose && heldPose({ record, skeleton, pose: entity.pose, seconds: entity._heldTime ?? 0, memory, weight, hands })
+  const now = recordNow(entity, record)
+  const held = now && skeleton && entity.pose && heldPose({ record: now, skeleton, pose: entity.pose, seconds: entity._heldTime ?? 0, memory, weight, hands })
   entity._heldTime = (entity._heldTime ?? 0) + seconds
   if (!held) {
     if (!entity._isHolding) return
@@ -146,7 +160,7 @@ export function stepBody({ entity, readJson, skeletonOf, random, seconds, report
   const machine = machineWith(graph, sets)
   const skeleton = skeletonOf(entity)
   stepMachine(entity, machine, random, `${names.join(',')}:${sets.length}`)
-  stepAction(entity, sets, skeleton, random, report)
+  stepAction(entity, sets, skeleton, random, report, seconds)
   stepHold(entity, record, skeleton, machine, seconds)
   return machine
 }

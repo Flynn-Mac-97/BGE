@@ -91,3 +91,12 @@ test('sets lay their states over the graph, later sets winning, and give actions
   const skeleton = { nodes: { Hips: { parent: null }, Spine: { parent: 'Hips' }, Spine2: { parent: 'Spine' }, Arm: { parent: 'Spine2' }, Leg: { parent: 'Hips' } } }
   assert.deepEqual(upperBodyOf(skeleton, 'Spine2'), ['Spine', 'Spine2', 'Arm'])
 })
+
+test('a path action moves the guard through its keys, each missing field the item\'s own', async () => {
+  const { guardAt, guardCurveOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const guard = { distance: 0.3, height: -0.2, side: 0.22, pitch: 45, yaw: 0, roll: 0 }
+  const curve = guardCurveOf([{ at: 0, guard: {} }, { at: 0.5, guard: { height: 0.4, yaw: -60 } }, { at: 1, guard: {} }], guard)
+  assert.deepEqual(guardAt(curve, 0), guard)
+  assert.deepEqual(guardAt(curve, 0.5), { ...guard, height: 0.4, yaw: -60 })
+  assert.deepEqual(guardAt(curve, 1), guard)
+})

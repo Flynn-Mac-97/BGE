@@ -10,6 +10,10 @@ The full contracts are at the top of the code; this is where to look.
 - Scaffold names and the inputs its transitions read: `animation-states/scaffold.js`.
 - What `animation.graph` checks: `animation-states/report.js`.
 
-An action: `{ clips, mask, hold: { holding, other }, speed }`; `mask` is 'upper', 'right-arm' or 'left-arm' (the spine and one arm, so a one-handed swing leaves the other arm to the state), 'all', or a list of nodes.
+An action plays a take or follows a path. A path action, `{ path: [{ at, guard, ease }] }`,
+moves the held item's guard through keys and the hands stay locked to it
+(`animation-states/guard-path.js`): nothing in a take can break it, and a
+swing is tuned by editing numbers. A take action:
+`{ clips, mask, hold: { holding, other }, speed }`; `mask` is 'upper', 'right-arm' or 'left-arm' (the spine and one arm, so a one-handed swing leaves the other arm to the state), 'all', or a list of nodes.
 While it plays, `acting` is an input the graph can read, so a transition can
 stop a sprint during an attack.
