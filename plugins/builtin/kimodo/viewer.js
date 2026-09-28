@@ -27,7 +27,9 @@
  * node, in its space in metres and radians. `guides(seconds)`, if given,
  * answers `[{ handle, keys, path, target }]` (designer.js `guidesAt`): the
  * viewer draws the path and keys, and a ring at `target` joined to the handle,
- * so a key the limb cannot reach shows as a gap. `body(seconds)`, if given,
+ * so a key the limb cannot reach shows as a gap. A guide may also give
+ * `ticks`, points drawn as small white marks (closer marks are slower
+ * motion), and `picked`, the index of the key drawn yellow. `body(seconds)`, if given,
  * answers `{ target: { hips, chest, head, look }, reached: { hips, chest,
  * head } }` or null (body-rig.js): the viewer draws the body keys as a white
  * line through hips, chest and head with a look arrow, and the body as it is
@@ -42,7 +44,7 @@ const HOLD_SECONDS = 0.6
 /** A handle's colour by how it looks: picked, keyed, or not yet keyed. */
 const HANDLE_COLOURS = { selected: '#ffd84a', keyed: '#ff8a3d', free: '#4ad8ff' }
 /** Guide colours: the keys and the path between them, and where a handle is asked to be now. */
-const GUIDE_COLOURS = { path: '#ff8a3d', key: '#ff8a3d', target: '#ffffff' }
+const GUIDE_COLOURS = { path: '#ff8a3d', key: '#ff8a3d', picked: '#ffd84a', tick: '#ffffff', target: '#ffffff' }
 /** Body line colours: where the body keys ask the spine to be, and where it is. */
 const BODY_COLOURS = { target: '#ffffff', reached: '#4ad8ff' }
 const TURN_PER_PIXEL = 0.01
@@ -245,6 +247,12 @@ export function mountViewer(stage) {
       child.geometry.dispose()
       child.removeFromParent()
     }
+    const markAt = (point, size, colour) => {
+      const cube = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), overlayMaterial(THREE.MeshBasicMaterial, colour))
+      cube.position.copy(lifted(point))
+      cube.renderOrder = 9
+      guideParts.paths.add(cube)
+    }
     for (const guide of guides) {
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(guide.path.map(lifted)),
@@ -252,15 +260,8 @@ export function mountViewer(stage) {
       )
       line.renderOrder = 9
       guideParts.paths.add(line)
-      for (const key of guide.keys) {
-        const cube = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 0.03, 0.03),
-          overlayMaterial(THREE.MeshBasicMaterial, GUIDE_COLOURS.key)
-        )
-        cube.position.copy(lifted(key))
-        cube.renderOrder = 9
-        guideParts.paths.add(cube)
-      }
+      for (const tick of guide.ticks ?? []) markAt(tick, 0.012, GUIDE_COLOURS.tick)
+      guide.keys.forEach((key, index) => markAt(key, 0.03, index === guide.picked ? GUIDE_COLOURS.picked : GUIDE_COLOURS.key))
     }
   }
 
@@ -286,7 +287,7 @@ export function mountViewer(stage) {
   /** Draw the session's guides at `seconds`; `handles` are where the limbs reached. */
   function drawGuides(session, seconds, handles) {
     const guides = session.guides?.(seconds) ?? []
-    const signature = JSON.stringify(guides.map(guide => [guide.keys, guide.path.at(-1), view.lift]))
+    const signature = JSON.stringify(guides.map(guide => [guide.keys, guide.path.at(-1), guide.picked, view.lift]))
     if (signature !== guideParts.signature) {
       guideParts.signature = signature
       buildGuidePaths(guides)

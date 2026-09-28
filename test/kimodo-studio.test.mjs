@@ -248,3 +248,35 @@ test('a held item locks each hand to its socket on the item, place and turn', as
   const shieldMiss = distanceOf(placeOf(rig, strapped.pose, 'LeftHand').position, shieldGuard)
   assert.ok(shieldMiss < 0.03, `the shield hand is at its guard (off by ${shieldMiss.toFixed(3)} m)`)
 })
+
+test('a path action turns the spine by its share of the item\'s yaw, and the hips stay', async () => {
+  const { followOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const { applyConstraints } = await import('../plugins/builtin/rig-animation/constraints.js')
+  const { placeOf, widenSkeleton } = await import('../plugins/builtin/rig-animation/skeleton.js')
+  const widened = widenSkeleton(skeleton, 'kimodo-mannequin.skeleton.json')
+  const roles = rolesOf(widened)
+  const entity = { id: 'follow', pose: Object.fromEntries(Object.entries(skeleton.nodes).map(([name, node]) => [name, [...node.rotation, ...node.position]])) }
+  const before = { hips: placeOf(widened, entity.pose, roles.hips).turn, chest: placeOf(widened, entity.pose, roles.chest).turn }
+  const follow = followOf(widened, { yaw: 60, pitch: 45 }, { yaw: 0, pitch: 45 }, 0.5)
+  assert.ok(!follow.nodes.includes(roles.hips) && follow.nodes.at(-1) === roles.chest)
+  applyConstraints(entity, widened, [follow], 1 / 60)
+  assert.deepEqual(placeOf(widened, entity.pose, roles.hips).turn, before.hips)
+  const chestTurn = multiply(placeOf(widened, entity.pose, roles.chest).turn, inverse(before.chest))
+  const front = turned(chestTurn, [0, 0, 1])
+  assert.ok(Math.abs(Math.atan2(front[0], front[2]) - (30 * Math.PI) / 180) < 0.01, 'the chest turns half the item\'s 60 degrees')
+})
+
+test('a drawn path ends at the tip, the item\'s length from the hand, and a set saves as it was read', async () => {
+  const { pathLineOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const { setText } = await import('../plugins/builtin/kimodo/path-board.js')
+  const record = { hand: 'right', points: { axis: [0, -1, 0], upAxis: [0, 0, 1], up: 'outward' }, grip: { sockets: { right: { position: [0, 0, 0] } } }, guard: { distance: 0.3, height: 0, side: 0.2, pitch: 0, yaw: 0, roll: 0 }, length: 0.8 }
+  const path = [{ at: 0, guard: {} }, { at: 0.3, guard: { pitch: 90 } }]
+  const line = pathLineOf(record, path, { position: [0, 1.4, 0], turn: [0, 0, 0, 1] })
+  assert.equal(line.keys.length, 2)
+  assert.deepEqual(line.keys[0].map(value => Number(value.toFixed(6))), [-0.2, 1.4, 1.1], 'pointing ahead, the tip is 0.8 m in front of the hand')
+  assert.deepEqual(line.keys[1].map(value => Number(value.toFixed(6))), [-0.2, 2.2, 0.3], 'pointing up, the tip is 0.8 m above it')
+  const set = { actions: { attack: { path, body: 0.4 } } }
+  const text = setText(set)
+  assert.deepEqual(JSON.parse(text), set)
+  assert.ok(text.includes('{"at":0.3,"guard":{"pitch":90}}'), 'each key on one line')
+})

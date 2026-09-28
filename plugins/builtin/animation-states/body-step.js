@@ -13,7 +13,7 @@
 import { nextState, pickClip } from './machine.js'
 import { heldPose } from './held-items.js'
 import { actionOf, armMaskOf, machineWith, upperBodyOf } from './graph.js'
-import { guardAt, guardCurveOf } from './guard-path.js'
+import { FOLLOW, followOf, guardCurveOf, recordAlong } from './guard-path.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { yawPitchRollOf } from '../game-maths/turns.js'
 
@@ -105,7 +105,7 @@ function stepAction(entity, sets, skeleton, random, report, seconds) {
     return
   }
   // A path action moves the held item; its hands stay locked to the item unless it says otherwise.
-  entity._animationAction = { name: asked, hands: action.hold ?? {}, path: action.path ?? null, time: 0, curve: null }
+  entity._animationAction = { name: asked, hands: action.hold ?? {}, path: action.path ?? null, body: action.body ?? FOLLOW, time: 0, curve: null }
   if (!action.clips?.length) return
   entity._animationActionCount = (entity._animationActionCount ?? 0) + 1
   entity.rigLayer = {
@@ -122,7 +122,7 @@ function recordNow(entity, record) {
   const acting = entity._animationAction
   if (!record || !acting?.path) return record
   acting.curve ??= guardCurveOf(acting.path, record.guard)
-  return { ...record, guard: guardAt(acting.curve, acting.time), motion: { ...record.motion, stiffness: 0, sway: 0 } }
+  return recordAlong(record, acting.curve, acting.time)
 }
 
 /** Hold the entity's item this step, or let go of one it held. */
@@ -143,7 +143,10 @@ function stepHold(entity, record, skeleton, machine, seconds) {
   }
   const { model, node, position, turn } = held.attachment
   entity.attachments = { ...entity.attachments, held: { model, node, position, rotation: yawPitchRollOf(turn) } }
-  entity.rigConstraints = held.constraints
+  // During a path action the spine turns after the item first, then the hands reach it.
+  const acting = entity._animationAction
+  const follow = acting?.path ? followOf(skeleton, now.guard, record.guard, acting.body) : null
+  entity.rigConstraints = [...(follow ? [{ ...follow, weight: follow.weight * weight }] : []), ...held.constraints]
   entity._isHolding = true
 }
 

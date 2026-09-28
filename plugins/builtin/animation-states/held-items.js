@@ -27,7 +27,9 @@
  *                                        for the holding side; the other side is mirrored
  *     guard: { distance, height, side, pitch, yaw, roll },   metres from the chest, degrees
  *     motion: { stiffness, damping, sway, swaySpeed },       the spring (0 stiffness: none)
- *     weight: 1                          0 leaves the clip's hands, 1 holds fully
+ *     weight: 1,                         0 leaves the clip's hands, 1 holds fully
+ *     length?: 0.95                      sockets only: metres from the item's origin to its tip
+ *                                        along `points.axis`, where a drawn path (guard-path.js) follows
  *   }
  * Socket and mount numbers fit the rig they were set on; each rig's hands
  * differ, so an item set on one rig needs its grip set again on another.
@@ -57,22 +59,27 @@ const elbowOf = (record, side) => {
   return [Math.abs(x) * OUTWARD[side], y, z]
 }
 
+/** The way the item points in the chest's space, a unit direction, by the guard's pitch and yaw. */
+function pointingIn(guard) {
+  const [pitchAngle, yawAngle] = [(guard.pitch ?? 0) * DEGREES, (guard.yaw ?? 0) * DEGREES]
+  return [Math.sin(yawAngle) * Math.cos(pitchAngle), Math.sin(pitchAngle), Math.cos(yawAngle) * Math.cos(pitchAngle)]
+}
+
 /**
  * The item's turn in model space: its axis along the guard's pitch and yaw,
  * its up axis toward the body's outside or up, rolled about the way it
  * points, all in the chest's space.
  */
-function itemTurnOf(record, chestTurn) {
-  const { pitch = 0, yaw = 0, roll = 0 } = record.guard
-  const [pitchAngle, yawAngle, rollAngle] = [pitch * DEGREES, yaw * DEGREES, roll * DEGREES]
-  const pointing = [Math.sin(yawAngle) * Math.cos(pitchAngle), Math.sin(pitchAngle), Math.cos(yawAngle) * Math.cos(pitchAngle)]
+export function itemTurnOf(record, chestTurn) {
+  const rollAngle = (record.guard.roll ?? 0) * DEGREES
+  const pointing = pointingIn(record.guard)
   const upward = record.points.up === 'up' ? [0, 1, 0] : [OUTWARD[record.hand], 0, 0]
   const rolled = rotate([...scaled(unit(pointing), Math.sin(rollAngle / 2)), Math.cos(rollAngle / 2)], upward)
   return turnOnto(record.points.axis, record.points.upAxis, rotate(chestTurn, pointing), rotate(chestTurn, rolled))
 }
 
 /** Where the holding hand is asked to be, in model space, before the spring. */
-function guardPoint(record, chest, seconds) {
+export function guardPoint(record, chest, seconds) {
   const { distance = 0.3, height = 0, side = 0.2 } = record.guard
   const { sway = 0, swaySpeed = 0 } = record.motion ?? {}
   const phase = seconds * swaySpeed * 2 * Math.PI

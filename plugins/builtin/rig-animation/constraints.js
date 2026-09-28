@@ -17,11 +17,12 @@ import solveReach from './solvers/reach.js'
 import solveLookAt from './solvers/look-at.js'
 import solvePlant from './solvers/plant.js'
 import solveOrient from './solvers/orient.js'
+import solveTwist from './solvers/twist.js'
 
 const reportOnce = makeOnceReporter().report
 
 /** Every solver by kind. */
-const SOLVERS = { reach: solveReach, lookAt: solveLookAt, orient: solveOrient, plant: solvePlant }
+const SOLVERS = { reach: solveReach, lookAt: solveLookAt, orient: solveOrient, plant: solvePlant, twist: solveTwist }
 
 /** Solve `constraints` in order over the entity's pose, one fixed step of `seconds`. */
 export function applyConstraints(entity, skeleton, constraints, seconds) {

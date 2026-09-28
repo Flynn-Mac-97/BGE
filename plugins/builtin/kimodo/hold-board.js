@@ -11,11 +11,17 @@
  *     record,                           the hold record the board shows, sliders applied
  *     edits: { [part]: [across, along, depth, roll] },   metres and degrees over the grip,
  *                                       part a socket's side or 'mount'; Save folds them in
+ *     set, action, key, isPinned        the path board's part (path-board.js)
  *   }
  */
 import { applyClip } from '../rig-animation.js'
 import { applyConstraints } from '../rig-animation/constraints.js'
 import { heldPose } from '../animation-states/held-items.js'
+import { followOf, guardCurveOf, pathLineOf, recordAlong } from '../animation-states/guard-path.js'
+import { placeOf } from '../rig-animation/skeleton.js'
+import { rolesOf } from '../rig-animation/clip-reading.js'
+import { liveSlider } from './live-slider.js'
+import { pathActionOf, pathRows, pathTimeOf } from './path-board.js'
 import { add } from '../game-maths/space.js'
 import { multiply, turnAbout } from '../game-maths/turns.js'
 
@@ -29,7 +35,7 @@ export const holdFileOf = item => `${ITEMS}/${item}.hold.json`
 
 /** The board's hold before any item is picked. */
 export function newHold() {
-  return { item: 'none', record: null, edits: {} }
+  return { item: 'none', record: null, edits: {}, set: null, action: 'none', key: 0, isPinned: false }
 }
 
 /** The parts of a grip a person can move: each socket's side, or 'mount'. */
@@ -58,6 +64,14 @@ export function editedRecord(hold) {
   return { ...record, grip }
 }
 
+/** Draw the path again into `line` when its keys, the guard or the picked key changed; the chest is where it is now. */
+function keepLine(line, record, path, picked, chest) {
+  const signature = JSON.stringify([path, record.guard, record.length, picked])
+  if (signature === line.signature) return
+  line.signature = signature
+  line.guides = [{ handle: 'path', ...pathLineOf(record, path, chest), picked, target: null }]
+}
+
 /**
  * A session the viewer draws (viewer.js `edit`): a take played on its model,
  * the board's item held over it. `hold` is read every frame, so a slider moves
@@ -66,7 +80,10 @@ export function editedRecord(hold) {
 export function holdSession({ model, clip, skeleton, hold, clock }) {
   const entity = { id: 'kimodo-hold', x: 0, y: 0, z: 0, yaw: 0, pose: null, _rigTime: 0 }
   const memory = {}
+  const chestNode = rolesOf(skeleton).chest
   let hung = null
+  // The drawn path, kept until its keys or the guard change, so the view does not rebuild it every frame.
+  const line = { signature: '', guides: [] }
   return {
     model,
     clock,
@@ -74,12 +91,17 @@ export function holdSession({ model, clip, skeleton, hold, clock }) {
       entity._rigTime = seconds
       applyClip(entity, clip, {})
       const record = editedRecord(hold)
-      const held = record && heldPose({ record, skeleton, pose: entity.pose, seconds, memory })
+      const acting = record && pathActionOf(hold)
+      const now = acting ? recordAlong(record, guardCurveOf(acting.path, record.guard), pathTimeOf(hold, acting.path, seconds)) : record
+      const held = now && heldPose({ record: now, skeleton, pose: entity.pose, seconds, memory })
       hung = held?.attachment ?? null
-      if (held) applyConstraints(entity, skeleton, held.constraints, 1 / 60)
+      if (acting) keepLine(line, record, acting.path, hold.key, placeOf(skeleton, entity.pose, chestNode))
+      const follow = acting && held ? [followOf(skeleton, now.guard, record.guard, acting.body)] : []
+      if (held) applyConstraints(entity, skeleton, [...follow, ...held.constraints], 1 / 60)
       return entity.pose
     },
     handles: () => [],
+    guides: () => (pathActionOf(hold) ? line.guides : []),
     get hold() {
       return hung
     }
@@ -112,26 +134,11 @@ const GRIP_SLIDERS = [
   ['roll', -180, 180, 1]
 ]
 
-/** A slider that calls `set(value)` as it is dragged and shows the value beside it. */
-function liveSlider(ui, label, min, max, step, value, set) {
-  const element = ui.slider({
-    k: label,
-    min,
-    max,
-    step,
-    value,
-    onChange: changed => {
-      set(changed)
-      element.lastChild.textContent = String(changed)
-    }
-  })
-  return element
-}
-
 /**
- * The hold rows: the item, a slider per setting once an item is held, and the
- * grip's own sliders with Save. `items` are the item names with a hold record;
- * `actions` is `{ pickItem(item), save() }`.
+ * The hold rows: the item, a slider per setting once an item is held, the
+ * grip's own sliders with Save, then the path board's rows. `items` are the
+ * item names with a hold record; `actions` is `{ pickItem(item), save(),
+ * redraw(), saveSet() }`.
  */
 export function holdRows(ui, hold, items, actions, note = '') {
   const record = hold.record
@@ -157,7 +164,8 @@ export function holdRows(ui, hold, items, actions, note = '') {
         ...MOTION_SLIDERS.map(recordRow),
         ...gripParts(record.grip).flatMap(partRows),
         ui.button('Save hold', actions.save, { primary: true }),
-        ...(note ? [ui.text(note, { dim: true })] : [])
+        ...(note ? [ui.text(note, { dim: true })] : []),
+        ...pathRows(ui, hold, record, { redraw: actions.redraw, save: actions.saveSet }, note)
       ]
     : []
   return [

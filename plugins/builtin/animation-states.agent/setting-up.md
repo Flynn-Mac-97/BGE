@@ -27,4 +27,6 @@ model, a hold record, a set. Nothing else changes.
 A weapon swing is best a path action (files.md): the item moves along keys
 and the hands follow it. Taken from Kimodo, a swing's wrist turns the blade
 where the words never said; even with the hand held to its path by keys, the
-blade went wrong.
+blade went wrong. Send the person to Kimodo's hold board to shape a path by
+eye: it reads the set from the studio's `assets/animation/sets/`, and Save
+set writes it there, to copy into the game.

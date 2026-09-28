@@ -38,6 +38,7 @@ import { restOf } from './rig-animation/clip-reading.js'
 import { compareDesign, designFromPoses, poseMenu } from './kimodo/poser.js'
 import { cutPreview, cutRows, openCut } from './kimodo/cut-board.js'
 import { ITEMS, editedRecord, holdFileOf, holdRows, holdSession, newHold } from './kimodo/hold-board.js'
+import { SETS, setFileOf, setText } from './kimodo/path-board.js'
 import { widenSkeleton } from './rig-animation/skeleton.js'
 
 const DESIGNS = 'assets/motion/designs'
@@ -156,7 +157,9 @@ async function viewTake(context, clip) {
 /** Hold `item` over `take`: its hold record read from its file, or nothing. */
 async function holdItem(context, take, item) {
   const record = item === 'none' ? null : JSON.parse(await context.files.read(holdFileOf(item)))
-  state.hold = { item, record, edits: {} }
+  // The item's set, for the path board; a set with no file here is said on the board.
+  const setSource = record?.set ? await context.files.read(setFileOf(record.set)).catch(() => null) : null
+  state.hold = { ...newHold(), item, record, set: setSource ? { name: record.set, record: JSON.parse(setSource) } : null }
   state.holdNote = ''
   await holdOnView(context, take)
   context.redraw?.()
@@ -169,6 +172,14 @@ async function saveHold(context) {
   await context.files.write(file, JSON.stringify(record, null, 2) + '\n')
   state.hold = { ...state.hold, record, edits: {} }
   state.holdNote = `Saved ${file}.`
+  context.redraw?.()
+}
+
+/** Write the path board's set back to its file. */
+async function saveSet(context) {
+  const file = setFileOf(state.hold.set.name)
+  await context.files.write(file, setText(state.hold.set.record))
+  state.holdNote = `Saved ${file}. Copy it to the game's ${SETS}/.`
   context.redraw?.()
 }
 
@@ -321,7 +332,9 @@ function chosenRows(ui, context) {
           state.items,
           {
             pickItem: item => holdItem(context, take, item).catch(error => (state.error = String(error?.message || error))),
-            save: () => saveHold(context)
+            save: () => saveHold(context),
+            redraw: () => context.redraw?.(),
+            saveSet: () => saveSet(context).catch(error => (state.error = String(error?.message || error)))
           },
           state.holdNote
         )
