@@ -22,7 +22,12 @@ plays chains into `next` at `link` seconds, from where the item is. The hold
 keeps the hand far enough in front of the chest that the arm does not go into
 it. A person builds one by eye on Kimodo's hold board: hold the item, pick the
 action, pick the hand or blade arc, and drag each key while both arcs are
-drawn; Play combo plays the chain. A take action:
+drawn; Play combo plays the chain. A path action may name a take too, with
+`mask: 'lower'` and a `speed` that fits it to the keys: the take steps the
+feet and drops the hips while the keys move the item; a chained action with
+no take keeps the one playing. The hold keeps each wrist in a person's range
+(a `wrist` constraint), so a key a wrist cannot reach turns the item only as
+far as it can. A take action:
 `{ clips, mask, hold: { holding, other }, speed }`; `mask` is 'upper', 'right-arm' or 'left-arm' (the spine and one arm, so a one-handed swing leaves the other arm to the state), 'all', or a list of nodes.
 While it plays, `acting` is an input the graph can read, so a transition can
 stop a sprint during an attack.

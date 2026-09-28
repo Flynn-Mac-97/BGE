@@ -53,6 +53,13 @@ const LONGEST_STEP = 0.1
  */
 const ELBOW_FOLLOWS = [0.35, -0.3, 0.1]
 
+/**
+ * What a wrist on a grip may do (rig-animation/solvers/wrist.js): half its
+ * twist rolls the forearm, and what is left is held to a wrist's range. Past
+ * it the hand, and the item with it, turns no further than a person's would.
+ */
+const WRIST = { bend: 65, twist: 70, share: 0.5 }
+
 /** Which way is out from the body along X for each side: the model's right is -X. */
 const OUTWARD = { right: -1, left: 1 }
 
@@ -70,6 +77,18 @@ function elbowPoleOf(record, side, chest, shoulder, hand) {
   if (record.elbow) return { model: add(chest.position, rotate(chest.turn, mirrored(record.elbow, side))) }
   const halfway = scaled(add(shoulder, hand), 0.5)
   return { model: add(halfway, rotate(chest.turn, mirrored(ELBOW_FOLLOWS, side))) }
+}
+
+/**
+ * The pole for a hand on a grip: where the elbow is when the wrist is
+ * straight, behind the hand along the way `handTurn` points it. The arm
+ * then lines up with the grip, and the wrist bends as little as the reach
+ * lets it, rather than folding back to meet the item.
+ */
+function wristPoleOf(skeleton, handNode, hand, handTurn) {
+  const { position, rotation } = skeleton.nodes[handNode]
+  const forearmTurn = multiply(handTurn, inverse(rotation))
+  return { model: subtract(hand, rotate(forearmTurn, position)) }
 }
 
 /** The way the item points in the chest's space, a unit direction, by the guard's pitch and yaw. */
@@ -162,8 +181,9 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, 
   const itemTurn = itemTurnOf(record, chest.turn)
   const holdingTurn = multiply(itemTurn, sockets[record.hand].turn)
   const holdingHand = [
-    reachOf(record.hand, handPoint),
-    { kind: 'orient', node: roles[record.hand].hand, aim: rotate(holdingTurn, [0, 0, 1]), upAim: rotate(holdingTurn, [0, 1, 0]), weight: strengthOf(record.hand) }
+    { ...reachOf(record.hand, handPoint), pole: wristPoleOf(skeleton, roles[record.hand].hand, handPoint, holdingTurn) },
+    { kind: 'orient', node: roles[record.hand].hand, aim: rotate(holdingTurn, [0, 0, 1]), upAim: rotate(holdingTurn, [0, 1, 0]), weight: strengthOf(record.hand) },
+    { kind: 'wrist', node: roles[record.hand].hand, ...WRIST, weight: strengthOf(record.hand) }
   ]
   const other = OTHER[record.hand]
   const hasOther = sockets[other] && arm(other)?.every(Boolean)
@@ -174,8 +194,15 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, 
   const otherTurn = hasOther ? multiply(back, sockets[other].turn) : null
   const second = hasOther
     ? [
-        { kind: 'reach', nodes: arm(other), target: { node: roles[record.hand].hand, at: otherAt }, pole: poleOf(other), weight: strengthOf(other) },
-        { kind: 'orient', node: roles[other].hand, aim: rotate(otherTurn, [0, 0, 1]), upAim: rotate(otherTurn, [0, 1, 0]), in: roles[record.hand].hand, weight: strengthOf(other) }
+        {
+          kind: 'reach',
+          nodes: arm(other),
+          target: { node: roles[record.hand].hand, at: otherAt },
+          pole: wristPoleOf(skeleton, roles[other].hand, add(handPoint, rotate(holdingTurn, otherAt)), multiply(holdingTurn, otherTurn)),
+          weight: strengthOf(other)
+        },
+        { kind: 'orient', node: roles[other].hand, aim: rotate(otherTurn, [0, 0, 1]), upAim: rotate(otherTurn, [0, 1, 0]), in: roles[record.hand].hand, weight: strengthOf(other) },
+        { kind: 'wrist', node: roles[other].hand, ...WRIST, weight: strengthOf(other) }
       ]
     : []
   const turn = inverse(sockets[record.hand].turn)

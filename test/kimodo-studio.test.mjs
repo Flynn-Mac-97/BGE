@@ -201,12 +201,14 @@ test('a held item locks each hand to its socket on the item, place and turn', as
     return { pose: entity.pose, attachment: answer.attachment }
   }
   const still = { stiffness: 0, damping: 0, sway: 0, swaySpeed: 0 }
-  const hilt = { turn: [0, 0, 1, 0] }
+  // A person's grip: the blade out of the thumb side of each fist, the knuckles along the edge.
+  const RIGHT_GRIP = [Math.SQRT1_2, 0, 0, Math.SQRT1_2]
+  const LEFT_GRIP = [0, Math.SQRT1_2, -Math.SQRT1_2, 0]
   const greatsword = {
     model: 'models/items/greatsword.glb',
     hand: 'right',
     points: { axis: [0, -1, 0], upAxis: [0, 0, 1], up: 'outward' },
-    grip: { sockets: { right: { ...hilt, position: [-0.1, -0.2, 0] }, left: { ...hilt, position: [0.1, -0.1, 0] } } },
+    grip: { sockets: { right: { turn: RIGHT_GRIP, position: [0.1, -0.2, 0.02] }, left: { turn: LEFT_GRIP, position: [0.1, -0.1, -0.02] } } },
     guard: { distance: 0.25, height: -0.15, side: 0, pitch: 60, yaw: 0, roll: 0 },
     motion: still
   }
@@ -218,7 +220,7 @@ test('a held item locks each hand to its socket on the item, place and turn', as
   assert.ok(handMiss < 0.03, `the right hand is at the guard (off by ${handMiss.toFixed(3)} m)`)
   // Where the item is, from the right hand and its socket; the left hand must be on the left socket, turned as it says.
   const sockets = greatsword.grip.sockets
-  const itemTurn = multiply(right.turn, [0, 0, -1, 0])
+  const itemTurn = multiply(right.turn, inverse(RIGHT_GRIP))
   const origin = right.position.map((value, axis) => value - rotate(itemTurn, sockets.right.position)[axis])
   const leftSocket = origin.map((value, axis) => value + rotate(itemTurn, sockets.left.position)[axis])
   const left = placeOf(rig, pose, 'LeftHand')

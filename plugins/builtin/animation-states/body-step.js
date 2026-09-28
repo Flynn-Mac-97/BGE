@@ -65,16 +65,19 @@ function stepMachine(entity, machine, random, setKey) {
 }
 
 /**
- * The mask nodes an action names: 'upper', 'right-arm', 'left-arm', 'all', or
- * a list of nodes. Kept per skeleton, so a layer sees the same list each step.
+ * The mask nodes an action names: 'upper', 'lower' (the hips and legs),
+ * 'right-arm', 'left-arm', 'all', or a list of nodes. Kept per skeleton, so a
+ * layer sees the same list each step.
  */
 const masks = new WeakMap()
 function maskOf(skeleton, mask) {
   if (Array.isArray(mask)) return mask
   if (!masks.has(skeleton)) {
     const roles = rolesOf(skeleton)
+    const upper = upperBodyOf(skeleton, roles.chest)
     masks.set(skeleton, {
-      upper: upperBodyOf(skeleton, roles.chest),
+      upper,
+      lower: Object.keys(skeleton.nodes).filter(name => !upper.includes(name)),
       'right-arm': armMaskOf(skeleton, roles.chest, roles.right?.shoulder),
       'left-arm': armMaskOf(skeleton, roles.chest, roles.left?.shoulder),
       all: Object.keys(skeleton.nodes)
@@ -101,18 +104,37 @@ const playingOf = (name, action, guard, start = null) => ({
 })
 
 /**
+ * Play `action` as `name`: what it moves, and its take, if it names one, as a
+ * layer on its mask. A path action with a take plays both: the take on the
+ * legs, say, so the feet step, and the keys on the item and the arms.
+ */
+function startAction(entity, { name, action, guard, start }, skeleton, random) {
+  entity._animationAction = playingOf(name, action, guard, start)
+  // An action with no take leaves the layer as it is: a combo's later swings keep the first one's footwork.
+  if (!action.clips?.length) return
+  entity._animationActionCount = (entity._animationActionCount ?? 0) + 1
+  entity.rigLayer = {
+    clip: action.clips[Math.min(action.clips.length - 1, Math.floor(random() * action.clips.length))],
+    mask: maskOf(skeleton, action.mask),
+    speed: action.speed ?? 1,
+    startedAt: entity._animationActionCount
+  }
+  entity.rigLayerDone = false
+}
+
+/**
  * Move a path action on, and chain into its `next` once it was asked again
  * and has reached its `link`, from where the item is. Answers true when it
  * chained.
  */
-function chainedOn(entity, sets, guard, asked, seconds) {
+function chainedOn(entity, { sets, guard, skeleton, random }, asked, seconds) {
   const playing = entity._animationAction
   if (!playing?.motion) return false
   playing.time += seconds
   if (asked && playing.next) playing.isQueued = true
   const next = playing.isQueued && playing.time >= playing.link ? actionOf(sets, playing.next) : null
   if (!isPathAction(next)) return false
-  entity._animationAction = playingOf(playing.next, next, guard, playing.motion.guardAt(playing.time))
+  startAction(entity, { name: playing.next, action: next, guard, start: playing.motion.guardAt(playing.time) }, skeleton, random)
   return true
 }
 
@@ -125,7 +147,7 @@ function chainedOn(entity, sets, guard, asked, seconds) {
 function stepAction(entity, sets, skeleton, random, report, seconds, guard) {
   const asked = entity.animationAction
   entity.animationAction = null
-  if (chainedOn(entity, sets, guard, asked, seconds)) return
+  if (chainedOn(entity, { sets, guard, skeleton, random }, asked, seconds)) return
   const playing = entity._animationAction
   const isPathDone = playing?.motion && playing.time > playing.motion.duration
   if (playing && (isPathDone || (!playing.motion && entity.rigLayerDone))) {
@@ -138,16 +160,7 @@ function stepAction(entity, sets, skeleton, random, report, seconds, guard) {
     report(`no set that is on gives the action "${asked}"`)
     return
   }
-  entity._animationAction = playingOf(asked, action, guard)
-  if (!action.clips?.length) return
-  entity._animationActionCount = (entity._animationActionCount ?? 0) + 1
-  entity.rigLayer = {
-    clip: action.clips[Math.min(action.clips.length - 1, Math.floor(random() * action.clips.length))],
-    mask: maskOf(skeleton, action.mask),
-    speed: action.speed ?? 1,
-    startedAt: entity._animationActionCount
-  }
-  entity.rigLayerDone = false
+  startAction(entity, { name: asked, action, guard, start: null }, skeleton, random)
 }
 
 /** The hold record this step: during a path action, its guard moved along the action's motion. */

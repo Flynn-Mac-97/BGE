@@ -22,7 +22,7 @@
  *     actions: {
  *       attack: {
  *         clips: ['take-base-slash-sword-a'],   one picked each time it plays
- *         mask: 'upper',                         'upper' (above the hips), 'right-arm' or 'left-arm'
+ *         mask: 'upper',                         'upper' (above the hips), 'lower' (the hips and legs), 'right-arm' or 'left-arm'
  *                                                (the spine and one arm), 'all', or a list of nodes
  *         hold: { holding: 0, other: 1 },        how much each hand keeps its hold while it plays
  *         speed: 1
