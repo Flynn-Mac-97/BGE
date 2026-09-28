@@ -92,11 +92,46 @@ test('sets lay their states over the graph, later sets winning, and give actions
   assert.deepEqual(upperBodyOf(skeleton, 'Spine2'), ['Spine', 'Spine2', 'Arm'])
 })
 
-test('a path action moves the guard through its keys, each missing field the item\'s own', async () => {
-  const { guardAt, guardCurveOf } = await import('../plugins/builtin/animation-states/guard-path.js')
-  const guard = { distance: 0.3, height: -0.2, side: 0.22, pitch: 45, yaw: 0, roll: 0 }
-  const curve = guardCurveOf([{ at: 0, guard: {} }, { at: 0.5, guard: { height: 0.4, yaw: -60 } }, { at: 1, guard: {} }], guard)
-  assert.deepEqual(guardAt(curve, 0), guard)
-  assert.deepEqual(guardAt(curve, 0.5), { ...guard, height: 0.4, yaw: -60 })
-  assert.deepEqual(guardAt(curve, 1), guard)
+const GUARD = { distance: 0.3, height: -0.2, side: 0.22, pitch: 45, yaw: 0, roll: 0 }
+
+test('a path action moves the hand and the blade through their own keys, each missing field the item\'s own', async () => {
+  const { motionOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const motion = motionOf(
+    {
+      hand: [{ at: 0, guard: {} }, { at: 0.4, guard: { height: 0.4 } }, { at: 1, guard: {} }],
+      blade: [{ at: 0, guard: {} }, { at: 0.5, guard: { yaw: -60 } }, { at: 1, guard: {} }]
+    },
+    GUARD
+  )
+  assert.equal(motion.duration, 1)
+  assert.deepEqual(motion.guardAt(0), GUARD)
+  assert.equal(motion.guardAt(0.4).height, 0.4)
+  assert.equal(motion.guardAt(0.5).yaw, -60)
+  assert.deepEqual(motion.guardAt(1), GUARD)
+  const path = [{ at: 0, guard: {} }, { at: 0.5, guard: { height: 0.4, yaw: -60 } }, { at: 1, guard: {} }]
+  assert.deepEqual(motionOf({ path }, GUARD).guardAt(0.5), { ...GUARD, height: 0.4, yaw: -60 }, 'one path serves both tracks')
+})
+
+test('a track runs smoothly through a key it passes, and never overshoots a key it turns at', async () => {
+  const { motionOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const hand = [{ at: 0, guard: { height: 0 } }, { at: 0.5, guard: { height: 0.5 } }, { at: 1, guard: { height: 1 } }, { at: 1.5, guard: { height: 0 } }]
+  const motion = motionOf({ hand }, GUARD)
+  const heights = Array.from({ length: 151 }, (_, index) => motion.guardAt(index / 100).height)
+  assert.ok(Math.max(...heights) <= 1 + 1e-9, 'the top key is the top')
+  const before = motion.guardAt(0.49).height
+  const after = motion.guardAt(0.51).height
+  assert.ok(after - 0.5 > 0.005 && 0.5 - before > 0.005, 'still moving as it passes the middle key')
+})
+
+test('a combo chains each action at its link, from where the item is', async () => {
+  const { comboOf, motionOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const actions = {
+    first: { next: 'second', link: 0.5, hand: [{ at: 0, guard: {} }, { at: 0.5, guard: { side: -0.3 } }, { at: 1, guard: {} }] },
+    second: { hand: [{ at: 0, guard: {} }, { at: 0.4, guard: { side: 0.4 } }, { at: 0.8, guard: {} }] }
+  }
+  const combo = comboOf(actions, 'first', GUARD)
+  assert.deepEqual(combo.steps, [{ name: 'first', from: 0 }, { name: 'second', from: 0.5 }])
+  assert.equal(combo.duration, 1.3)
+  assert.equal(combo.guardAt(0.5).side, -0.3, 'the second begins where the first was at its link')
+  assert.equal(combo.guardAt(0.9).side, motionOf(actions.second, GUARD).guardAt(0.4).side)
 })

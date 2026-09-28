@@ -267,11 +267,11 @@ test('a path action turns the spine by its share of the item\'s yaw, and the hip
 })
 
 test('a drawn path ends at the tip, the item\'s length from the hand, and a set saves as it was read', async () => {
-  const { pathLineOf } = await import('../plugins/builtin/animation-states/guard-path.js')
+  const { motionOf, pathLineOf } = await import('../plugins/builtin/animation-states/guard-path.js')
   const { setText } = await import('../plugins/builtin/kimodo/path-board.js')
   const record = { hand: 'right', points: { axis: [0, -1, 0], upAxis: [0, 0, 1], up: 'outward' }, grip: { sockets: { right: { position: [0, 0, 0] } } }, guard: { distance: 0.3, height: 0, side: 0.2, pitch: 0, yaw: 0, roll: 0 }, length: 0.8 }
   const path = [{ at: 0, guard: {} }, { at: 0.3, guard: { pitch: 90 } }]
-  const line = pathLineOf(record, path, { position: [0, 1.4, 0], turn: [0, 0, 0, 1] })
+  const line = pathLineOf(record, motionOf({ path }, record.guard), { position: [0, 1.4, 0], turn: [0, 0, 0, 1] }, { hand: [0], blade: [0, 0.3] }).tip
   assert.equal(line.keys.length, 2)
   assert.deepEqual(line.keys[0].map(value => Number(value.toFixed(6))), [-0.2, 1.4, 1.1], 'pointing ahead, the tip is 0.8 m in front of the hand')
   assert.deepEqual(line.keys[1].map(value => Number(value.toFixed(6))), [-0.2, 2.2, 0.3], 'pointing up, the tip is 0.8 m above it')

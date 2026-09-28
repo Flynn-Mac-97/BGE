@@ -11,17 +11,18 @@
  *     record,                           the hold record the board shows, sliders applied
  *     edits: { [part]: [across, along, depth, roll] },   metres and degrees over the grip,
  *                                       part a socket's side or 'mount'; Save folds them in
- *     set, action, key, isPinned        the path board's part (path-board.js)
+ *     set, action, track, key,          the path board's part (path-board.js)
+ *     isPinned, isCombo
  *   }
  */
 import { applyClip } from '../rig-animation.js'
 import { applyConstraints } from '../rig-animation/constraints.js'
 import { heldPose } from '../animation-states/held-items.js'
-import { followOf, guardCurveOf, pathLineOf, recordAlong } from '../animation-states/guard-path.js'
+import { FOLLOW, followOf, pathLineOf, recordAlong } from '../animation-states/guard-path.js'
 import { placeOf } from '../rig-animation/skeleton.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { liveSlider } from './live-slider.js'
-import { pathActionOf, pathRows, pathTimeOf } from './path-board.js'
+import { boardMotionOf, boardTimeOf, keyTimesOf, pathActionOf, pathRows } from './path-board.js'
 import { add } from '../game-maths/space.js'
 import { multiply, turnAbout } from '../game-maths/turns.js'
 
@@ -35,7 +36,7 @@ export const holdFileOf = item => `${ITEMS}/${item}.hold.json`
 
 /** The board's hold before any item is picked. */
 export function newHold() {
-  return { item: 'none', record: null, edits: {}, set: null, action: 'none', key: 0, isPinned: false }
+  return { item: 'none', record: null, edits: {}, set: null, action: 'none', track: 'hand', key: 0, isPinned: false, isCombo: false }
 }
 
 /** The parts of a grip a person can move: each socket's side, or 'mount'. */
@@ -64,12 +65,26 @@ export function editedRecord(hold) {
   return { ...record, grip }
 }
 
-/** Draw the path again into `line` when its keys, the guard or the picked key changed; the chest is where it is now. */
-function keepLine(line, record, path, picked, chest) {
-  const signature = JSON.stringify([path, record.guard, record.length, picked])
+/** The drawn arcs' colours: the hand's, and the item tip's. */
+const ARC_COLOURS = { hand: '#4ad8ff', tip: '#ff8a3d' }
+
+/**
+ * Draw the arcs again into `line` when the actions, the guard or the picked
+ * key changed; the chest is where it is now. The picked key is marked on the
+ * arc of its track: the hand's, or the tip's for the blade.
+ */
+function keepLine(line, hold, record, motion, chest) {
+  const signature = JSON.stringify([hold.set.record.actions, record.guard, record.length, hold.action, hold.track, hold.key, hold.isCombo])
   if (signature === line.signature) return
   line.signature = signature
-  line.guides = [{ handle: 'path', ...pathLineOf(record, path, chest), picked, target: null }]
+  const arcs = pathLineOf(record, motion, chest, keyTimesOf(hold))
+  line.guides = Object.entries(arcs).map(([arc, drawn]) => ({
+    handle: arc,
+    ...drawn,
+    colour: ARC_COLOURS[arc],
+    picked: (arc === 'hand') === (hold.track === 'hand') ? hold.key : null,
+    target: null
+  }))
 }
 
 /**
@@ -92,11 +107,12 @@ export function holdSession({ model, clip, skeleton, hold, clock }) {
       applyClip(entity, clip, {})
       const record = editedRecord(hold)
       const acting = record && pathActionOf(hold)
-      const now = acting ? recordAlong(record, guardCurveOf(acting.path, record.guard), pathTimeOf(hold, acting.path, seconds)) : record
+      const motion = acting && boardMotionOf(hold, record)
+      const now = acting ? recordAlong(record, motion, boardTimeOf(hold, motion, seconds)) : record
       const held = now && heldPose({ record: now, skeleton, pose: entity.pose, seconds, memory })
       hung = held?.attachment ?? null
-      if (acting) keepLine(line, record, acting.path, hold.key, placeOf(skeleton, entity.pose, chestNode))
-      const follow = acting && held ? [followOf(skeleton, now.guard, record.guard, acting.body)] : []
+      if (acting) keepLine(line, hold, record, motion, placeOf(skeleton, entity.pose, chestNode))
+      const follow = acting && held ? [followOf(skeleton, now.guard, record.guard, acting.body ?? FOLLOW)] : []
       if (held) applyConstraints(entity, skeleton, [...follow, ...held.constraints], 1 / 60)
       return entity.pose
     },

@@ -30,7 +30,8 @@
  * viewer draws the path and keys, and a ring at `target` joined to the handle,
  * so a key the limb cannot reach shows as a gap. A guide may also give
  * `ticks`, points drawn as small white marks (closer marks are slower
- * motion), and `picked`, the index of the key drawn yellow. `body(seconds)`, if given,
+ * motion), `picked`, the index of the key drawn yellow, and `colour`, its
+ * line and keys' colour in place of orange. `body(seconds)`, if given,
  * answers `{ target: { hips, chest, head, look }, reached: { hips, chest,
  * head } }` or null (body-rig.js): the viewer draws the body keys as a white
  * line through hips, chest and head with a look arrow, and the body as it is
@@ -263,12 +264,12 @@ export function mountViewer(stage) {
     for (const guide of guides) {
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(guide.path.map(lifted)),
-        overlayMaterial(THREE.LineBasicMaterial, GUIDE_COLOURS.path, 0.6)
+        overlayMaterial(THREE.LineBasicMaterial, guide.colour ?? GUIDE_COLOURS.path, 0.6)
       )
       line.renderOrder = 9
       guideParts.paths.add(line)
       for (const tick of guide.ticks ?? []) markAt(tick, 0.012, GUIDE_COLOURS.tick)
-      guide.keys.forEach((key, index) => markAt(key, 0.03, index === guide.picked ? GUIDE_COLOURS.picked : GUIDE_COLOURS.key))
+      guide.keys.forEach((key, index) => markAt(key, 0.03, index === guide.picked ? GUIDE_COLOURS.picked : (guide.colour ?? GUIDE_COLOURS.key)))
     }
   }
 

@@ -13,7 +13,7 @@
 import { nextState, pickClip } from './machine.js'
 import { heldPose } from './held-items.js'
 import { actionOf, armMaskOf, machineWith, upperBodyOf } from './graph.js'
-import { FOLLOW, followOf, guardCurveOf, recordAlong } from './guard-path.js'
+import { FOLLOW, followOf, isPathAction, motionOf, recordAlong } from './guard-path.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
 import { yawPitchRollOf } from '../game-maths/turns.js'
 
@@ -84,28 +84,61 @@ function maskOf(skeleton, mask) {
 }
 
 /**
- * Start the action game code asked for (`entity.animationAction`, taken when
- * read) as a layer over the state, or end the one playing when its clip is
- * done. An action the on sets do not give is let go of, and said once.
+ * The action playing, as the entity keeps it. A path action moves the held
+ * item by `motion` (guard-path.js) and its hands stay locked to the item
+ * unless it says otherwise; a take action has no motion. `start` is the guard
+ * a chained action takes over from.
  */
-function stepAction(entity, sets, skeleton, random, report, seconds) {
+const playingOf = (name, action, guard, start = null) => ({
+  name,
+  hands: action.hold ?? {},
+  body: action.body ?? FOLLOW,
+  next: action.next ?? null,
+  link: action.link ?? Infinity,
+  isQueued: false,
+  time: 0,
+  motion: isPathAction(action) ? motionOf(action, guard, start) : null
+})
+
+/**
+ * Move a path action on, and chain into its `next` once it was asked again
+ * and has reached its `link`, from where the item is. Answers true when it
+ * chained.
+ */
+function chainedOn(entity, sets, guard, asked, seconds) {
+  const playing = entity._animationAction
+  if (!playing?.motion) return false
+  playing.time += seconds
+  if (asked && playing.next) playing.isQueued = true
+  const next = playing.isQueued && playing.time >= playing.link ? actionOf(sets, playing.next) : null
+  if (!isPathAction(next)) return false
+  entity._animationAction = playingOf(playing.next, next, guard, playing.motion.guardAt(playing.time))
+  return true
+}
+
+/**
+ * Start the action game code asked for (`entity.animationAction`, taken when
+ * read) as a layer over the state, chain a path action into its next, or end
+ * the one playing when it is done. An action the on sets do not give is let
+ * go of, and said once. `guard` is the held item's own guard.
+ */
+function stepAction(entity, sets, skeleton, random, report, seconds, guard) {
   const asked = entity.animationAction
   entity.animationAction = null
+  if (chainedOn(entity, sets, guard, asked, seconds)) return
   const playing = entity._animationAction
-  if (playing?.path) playing.time += seconds
-  const isPathDone = playing?.path && playing.time > playing.path.at(-1).at
-  if (playing && (isPathDone || (!playing.path && entity.rigLayerDone))) {
+  const isPathDone = playing?.motion && playing.time > playing.motion.duration
+  if (playing && (isPathDone || (!playing.motion && entity.rigLayerDone))) {
     entity._animationAction = null
     entity.rigLayer = null
   }
   if (!asked || entity._animationAction || !skeleton) return
   const action = actionOf(sets, asked)
-  if (!action?.path?.length && !action?.clips?.length) {
+  if (!isPathAction(action) && !action?.clips?.length) {
     report(`no set that is on gives the action "${asked}"`)
     return
   }
-  // A path action moves the held item; its hands stay locked to the item unless it says otherwise.
-  entity._animationAction = { name: asked, hands: action.hold ?? {}, path: action.path ?? null, body: action.body ?? FOLLOW, time: 0, curve: null }
+  entity._animationAction = playingOf(asked, action, guard)
   if (!action.clips?.length) return
   entity._animationActionCount = (entity._animationActionCount ?? 0) + 1
   entity.rigLayer = {
@@ -117,12 +150,10 @@ function stepAction(entity, sets, skeleton, random, report, seconds) {
   entity.rigLayerDone = false
 }
 
-/** The hold record this step: during a path action, its guard moved along the path, with no spring or sway to lag it. */
+/** The hold record this step: during a path action, its guard moved along the action's motion. */
 function recordNow(entity, record) {
   const acting = entity._animationAction
-  if (!record || !acting?.path) return record
-  acting.curve ??= guardCurveOf(acting.path, record.guard)
-  return recordAlong(record, acting.curve, acting.time)
+  return record && acting?.motion ? recordAlong(record, acting.motion, acting.time) : record
 }
 
 /** Hold the entity's item this step, or let go of one it held. */
@@ -145,7 +176,7 @@ function stepHold(entity, record, skeleton, machine, seconds) {
   entity.attachments = { ...entity.attachments, held: { model, node, position, rotation: yawPitchRollOf(turn) } }
   // During a path action the spine turns after the item first, then the hands reach it.
   const acting = entity._animationAction
-  const follow = acting?.path ? followOf(skeleton, now.guard, record.guard, acting.body) : null
+  const follow = acting?.motion ? followOf(skeleton, now.guard, record.guard, acting.body) : null
   entity.rigConstraints = [...(follow ? [{ ...follow, weight: follow.weight * weight }] : []), ...held.constraints]
   entity._isHolding = true
 }
@@ -163,7 +194,7 @@ export function stepBody({ entity, readJson, skeletonOf, random, seconds, report
   const machine = machineWith(graph, sets)
   const skeleton = skeletonOf(entity)
   stepMachine(entity, machine, random, `${names.join(',')}:${sets.length}`)
-  stepAction(entity, sets, skeleton, random, report, seconds)
+  stepAction(entity, sets, skeleton, random, report, seconds, record?.guard ?? {})
   stepHold(entity, record, skeleton, machine, seconds)
   return machine
 }

@@ -24,7 +24,8 @@
  *                                        the item's space; a mount is where the item's origin
  *                                        goes and its turn, in the bone's space
  *     elbow?: [x, y, z],                 where each elbow bends toward, in the chest's space,
- *                                        for the holding side; the other side is mirrored
+ *                                        for the holding side; the other side is mirrored.
+ *                                        Left out, each elbow follows its hand (ELBOW_FOLLOWS)
  *     guard: { distance, height, side, pitch, yaw, roll },   metres from the chest, degrees
  *     motion: { stiffness, damping, sway, swaySpeed },       the spring (0 stiffness: none)
  *     weight: 1,                         0 leaves the clip's hands, 1 holds fully
@@ -44,8 +45,13 @@ const DEGREES = Math.PI / 180
 /** The longest step the spring takes; a longer gap (a pause, a loop's wrap) is taken as one frame. */
 const LONGEST_STEP = 0.1
 
-/** Where an elbow bends toward when the record names none: down, out and back from the chest. */
-const ELBOW_OUT = [0.45, -0.3, -0.3]
+/**
+ * Where an elbow bends toward when the record names none: out, down and a
+ * little forward from halfway between the shoulder and the hand, in the
+ * chest's space. It follows the hand, so an arm swung across the body bends
+ * its elbow out in front, not back through the chest.
+ */
+const ELBOW_FOLLOWS = [0.35, -0.3, 0.1]
 
 /** Which way is out from the body along X for each side: the model's right is -X. */
 const OUTWARD = { right: -1, left: 1 }
@@ -53,10 +59,17 @@ const OUTWARD = { right: -1, left: 1 }
 /** The other hand. */
 const OTHER = { right: 'left', left: 'right' }
 
-/** The elbow target for `side`: the record's, mirrored for the other side. */
-const elbowOf = (record, side) => {
-  const [x, y, z] = record.elbow ?? ELBOW_OUT
-  return [Math.abs(x) * OUTWARD[side], y, z]
+/** An elbow offset for `side`, mirrored from the holding side's. */
+const mirrored = ([x, y, z], side) => [Math.abs(x) * OUTWARD[side], y, z]
+
+/**
+ * The pole an elbow bends toward: the record's `elbow` from the chest, or, when
+ * it names none, ELBOW_FOLLOWS from halfway between the shoulder and `hand`.
+ */
+function elbowPoleOf(record, side, chest, shoulder, hand) {
+  if (record.elbow) return { model: add(chest.position, rotate(chest.turn, mirrored(record.elbow, side))) }
+  const halfway = scaled(add(shoulder, hand), 0.5)
+  return { model: add(halfway, rotate(chest.turn, mirrored(ELBOW_FOLLOWS, side))) }
 }
 
 /** The way the item points in the chest's space, a unit direction, by the guard's pitch and yaw. */
@@ -78,13 +91,23 @@ export function itemTurnOf(record, chestTurn) {
   return turnOnto(record.points.axis, record.points.upAxis, rotate(chestTurn, pointing), rotate(chestTurn, rolled))
 }
 
-/** Where the holding hand is asked to be, in model space, before the spring. */
+/**
+ * The least distance in front of the chest that keeps the arm out of the
+ * torso, in metres: more as the hand crosses the body (a negative side) and as
+ * it goes low; none once the hand is out past the body's side, fading in over
+ * `fade` metres. Measured on a person-sized rig, arm and torso box together.
+ */
+const BODY_CLEAR = { front: 0.2, across: 1, low: 0.6, lowFrom: -0.05, outside: 0.32, fade: 0.1 }
+
+/** Where the holding hand is asked to be, in model space, before the spring; never so near the chest that the arm goes into it. */
 export function guardPoint(record, chest, seconds) {
   const { distance = 0.3, height = 0, side = 0.2 } = record.guard
+  const inFront = Math.min(1, Math.max(0, (BODY_CLEAR.outside - side) / BODY_CLEAR.fade))
+  const clear = inFront * (BODY_CLEAR.front + Math.max(0, -side) * BODY_CLEAR.across + Math.max(0, BODY_CLEAR.lowFrom - height) * BODY_CLEAR.low)
   const { sway = 0, swaySpeed = 0 } = record.motion ?? {}
   const phase = seconds * swaySpeed * 2 * Math.PI
   const drift = [Math.sin(phase) * sway, Math.sin(phase * 2) * sway * 0.5, 0]
-  return add(add(chest, [OUTWARD[record.hand] * side, height, distance]), drift)
+  return add(add(chest, [OUTWARD[record.hand] * side, height, Math.max(distance, clear)]), drift)
 }
 
 /** The point after the spring, stepped from the last step's, kept in `memory`. */
@@ -122,7 +145,9 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, 
   const strengthOf = side => (record.weight ?? 1) * weight * ((side === record.hand ? hands.holding : hands.other) ?? 1)
   const chest = placeOf(skeleton, pose, roles.chest)
   const handPoint = sprungPoint(record, guardPoint(record, chest.position, seconds), seconds, memory)
-  const reachOf = (side, point) => ({ kind: 'reach', nodes: arm(side), target: { model: point }, pole: { node: roles.chest, at: elbowOf(record, side) }, weight: strengthOf(side) })
+  // The other hand is held near the holding hand, so both elbows follow the holding hand's point.
+  const poleOf = side => elbowPoleOf(record, side, chest, placeOf(skeleton, pose, arm(side)[0]).position, handPoint)
+  const reachOf = (side, point) => ({ kind: 'reach', nodes: arm(side), target: { model: point }, pole: poleOf(side), weight: strengthOf(side) })
 
   const mount = record.grip.mount
   if (mount) {
@@ -149,7 +174,7 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, 
   const otherTurn = hasOther ? multiply(back, sockets[other].turn) : null
   const second = hasOther
     ? [
-        { kind: 'reach', nodes: arm(other), target: { node: roles[record.hand].hand, at: otherAt }, pole: { node: roles.chest, at: elbowOf(record, other) }, weight: strengthOf(other) },
+        { kind: 'reach', nodes: arm(other), target: { node: roles[record.hand].hand, at: otherAt }, pole: poleOf(other), weight: strengthOf(other) },
         { kind: 'orient', node: roles[other].hand, aim: rotate(otherTurn, [0, 0, 1]), upAim: rotate(otherTurn, [0, 1, 0]), in: roles[record.hand].hand, weight: strengthOf(other) }
       ]
     : []
