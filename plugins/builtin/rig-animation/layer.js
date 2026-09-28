@@ -3,6 +3,7 @@
  * base clip, faded in and out. See the Rig Animation header for the contract.
  */
 import { framesAt, mixInto } from './sample.js'
+import { clipFileOf, maskNodesOf } from './clip-names.js'
 
 /**
  * Play the entity's layer clip over the pose already written, on the layer's
@@ -27,8 +28,8 @@ export function applyLayer(entity, rig, seconds, clipOf) {
   entity._rigLayer = layer.weight > 0 || wanted ? layer : null
   if (isNew) entity.rigLayerDone = false
 
-  const file = rig.clips?.[layer.clip]
-  const nodes = rig.masks?.[layer.mask]
+  const file = clipFileOf(rig, layer.clip)
+  const nodes = maskNodesOf(rig, layer.mask)
   const clip = file && clipOf(file)
   if (!clip || !nodes || !entity.pose) return
 

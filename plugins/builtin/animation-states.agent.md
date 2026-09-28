@@ -1,61 +1,47 @@
 ---
 skill: animation-states
-description: Chooses which clip a rigged 3D body plays with a state machine declared on its type (idle, walk, run, crouch, turns), picks among several takes of a state for variety, and holds items (a sword, a two-handed sword, a shield) by constraints over the clip. Use to wire clips into a character, add a movement state, give a character something to hold, or when a character plays the wrong clip.
-triggers: animation state, state machine, animator, locomotion, blend states, idle variety, hold item, held item, wield, grip, socket, shield on forearm, two handed, which clip plays
-match: plugins/builtin/animation-states.js, plugins/builtin/animation-states/*.js, **/*.hold.json
+description: Sets up and runs a rigged 3D character's animation graph — which take plays in which state (idle, walk, run, crouch, turns), sets of actions layered over it (a sword slash, a shield block), and items held by constraints. Use to wire takes into a character, build or fix its state graph, add a weapon or action set, or when a character plays the wrong clip.
+triggers: animation state, state graph, state machine, animator, locomotion, idle variety, hold item, held item, wield, grip, socket, action layer, attack animation, slash, block, animation set, which clip plays, set up animations
+match: plugins/builtin/animation-states.js, plugins/builtin/animation-states/*.js, **/*.states.json, **/*.set.json, **/*.hold.json
 category: gameplay
 ---
 
 # Animation States
 
-It runs before Rig Animation each fixed step. Game code sets inputs and the
-held item; it never names a clip.
+A character's animation is three kinds of file, all JSON under `assets/`:
+
+| file | what it is |
+|---|---|
+| `animation/<name>.states.json` | the graph: states, their takes, transitions in priority order |
+| `animation/sets/<set>.set.json` | a module: actions played as a layer over any state, and states whose takes it swaps |
+| `models/items/<item>.hold.json` | how an item is held, and the set it turns on (`set`) |
+
+The type names the graph: `animationStates: 'animation/hero.states.json'`
+(beside `rig: { skeleton, rootMotion: false }`). Game code sets three
+things, never a clip:
 
 ```js
-rig: { clips: { 'idle-a': 'motion/hero/idle-a.json', ... }, skeleton: 'motion/hero.skeleton.json', rootMotion: false },
-animationStates: {
-  start: 'idle',
-  states: {
-    idle: { clips: ['idle-a', 'idle-b'] },        // one picked at random on entry
-    walk: { clips: ['walk-a'] },
-    'turn-left': { clips: ['turn-left-a'], then: 'idle', turns: true },   // once, then idle; the turn moves into entity.yaw
-    dead: { clips: ['death-a'], hold: 0 }        // lets go of the held item
-  },
-  transitions: [                                 // priority order: the first that matches names the state
-    { to: 'walk', from: ['idle'], when: { speed: { above: 0.2 } } },
-    { to: 'idle', when: { speed: { below: 0.2 }, crouched: false } }
-  ],
-  items: 'models/items'                          // where hold records are (the default)
-},
-update(entity, seconds, context) {
-  entity.animationInputs = { speed, crouched }
-  const travel = context.animationStates.travelOf(entity)   // m/s the clip's feet cover
-}
+entity.animationInputs = { moving, gait, crouched, turning }   // what the transitions read
+entity.heldItem = 'sword'                                      // null lets go
+entity.animationAction = 'attack'                              // a request, taken when read
+const speed = context.animationStates.travelOf(entity)         // move at this so feet do not slide
 ```
 
-- `when` values match when equal, or `{ above }`, `{ below }` a number. `done` is set by the machine: the state's clip has ended.
-- `entity.animationState` is the state; `entity.rigClip` is written here each step.
-- Move the body at `travelOf(entity)` so the feet do not slide.
-- A machine with a missing state or clip plays nothing and is reported once; `animation.states` lists the problems.
-
-## Held items
-
-`entity.heldItem = 'sword'` holds `assets/<items>/sword.hold.json`; `null`
-lets go. The record's shape is at the top of `animation-states/held-items.js`:
-a hand, a guard in front of the chest, and a grip — sockets (each hand locked
-to a place and turn on the item) or a mount (the item rides a bone, a shield
-on the forearm). It writes `entity.rigConstraints` and `entity.attachments.held`
-while an item is held; use `entity.rigControls` for game constraints then.
-
-A new item is a new `.hold.json` beside its model. Set its grip on the Kimodo
-board (**hold** under a take, then **Save hold**); a grip fits the rig it was
-set on.
+Setting one up for a person: follow `animation-states.agent/setting-up.md`.
+It starts with `animation.scaffold`, so there is a graph that plays before
+anything is asked.
 
 ## Commands
 
-- `animation.states` — each type's states and problems.
-- `animation.state '{"id":"player"}'` — state, clip, inputs and held item now.
-- `animation.hold '{"id":"player","item":"shield"}'` — hold or let go.
-- `animation.items` — items that have a hold record.
+- `animation.scaffold '{"folder":"motion/hero","name":"hero","skip":["slash"]}'` — a graph from a folder of takes.
+- `animation.graph '{"type":"player"}'` — the graph in words, the inputs to set, its problems, and a flowchart to show the person.
+- `animation.load` — read every file and load every take; a headless run awaits it before it simulates.
+- `animation.state`, `animation.hold`, `animation.act`, `animation.library`, `animation.reload`.
 
-The **Animation States** panel shows each body's state live and holds items.
+The **Animation States** panel shows each body's state, its transitions from
+here, item and action buttons, and **Reload** after a file is edited.
+
+## Detail
+
+- `plugins/builtin/animation-states.agent/setting-up.md` — the steps, and what to ask the person
+- `plugins/builtin/animation-states.agent/files.md` — every field of the three files

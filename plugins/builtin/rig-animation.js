@@ -59,6 +59,7 @@ import { constraintsForControls } from './rig-animation/controls.js'
 import { rigView } from './rig-animation/rig-view.js'
 import { faultsOfClip, poseOfClip } from './rig-animation/motion-review.js'
 import { applyRootTurn, resetRootTurn, rootTurnBack } from './rig-animation/root-turn.js'
+import { clipFileOf } from './rig-animation/clip-names.js'
 import { makeOnceReporter } from '../../engine/report-once.js'
 
 /** file -> { status, value, error }: a clip or a skeleton. Both files are immutable, so one cache serves every world. */
@@ -150,7 +151,7 @@ export default {
        * do not slide. 0 while the clip loads or when it has no root.
        */
       travelOf(entity, name) {
-        const file = entity._definition.rig?.clips?.[name]
+        const file = clipFileOf(entity._definition.rig, name)
         const clip = file && read(context, file).value
         if (!clip?.root || clip.root.length < 2) return 0
         const first = clip.root[0]
@@ -173,17 +174,17 @@ export default {
 
       for (const entity of world.entities) {
         const rig = entity._definition.rig
-        if (!rig?.clips) continue
+        if (!rig) continue
 
-        const name = entity.rigClip ?? rig.default ?? Object.keys(rig.clips)[0]
-        const file = rig.clips[name]
+        const name = entity.rigClip ?? rig.default ?? Object.keys(rig.clips ?? {})[0]
+        const file = clipFileOf(rig, name)
         // An unknown name holds the last pose, the same answer Sprite Animation
         // gives. Check the spelling against `rig.clips`.
         if (!file) continue
 
         const clip = read(state.context, file).value
         if (!clip) continue
-        const blendFile = entity.rigBlend && rig.clips[entity.rigBlend.clip]
+        const blendFile = entity.rigBlend && clipFileOf(rig, entity.rigBlend.clip)
         const blendClip = blendFile ? read(state.context, blendFile).value : null
 
         if (entity._rigClipFile !== file) {

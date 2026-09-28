@@ -1,13 +1,17 @@
-<!--aaca7a6c-->
+<!--20e34ab1-->
 parsed from source
   plugin Animation States
   category visuals
   points 1 panel
-  commands animation.states
+  commands animation.graph
+  animation.scaffold
+  animation.load
   animation.state
   animation.hold
-  animation.items
-  arguments animation.states:;animation.state: options = {};animation.hold: options = {};animation.items:
+  animation.act
+  animation.library
+  animation.reload
+  arguments animation.graph: options = {};animation.scaffold: options = {};animation.load:;animation.state: options = {};animation.hold: options = {};animation.act: options = {};animation.library:;animation.reload:
   context animationStates
   systems fixed
-  source 229 lines
+  source 294 lines

@@ -53,3 +53,41 @@ test('a missing clip or state is named', () => {
     'a transition goes to "jump", which is not a state'
   ])
 })
+
+test('a scaffold gathers takes into states and wires the states it knows, in priority order', async () => {
+  const { scaffoldGraph } = await import('../plugins/builtin/animation-states/scaffold.js')
+  const { graph, unwired } = scaffoldGraph('motion/hero', ['take-base-walk-b', 'take-base-walk-a', 'take-base-idle-a', 'take-base-run-a', 'take-base-dance-a'])
+  assert.deepEqual(graph.states.walk.clips, ['take-base-walk-a', 'take-base-walk-b'])
+  assert.deepEqual(graph.transitions.map(transition => transition.to), ['run', 'walk', 'idle'])
+  assert.equal(graph.start, 'idle')
+  assert.deepEqual(unwired, ['dance'])
+})
+
+test('a report names states nothing reaches, missing files and transitions that never fire', async () => {
+  const { graphReport } = await import('../plugins/builtin/animation-states/report.js')
+  const machine = {
+    start: 'idle',
+    states: { idle: { clips: ['motion/hero/idle.json'] }, walk: { clips: ['motion/hero/walk.json'] }, dance: { clips: ['motion/hero/dance.json'] } },
+    transitions: [{ to: 'idle' }, { to: 'walk', when: { moving: true } }]
+  }
+  const report = graphReport(machine, {}, new Set(['assets/motion/hero/idle.json', 'assets/motion/hero/walk.json']))
+  assert.deepEqual(report.problems, [
+    'state "dance": no file assets/motion/hero/dance.json',
+    'state "dance" is never reached: no transition goes to it',
+    'the transition to "walk" never fires: a transition above it always matches'
+  ])
+  assert.deepEqual(report.inputs, ['moving'])
+})
+
+test('sets lay their states over the graph, later sets winning, and give actions as clip files', async () => {
+  const { actionOf, machineWith, upperBodyOf } = await import('../plugins/builtin/animation-states/graph.js')
+  const graph = { folder: 'motion/hero', start: 'idle', states: { idle: { clips: ['idle-a'] } }, transitions: [] }
+  const sword = { folder: 'motion/hero', states: { idle: { clips: ['guard-a'] } }, actions: { attack: { clips: ['slash-a'], mask: 'upper' } } }
+  const shield = { folder: 'motion/shield', actions: { attack: { clips: ['bash-a'] } } }
+  assert.deepEqual(machineWith(graph, []).states.idle.clips, ['motion/hero/idle-a.json'])
+  assert.deepEqual(machineWith(graph, [sword]).states.idle.clips, ['motion/hero/guard-a.json'])
+  assert.deepEqual(actionOf([sword, shield], 'attack').clips, ['motion/shield/bash-a.json'])
+  assert.equal(actionOf([sword], 'block'), null)
+  const skeleton = { nodes: { Hips: { parent: null }, Spine: { parent: 'Hips' }, Spine2: { parent: 'Spine' }, Arm: { parent: 'Spine2' }, Leg: { parent: 'Hips' } } }
+  assert.deepEqual(upperBodyOf(skeleton, 'Spine2'), ['Spine', 'Spine2', 'Arm'])
+})

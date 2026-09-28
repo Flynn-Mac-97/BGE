@@ -78,7 +78,8 @@ export function machineProblems(machine, rigClips) {
   if (machine?.start && !states[machine.start]) problems.push(`start "${machine.start}" is not a state`)
   for (const [name, state] of Object.entries(states)) {
     if (!state.clips?.length) problems.push(`state "${name}" has no clips`)
-    for (const clip of state.clips ?? []) if (!rigClips?.[clip]) problems.push(`state "${name}" plays "${clip}", which rig.clips does not declare`)
+    // A clip file (from a graph file's folder) is checked against the disk by animation.graph, not here.
+    for (const clip of state.clips ?? []) if (!clip.endsWith('.json') && !rigClips?.[clip]) problems.push(`state "${name}" plays "${clip}", which rig.clips does not declare`)
     if (state.then && !states[state.then]) problems.push(`state "${name}" goes on to "${state.then}", which is not a state`)
   }
   for (const transition of machine?.transitions ?? []) {

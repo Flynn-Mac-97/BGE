@@ -102,18 +102,20 @@ function sprungPoint(record, wanted, seconds, memory) {
  * The constraints that hold `record`'s item this step, and where it hangs:
  * `{ constraints, attachment }`, or null when the skeleton lacks what it
  * needs. `pose` is the body before the hold (the clip's); `weight` scales the
- * record's own. `memory` is a record kept between steps for the spring.
+ * record's own, and `hands` scales each hand: `{ holding, other }`, what an
+ * action sets so its clip swings the item while the other hand keeps its grip.
+ * `memory` is a record kept between steps for the spring.
  * `attachment` is `{ model, node, position, turn }`, `turn` a quaternion.
  */
-export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1 }) {
+export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1, hands = {} }) {
   const roles = rolesOf(skeleton)
   const arm = side => roles[side] && [roles[side].shoulder, roles[side].elbow, roles[side].hand]
   const holding = arm(record.hand)
   if (!roles.chest || !holding?.every(Boolean)) return null
-  const strength = (record.weight ?? 1) * weight
+  const strengthOf = side => (record.weight ?? 1) * weight * ((side === record.hand ? hands.holding : hands.other) ?? 1)
   const chest = placeOf(skeleton, pose, roles.chest)
   const handPoint = sprungPoint(record, guardPoint(record, chest.position, seconds), seconds, memory)
-  const reachOf = (side, point) => ({ kind: 'reach', nodes: arm(side), target: { model: point }, pole: { node: roles.chest, at: elbowOf(record, side) }, weight: strength })
+  const reachOf = (side, point) => ({ kind: 'reach', nodes: arm(side), target: { model: point }, pole: { node: roles.chest, at: elbowOf(record, side) }, weight: strengthOf(side) })
 
   const mount = record.grip.mount
   if (mount) {
@@ -126,19 +128,27 @@ export function heldPose({ record, skeleton, pose, seconds, memory, weight = 1 }
 
   const sockets = record.grip.sockets
   const itemTurn = itemTurnOf(record, chest.turn)
-  const origin = subtract(handPoint, rotate(itemTurn, sockets[record.hand].position))
-  const lockedHand = side => {
-    const handTurn = multiply(itemTurn, sockets[side].turn)
-    return [
-      reachOf(side, add(origin, rotate(itemTurn, sockets[side].position))),
-      { kind: 'orient', node: roles[side].hand, aim: rotate(handTurn, [0, 0, 1]), upAim: rotate(handTurn, [0, 1, 0]), weight: strength }
-    ]
-  }
-  // The holding hand first, so the other hand's socket is where the item is.
-  const sides = [record.hand, ...(sockets[OTHER[record.hand]] && arm(OTHER[record.hand])?.every(Boolean) ? [OTHER[record.hand]] : [])]
+  const holdingTurn = multiply(itemTurn, sockets[record.hand].turn)
+  const holdingHand = [
+    reachOf(record.hand, handPoint),
+    { kind: 'orient', node: roles[record.hand].hand, aim: rotate(holdingTurn, [0, 0, 1]), upAim: rotate(holdingTurn, [0, 1, 0]), weight: strengthOf(record.hand) }
+  ]
+  const other = OTHER[record.hand]
+  const hasOther = sockets[other] && arm(other)?.every(Boolean)
+  // The other hand is locked to the holding hand as it ends up, not to the
+  // guard, so it stays on the item when an action's clip swings it.
+  const back = inverse(sockets[record.hand].turn)
+  const otherAt = hasOther ? rotate(back, subtract(sockets[other].position, sockets[record.hand].position)) : null
+  const otherTurn = hasOther ? multiply(back, sockets[other].turn) : null
+  const second = hasOther
+    ? [
+        { kind: 'reach', nodes: arm(other), target: { node: roles[record.hand].hand, at: otherAt }, pole: { node: roles.chest, at: elbowOf(record, other) }, weight: strengthOf(other) },
+        { kind: 'orient', node: roles[other].hand, aim: rotate(otherTurn, [0, 0, 1]), upAim: rotate(otherTurn, [0, 1, 0]), in: roles[record.hand].hand, weight: strengthOf(other) }
+      ]
+    : []
   const turn = inverse(sockets[record.hand].turn)
   return {
-    constraints: sides.flatMap(lockedHand),
+    constraints: [...holdingHand, ...second],
     attachment: { model: record.model, node: roles[record.hand].hand, position: rotate(turn, scaled(sockets[record.hand].position, -1)), turn }
   }
 }

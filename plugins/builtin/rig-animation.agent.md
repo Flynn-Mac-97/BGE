@@ -36,6 +36,7 @@ update(entity) { entity.rigClip = entity.moveSpeed > 2.8 ? 'run' : 'idle' }
 
 - Clips load asynchronously (a headless test awaits `rig.load`). A playing clip owns `entity.pose`. Unknown names hold the last pose. Switching `rigClip` crossfades from the old clip over `rig.clipFade` (0.2 s).
 - Blend: `entity.rigBlend = { clip, weight }` mixes a second looping clip over the base, in step (it starts at its frame nearest the base's first, and the cycle runs between both paces). Use it for a load or mood on a gait: `run` with `run-heavy`. Move the body at the two clips' `travelOf` mixed by the same weight.
+- A clip name may be a clip file (`motion/hero/take-a.json`) instead of a `rig.clips` name; a layer `mask` may be a list of nodes. Animation States names takes this way.
 - Layers: `rig.masks` names node lists; `entity.rigLayer = { clip, mask }` plays a clip on those nodes over the base, fading over `rig.layerFade` (0.12 s). `null` fades out; `rigLayerDone` marks a once clip's end. `speed` (default 1) plays it faster or slower; a new `startedAt` value plays the same clip again from its start.
 
 ## Detail
