@@ -31,3 +31,10 @@ far as it can. A take action:
 `{ clips, mask, hold: { holding, other }, speed }`; `mask` is 'upper', 'right-arm' or 'left-arm' (the spine and one arm, so a one-handed swing leaves the other arm to the state), 'all', or a list of nodes.
 While it plays, `acting` is an input the graph can read, so a transition can
 stop a sprint during an attack.
+
+Two items: game code sets `entity.offHandItem` too, and the same hold record
+is held in the other hand as seen in a mirror (grip, guard yaw and roll). Its
+`offSet` names a set that turns on only then and wins over the item's own set,
+so a dual set can give its own `attack`. A path action with `item: 'off'`
+moves the off-hand item; write its keys as for the holding hand, and they
+are mirrored as they play. `animation.hold '{"id":"p","item":"sword","hand":"off"}'`.

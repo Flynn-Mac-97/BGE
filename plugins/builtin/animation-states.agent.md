@@ -22,7 +22,7 @@ things, never a clip:
 
 ```js
 entity.animationInputs = { moving, gait, crouched, turning }   // what the transitions read
-entity.heldItem = 'sword'                                      // null lets go
+entity.heldItem = 'sword'                                      // null lets go; offHandItem for the other hand
 entity.animationAction = 'attack'                              // a request, taken when read
 const speed = context.animationStates.travelOf(entity)         // move at this so feet do not slide
 ```

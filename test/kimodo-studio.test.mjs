@@ -282,3 +282,43 @@ test('a drawn path ends at the tip, the item\'s length from the hand, and a set 
   assert.deepEqual(JSON.parse(text), set)
   assert.ok(text.includes('{"at":0.3,"guard":{"pitch":90}}'), 'each key on one line')
 })
+
+test('an off-hand item is held as the main one seen in a mirror, and only an off-hand action moves it', async () => {
+  const { stepBody } = await import('../plugins/builtin/animation-states/body-step.js')
+  const { applyConstraints } = await import('../plugins/builtin/rig-animation/constraints.js')
+  const { widenSkeleton, placeOf } = await import('../plugins/builtin/rig-animation/skeleton.js')
+  const { widenClip, applyClip } = await import('../plugins/builtin/rig-animation.js')
+  const rig = widenSkeleton(skeleton, 'kimodo-mannequin.skeleton.json')
+  const idle = widenClip(clip, 'kimodo-idle.json')
+  const sword = {
+    model: 'models/items/sword.glb',
+    hand: 'right',
+    points: { axis: [0, -1, 0], upAxis: [0, 0, 1], up: 'outward' },
+    grip: { sockets: { right: { turn: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], position: [0.1, -0.09, 0.02] } } },
+    guard: { distance: 0.25, height: -0.15, side: 0.3, pitch: 50, yaw: -25, roll: -60 },
+    motion: { stiffness: 0, damping: 0, sway: 0, swaySpeed: 0 },
+    offSet: 'dual'
+  }
+  const dual = { actions: { cut: { item: 'off', hand: [{ at: 0, guard: {} }, { at: 0.3, guard: { height: 0.3, side: -0.1 } }, { at: 0.6, guard: {} }] } } }
+  const files = { 'models/items/sword.hold.json': sword, 'animation/sets/dual.set.json': dual }
+  const graph = { folder: 'motion/kimodo-mannequin', start: 'idle', states: { idle: { clips: ['kimodo-idle'] } }, transitions: [] }
+  const entity = { id: 'dual', heldItem: 'sword', offHandItem: 'sword', _definition: { animationStates: graph }, animationInputs: {}, pose: null, _rigTime: 0 }
+  const step = seconds => {
+    applyClip(entity, idle, {})
+    stepBody({ entity, readJson: file => files[file] ?? null, skeletonOf: () => rig, random: () => 0, seconds, report: () => {} })
+    applyConstraints(entity, rig, entity.rigConstraints ?? [], seconds)
+    return { right: placeOf(rig, entity.pose, 'RightHand').position, left: placeOf(rig, entity.pose, 'LeftHand').position }
+  }
+  step(1 / 60)
+  const still = step(1 / 60)
+  assert.ok(entity.attachments.held && entity.attachments.heldOff, 'both items are on a hand')
+  const chest = placeOf(rig, entity.pose, 'Spine2').position
+  const across = Math.abs(still.right[0] - chest[0] + (still.left[0] - chest[0]))
+  assert.ok(across < 0.05 && Math.abs(still.right[1] - still.left[1]) < 0.05, `the hands mirror each other (off by ${across.toFixed(3)} m)`)
+  entity.animationAction = 'cut'
+  for (let frame = 0; frame < 18; frame++) step(1 / 60)
+  const cutting = step(1 / 60)
+  const moved = (from, to) => Math.hypot(...from.map((value, axis) => value - to[axis]))
+  assert.ok(moved(still.left, cutting.left) > 0.15, 'the off hand swings')
+  assert.ok(moved(still.right, cutting.right) < 0.05, 'the main hand keeps its guard')
+})

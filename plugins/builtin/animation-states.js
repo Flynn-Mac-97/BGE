@@ -16,7 +16,7 @@
  * `animation.scaffold` and checks it with `animation.graph`.
  */
 import { makeOnceReporter } from '../../engine/report-once.js'
-import { ITEM_FOLDER, SET_FOLDER, graphOf, heldRecordOf, setNamesOf, setsOf, stepBody } from './animation-states/body-step.js'
+import { ITEM_FOLDER, SET_FOLDER, graphOf, heldRecordOf, offHandItemRecordOf, setNamesOf, setsOf, stepBody } from './animation-states/body-step.js'
 import { actionNames, actionOf, machineWith } from './animation-states/graph.js'
 import { graphReport } from './animation-states/report.js'
 import { scaffoldGraph } from './animation-states/scaffold.js'
@@ -84,7 +84,8 @@ const stateReport = entity => ({
   isClipDone: Boolean(entity.rigDone),
   action: entity._animationAction?.name ?? null,
   inputs: entity.animationInputs ?? {},
-  held: entity.heldItem ?? null
+  held: entity.heldItem ?? null,
+  offHand: entity.offHandItem ?? null
 })
 
 /** The machine a body runs now, and the sets that are on; null while its graph loads. */
@@ -92,7 +93,7 @@ function machineOf(state, entity) {
   const readJson = path => readJsonIn(state, path)
   const graph = graphOf(entity._definition, readJson)
   if (!graph) return null
-  const sets = setsOf(graph, setNamesOf(graph, heldRecordOf(entity, graph, readJson)), readJson)
+  const sets = setsOf(graph, setNamesOf(graph, heldRecordOf(entity, graph, readJson), offHandItemRecordOf(entity, graph, readJson)), readJson)
   return { graph, sets, machine: machineWith(graph, sets) }
 }
 
@@ -233,11 +234,11 @@ export default {
     {
       id: 'animation.hold',
       label: 'Hold an item, or let go',
-      // args: {"id":"player","item":"sword"}; item null or "none" lets go
+      // args: {"id":"player","item":"sword"}; item null or "none" lets go; "hand":"off" holds it in the off hand
       run: (context, options = {}) => {
         const entity = context.world.entities.find(one => one.id === options.id)
         if (!entity) return { error: `no entity ${options.id}` }
-        entity.heldItem = options.item && options.item !== 'none' ? options.item : null
+        entity[options.hand === 'off' ? 'offHandItem' : 'heldItem'] = options.item && options.item !== 'none' ? options.item : null
         return stateReport(entity)
       }
     },

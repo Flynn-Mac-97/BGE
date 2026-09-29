@@ -7,11 +7,16 @@
  * `readJson(path)` is an asset file under assets/ as a record, or null while
  * it loads or when it is missing (the plugin reads and reports). The entity's
  * own fields it writes: `animationState`, `rigClip`, `rigRootTurn`,
- * `rigLayer`, `rigConstraints` and `attachments.held`, and the private ones
- * named below.
+ * `rigLayer`, `rigConstraints`, `attachments.held` and `attachments.heldOff`,
+ * and the private ones named below.
+ *
+ * `entity.offHandItem` holds a second item in the other hand: its own hold
+ * record seen in a mirror (held-items.js `offHandRecord`), and its `offSet`
+ * turned on. A path action with `item: 'off'` moves that item; its keys are
+ * written as for the holding hand, and are mirrored as they play.
  */
 import { nextState, pickClip } from './machine.js'
-import { heldPose } from './held-items.js'
+import { heldPose, offHandRecord } from './held-items.js'
 import { actionOf, armMaskOf, machineWith, upperBodyOf } from './graph.js'
 import { FOLLOW, followOf, isPathAction, motionOf, recordAlong } from './guard-path.js'
 import { rolesOf } from '../rig-animation/clip-reading.js'
@@ -27,12 +32,27 @@ export const SET_FOLDER = 'animation/sets'
 export const graphOf = (definition, readJson) =>
   typeof definition.animationStates === 'string' ? readJson(definition.animationStates) : definition.animationStates
 
-/** The hold record of the entity's item, or null. */
-export const heldRecordOf = (entity, graph, readJson) =>
-  entity.heldItem ? readJson(`${graph.items ?? ITEM_FOLDER}/${entity.heldItem}.hold.json`) : null
+/** The hold record of `item`, as its file has it, or null. */
+const holdRecordOf = (graph, item, readJson) => (item ? readJson(`${graph.items ?? ITEM_FOLDER}/${item}.hold.json`) : null)
 
-/** The names of the sets on: the graph's own, then the held item's. */
-export const setNamesOf = (graph, heldRecord) => [...(graph.sets ?? []), ...(heldRecord?.set ? [heldRecord.set] : [])]
+/** The hold record of the entity's item, or null. */
+export const heldRecordOf = (entity, graph, readJson) => holdRecordOf(graph, entity.heldItem, readJson)
+
+/** The hold record of the entity's off-hand item as its file has it (for the holding hand), or null. */
+export const offHandItemRecordOf = (entity, graph, readJson) => holdRecordOf(graph, entity.offHandItem, readJson)
+
+/**
+ * The names of the sets on: the graph's own, the held item's, then the set
+ * the off-hand item turns on (`offSet`), which wins where it gives the same action.
+ */
+export const setNamesOf = (graph, heldRecord, offHandRecordOnFile = null) => [
+  ...(graph.sets ?? []),
+  ...(heldRecord?.set ? [heldRecord.set] : []),
+  ...(offHandRecordOnFile?.offSet ? [offHandRecordOnFile.offSet] : [])
+]
+
+/** Which held item an action moves: 'main', or 'off' for the off-hand item. */
+const movedItemOf = action => (action?.item === 'off' ? 'off' : 'main')
 
 /** The set records that have loaded, in order. */
 export const setsOf = (graph, names, readJson) => names.map(name => readJson(`${graph.setsFolder ?? SET_FOLDER}/${name}.set.json`)).filter(Boolean)
@@ -94,6 +114,7 @@ function maskOf(skeleton, mask) {
  */
 const playingOf = (name, action, guard, start = null) => ({
   name,
+  item: movedItemOf(action),
   hands: action.hold ?? {},
   body: action.body ?? FOLLOW,
   next: action.next ?? null,
@@ -108,8 +129,8 @@ const playingOf = (name, action, guard, start = null) => ({
  * layer on its mask. A path action with a take plays both: the take on the
  * legs, say, so the feet step, and the keys on the item and the arms.
  */
-function startAction(entity, { name, action, guard, start }, skeleton, random) {
-  entity._animationAction = playingOf(name, action, guard, start)
+function startAction(entity, { name, action, guards, start }, skeleton, random) {
+  entity._animationAction = playingOf(name, action, guards[movedItemOf(action)], start)
   // An action with no take leaves the layer as it is: a combo's later swings keep the first one's footwork.
   if (!action.clips?.length) return
   entity._animationActionCount = (entity._animationActionCount ?? 0) + 1
@@ -127,14 +148,16 @@ function startAction(entity, { name, action, guard, start }, skeleton, random) {
  * and has reached its `link`, from where the item is. Answers true when it
  * chained.
  */
-function chainedOn(entity, { sets, guard, skeleton, random }, asked, seconds) {
+function chainedOn(entity, { sets, guards, skeleton, random }, asked, seconds) {
   const playing = entity._animationAction
   if (!playing?.motion) return false
   playing.time += seconds
   if (asked && playing.next) playing.isQueued = true
   const next = playing.isQueued && playing.time >= playing.link ? actionOf(sets, playing.next) : null
   if (!isPathAction(next)) return false
-  startAction(entity, { name: playing.next, action: next, guard, start: playing.motion.guardAt(playing.time) }, skeleton, random)
+  // The next swing takes over from where the item is, when it moves the same item.
+  const start = movedItemOf(next) === playing.item ? playing.motion.guardAt(playing.time) : null
+  startAction(entity, { name: playing.next, action: next, guards, start }, skeleton, random)
   return true
 }
 
@@ -142,12 +165,12 @@ function chainedOn(entity, { sets, guard, skeleton, random }, asked, seconds) {
  * Start the action game code asked for (`entity.animationAction`, taken when
  * read) as a layer over the state, chain a path action into its next, or end
  * the one playing when it is done. An action the on sets do not give is let
- * go of, and said once. `guard` is the held item's own guard.
+ * go of, and said once. `guards` is each held item's own guard, `{ main, off }`.
  */
-function stepAction(entity, sets, skeleton, random, report, seconds, guard) {
+function stepAction(entity, sets, skeleton, random, report, seconds, guards) {
   const asked = entity.animationAction
   entity.animationAction = null
-  if (chainedOn(entity, { sets, guard, skeleton, random }, asked, seconds)) return
+  if (chainedOn(entity, { sets, guards, skeleton, random }, asked, seconds)) return
   const playing = entity._animationAction
   const isPathDone = playing?.motion && playing.time > playing.motion.duration
   if (playing && (isPathDone || (!playing.motion && entity.rigLayerDone))) {
@@ -160,37 +183,51 @@ function stepAction(entity, sets, skeleton, random, report, seconds, guard) {
     report(`no set that is on gives the action "${asked}"`)
     return
   }
-  startAction(entity, { name: asked, action, guard, start: null }, skeleton, random)
+  startAction(entity, { name: asked, action, guards, start: null }, skeleton, random)
 }
 
-/** The hold record this step: during a path action, its guard moved along the action's motion. */
-function recordNow(entity, record) {
+/**
+ * Each item held this step, `{ item, attachment, record, rest }`: `record` the
+ * hold as it is now (during a path action that moves it, its guard moved
+ * along the motion), `rest` as its file has it, each seen from the hand that
+ * holds it. `records` is `{ main, off }` as the files have them.
+ */
+function holdsNow(entity, records) {
   const acting = entity._animationAction
-  return record && acting?.motion ? recordAlong(record, acting.motion, acting.time) : record
+  const moved = (record, item) => (acting?.motion && acting.item === item ? recordAlong(record, acting.motion, acting.time) : record)
+  return [
+    records.main && { item: 'main', attachment: 'held', record: moved(records.main, 'main'), rest: records.main },
+    records.off && { item: 'off', attachment: 'heldOff', record: offHandRecord(moved(records.off, 'off')), rest: offHandRecord(records.off) }
+  ].filter(Boolean)
 }
 
-/** Hold the entity's item this step, or let go of one it held. */
-function stepHold(entity, record, skeleton, machine, seconds) {
+/** The attachments with the held items' dropped. */
+const withoutHeld = attachments => Object.fromEntries(Object.entries(attachments ?? {}).filter(([name]) => name !== 'held' && name !== 'heldOff'))
+
+/** Hold the entity's items this step, or let go of those it held. */
+function stepHold(entity, records, skeleton, machine, seconds) {
   // `entity.holdWeight` (default 1) scales the whole hold: 0 shows the clip's own arms with the item still in the hand.
   const weight = (machine.states[entity.animationState]?.hold ?? 1) * (entity.holdWeight ?? 1)
-  const hands = entity._animationAction?.hands ?? {}
-  const memory = (entity._heldMemory ??= {})
-  const now = recordNow(entity, record)
-  const held = now && skeleton && entity.pose && heldPose({ record: now, skeleton, pose: entity.pose, seconds: entity._heldTime ?? 0, memory, weight, hands })
+  const acting = entity._animationAction
+  const memories = (entity._heldMemories ??= { main: {}, off: {} })
+  const holds = skeleton && entity.pose ? holdsNow(entity, records) : []
+  const posed = holds
+    .map(hold => ({ ...hold, held: heldPose({ record: hold.record, skeleton, pose: entity.pose, seconds: entity._heldTime ?? 0, memory: memories[hold.item], weight, hands: acting?.item === hold.item ? acting.hands : {} }) }))
+    .filter(hold => hold.held)
   entity._heldTime = (entity._heldTime ?? 0) + seconds
-  if (!held) {
+  if (!posed.length) {
     if (!entity._isHolding) return
-    entity.attachments = Object.fromEntries(Object.entries(entity.attachments ?? {}).filter(([name]) => name !== 'held'))
+    entity.attachments = withoutHeld(entity.attachments)
     entity.rigConstraints = []
     entity._isHolding = false
     return
   }
-  const { model, node, position, turn } = held.attachment
-  entity.attachments = { ...entity.attachments, held: { model, node, position, rotation: yawPitchRollOf(turn) } }
-  // During a path action the spine turns after the item first, then the hands reach it.
-  const acting = entity._animationAction
-  const follow = acting?.motion ? followOf(skeleton, now.guard, record.guard, acting.body) : null
-  entity.rigConstraints = [...(follow ? [{ ...follow, weight: follow.weight * weight }] : []), ...held.constraints]
+  const attachments = Object.fromEntries(posed.map(({ attachment, held: { attachment: { model, node, position, turn } } }) => [attachment, { model, node, position, rotation: yawPitchRollOf(turn) }]))
+  entity.attachments = { ...withoutHeld(entity.attachments), ...attachments }
+  // During a path action the spine turns after the item it moves first, then the hands reach it.
+  const mover = acting?.motion && posed.find(hold => hold.item === acting.item)
+  const follow = mover ? followOf(skeleton, mover.record.guard, mover.rest.guard, acting.body) : null
+  entity.rigConstraints = [...(follow ? [{ ...follow, weight: follow.weight * weight }] : []), ...posed.flatMap(hold => hold.held.constraints)]
   entity._isHolding = true
 }
 
@@ -202,12 +239,13 @@ export function stepBody({ entity, readJson, skeletonOf, random, seconds, report
   const graph = graphOf(entity._definition, readJson)
   if (!graph) return null
   const record = heldRecordOf(entity, graph, readJson)
-  const names = setNamesOf(graph, record)
+  const offRecord = offHandItemRecordOf(entity, graph, readJson)
+  const names = setNamesOf(graph, record, offRecord)
   const sets = setsOf(graph, names, readJson)
   const machine = machineWith(graph, sets)
   const skeleton = skeletonOf(entity)
   stepMachine(entity, machine, random, `${names.join(',')}:${sets.length}`)
-  stepAction(entity, sets, skeleton, random, report, seconds, record?.guard ?? {})
-  stepHold(entity, record, skeleton, machine, seconds)
+  stepAction(entity, sets, skeleton, random, report, seconds, { main: record?.guard ?? {}, off: offRecord?.guard ?? {} })
+  stepHold(entity, { main: record, off: offRecord }, skeleton, machine, seconds)
   return machine
 }

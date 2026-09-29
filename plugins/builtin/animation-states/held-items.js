@@ -31,6 +31,8 @@
  *     weight: 1,                         0 leaves the clip's hands, 1 holds fully
  *     length?: 0.95                      sockets only: metres from the item's origin to its tip
  *                                        along `points.axis`, where a drawn path (guard-path.js) follows
+ *     set?: 'one-handed',                the set the item turns on
+ *     offSet?: 'dual'                    the set it turns on held in the off hand (offHandRecord)
  *   }
  * Socket and mount numbers fit the rig they were set on; each rig's hands
  * differ, so an item set on one rig needs its grip set again on another.
@@ -64,6 +66,27 @@ const WRIST = { bend: 65, twist: 70, share: 0.5 }
 
 /** Which way is out from the body along X for each side: the model's right is -X. */
 const OUTWARD = { right: -1, left: 1 }
+
+/** A turn seen in a mirror across X, the item's own X flipped with it, so it is a turn again. */
+const mirroredTurn = ([x, y, z, w]) => [x, -y, -z, w]
+
+/** A place, or a hand's grip, seen in the same mirror. */
+const mirroredPlace = ([x, y, z]) => [-x, y, z]
+const mirroredGrip = ({ position, turn, ...rest }) => ({ ...rest, position: mirroredPlace(position), turn: mirroredTurn(turn) })
+
+/**
+ * The hold record for the same item in the other hand: the holding hand's
+ * grip and the guard seen in a mirror across the body (`side` is already
+ * measured outward, so yaw and roll change sign). Only the holding hand's
+ * socket is kept, so the other hand does not reach for a second grip. A
+ * rig's left and right hand bones mirror each other, so one grip serves both.
+ */
+export function offHandRecord(record) {
+  const { sockets, mount } = record.grip
+  const guard = { ...record.guard, yaw: -(record.guard.yaw ?? 0), roll: -(record.guard.roll ?? 0) }
+  const grip = mount ? { mount: mirroredGrip(mount) } : { sockets: { [OTHER[record.hand]]: mirroredGrip(sockets[record.hand]) } }
+  return { ...record, hand: OTHER[record.hand], grip, guard }
+}
 
 /** The other hand. */
 const OTHER = { right: 'left', left: 'right' }
