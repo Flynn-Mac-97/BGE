@@ -222,4 +222,13 @@ export const BASE_CSS = `
 
 /* Tooltip box (tooltip.js). */
 .ui-tooltip-box { position: absolute; max-width: 260px; padding: var(--ui-space) calc(var(--ui-space) * 1.5); background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: calc(var(--ui-radius) * 0.7); font-size: 0.9em; pointer-events: none; animation: ui-fade-in var(--ui-duration) both; }
+
+/* Long lists: rows out of view skip layout and paint. A log stays at its bottom; a virtual list places only the rows in view. */
+.ui-row-item, .ui-table-row, .ui-log-line { content-visibility: auto; contain-intrinsic-size: auto 2.5em; }
+.ui-log { display: flex; flex-direction: column-reverse; overflow: auto; max-height: var(--height, 160px); background: var(--ui-track); border-radius: var(--ui-radius); }
+.ui-log-inner { padding: var(--ui-space); display: flex; flex-direction: column; gap: 2px; }
+.ui-log-line { font-size: 0.9em; }
+.ui-vlist { position: relative; overflow: auto; height: var(--height, 240px); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); }
+.ui-vlist-inner { position: relative; }
+.ui-vlist-row { position: absolute; left: 0; right: 0; height: var(--row, 32px); content-visibility: visible; }
 `

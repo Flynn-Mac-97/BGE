@@ -28,6 +28,8 @@
 | `avatar({ image, name, size, status })` | a round picture or initials; `status`: `online away busy` |
 | `keybind(label, code, { isListening })` | a label and a keycap; the keycap raises `rebind`. Then call `gameUi.captureKey` |
 | `radial(items, { x, y, radius })` | items `{ label, value, glyph, isDisabled }` on a circle clockwise from the top. Use `gameUi.radial` |
+| `log(lines, { height, max })` | a chat or combat log that stays at its newest line with no script; lines are text or `{ who, text, tone }`, and only the last `max` (200) are drawn |
+| `virtualList(items, { rowHeight, height, top, overscan, pick })` | any number of rows, only those in view drawn. Keep `top` from the `scroll` action |
 | `contextMenu(items, { x, y })` | a menu at a point over an outside layer that dismisses it; rows are `{ label, value, isDisabled, kind }` or `{ isDivider: true }`. Use `gameUi.menu` |
 | `element(children, { as, attributes })` | any tag: the way to markup the kit has no name for |
 | `target(children, { action, value, triggers, as, attributes })` | any element that raises your event; `attributes` such as `data-hot` are for your CSS |
@@ -68,3 +70,9 @@ kit.slot({ glyph: '⚔', tipKey: 'item', tipValue: 'sword' })
 - A control that keys or a gamepad stick moved focus to explains itself under the element. Pointer movement anywhere hands it back to the pointer.
 - Text is escaped; a provider's HTML is yours. A provider that answers nothing falls back to `tip`. `gameUi.tipHtml({ tip, tipKey, tipValue })` answers what the box would show, for a test. Style `.ui-tooltip-box`.
 - `kit.tooltip(content, text)` is the CSS-only version, for a plain hover.
+
+## Long lists
+
+- **Any list, table or log:** rows out of view skip layout and paint (`content-visibility: auto`), so a few hundred rows cost little.
+- **Thousands of rows:** use `virtualList`. Keep the scroll position in your state: the `scroll` action's value is `scrollTop` in pixels, and you pass it back as `top`. Rows are a fixed height, so the scroll bar is exact, and about 14 rows are in the page whatever the length. `pick: 'action'` makes rows clickable; `gameUi.controls(id)` lists only the rows drawn.
+- **A log:** `log(lines)` needs no script. Append to your array; the newest line stays at the bottom, and a person who scrolls up is not pulled back down until they return.

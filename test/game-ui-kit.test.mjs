@@ -799,3 +799,48 @@ test('a focused control explains itself only when keys led, not when the pointer
   runTooltip(context, state, 0.016)
   assert.equal(state.tip.isShown, false, 'the pointer took over, so the focus tip goes')
 })
+
+test('a log draws its newest lines in order, escaped, capped, in a bottom-anchored scroller', () => {
+  const html = kit.log(['one', { who: 'Ada', text: 'two <b>', tone: 'danger' }, 'three'], { max: 2 })
+  assert.match(html, /class="ui-log"/)
+  assert.doesNotMatch(html, />one</, 'the oldest is dropped past max')
+  assert.match(html, /<b>Ada <\/b>two &lt;b&gt;/)
+  assert.match(html, /data-tone="danger"/)
+  assert.ok(html.indexOf('two') < html.indexOf('three'), 'oldest first in the page; the scroller is what puts the newest at the bottom')
+  const { context } = loaded()
+  context.gameUi.show('chat', { html })
+  assert.equal(context.gameUi.read('chat'), 'Ada two <b> three')
+})
+
+test('a virtual list draws only the rows near its window, sized for all of them', () => {
+  const items = Array.from({ length: 5000 }, (unused, index) => ({ label: `Row ${index}`, value: index }))
+  const top = kit.virtualList(items, { rowHeight: 30, height: 300, top: 0, overscan: 2, pick: 'pick' })
+  const rowsAt = html => (html.match(/ui-vlist-row/g) ?? []).length
+  assert.equal(rowsAt(top), 12, '10 in view and 2 of overscan below')
+  assert.match(top, /class="ui-vlist-inner" style="height:150000px"/, 'the scroll bar is the length of all 5000')
+  const scrolled = kit.virtualList(items, { rowHeight: 30, height: 300, top: 3000, overscan: 2, pick: 'pick' })
+  assert.equal(rowsAt(scrolled), 14, '2 above, 10 in view, 2 below')
+  assert.match(scrolled, /Row 98/)
+  assert.doesNotMatch(scrolled, /Row 50</)
+  assert.match(scrolled, /style="top:2940px"/, 'rows sit at their place in the whole list')
+  const end = kit.virtualList(items, { rowHeight: 30, height: 300, top: 149700, overscan: 2 })
+  assert.match(end, /Row 4999/)
+  assert.equal(rowsAt(end), 12)
+})
+
+test('a virtual list reports its scroll position, cannot be focused, and lists only the rows it drew', () => {
+  const { context, step } = loaded()
+  const seen = []
+  let top = 0
+  const items = Array.from({ length: 1000 }, (unused, index) => ({ label: `R${index}`, value: index }))
+  context.gameUi.show('list', { takesKeys: true, html: () => kit.virtualList(items, { rowHeight: 30, height: 300, top, pick: 'pick' }), on: { scroll: value => { top = value; seen.push(value) }, pick: value => seen.push('pick ' + value) } })
+  const before = context.gameUi.controls('list')
+  assert.equal(before.filter(control => control.action === 'pick').length, 14, '10 in view and the default 4 of overscan')
+  assert.equal(before.find(control => control.action === 'scroll').isPassive, true)
+  assert.equal(before[0].isFocused, false, 'focus starts on a row, not the scroller')
+  assert.equal(context.gameUi.click('list', 'scroll', 6000, 'scroll'), true)
+  step()
+  assert.deepEqual(seen, [6000])
+  const after = context.gameUi.controls('list').filter(control => control.action === 'pick').map(control => control.value)
+  assert.deepEqual([after[0], after.at(-1)], ['196', '213'], 'the window moved to rows 196 to 213')
+})

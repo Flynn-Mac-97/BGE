@@ -33,7 +33,8 @@ function routeControlEvent(event, report) {
   if ((event.type === 'pointerover' || event.type === 'pointerout') && control.contains(event.relatedTarget)) return
   const field = control.querySelector('input, select') ?? control
   const isOwnEvent = TRIGGER[kind] === event.type
-  const value = isOwnEvent && FIELD_VALUES[kind] ? FIELD_VALUES[kind](field) : control.dataset.value ?? ''
+  // A scroll reports where the scrolled element is.
+  const value = event.type === 'scroll' ? event.target.scrollTop : isOwnEvent && FIELD_VALUES[kind] ? FIELD_VALUES[kind](field) : control.dataset.value ?? ''
   report({ action: control.dataset.action, value, kind, type: event.type, x: event.clientX ?? 0, y: event.clientY ?? 0, target: control })
 }
 
@@ -45,6 +46,8 @@ export function watchRoot(root, { report, hover, tip }) {
   root.addEventListener('pointerover', event => hover(event.target.closest?.('[data-ui]')?.dataset.ui ?? null, event.target))
   root.addEventListener('pointerout', event => { if (!event.relatedTarget || !root.contains(event.relatedTarget)) hover(null, event.target) })
   for (const type of EVENT_TYPES) root.addEventListener(type, event => routeControlEvent(event, report))
+  // Scroll does not bubble, so it is heard on the way down.
+  root.addEventListener('scroll', event => routeControlEvent(event, report), true)
   watchDrag(root, report)
   if (!tip) return
   root.addEventListener('pointerover', event => {

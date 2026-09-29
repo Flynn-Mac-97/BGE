@@ -198,6 +198,39 @@ const components = {
     return tag('table', { class: 'ui-table' }, tag('thead', {}, tag('tr', {}, head)) + tag('tbody', {}, body))
   },
 
+  /**
+   * A log that shows its newest line at the bottom and stays there as lines
+   * arrive, with no script: the scroller is `column-reverse`, which anchors its
+   * scroll at the end. `lines` are strings or `{ who, text, tone }`, oldest
+   * first; only the last `max` are drawn, so a long fight cannot grow the page.
+   */
+  log: (lines, { height = 160, max = 200 } = {}) =>
+    tag('div', { class: 'ui-log', role: 'log', style: `--height:${Number(height) || 160}px` }, tag('div', { class: 'ui-log-inner' },
+      lines.slice(-max).map(line => {
+        const { who, text, tone } = typeof line === 'string' ? { text: line } : line
+        return tag('div', { class: 'ui-log-line', 'data-tone': tone }, (who ? tag('b', {}, escapeHtml(who) + ' ') : '') + escapeHtml(text))
+      }).join(''))),
+
+  /**
+   * A list of any length that draws only the rows in view. `items` are
+   * `{ label, detail, value }`; `top` is the pixels scrolled, which the game
+   * keeps from the `scroll` action (its value is the scroll position), so a row
+   * is drawn only within `overscan` rows of the window. Row height is fixed, so
+   * the scroll bar is exact. With `pick`, a row raises it with its value.
+   */
+  virtualList: (items, { rowHeight = 32, height = 240, top = 0, overscan = 4, pick, scrollAction = 'scroll' } = {}) => {
+    const first = Math.max(0, Math.floor(top / rowHeight) - overscan)
+    const last = Math.min(items.length, Math.ceil((top + height) / rowHeight) + overscan)
+    const rows = items.slice(first, last).map((item, offset) => {
+      const attributes = { class: 'ui-row-item ui-vlist-row', style: `top:${(first + offset) * rowHeight}px` }
+      const inner = tag('span', {}, escapeHtml(item.label)) + (item.detail === undefined ? '' : tag('span', { 'data-tone': 'quiet' }, escapeHtml(item.detail)))
+      if (!pick) return tag('div', attributes, inner)
+      return tag('button', { ...attributes, type: 'button', ...controlAttributes('row', { action: pick, value: item.value, label: item.label }) }, inner)
+    }).join('')
+    return tag('div', { class: 'ui-vlist', style: `--height:${height}px;--row:${rowHeight}px`, ...controlAttributes('target', { action: scrollAction, triggers: ['scroll'] }), 'data-passive': true },
+      tag('div', { class: 'ui-vlist-inner', style: `height:${items.length * rowHeight}px` }, rows))
+  },
+
   /** A round picture, or the name's initials when there is none. `status` is `online`, `away` or `busy`. */
   avatar: ({ image, name = '', size = 40, status } = {}) =>
     tag('span', { class: 'ui-avatar', title: name, 'data-status': status, style: `--size:${Number(size) || 40}px` },

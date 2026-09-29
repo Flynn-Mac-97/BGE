@@ -110,14 +110,14 @@ export default {
     const loadTheme = async (name = THEME_FILE) => useTheme(await context.files.read(assetPath(name)), 'file', name)
 
     /** The enabled control an action names, taking the one with this value when several share the action. */
-    const controlFor = (id, action, value) => {
+    const controlFor = (id, action, value, type) => {
       const record = recordOf(id)
       if (!record || record.phase === 'leaving') return undefined
       refresh(record, targetOf(record))
       const candidates = record.lastControls.filter(control => control.action === action && !control.isDisabled)
       const exact = candidates.find(control => String(control.value) === String(value))
-      // A control raised by a click sends its own value, so another one's is no substitute. Others take `value` as the new value.
-      return exact ?? candidates.find(control => value === undefined || TRIGGER[control.kind] !== 'click')
+      // A control raised by a click sends its own value, so another one's is no substitute. Other events carry `value`.
+      return exact ?? candidates.find(control => value === undefined || TRIGGER[control.kind] !== 'click' || (type !== undefined && type !== 'click'))
     }
 
     context.gameUi = {
@@ -197,10 +197,11 @@ export default {
        * control has this action and trigger.
        */
       click(id, action, value, type) {
-        const control = controlFor(id, action, value)
+        const control = controlFor(id, action, value, type)
         const raised = type ?? control?.triggers[0]
         if (!control || !control.triggers.includes(raised)) return false
-        const sendsOwnValue = raised !== TRIGGER[control.kind] || raised === 'click'
+        // A scroll reports where it scrolled to, so the caller's value stands in for it.
+        const sendsOwnValue = raised !== 'scroll' && (raised !== TRIGGER[control.kind] || raised === 'click')
         state.queue.push(makeUiEvent(id, action, sendsOwnValue ? control.value : value, control.kind, { type: raised }))
         return true
       },
