@@ -59,7 +59,7 @@ async function loadBody(state, entity, items) {
   const graph = typeof definition.animationStates === 'string' ? await loadJsonIn(state, definition.animationStates) : definition.animationStates
   if (!graph) return []
   const holds = await Promise.all(items.map(item => loadJsonIn(state, `${graph.items ?? ITEM_FOLDER}/${item}.hold.json`)))
-  const names = [...new Set([...(graph.sets ?? []), ...holds.map(hold => hold?.set).filter(Boolean)])]
+  const names = [...new Set([...(graph.sets ?? []), ...holds.flatMap(hold => [hold?.set, hold?.offSet]).filter(Boolean)])]
   const sets = (await Promise.all(names.map(name => loadJsonIn(state, `${graph.setsFolder ?? SET_FOLDER}/${name}.set.json`)))).filter(Boolean)
   const machine = machineWith(graph, sets)
   const clips = [
