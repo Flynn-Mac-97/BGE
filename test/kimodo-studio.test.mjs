@@ -299,7 +299,12 @@ test('an off-hand item is held as the main one seen in a mirror, and only an off
     motion: { stiffness: 0, damping: 0, sway: 0, swaySpeed: 0 },
     offSet: 'dual'
   }
-  const dual = { actions: { cut: { item: 'off', hand: [{ at: 0, guard: {} }, { at: 0.3, guard: { height: 0.3, side: -0.1 } }, { at: 0.6, guard: {} }] } } }
+  const dual = {
+    actions: {
+      cut: { item: 'off', hand: [{ at: 0, guard: {} }, { at: 0.3, guard: { height: 0.3, side: -0.1 } }, { at: 0.6, guard: {} }] },
+      raise: { next: 'cut', link: 0.3, hand: [{ at: 0, guard: {} }, { at: 0.3, guard: { height: 0.4 } }, { at: 0.9, guard: {} }] }
+    }
+  }
   const files = { 'models/items/sword.hold.json': sword, 'animation/sets/dual.set.json': dual }
   const graph = { folder: 'motion/kimodo-mannequin', start: 'idle', states: { idle: { clips: ['kimodo-idle'] } }, transitions: [] }
   const entity = { id: 'dual', heldItem: 'sword', offHandItem: 'sword', _definition: { animationStates: graph }, animationInputs: {}, pose: null, _rigTime: 0 }
@@ -321,4 +326,13 @@ test('an off-hand item is held as the main one seen in a mirror, and only an off
   const moved = (from, to) => Math.hypot(...from.map((value, axis) => value - to[axis]))
   assert.ok(moved(still.left, cutting.left) > 0.15, 'the off hand swings')
   assert.ok(moved(still.right, cutting.right) < 0.05, 'the main hand keeps its guard')
+
+  // A chain into the other hand's swing leaves the first item to finish its own path, not snap to its guard.
+  for (let frame = 0; frame < 60; frame++) step(1 / 60)
+  entity.animationAction = 'raise'
+  for (let frame = 0; frame < 19; frame++) step(1 / 60)
+  entity.animationAction = 'raise'
+  for (let frame = 0; frame < 4; frame++) step(1 / 60)
+  assert.equal(entity._animationAction.name, 'cut', 'the chain has moved to the off hand')
+  assert.ok(step(1 / 60).right[1] - still.right[1] > 0.2, 'the main hand is still high on its way back')
 })

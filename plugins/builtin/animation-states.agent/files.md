@@ -37,4 +37,5 @@ is held in the other hand as seen in a mirror (grip, guard yaw and roll). Its
 `offSet` names a set that turns on only then and wins over the item's own set,
 so a dual set can give its own `attack`. A path action with `item: 'off'`
 moves the off-hand item; write its keys as for the holding hand, and they
-are mirrored as they play. `animation.hold '{"id":"p","item":"sword","hand":"off"}'`.
+are mirrored as they play. A combo may chain from one hand to the other; the
+item left mid-swing finishes its own path back to its guard. `animation.hold '{"id":"p","item":"sword","hand":"off"}'`.

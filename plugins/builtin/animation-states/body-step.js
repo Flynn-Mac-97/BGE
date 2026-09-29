@@ -155,10 +155,23 @@ function chainedOn(entity, { sets, guards, skeleton, random }, asked, seconds) {
   if (asked && playing.next) playing.isQueued = true
   const next = playing.isQueued && playing.time >= playing.link ? actionOf(sets, playing.next) : null
   if (!isPathAction(next)) return false
-  // The next swing takes over from where the item is, when it moves the same item.
-  const start = movedItemOf(next) === playing.item ? playing.motion.guardAt(playing.time) : null
+  // The next swing takes over from where its item is. A swing of the other item leaves this one to finish
+  // its own path (its trail), so it comes back to its guard instead of snapping there.
+  const item = movedItemOf(next)
+  const trail = entity._animationTrail
+  const start = item === playing.item ? playing.motion.guardAt(playing.time) : trail?.item === item ? trail.motion.guardAt(trail.time) : null
+  entity._animationTrail = item === playing.item ? trail : { item: playing.item, motion: playing.motion, time: playing.time }
+  if (entity._animationTrail?.item === item) entity._animationTrail = null
   startAction(entity, { name: playing.next, action: next, guards, start }, skeleton, random)
   return true
+}
+
+/** Move the trail on, the path an item left mid-way finishing; drop it when done. */
+function stepTrail(entity, seconds) {
+  const trail = entity._animationTrail
+  if (!trail) return
+  trail.time += seconds
+  if (trail.time > trail.motion.duration) entity._animationTrail = null
 }
 
 /**
@@ -170,6 +183,7 @@ function chainedOn(entity, { sets, guards, skeleton, random }, asked, seconds) {
 function stepAction(entity, sets, skeleton, random, report, seconds, guards) {
   const asked = entity.animationAction
   entity.animationAction = null
+  stepTrail(entity, seconds)
   if (chainedOn(entity, { sets, guards, skeleton, random }, asked, seconds)) return
   const playing = entity._animationAction
   const isPathDone = playing?.motion && playing.time > playing.motion.duration
@@ -189,12 +203,14 @@ function stepAction(entity, sets, skeleton, random, report, seconds, guards) {
 /**
  * Each item held this step, `{ item, attachment, record, rest }`: `record` the
  * hold as it is now (during a path action that moves it, its guard moved
- * along the motion), `rest` as its file has it, each seen from the hand that
+ * along the motion, or along the trail it was left to finish), `rest` as its file has it, each seen from the hand that
  * holds it. `records` is `{ main, off }` as the files have them.
  */
 function holdsNow(entity, records) {
   const acting = entity._animationAction
-  const moved = (record, item) => (acting?.motion && acting.item === item ? recordAlong(record, acting.motion, acting.time) : record)
+  const trail = entity._animationTrail
+  const pathOf = item => (acting?.motion && acting.item === item ? acting : trail?.item === item ? trail : null)
+  const moved = (record, item) => (pathOf(item) ? recordAlong(record, pathOf(item).motion, pathOf(item).time) : record)
   return [
     records.main && { item: 'main', attachment: 'held', record: moved(records.main, 'main'), rest: records.main },
     records.off && { item: 'off', attachment: 'heldOff', record: offHandRecord(moved(records.off, 'off')), rest: offHandRecord(records.off) }
