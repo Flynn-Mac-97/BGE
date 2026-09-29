@@ -28,6 +28,18 @@ export const BASE_CSS = `
 .ui-drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0.92; transform-origin: 0 0; filter: drop-shadow(0 6px 10px var(--ui-outline)); }
 [data-drag], [data-drop] { pointer-events: auto; }
 
+/* Rings, cooldowns and pips. --fraction is registered as a number (draw.js), so a ring eases between values. */
+.ui-ring { position: relative; width: var(--size, 64px); height: var(--size, 64px); border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--ui-accent) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); transition: --fraction var(--ui-duration) var(--ui-ease); }
+.ui-ring::before { content: ''; position: absolute; inset: calc(var(--size, 64px) * 0.12); border-radius: 50%; background: var(--ui-surface); }
+.ui-ring-label { position: relative; font-size: 0.8em; }
+.ui-ring[data-kind="health"] { background: conic-gradient(var(--ui-danger) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); }
+.ui-ring[data-kind="good"] { background: conic-gradient(var(--ui-good) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); }
+.ui-cooldown { position: relative; display: inline-block; }
+.ui-cooldown[data-cooling]::after { content: ''; position: absolute; inset: 0; border-radius: var(--ui-radius); pointer-events: none; background: conic-gradient(transparent calc((1 - var(--fraction, 0)) * 1turn), rgba(0, 0, 0, 0.62) 0); }
+.ui-cooldown-text { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-weight: 700; pointer-events: none; text-shadow: 0 1px 3px var(--ui-outline); }
+.ui-pips { display: inline-flex; gap: 0.15em; color: var(--ui-danger); }
+.ui-pip[data-full="false"] { opacity: 0.45; }
+
 /* Dialogue and typewriter text. */
 .ui-untyped { visibility: hidden; }
 .ui-caret { display: inline-block; width: 0; overflow: visible; color: var(--ui-accent); animation: ui-blink 0.8s steps(1) infinite; }

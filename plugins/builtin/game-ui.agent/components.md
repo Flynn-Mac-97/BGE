@@ -18,6 +18,9 @@
 | `select(label, { action, value, options })` `textInput(label, { action, value, placeholder })` | send text |
 | `tabs(items, { action, value })` `list(items, { action })` | items `{ label, value, detail, isSelected }` |
 | `slot({ glyph, image, count, action, value, isSelected })` | an inventory cell |
+| `ring(value, { max, size, label, kind })` | circular progress; the value eases (`kind`: `health good`) |
+| `cooldown(content, { remaining, total })` | wraps content: a dark wedge sweeps away clockwise while `remaining > 0`, with the seconds in the middle. Disable the content yourself while cooling |
+| `pips(value, { max, glyph, emptyGlyph })` | hearts, ammo: `value` full of `max` |
 | `typewriter(text, { chars })` | text shown to `chars` characters; the rest is laid out but hidden, so the box never grows |
 | `dialogue({ speaker, text, chars, portrait, choices, advance, choose })` | a box that raises `advance` (click or Enter) and, once the text is complete, choice buttons that raise `choose` |
 | `element(children, { as, attributes })` | any tag: the way to markup the kit has no name for |
@@ -28,3 +31,7 @@ A control also carries `data-ui-control`, `data-action`, `data-value`, `data-lab
 ## Typing a line
 
 `const line = gameUi.typewriter(text, { speed: 30 })` starts a line now, in game time, so a replay types the same. `dialogue({ text: line.text, chars: line.chars() })` in a panel's `html` function shows it. `line.skip()` shows all, `line.isDone()`, `line.restart(next)` starts another. Full stops and `!` `?` pause a little, commas less. A common `advance` handler: skip while typing, next line when done. Style `.ui-caret` (the blinking cursor), `.ui-typed`, `.ui-dialogue-box`.
+
+## Cooldowns
+
+Read `remaining` from engine time so the sweep pauses with the game: `remaining = Math.max(0, readyAt - context.time)`. Set `readyAt = context.time + seconds` in the handler, and pass `isDisabled: remaining > 0` to the control inside. Rings and bars ease because `--fraction` is registered as a number in the page (draw.js); a ring drawn without the Game UI plugin jumps instead.

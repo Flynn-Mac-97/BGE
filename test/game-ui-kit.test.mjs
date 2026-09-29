@@ -359,3 +359,35 @@ test('a dialogue shows typed text, hides the rest, and offers choices only once 
   step()
   assert.deepEqual(seen, ['advance', 'y'])
 })
+
+test('a ring carries its fraction and label, and a cooldown sweeps while it has time left', () => {
+  assert.match(kit.ring(3, { max: 4, label: '3/4', size: 80 }), /--fraction:0.75;--size:80px/)
+  assert.match(kit.ring(1, { max: 4 }), /25%/)
+  const cooling = kit.cooldown(kit.button('Fire', { action: 'fire' }), { remaining: 2.26, total: 5 })
+  assert.match(cooling, /data-cooling/)
+  assert.match(cooling, /--fraction:0.452/)
+  assert.match(cooling, /ui-cooldown-text">2.3</)
+  assert.match(kit.cooldown('x', { remaining: 12.2, total: 20 }), />13</, 'a long wait shows whole seconds')
+  const ready = kit.cooldown('x', { remaining: 0, total: 5 })
+  assert.doesNotMatch(ready, /data-cooling|ui-cooldown-text/)
+})
+
+test('pips fill up to the value', () => {
+  const html = kit.pips(2, { max: 4 })
+  assert.equal((html.match(/data-full/g) ?? []).length, 4)
+  assert.equal((html.match(/data-full="true"/g) ?? []).length, 2)
+})
+
+test('click never presses another control of the same action when the one asked for is disabled', () => {
+  const { context, step } = loaded()
+  const seen = []
+  context.gameUi.show('bar', {
+    html: kit.row([kit.slot({ glyph: 'F', action: 'skill', value: 'fire', isDisabled: true }), kit.slot({ glyph: 'I', action: 'skill', value: 'ice' })]),
+    on: { skill: value => seen.push(value) }
+  })
+  assert.equal(context.gameUi.click('bar', 'skill', 'fire'), false)
+  assert.equal(context.gameUi.click('bar', 'skill', 'ice'), true)
+  assert.equal(context.gameUi.click('bar', 'skill'), true, 'with no value, the first enabled one')
+  step()
+  assert.deepEqual(seen, ['ice', 'ice'])
+})

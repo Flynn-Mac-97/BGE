@@ -103,7 +103,9 @@ export default {
       if (!record || record.phase === 'leaving') return undefined
       refresh(record, targetOf(record))
       const candidates = record.lastControls.filter(control => control.action === action && !control.isDisabled)
-      return candidates.find(control => String(control.value) === String(value)) ?? candidates[0]
+      const exact = candidates.find(control => String(control.value) === String(value))
+      // A control raised by a click sends its own value, so another one's is no substitute. Others take `value` as the new value.
+      return exact ?? candidates.find(control => value === undefined || TRIGGER[control.kind] !== 'click')
     }
 
     context.gameUi = {

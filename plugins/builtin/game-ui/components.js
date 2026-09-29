@@ -33,6 +33,9 @@ const tag = (name, attributes, inner = '') =>
   VOID_TAGS.has(name) ? `<${name}${attributesOf(attributes)}>` : `<${name}${attributesOf(attributes)}>${inner}</${name}>`
 const join = children => [].concat(children ?? []).join('')
 
+/** `value` as a share of `max`, from 0 to 1, to three decimals so an unchanged bar writes an unchanged string. */
+const fractionOf = (value, max) => Math.round(Math.min(Math.max(Number(value) / Number(max) || 0, 0), 1) * 1000) / 1000
+
 /** A CSS custom property for the style attribute, or nothing. Only plain numbers and lengths pass. */
 const variable = (name, value) => (/^[\w.%-]+$/.test(String(value ?? '')) ? `--${name}:${value}` : undefined)
 const styleOf = (...declarations) => declarations.filter(Boolean).join(';') || undefined
@@ -110,7 +113,7 @@ const components = {
       tag('button', { class: 'ui-tab', type: 'button', 'data-selected': item.value === value, ...controlAttributes('tab', { action, value: item.value, label: item.label }) }, escapeHtml(item.label))).join('')),
 
   bar: (value, { max = 1, label, kind, trail = true } = {}) => {
-    const fraction = Math.min(Math.max(Number(value) / Number(max) || 0, 0), 1)
+    const fraction = fractionOf(value, max)
     const head = label ? tag('div', { class: 'ui-bar-head' }, tag('span', {}, escapeHtml(label)) + tag('span', {}, `${escapeHtml(value)} / ${escapeHtml(max)}`)) : ''
     return tag('div', { class: 'ui-bar', 'data-kind': kind, role: 'progressbar', 'aria-valuenow': value, 'aria-valuemax': max },
       head + tag('div', { class: 'ui-bar-track', style: `--fraction:${fraction}` }, (trail ? tag('div', { class: 'ui-bar-trail' }) : '') + tag('div', { class: 'ui-bar-fill' })))
@@ -123,6 +126,30 @@ const components = {
     if (!action) return tag('div', attributes, inner)
     return tag('button', { ...attributes, type: 'button', ...controlAttributes('slot', { action, value, label, isDisabled, triggers }) }, inner)
   },
+
+  /** A circular progress: `value` of `max`, the centre reads `label` or the percent. `size` is pixels. */
+  ring: (value, { max = 1, size = 64, label, kind } = {}) => {
+    const fraction = fractionOf(value, max)
+    return tag('div', { class: 'ui-ring', role: 'progressbar', 'aria-valuenow': value, 'aria-valuemax': max, 'data-kind': kind, style: `--fraction:${fraction};--size:${Number(size) || 64}px` },
+      tag('span', { class: 'ui-ring-label' }, escapeHtml(label ?? `${Math.round(fraction * 100)}%`)))
+  },
+
+  /**
+   * Content under a cooldown: while `remaining` seconds of `total` are left, a
+   * dark wedge sweeps away clockwise and the seconds show in the middle. The
+   * game reads `remaining` from engine time, so the sweep pauses with the game.
+   */
+  cooldown: (content, { remaining = 0, total = 1 } = {}) => {
+    const isCooling = remaining > 0
+    const fraction = isCooling ? fractionOf(remaining, total || 1) : 0
+    const seconds = remaining >= 10 ? Math.ceil(remaining) : remaining.toFixed(1)
+    return tag('div', { class: 'ui-cooldown', 'data-cooling': isCooling, style: `--fraction:${fraction}` }, join(content) + (isCooling ? tag('span', { class: 'ui-cooldown-text' }, seconds) : ''))
+  },
+
+  /** Discrete steps, such as hearts or ammo: `value` full out of `max`. */
+  pips: (value, { max = 5, glyph = '●', emptyGlyph = '○' } = {}) =>
+    tag('span', { class: 'ui-pips', role: 'meter', 'aria-valuenow': value, 'aria-valuemax': max },
+      Array.from({ length: max }, (unused, index) => tag('span', { class: 'ui-pip', 'data-full': String(index < value) }, escapeHtml(index < value ? glyph : emptyGlyph))).join('')),
 
   /**
    * Text revealed up to `chars` characters. The rest is laid out but hidden, so

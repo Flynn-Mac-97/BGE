@@ -19,9 +19,23 @@ const REGION = 'overlay'
 /** Mount order in the region: anchors under panels, so a menu covers a nameplate. */
 const WORLD_ORDER = 40
 
+/** Custom properties that must be registered in the page, not a shadow root, to animate. */
+const PROPERTY_RULES = '@property --fraction { syntax: "<number>"; inherits: true; initial-value: 0; }'
+let hasRegisteredProperties = false
+
+/** Register them once. A shadow root's stylesheet cannot, so this adds a page stylesheet named by `--fraction` alone. */
+function registerProperties() {
+  if (hasRegisteredProperties || !('adoptedStyleSheets' in document)) return
+  hasRegisteredProperties = true
+  const sheet = new CSSStyleSheet()
+  sheet.replaceSync(PROPERTY_RULES)
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
+}
+
 /** Draw one frame. `seconds` is the frame's length, which times a `leave`. */
 export function drawFrame(context, state, seconds) {
   state.frame++
+  registerProperties()
   runPhases(context, state, seconds)
   const sheet = themeSheet(state)
   drawPanels(context, state, sheet)
