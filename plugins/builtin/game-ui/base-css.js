@@ -40,6 +40,14 @@ export const BASE_CSS = `
 .ui-pips { display: inline-flex; gap: 0.15em; color: var(--ui-danger); }
 .ui-pip[data-full="false"] { opacity: 0.45; }
 
+/* Notifications stack and popup menu. */
+.ui-notifications { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ui-space); }
+.ui-notifications > [data-ui-control] { cursor: pointer; }
+.ui-menu { position: absolute; z-index: 1; min-width: 180px; padding: calc(var(--ui-space) * 0.5); display: flex; flex-direction: column; gap: 2px; background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); pointer-events: auto; animation: ui-pop var(--ui-duration) var(--ui-ease) both; }
+.ui-menu-item { justify-content: flex-start; background: transparent; border-color: transparent; }
+.ui-menu-item:hover, .ui-menu-item[data-focus] { background: var(--ui-track); }
+.ui-menu-scrim { position: absolute; inset: 0; }
+
 /* Dialogue and typewriter text. */
 .ui-untyped { visibility: hidden; }
 .ui-caret { display: inline-block; width: 0; overflow: visible; color: var(--ui-accent); animation: ui-blink 0.8s steps(1) infinite; }

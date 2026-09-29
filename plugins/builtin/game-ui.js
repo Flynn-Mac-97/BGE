@@ -37,6 +37,8 @@ import { escapeHtml, kit } from './game-ui/components.js'
 import { dragsOf, dropsOf, TRIGGER } from './game-ui/controls.js'
 import { drawFrame } from './game-ui/draw.js'
 import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
+import { makeNotifications } from './game-ui/notifications.js'
+import { openMenu } from './game-ui/popup.js'
 import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
@@ -81,6 +83,8 @@ export default {
       world: { limit: 48, drawn: 0 }
     }
     stateOf.set(context, state)
+
+    const notifications = makeNotifications(context, state)
 
     const recordOf = id => state.panels.get(id) ?? state.anchors.get(id)
 
@@ -223,6 +227,12 @@ export default {
         }
       },
 
+      /** Show a message in the notifications stack, for `life` seconds of game time. See game-ui/notifications.js. */
+      notify: notifications.notify,
+
+      /** Open a menu of choices at `at` (`{ x, y }`, as a pointer event has), and run `onPick(value)` on a pick. See game-ui/popup.js. */
+      menu: options => openMenu(context, options),
+
       /** The payloads a panel or anchor lets a person drag, and the drop zones it offers as `{ action, value }`. */
       drags: id => dragsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
       drops: id => dropsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
@@ -255,6 +265,7 @@ export default {
     const clearRun = () => {
       for (const id of [...state.panels.keys(), ...state.anchors.keys()]) remove(id)
       state.queue.length = 0
+      notifications.clear()
     }
     context.bus.on('play:stopped', clearRun)
     context.bus.on('level:loaded', () => {

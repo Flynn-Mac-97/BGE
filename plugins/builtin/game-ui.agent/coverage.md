@@ -17,7 +17,7 @@ The loop that grows Game UI stops when every row is `done`. `done` means: a kit 
 | Drag and drop (inventory, hotbar) | done | `drag`, `drop`, ghost, zones across panels |
 | Dialogue and typewriter text | done | `kit.dialogue`, `gameUi.typewriter` |
 | Cooldown, ring and radial progress | done | `ring`, `cooldown`, `pips` |
-| Notifications stack, context menu | planned | queue and pointer-placed menu |
+| Notifications stack, context menu | done | `notify`, `menu` |
 | Accordion, table, avatar, keybind | planned | kit components |
 | Screen effects (flash, vignette, shake) | planned | full-viewport effect layer |
 | Demo shows all of it | ongoing | `ui-kit-demo` tabs |

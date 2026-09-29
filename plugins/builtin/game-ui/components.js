@@ -175,6 +175,17 @@ const components = {
     return tag('div', { class: 'ui-dialogue' }, box + options)
   },
 
+  /**
+   * A menu of choices at a point (`x`, `y` in pixels), over a transparent layer
+   * that dismisses it when clicked. A row is `{ label, value, isDisabled, kind }`
+   * and raises `pick` with its value; `{ isDivider: true }` is a line.
+   */
+  contextMenu: (items, { x = 0, y = 0, pick = 'pick', dismiss = 'dismiss' } = {}) =>
+    tag('div', { class: 'ui-menu', role: 'menu', style: `left:${Number(x)}px;top:${Number(y)}px` },
+      items.map(item => (item.isDivider ? '<hr class="ui-divider">' : kit.button(item.label, { action: pick, value: item.value, kind: item.kind, isDisabled: item.isDisabled, class: 'ui-menu-item' }))).join(''))
+    // `kit`, not `components`: only the kit's functions take a class.
+    + kit.target('', { action: dismiss, triggers: ['click', 'contextmenu'], class: 'ui-menu-scrim' }),
+
   /** Any element: a tag from a safe set of characters, extra attributes, and children. The way to CSS the kit has no class for. */
   element: (children, { as = 'div', attributes = {} } = {}) => tag(/^[a-z][a-z0-9-]*$/.test(as) ? as : 'div', attributes, join(children)),
 

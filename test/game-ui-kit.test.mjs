@@ -9,6 +9,7 @@ import { makeBus } from '../engine/bus.js'
 import gameUi from '../plugins/builtin/game-ui.js'
 import { kit } from '../plugins/builtin/game-ui/components.js'
 import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
+import { menuPlacement } from '../plugins/builtin/game-ui/popup.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
 
@@ -390,4 +391,77 @@ test('click never presses another control of the same action when the one asked 
   assert.equal(context.gameUi.click('bar', 'skill'), true, 'with no value, the first enabled one')
   step()
   assert.deepEqual(seen, ['ice', 'ice'])
+})
+
+/** A context with a clock and timers the test runs by hand. */
+function timed() {
+  const made = loaded()
+  const timers = []
+  made.context.time = 0
+  made.context.after = (seconds, run) => timers.push({ at: made.context.time + seconds, run })
+  const advance = seconds => {
+    made.context.time += seconds
+    for (const timer of timers.filter(candidate => candidate.at <= made.context.time)) { timers.splice(timers.indexOf(timer), 1); timer.run() }
+  }
+  return { ...made, advance }
+}
+
+test('notifications stack, fade near their end, go at their end, and a click dismisses one early', () => {
+  const { context, step, advance } = timed()
+  const first = context.gameUi.notify('Saved', { tone: 'good', life: 2 })
+  context.gameUi.notify('Low health', { tone: 'danger', life: 5 })
+  assert.equal(context.gameUi.read('ui:notifications'), 'Saved Low health')
+  assert.match(context.gameUi.controls('ui:notifications')[0].value, /^note:/)
+  advance(1.8)
+  assert.equal(context.gameUi.read('ui:notifications'), 'Saved Low health')
+  context.gameUi.click('ui:notifications', 'dismiss', 'note:1')
+  step()
+  assert.equal(context.gameUi.read('ui:notifications'), 'Saved', 'the click removed the second')
+  advance(0.3)
+  assert.equal(context.gameUi.isShowing('ui:notifications'), false, 'the last one ended, so the stack is gone')
+  assert.equal(first, 'note:0')
+})
+
+test('notifications keep the newest six, and the run ending clears them', () => {
+  const { context } = timed()
+  for (let count = 0; count < 9; count++) context.gameUi.notify(`n${count}`)
+  assert.equal(context.gameUi.read('ui:notifications'), 'n3 n4 n5 n6 n7 n8')
+  context.bus.emit('play:stopped')
+  assert.equal(context.gameUi.isShowing('ui:notifications'), false)
+  context.gameUi.notify('again')
+  assert.equal(context.gameUi.read('ui:notifications'), 'again', 'a new run starts with an empty list')
+})
+
+test('a popup menu opens at a point kept on screen, picks once, and dismisses on an outside click', () => {
+  const { context, step } = loaded()
+  context.viewport = { width: 800, height: 600 }
+  const picked = []
+  context.gameUi.menu({ at: { x: 790, y: 590 }, items: [{ label: 'Mark', value: 'mark' }, { isDivider: true }, { label: 'Drop', value: 'drop', kind: 'danger', isDisabled: true }], onPick: value => picked.push(value) })
+  assert.ok(context.gameUi.isShowing('ui:menu'))
+  assert.deepEqual(context.gameUi.controls('ui:menu').map(control => [control.action, control.isDisabled]), [['pick', false], ['pick', true], ['dismiss', false]])
+  assert.equal(context.gameUi.controls('ui:menu')[0].isFocused, true, 'the first item has the keys, not the outside layer')
+  assert.equal(context.gameUi.click('ui:menu', 'pick', 'drop'), false, 'a disabled row cannot be picked')
+  context.gameUi.click('ui:menu', 'pick', 'mark')
+  step()
+  assert.deepEqual(picked, ['mark'])
+  assert.equal(context.gameUi.isShowing('ui:menu'), false)
+  context.gameUi.menu({ at: { x: 10, y: 10 }, items: [{ label: 'A', value: 'a' }], onPick: value => picked.push(value) })
+  context.gameUi.click('ui:menu', 'dismiss')
+  step()
+  assert.deepEqual(picked, ['mark'], 'dismissing picks nothing')
+  assert.equal(context.gameUi.isShowing('ui:menu'), false)
+})
+
+test('a popup menu is placed inside the viewport, and left where it was asked when there is room', () => {
+  const viewport = { width: 800, height: 600 }
+  assert.deepEqual(menuPlacement({ x: 790, y: 590 }, 2, viewport), { x: 592, y: 504 }, 'moved in from the corner: 800 - 200 - 8 across, 600 - (2 x 36 + 16) - 8 down')
+  assert.deepEqual(menuPlacement({ x: 100, y: 120 }, 3, viewport), { x: 100, y: 120 })
+  assert.deepEqual(menuPlacement({ x: -50, y: -5 }, 1, viewport), { x: 8, y: 8 })
+})
+
+test('a context menu carries the classes its CSS needs, on the rows and on the outside layer', () => {
+  const html = kit.contextMenu([{ label: 'A', value: 'a' }], { x: 5, y: 6 })
+  assert.match(html, /class="ui-menu-item ui-button"/)
+  assert.match(html, /class="ui-menu-scrim"/)
+  assert.match(html, /left:5px;top:6px/)
 })

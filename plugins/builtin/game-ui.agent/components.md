@@ -23,6 +23,7 @@
 | `pips(value, { max, glyph, emptyGlyph })` | hearts, ammo: `value` full of `max` |
 | `typewriter(text, { chars })` | text shown to `chars` characters; the rest is laid out but hidden, so the box never grows |
 | `dialogue({ speaker, text, chars, portrait, choices, advance, choose })` | a box that raises `advance` (click or Enter) and, once the text is complete, choice buttons that raise `choose` |
+| `contextMenu(items, { x, y })` | a menu at a point over an outside layer that dismisses it; rows are `{ label, value, isDisabled, kind }` or `{ isDivider: true }`. Use `gameUi.menu` |
 | `element(children, { as, attributes })` | any tag: the way to markup the kit has no name for |
 | `target(children, { action, value, triggers, as, attributes })` | any element that raises your event; `attributes` such as `data-hot` are for your CSS |
 
@@ -35,3 +36,8 @@ A control also carries `data-ui-control`, `data-action`, `data-value`, `data-lab
 ## Cooldowns
 
 Read `remaining` from engine time so the sweep pauses with the game: `remaining = Math.max(0, readyAt - context.time)`. Set `readyAt = context.time + seconds` in the handler, and pass `isDisabled: remaining > 0` to the control inside. Rings and bars ease because `--fraction` is registered as a number in the page (draw.js); a ring drawn without the Game UI plugin jumps instead.
+
+## Notifications and menus
+
+- `gameUi.notify(text, { tone, life })` adds a message to one stack (bottom right). It slides in, fades over its last 0.3 s, and goes after `life` seconds (default 3) of game time; a click dismisses it. Six at most; the oldest goes first. Style `.ui-notifications` and the toast in `theme.css`. Answers the id.
+- `gameUi.menu({ at, items, onPick })` opens a menu at `at` (`{ x, y }`; a pointer event has both, so `at: event` works), kept inside the viewport. It takes the pointer and the menu keys: arrows, Enter and Esc work, and a click outside dismisses it. `onPick(value)` runs on the next fixed step. One menu at a time. Panel ids `ui:notifications` and `ui:menu` are for tests: `gameUi.click('ui:menu', 'pick', value)`.
