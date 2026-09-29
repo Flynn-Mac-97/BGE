@@ -61,11 +61,12 @@ async function loadBody(state, entity, items) {
   const holds = await Promise.all(items.map(item => loadJsonIn(state, `${graph.items ?? ITEM_FOLDER}/${item}.hold.json`)))
   const names = [...new Set([...(graph.sets ?? []), ...holds.flatMap(hold => [hold?.set, hold?.offSet]).filter(Boolean)])]
   const sets = (await Promise.all(names.map(name => loadJsonIn(state, `${graph.setsFolder ?? SET_FOLDER}/${name}.set.json`)))).filter(Boolean)
-  const machine = machineWith(graph, sets)
-  const clips = [
-    ...Object.values(machine.states).flatMap(one => one.clips ?? []),
-    ...actionNames(sets).flatMap(name => actionOf(sets, name).clips)
-  ]
+  // Each set on its own: merged, a later set's `attack` or `idle` hides an earlier one's, whose takes still play
+  // when that set is on.
+  const clips = [graph, ...sets].flatMap(set => {
+    const one = set === graph ? [] : [set]
+    return [...Object.values(machineWith(graph, one).states).flatMap(state => state.clips ?? []), ...actionNames(one).flatMap(name => actionOf(one, name).clips ?? [])]
+  })
   const files = [...new Set(clips.map(clip => definition.rig?.clips?.[clip] ?? clip))]
   await Promise.all(files.map(file => state.context.rigAnimation?.load(file).catch(error => reportOnce(`[animation-states] ${error.message}`))))
   return files
