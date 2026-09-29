@@ -48,12 +48,15 @@ test('hide takes a panel down, and stopping play takes them all down', () => {
 
 test('a panel the page took off is put back on the next frame', () => {
   const context = loaded()
-  const element = { dataset: {}, style: {}, isConnected: false, attachShadow: () => ({ innerHTML: '' }) }
+  const root = { addEventListener() {}, contains: () => false, childNodes: [], append() {}, innerHTML: '' }
+  const element = { dataset: {}, style: {}, isConnected: false, attachShadow: () => root }
   let mountCount = 0
   context.ui = { mount: () => { mountCount++; element.isConnected = true } }
-  const saved = globalThis.document
-  globalThis.document = { createElement: () => element }
-  const drawFrame = () => gameUi.systems[0].run(null, 0, context)
+  const saved = { document: globalThis.document, sheet: globalThis.CSSStyleSheet }
+  globalThis.document = { createElement: name => (name === 'template' ? { content: { childNodes: [] } } : element) }
+  globalThis.CSSStyleSheet = class { replaceSync() {} }
+  const frameSystem = gameUi.systems.find(system => system.phase === 'frame')
+  const drawFrame = () => frameSystem.run(null, 0, context)
   context.gameUi.show('hud', { html: '<b>85</b>' })
   drawFrame()
   drawFrame()
@@ -61,5 +64,5 @@ test('a panel the page took off is put back on the next frame', () => {
   element.isConnected = false
   drawFrame()
   assert.equal(mountCount, 2, 'and again once it was taken off')
-  globalThis.document = saved
+  Object.assign(globalThis, { document: saved.document, CSSStyleSheet: saved.sheet })
 })

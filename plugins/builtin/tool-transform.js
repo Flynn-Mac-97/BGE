@@ -10,6 +10,9 @@
 const GRID = 0.5
 const SNAP_PX = 7
 
+/** Where the tool's handles sit in the overlay: above a game's panels, so a handle is always reachable. */
+const TOOL_ORDER = 60
+
 export default {
   name: 'Transform Tool',
 
@@ -77,7 +80,11 @@ function nearestSnap(best, centres, targets, tol, other) {
 function attach(context) {
   const { renderer, world, editor, bus } = context
   const viewport = context.shell.viewport
-  const layer = context.shell.overlay
+  // Its own element in the overlay region. Writing `innerHTML` on the region's
+  // host itself would remove every other plugin's mount on each repaint.
+  const layer = document.createElement('div')
+  layer.style.cssText = 'position:absolute;inset:0;pointer-events:none'
+  context.ui.mount('overlay', layer, { order: TOOL_ORDER, plugin: 'Transform Tool' })
 
   let drag = null, marquee = null, guides = [], readout = null
   let menu = null, peek = null, space = false

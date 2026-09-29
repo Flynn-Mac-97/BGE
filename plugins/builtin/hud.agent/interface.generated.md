@@ -1,4 +1,4 @@
-<!--6fb2e565-->
+<!--6d5964be-->
 parsed from source
   plugin Heads Up Display
   category game
@@ -8,4 +8,4 @@ parsed from source
   context hud
   systems frame
   listens level:loaded
-  source 170 lines
+  source 173 lines

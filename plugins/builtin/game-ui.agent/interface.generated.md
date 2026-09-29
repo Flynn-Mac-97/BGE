@@ -1,11 +1,15 @@
-<!--73521a3a-->
+<!--56129d79-->
 parsed from source
   plugin Game UI
   category game
+  needs Screen, Heads Up Display, Keyboard Input
   commands gameui.read
   gameui.list
-  arguments gameui.read: id;gameui.list:
+  gameui.controls
+  gameui.click
+  gameui.theme
+  arguments gameui.read: id;gameui.list:;gameui.controls: id;gameui.click: { id, action, value, type };gameui.theme: name
   context gameUi
-  systems frame
-  listens level:loaded, play:stopped
-  source 141 lines
+  systems fixed, frame
+  listens hot:applied, level:loaded, play:stopped
+  source 355 lines

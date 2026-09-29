@@ -39,7 +39,9 @@ export function makeRegions(hosts) {
     const host = hosts[entry.region]
     if (!host) return
     const ordered = orderedFor(entry.region)
-    const next = ordered[ordered.indexOf(entry) + 1]
+    // Another plugin may have rewritten the host's children, so a later entry
+    // can be registered and no longer on the page. Inserting before it throws.
+    const next = ordered.slice(ordered.indexOf(entry) + 1).find(later => later.element.parentNode === host)
     if (next) host.insertBefore(entry.element, next.element)
     else host.append(entry.element)
   }
