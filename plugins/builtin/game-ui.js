@@ -40,6 +40,7 @@ import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
+import { revealedChars } from './game-ui/typewriter.js'
 import { resolveTarget } from './game-ui/world-layer.js'
 
 /** The most floating texts alive at once. The oldest go first, so a burst of hits cannot grow the page. */
@@ -202,6 +203,22 @@ export default {
         const sendsOwnValue = raised !== TRIGGER[control.kind] || raised === 'click'
         state.queue.push(makeUiEvent(id, action, sendsOwnValue ? control.value : value, control.kind, { type: raised }))
         return true
+      },
+
+      /**
+       * A line that types itself out at `speed` characters a second of game
+       * time, starting now. `chars()` is how much shows, for `kit.dialogue`;
+       * `skip()` shows it all; `isDone()`; `restart(text)` starts a new line.
+       */
+      typewriter(text, { speed = 30 } = {}) {
+        const line = { text, speed, startedAt: context.time }
+        return {
+          get text() { return line.text },
+          chars: () => revealedChars(line.text, context.time - line.startedAt, line.speed),
+          isDone: () => revealedChars(line.text, context.time - line.startedAt, line.speed) >= line.text.length,
+          skip() { line.startedAt = -Infinity },
+          restart(next) { Object.assign(line, { text: next ?? line.text, startedAt: context.time }) }
+        }
       },
 
       /** The payloads a panel or anchor lets a person drag, and the drop zones it offers as `{ action, value }`. */

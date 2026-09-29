@@ -9,6 +9,7 @@ import { makeBus } from '../engine/bus.js'
 import gameUi from '../plugins/builtin/game-ui.js'
 import { kit } from '../plugins/builtin/game-ui/components.js'
 import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
+import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
 
 const fixedSystem = gameUi.systems.find(system => system.phase === 'fixed')
@@ -319,4 +320,42 @@ test('drag and drop: sources and zones read back, and a drop reaches the zone ac
 
 test('drag and drop attributes are escaped', () => {
   assert.match(kit.text('x', { drag: 'a"b' }), /data-drag="a&quot;b"/)
+})
+
+test('a typewriter reveals characters by time, pausing on punctuation, and skip shows all', () => {
+  assert.equal(revealedChars('Hello', 0), 0)
+  assert.equal(revealedChars('Hello', 0.05, 30), 1)
+  assert.equal(revealedChars('Hello', 10, 30), 5)
+  assert.equal(revealedChars('Wait. Go', 0.2, 30), 4, 'the full stop holds the next word back')
+  assert.equal(revealedChars('anything', Infinity), 8)
+})
+
+test('gameUi.typewriter follows engine time and can be skipped or restarted', () => {
+  const { context } = loaded()
+  context.time = 5
+  const line = context.gameUi.typewriter('Hello there', { speed: 10 })
+  assert.equal(line.chars(), 0)
+  context.time = 5.35
+  assert.equal(line.chars(), 3)
+  assert.equal(line.isDone(), false)
+  line.skip()
+  assert.equal(line.isDone(), true)
+  line.restart('Again')
+  assert.equal(line.text, 'Again')
+  assert.equal(line.chars(), 0)
+})
+
+test('a dialogue shows typed text, hides the rest, and offers choices only once the text is complete', () => {
+  const partial = kit.dialogue({ speaker: 'Elder', text: 'Help us <please>', chars: 4, choices: [{ label: 'Yes', value: 'y' }] })
+  assert.match(partial, /<span class="ui-typed">Help<\/span>/)
+  assert.match(partial, /<span class="ui-untyped"> us &lt;please&gt;<\/span>/)
+  assert.doesNotMatch(partial, /data-action="choose"/, 'no choices while it types')
+  const { context, step } = loaded()
+  const seen = []
+  context.gameUi.show('talk', { html: kit.dialogue({ speaker: 'Elder', text: 'Hi', choices: [{ label: 'Yes', value: 'y' }] }), on: { advance: () => seen.push('advance'), choose: value => seen.push(value) } })
+  assert.deepEqual(context.gameUi.controls('talk').map(control => control.action), ['advance', 'choose'])
+  context.gameUi.click('talk', 'advance')
+  context.gameUi.click('talk', 'choose', 'y')
+  step()
+  assert.deepEqual(seen, ['advance', 'y'])
 })

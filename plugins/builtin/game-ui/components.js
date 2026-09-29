@@ -124,6 +124,30 @@ const components = {
     return tag('button', { ...attributes, type: 'button', ...controlAttributes('slot', { action, value, label, isDisabled, triggers }) }, inner)
   },
 
+  /**
+   * Text revealed up to `chars` characters. The rest is laid out but hidden, so
+   * the box does not grow as it types. Without `chars` all of it shows.
+   */
+  typewriter: (text, { chars = text.length } = {}) => {
+    const shown = String(text).slice(0, chars)
+    const rest = String(text).slice(chars)
+    return tag('span', { class: 'ui-typewriter' }, tag('span', { class: 'ui-typed' }, escapeHtml(shown)) + (rest ? tag('span', { class: 'ui-caret' }, '▌') + tag('span', { class: 'ui-untyped' }, escapeHtml(rest)) : ''))
+  },
+
+  /**
+   * A dialogue box: a speaker, typed text, and choices once the text is fully
+   * shown. The box raises `advance` on a click or confirm key; choices raise
+   * `choose` with their `value`. `chars` is how much text shows.
+   */
+  dialogue: ({ speaker, text, chars = text.length, portrait, choices = [], advance = 'advance', choose = 'choose' } = {}) => {
+    const isDone = chars >= text.length
+    const box = tag('div', { class: 'ui-dialogue-box', ...controlAttributes('target', { action: advance, label: speaker, triggers: ['click'] }) },
+      (portrait ? tag('img', { class: 'ui-portrait', src: assetURL(portrait), alt: speaker ?? '' }) : '')
+      + tag('div', { class: 'ui-dialogue-body' }, (speaker ? tag('div', { class: 'ui-dialogue-speaker' }, escapeHtml(speaker)) : '') + components.typewriter(text, { chars })))
+    const options = isDone && choices.length ? tag('div', { class: 'ui-choices' }, choices.map(choice => components.button(choice.label, { action: choose, value: choice.value })).join('')) : ''
+    return tag('div', { class: 'ui-dialogue' }, box + options)
+  },
+
   /** Any element: a tag from a safe set of characters, extra attributes, and children. The way to CSS the kit has no class for. */
   element: (children, { as = 'div', attributes = {} } = {}) => tag(/^[a-z][a-z0-9-]*$/.test(as) ? as : 'div', attributes, join(children)),
 

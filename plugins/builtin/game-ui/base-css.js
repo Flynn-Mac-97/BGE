@@ -28,6 +28,15 @@ export const BASE_CSS = `
 .ui-drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0.92; transform-origin: 0 0; filter: drop-shadow(0 6px 10px var(--ui-outline)); }
 [data-drag], [data-drop] { pointer-events: auto; }
 
+/* Dialogue and typewriter text. */
+.ui-untyped { visibility: hidden; }
+.ui-caret { display: inline-block; width: 0; overflow: visible; color: var(--ui-accent); animation: ui-blink 0.8s steps(1) infinite; }
+@keyframes ui-blink { 50% { opacity: 0; } }
+.ui-dialogue { display: flex; flex-direction: column; gap: var(--ui-space); }
+.ui-dialogue-box { display: flex; gap: calc(var(--ui-space) * 1.5); align-items: flex-start; padding: calc(var(--ui-space) * 2); background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); cursor: pointer; min-height: 5em; }
+.ui-dialogue-speaker { color: var(--ui-accent); font-weight: 700; margin-bottom: calc(var(--ui-space) * 0.5); }
+.ui-choices { display: flex; flex-wrap: wrap; gap: var(--ui-space); justify-content: flex-end; }
+
 @keyframes ui-fade-in { from { opacity: 0; } }
 @keyframes ui-fade-out { to { opacity: 0; } }
 @keyframes ui-slide-up { from { opacity: 0; transform: translateY(16px); } }

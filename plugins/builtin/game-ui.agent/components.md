@@ -18,7 +18,13 @@
 | `select(label, { action, value, options })` `textInput(label, { action, value, placeholder })` | send text |
 | `tabs(items, { action, value })` `list(items, { action })` | items `{ label, value, detail, isSelected }` |
 | `slot({ glyph, image, count, action, value, isSelected })` | an inventory cell |
+| `typewriter(text, { chars })` | text shown to `chars` characters; the rest is laid out but hidden, so the box never grows |
+| `dialogue({ speaker, text, chars, portrait, choices, advance, choose })` | a box that raises `advance` (click or Enter) and, once the text is complete, choice buttons that raise `choose` |
 | `element(children, { as, attributes })` | any tag: the way to markup the kit has no name for |
 | `target(children, { action, value, triggers, as, attributes })` | any element that raises your event; `attributes` such as `data-hot` are for your CSS |
 
 A control also carries `data-ui-control`, `data-action`, `data-value`, `data-label`. Those are what routing, focus and `gameui.controls` read.
+
+## Typing a line
+
+`const line = gameUi.typewriter(text, { speed: 30 })` starts a line now, in game time, so a replay types the same. `dialogue({ text: line.text, chars: line.chars() })` in a panel's `html` function shows it. `line.skip()` shows all, `line.isDone()`, `line.restart(next)` starts another. Full stops and `!` `?` pause a little, commas less. A common `advance` handler: skip while typing, next line when done. Style `.ui-caret` (the blinking cursor), `.ui-typed`, `.ui-dialogue-box`.
