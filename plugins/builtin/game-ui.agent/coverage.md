@@ -20,7 +20,14 @@ The loop that grows Game UI stops when every row is `done`. `done` means: a kit 
 | Notifications stack, context menu | done | `notify`, `menu` |
 | Accordion, table, avatar, keybind | done | kit components, `captureKey` |
 | Screen effects (flash, vignette, fade, letterbox) | done | `effect`, `clearEffect`, `.ui-fx-<name>` |
+| UI sounds (hover, click, focus, open, notify) | planned | `gameUi.sounds`, through `context.play` |
+| Gamepad and touch input | planned | gamepad to menu actions, pointer-event drag |
+| Radial (pie) menu | planned | `gameUi.radial` |
+| Rich tooltip that follows the pointer | planned | delayed, placed inside the viewport |
+| Long lists and chat logs stay cheap | planned | row culling, a log stuck to the bottom |
 | Demo shows all of it | ongoing | `ui-kit-demo` tabs |
+
+Not the kit's job, so a game writes them: what its menus say (text and translation), what a minimap draws, and its own art in `theme.css`.
 
 ## Rules for the loop
 
