@@ -13,6 +13,7 @@ import { BASE_CSS } from '../plugins/builtin/game-ui/base-css.js'
 import { heldPadCodes, pollGamepad } from '../plugins/builtin/game-ui/gamepad.js'
 import { menuPlacement, radialPlacement } from '../plugins/builtin/game-ui/popup.js'
 import { soundOfEvent } from '../plugins/builtin/game-ui/sounds.js'
+import { makeTipState, tipHooks, tipHtml, tipPlacement, runTooltip } from '../plugins/builtin/game-ui/tooltip.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
 
@@ -735,4 +736,66 @@ test('the layer behind a menu or wheel can be clicked but is never focused, so a
   assert.equal(context.gameUi.pickFocused('ui:radial'), true)
   step()
   assert.deepEqual(picked, ['b'])
+})
+
+test('a tip is text, escaped, or HTML from a registered provider, or nothing', () => {
+  const providers = { item: value => `<b>${value}</b> card` }
+  assert.equal(tipHtml({ tip: 'Saves <now>' }, providers), 'Saves &lt;now&gt;')
+  assert.equal(tipHtml({ tip: 'fallback', tipKey: 'item', tipValue: 'sword' }, providers), '<b>sword</b> card', 'a provider wins over the text')
+  assert.equal(tipHtml({ tip: 'fallback', tipKey: 'missing', tipValue: 'x' }, providers), 'fallback', 'no provider, so the text')
+  assert.equal(tipHtml({}, providers), '')
+  const html = kit.button('Go', { action: 'go', tip: 'Goes "far"', tipKey: 'item', tipValue: 7 })
+  assert.match(html, /data-tip="Goes &quot;far&quot;" data-tip-key="item" data-tip-value="7"/)
+})
+
+test('a tip box opens from the side of the viewport with room', () => {
+  const viewport = { width: 800, height: 600 }
+  assert.equal(tipPlacement(100, 100, viewport), 'left:114px;top:118px')
+  assert.equal(tipPlacement(700, 500, viewport), 'right:114px;bottom:118px')
+})
+
+test('the tooltip waits, shows once, follows the pointer, and goes when the pointer leaves', () => {
+  const shown = []
+  const element = { isConnected: true, dataset: { tip: 'Hello' }, getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }
+  const state = { panels: new Map(), anchors: new Map(), tip: makeTipState() }
+  const context = { viewport: { width: 800, height: 600 }, gameUi: { show: (id, options) => shown.push([id, options]) } }
+  const hooks = tipHooks(state.tip)
+  hooks.enter(element, 100, 100)
+  runTooltip(context, state, 0.2)
+  assert.equal(shown.length, 0, 'not before its delay')
+  runTooltip(context, state, 0.2)
+  assert.equal(shown.length, 1)
+  assert.equal(shown[0][1].order, 70)
+  assert.match(shown[0][1].html(), /ui-tooltip-box/)
+  assert.match(shown[0][1].html(), /left:114px;top:118px/)
+  hooks.move(300, 250)
+  runTooltip(context, state, 0.016)
+  assert.equal(shown.length, 1, 'it moves; it is not shown again')
+  assert.match(shown[0][1].html(), /left:314px;top:268px/, 'and the one panel follows the pointer')
+  hooks.leave()
+  runTooltip(context, state, 0.016)
+  assert.equal(state.tip.isShown, false)
+  hooks.enter(element, 10, 10)
+  runTooltip(context, state, 0.1)
+  assert.equal(shown.length, 1, 'a new hover starts its wait again')
+})
+
+test('a focused control explains itself only when keys led, not when the pointer left focus behind', () => {
+  const shown = []
+  const focused = { isConnected: true, dataset: { tip: 'Focused tip' }, getBoundingClientRect: () => ({ left: 20, bottom: 50 }) }
+  const root = { querySelector: () => focused }
+  const panels = new Map([['menu', { isInteractive: true, phase: 'open', root, lastControls: [{ isDisabled: false }] }]])
+  const state = { panels, anchors: new Map(), tip: makeTipState() }
+  const context = { viewport: { width: 800, height: 600 }, gameUi: { show: (id, options) => shown.push([id, options]) } }
+  runTooltip(context, state, 1)
+  assert.equal(shown.length, 0, 'the pointer never led, and keys have not either: no tip for a focus nobody moved')
+  state.tip.isKeyLed = true
+  runTooltip(context, state, 0.2)
+  runTooltip(context, state, 0.2)
+  assert.equal(shown.length, 1, 'keys moved the focus, so its tip shows after the delay')
+  assert.match(shown[0][1].html(), /Focused tip/)
+  assert.match(shown[0][1].html(), /left:34px;top:50px/, 'under the element')
+  tipHooks(state.tip).move(5, 5)
+  runTooltip(context, state, 0.016)
+  assert.equal(state.tip.isShown, false, 'the pointer took over, so the focus tip goes')
 })

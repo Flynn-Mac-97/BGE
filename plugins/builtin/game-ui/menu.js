@@ -81,6 +81,8 @@ export function moveFocus(context, state) {
 
   const moved = Object.entries(FOCUS_DIRECTIONS).find(([action]) => context.input.pressed(action))
   if (!moved) return
+  // Keys or a stick now lead, so the focused control may explain itself.
+  state.tip.isKeyLed = true
   const [action, direction] = moved
   const stepped = STEPPING_ACTIONS.has(action) && focused ? steppedValue(focused, direction) : undefined
   if (stepped !== undefined) {

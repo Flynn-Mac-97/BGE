@@ -11,6 +11,7 @@ import { createPanelElement } from './panel-element.js'
 import { patchInto } from './patch.js'
 import { isDue, makeUiEvent, refresh } from './records.js'
 import { sheetText } from './theme.js'
+import { runTooltip, tipHooks } from './tooltip.js'
 import { createWorldLayer, drawAnchor, hideAnchor, placeAnchors, pruneHidden, resolveTarget } from './world-layer.js'
 
 /** Where panels mount, and above what. Screen's canvas layer draws under the overlay. */
@@ -40,6 +41,7 @@ export function drawFrame(context, state, seconds) {
   const sheet = themeSheet(state)
   drawPanels(context, state, sheet)
   drawAnchors(context, state, sheet)
+  runTooltip(context, state, seconds)
 }
 
 /** The one stylesheet every panel and anchor adopts. Made on first use, and rewritten in place when the theme changes. */
@@ -62,7 +64,7 @@ function drawPanels(context, state, sheet) {
 function writePanel(context, state, id, panel, { sheet, scope }) {
   if (!panel.element) {
     const report = details => state.queue.push(makeUiEvent(id, details.action, details.value, details.kind, details))
-    Object.assign(panel, createPanelElement(id, panel, report))
+    Object.assign(panel, createPanelElement(id, panel, report, tipHooks(state.tip)))
     panel.element.dataset.phase = panel.phase
     panel.drawnFrame = state.frame
     panel.sheet = new CSSStyleSheet()
@@ -116,7 +118,7 @@ function worldLayerOf(context, state, sheet) {
       if (name && name !== anchor.hovered) state.queue.push(makeUiEvent(id, '', name, 'hover', { type: 'hover' }))
       anchor.hovered = name
     }
-    state.layer = createWorldLayer({ report, hover })
+    state.layer = createWorldLayer({ report, hover, tip: tipHooks(state.tip) })
     state.layer.root.adoptedStyleSheets = [sheet]
   }
   if (!state.layer.element.isConnected) context.ui.mount(REGION, state.layer.element, { plugin: 'Game UI', order: WORLD_ORDER })

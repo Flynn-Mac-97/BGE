@@ -23,7 +23,7 @@ The loop that grows Game UI stops when every row is `done`. `done` means: a kit 
 | UI sounds (hover, click, focus, open, notify) | done | `--ui-sound-*` tokens, `gameUi.sounds` |
 | Gamepad and touch input | done | `Gamepad*` codes, touch drag, coarse-pointer sizes |
 | Radial (pie) menu | done | `gameUi.radial`, `pickFocused`, hover focus |
-| Rich tooltip that follows the pointer | planned | delayed, placed inside the viewport |
+| Rich tooltip that follows the pointer | done | `tip`, `tipKey`, `gameUi.tips` |
 | Long lists and chat logs stay cheap | planned | row culling, a log stuck to the bottom |
 | Demo shows all of it | ongoing | `ui-kit-demo` tabs |
 

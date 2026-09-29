@@ -41,15 +41,23 @@ function routeControlEvent(event, report) {
  * Listen on a shadow root. `hover(name, target)` is called with the `data-ui`
  * name under the pointer, or null once it leaves; `report` gets each control use.
  */
-export function watchRoot(root, { report, hover }) {
+export function watchRoot(root, { report, hover, tip }) {
   root.addEventListener('pointerover', event => hover(event.target.closest?.('[data-ui]')?.dataset.ui ?? null, event.target))
   root.addEventListener('pointerout', event => { if (!event.relatedTarget || !root.contains(event.relatedTarget)) hover(null, event.target) })
   for (const type of EVENT_TYPES) root.addEventListener(type, event => routeControlEvent(event, report))
   watchDrag(root, report)
+  if (!tip) return
+  root.addEventListener('pointerover', event => {
+    const element = event.target.closest?.('[data-tip], [data-tip-key]')
+    if (element) tip.enter(element, event.clientX, event.clientY)
+    else tip.leave()
+  })
+  root.addEventListener('pointermove', event => tip.move(event.clientX, event.clientY))
+  root.addEventListener('pointerout', event => { if (!event.relatedTarget || !root.contains(event.relatedTarget)) tip.leave() })
 }
 
 /** Build a panel's element. `panel.hovered` is kept up to date on the record. */
-export function createPanelElement(id, panel, report) {
+export function createPanelElement(id, panel, report, tip) {
   const element = document.createElement('div')
   element.dataset.gameUi = id
   // The overlay lets clicks through. An interactive panel takes them back once it has content (game-ui.js).
@@ -67,6 +75,6 @@ export function createPanelElement(id, panel, report) {
     if (name && name !== panel.hovered) report({ action: '', value: name, kind: 'hover', type: 'hover' })
     panel.hovered = name
   }
-  watchRoot(root, { report, hover })
+  watchRoot(root, { report, hover, tip })
   return { element, root }
 }

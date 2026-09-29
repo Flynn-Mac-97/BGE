@@ -54,3 +54,17 @@ In the `rebind` handler: `gameUi.captureKey(code => { ... })`. The next key pres
 ## Weapon wheels
 
 `gameUi.radial({ at, items, radius, onPick })` opens a wheel around `at` (`{ x, y }`, the viewport's middle by default), kept on screen. Pointer hover, arrows and a gamepad stick all move one focus, and a click or the confirm key picks. For a wheel held open by a key: open it on press and call `gameUi.pickFocused('ui:radial')` on release; it confirms whatever the pointer or stick is on. A background layer (`data-passive` on a control) is clickable but never focused, so a release with nothing chosen picks nothing.
+
+## Tooltips
+
+Any component takes `tip: 'text'`. For an item card, register HTML by key and point the component at it:
+
+```js
+gameUi.tips({ item: id => kit.stack([kit.heading(names[id], { level: 3 }), kit.text(lines[id])]) })
+kit.slot({ glyph: '⚔', tipKey: 'item', tipValue: 'sword' })
+```
+
+- The box shows after 0.35 s over one element, beside the pointer on the side with room, and follows it. It never takes the pointer, and sits above every panel.
+- A control that keys or a gamepad stick moved focus to explains itself under the element. Pointer movement anywhere hands it back to the pointer.
+- Text is escaped; a provider's HTML is yours. A provider that answers nothing falls back to `tip`. `gameUi.tipHtml({ tip, tipKey, tipValue })` answers what the box would show, for a test. Style `.ui-tooltip-box`.
+- `kit.tooltip(content, text)` is the CSS-only version, for a plain hover.

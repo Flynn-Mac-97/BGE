@@ -20,3 +20,20 @@ export function revealedChars(text, elapsed, speed = 30) {
   }
   return text.length
 }
+
+/**
+ * A line that types itself out at `speed` characters a second of `context.time`,
+ * starting now. `chars()` is how much shows, `skip()` shows it all, `isDone()`,
+ * and `restart(text)` starts a new line.
+ */
+export function makeTypewriter(context, text, { speed = 30 } = {}) {
+  const line = { text, speed, startedAt: context.time }
+  const shown = () => revealedChars(line.text, context.time - line.startedAt, line.speed)
+  return {
+    get text() { return line.text },
+    chars: shown,
+    isDone: () => shown() >= line.text.length,
+    skip() { line.startedAt = -Infinity },
+    restart(next) { Object.assign(line, { text: next ?? line.text, startedAt: context.time }) }
+  }
+}

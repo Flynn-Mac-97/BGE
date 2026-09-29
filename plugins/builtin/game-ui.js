@@ -33,11 +33,13 @@
  * `level:loaded` and `play:stopped`, like Screen's. The theme is the game's and stays.
  */
 import { assetPath, assetURL } from '../../engine/asset-path.js'
-import { escapeHtml, kit } from './game-ui/components.js'
+import { kit } from './game-ui/components.js'
 import { dragsOf, dropsOf, isFocusable, TRIGGER } from './game-ui/controls.js'
 import { drawFrame } from './game-ui/draw.js'
 import { pollGamepad } from './game-ui/gamepad.js'
+import { makeCapture } from './game-ui/capture.js'
 import { makeEffects } from './game-ui/effects.js'
+import { makeFloats } from './game-ui/floating.js'
 import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { makeNotifications } from './game-ui/notifications.js'
 import { openMenu, openRadial } from './game-ui/popup.js'
@@ -45,11 +47,9 @@ import { makeSounds, soundOfEvent } from './game-ui/sounds.js'
 import { bindMenuKeys, confirmEvent, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
-import { revealedChars } from './game-ui/typewriter.js'
+import { makeTipState, tipHtml } from './game-ui/tooltip.js'
+import { makeTypewriter } from './game-ui/typewriter.js'
 import { resolveTarget } from './game-ui/world-layer.js'
-
-/** The most floating texts alive at once. The oldest go first, so a burst of hits cannot grow the page. */
-const FLOAT_CAP = 200
 
 /** The game's stylesheet, as an asset name. */
 const THEME_FILE = 'ui/theme.css'
@@ -79,10 +79,8 @@ export default {
       hasBoundKeys: false,
       frame: 0,
       shownCount: 0,
-      floatCount: 0,
-      floats: [],
-      capture: null,
       padHeld: new Map(),
+      tip: makeTipState(),
       // `limit` is the most anchors drawn at once; past it, the nearest to the view are kept.
       // `drawn` is how many the last frame drew.
       world: { limit: 48, drawn: 0 }
@@ -91,6 +89,8 @@ export default {
 
     const notifications = makeNotifications(context, state)
     const effects = makeEffects(context, state)
+    const floats = makeFloats(context, state)
+    const capture = makeCapture(state)
     const sounds = makeSounds(context, state)
     state.sounds = sounds
 
@@ -148,24 +148,8 @@ export default {
         state.anchors.set(id, makeAnchor(options, state.shownCount++))
       },
 
-      /**
-       * Show short-lived text at a point: a damage number, a pickup. `at` is
-       * an entity id, an entity or a `[x, y, z]` point, read once, so the text
-       * stays where it happened. It rises and fades over `life` seconds of game
-       * time (a `tone` of `danger`, `good` or `accent` colours it), then goes.
-       * Answers the id, or '' when `at` names nothing.
-       */
-      float(text, { at, life = 1, offset = [0, 1.2, 0], tone, class: className = '', html } = {}) {
-        const { point } = resolveTarget(at, context.world)
-        if (!point) return ''
-        const id = `float:${state.floatCount++}`
-        const content = kit.element(html ?? escapeHtml(text), { class: `ui-floating ${className}`.trim(), style: `--life:${life}s`, attributes: { 'data-tone': tone } })
-        context.gameUi.anchor(id, { to: point, offset, html: content })
-        state.floats.push(id)
-        context.after(life, () => removeNow(context, state, id))
-        for (const stale of state.floats.splice(0, Math.max(0, state.floats.length - FLOAT_CAP))) removeNow(context, state, stale)
-        return id
-      },
+      /** Show short-lived text at a point: a damage number, a pickup. See game-ui/floating.js. */
+      float: floats.float,
 
       /**
        * Take a panel or an anchor down. One made with `leave: seconds` stays
@@ -221,21 +205,8 @@ export default {
         return true
       },
 
-      /**
-       * A line that types itself out at `speed` characters a second of game
-       * time, starting now. `chars()` is how much shows, for `kit.dialogue`;
-       * `skip()` shows it all; `isDone()`; `restart(text)` starts a new line.
-       */
-      typewriter(text, { speed = 30 } = {}) {
-        const line = { text, speed, startedAt: context.time }
-        return {
-          get text() { return line.text },
-          chars: () => revealedChars(line.text, context.time - line.startedAt, line.speed),
-          isDone: () => revealedChars(line.text, context.time - line.startedAt, line.speed) >= line.text.length,
-          skip() { line.startedAt = -Infinity },
-          restart(next) { Object.assign(line, { text: next ?? line.text, startedAt: context.time }) }
-        }
-      },
+      /** A line that types itself out in game time, for `kit.dialogue`. See game-ui/typewriter.js. */
+      typewriter: (text, options) => makeTypewriter(context, text, options),
 
       /** Files for UI sounds by name (`click`, `hover`, `open`...), over the theme's `--ui-sound-*` tokens. See game-ui/sounds.js. */
       sounds: sounds.set,
@@ -252,25 +223,20 @@ export default {
       /** Open a menu of choices at `at` (`{ x, y }`, as a pointer event has), and run `onPick(value)` on a pick. See game-ui/popup.js. */
       menu: options => openMenu(context, options),
 
-      /**
-       * Take the next key press for `callback(code)` on the next fixed step:
-       * for a rebinding row. Esc cancels with `null`. While waiting, Game UI
-       * keeps the key from its own menu, and `isCapturing()` is true so a game
-       * can ignore its bindings. Replaces a capture already waiting.
-       */
-      captureKey(callback) {
-        state.capture = callback
-      },
-      isCapturing: () => Boolean(state.capture),
+      /** Take the next key press for a rebinding row. See game-ui/capture.js. */
+      captureKey: capture.captureKey,
+      isCapturing: capture.isCapturing,
+      feedKey: capture.feedKey,
 
-      /** Give a key press to a waiting `captureKey`, as the page's keydown does. True when it was taken. */
-      feedKey(code) {
-        if (!state.capture) return false
-        const callback = state.capture
-        state.capture = null
-        state.queue.push({ ...makeUiEvent('ui:capture', 'captured', code === 'Escape' ? null : code, 'key', { type: 'key' }), callback })
-        return true
-      },
+      /**
+       * Register tooltip providers by key: `tips({ item: value => '<b>...</b>' })`.
+       * A component with `tipKey: 'item', tipValue: id` shows what its provider
+       * answers. See game-ui/tooltip.js.
+       */
+      tips: providers => Object.assign(state.tip.providers, providers),
+
+      /** The tooltip HTML for `{ tip, tipKey, tipValue }`, or ''. What the box would show. */
+      tipHtml: source => tipHtml(source, state.tip.providers),
 
       /** Open a wheel of choices around a point. See game-ui/popup.js. */
       radial: options => openRadial(context, options),
@@ -319,19 +285,13 @@ export default {
       asset: assetURL
     }
 
-    // The page's keys go to a waiting capture first, so a rebinding row gets the key and nothing else does.
-    if (typeof window !== 'undefined') {
-      window.addEventListener('keydown', event => {
-        if (!context.gameUi.feedKey(event.code)) return
-        event.preventDefault()
-        event.stopImmediatePropagation()
-      }, { capture: true })
-    }
+    // The pointer moving anywhere takes the tooltip back from the keys.
+    if (typeof window !== 'undefined') window.addEventListener('pointermove', () => { state.tip.isKeyLed = false })
 
     const clearRun = () => {
       for (const id of [...state.panels.keys(), ...state.anchors.keys()]) remove(id)
       state.queue.length = 0
-      state.capture = null
+      capture.clear()
       notifications.clear()
       effects.clear()
     }

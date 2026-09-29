@@ -69,7 +69,7 @@ export function transformOf(anchor, { x, y, distance }) {
 }
 
 /** The one element that holds every anchor. `report` and `hover` are as for `watchRoot`; `hover` also gets the anchor's id. */
-export function createWorldLayer({ report, hover }) {
+export function createWorldLayer({ report, hover, tip }) {
   const element = document.createElement('div')
   element.dataset.gameUi = 'world'
   element.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none'
@@ -77,7 +77,8 @@ export function createWorldLayer({ report, hover }) {
   const anchorIdOf = target => target?.closest?.('[data-anchor]')?.dataset.anchor
   watchRoot(root, {
     report: details => report({ ...details, id: anchorIdOf(details.target) }),
-    hover: (name, target) => hover(anchorIdOf(target), name)
+    hover: (name, target) => hover(anchorIdOf(target), name),
+    tip
   })
   return { element, root }
 }

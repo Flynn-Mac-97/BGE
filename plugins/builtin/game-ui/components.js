@@ -289,15 +289,19 @@ const components = {
  * component takes them, so a game restyles one element with no new rule. The
  * caller's style comes last and so wins over the kit's inline style. A `key`
  * becomes `data-key`; changing it replaces the element, which replays its CSS animation.
+ * `tip: 'text'` gives it a tooltip (tooltip.js); `tipKey` and `tipValue` make the
+ * tooltip HTML from a registered provider.
  * `drag: payload` makes the element draggable; `drop: action` (with `dropValue`)
  * makes it a place to drop (drag.js).
  */
 export function decorate(html, options) {
-  if (!options?.class && !options?.style && [options?.key, options?.drag, options?.drop].every(value => value === undefined)) return html
+  if (!options?.class && !options?.style && [options?.key, options?.drag, options?.drop, options?.tip, options?.tipKey].every(value => value === undefined)) return html
   return html.replace(/^<([a-z0-9-]+)((?:\s[^>]*)?)>/, (whole, name, attributes) => {
     let head = attributes
     if (options.class) head = /\sclass="/.test(head) ? head.replace(/(\sclass=")/, (match, open) => `${open}${escapeHtml(options.class)} `) : `${head} class="${escapeHtml(options.class)}"`
     if (options.key !== undefined) head += ` data-key="${escapeHtml(options.key)}"`
+    if (options.tip !== undefined) head += ` data-tip="${escapeHtml(options.tip)}"`
+    if (options.tipKey !== undefined) head += ` data-tip-key="${escapeHtml(options.tipKey)}" data-tip-value="${escapeHtml(options.tipValue ?? '')}"`
     if (options.drag !== undefined) head += ` data-drag="${escapeHtml(options.drag)}"`
     if (options.drop !== undefined) head += ` data-drop="${escapeHtml(options.drop)}" data-drop-value="${escapeHtml(options.dropValue ?? '')}"`
     if (options.style) head = /\sstyle="/.test(head) ? head.replace(/(\sstyle="[^"]*)"/, (match, open) => `${open};${escapeHtml(options.style)}"`) : `${head} style="${escapeHtml(options.style)}"`

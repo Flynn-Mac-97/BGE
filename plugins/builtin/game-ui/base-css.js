@@ -219,4 +219,7 @@ export const BASE_CSS = `
 .ui-radial-item .ui-icon { font-size: 1.8em; line-height: 1; }
 .ui-radial-item:hover, .ui-radial-item[data-focus] { border-color: var(--ui-accent); background: var(--ui-track); }
 .ui-radial-scrim { position: absolute; inset: 0; }
+
+/* Tooltip box (tooltip.js). */
+.ui-tooltip-box { position: absolute; max-width: 260px; padding: var(--ui-space) calc(var(--ui-space) * 1.5); background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: calc(var(--ui-radius) * 0.7); font-size: 0.9em; pointer-events: none; animation: ui-fade-in var(--ui-duration) both; }
 `
