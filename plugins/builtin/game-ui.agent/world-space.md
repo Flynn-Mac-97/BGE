@@ -23,3 +23,12 @@
 - A move is one `transform` write, only when the rounded pixel changed. No layout.
 - Give a busy label `every: 4` so its `html` is asked less often.
 - The view is the one the frame's camera set; a camera that moves after this system draws one frame late.
+
+## Floating text
+
+`gameUi.float(text, { at, life, offset, tone, class })` shows a damage number or a pickup at a point, then removes it.
+
+- `at` is an entity id, an entity or `[x, y, z]`, read once: the text stays where the hit happened. Answers the id, or `''` when `at` names nothing.
+- It rises and fades over `life` seconds (default 1) of game time, using the `ui-rise` keyframes. `tone` is `danger`, `good` or `accent`.
+- Restyle it in `theme.css` on `.ui-floating`, or add a `class` (a critical: `.ui-floating.crit { font-size: 1.6em }`).
+- At most 200 live at once; the oldest go first. Text is escaped. Pass `html` for markup.

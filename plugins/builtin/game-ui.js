@@ -33,7 +33,7 @@
  * `level:loaded` and `play:stopped`, like Screen's. The theme is the game's and stays.
  */
 import { assetPath, assetURL } from '../../engine/asset-path.js'
-import { kit } from './game-ui/components.js'
+import { escapeHtml, kit } from './game-ui/components.js'
 import { controlsOf, TRIGGER, withFocus } from './game-ui/controls.js'
 import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { createPanelElement } from './game-ui/panel-element.js'
@@ -41,6 +41,9 @@ import { patchInto } from './game-ui/patch.js'
 import { advancePhase, htmlOf, isDue, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, sheetText, tokensOf } from './game-ui/theme.js'
 import { createWorldLayer, drawAnchor, hideAnchor, placeAnchors, pruneHidden, removeAnchorElement, resolveTarget } from './game-ui/world-layer.js'
+
+/** The most floating texts alive at once. The oldest go first, so a burst of hits cannot grow the page. */
+const FLOAT_CAP = 200
 
 /** Where panels mount, and above what. Screen's canvas layer draws under the overlay. */
 const REGION = 'overlay'
@@ -76,6 +79,8 @@ export default {
       hasBoundKeys: false,
       frame: 0,
       shownCount: 0,
+      floatCount: 0,
+      floats: [],
       // `limit` is the most anchors drawn at once; past it, the nearest to the view are kept.
       // `drawn` is how many the last frame drew.
       world: { limit: 48, drawn: 0 }
@@ -131,6 +136,25 @@ export default {
       anchor(id, options) {
         remove(id)
         state.anchors.set(id, makeAnchor(options, state.shownCount++))
+      },
+
+      /**
+       * Show short-lived text at a point: a damage number, a pickup. `at` is
+       * an entity id, an entity or a `[x, y, z]` point, read once, so the text
+       * stays where it happened. It rises and fades over `life` seconds of game
+       * time (a `tone` of `danger`, `good` or `accent` colours it), then goes.
+       * Answers the id, or '' when `at` names nothing.
+       */
+      float(text, { at, life = 1, offset = [0, 1.2, 0], tone, class: className = '', html } = {}) {
+        const { point } = resolveTarget(at, context.world)
+        if (!point) return ''
+        const id = `float:${state.floatCount++}`
+        const content = kit.element(html ?? escapeHtml(text), { class: `ui-floating ${className}`.trim(), style: `--life:${life}s`, attributes: { 'data-tone': tone } })
+        context.gameUi.anchor(id, { to: point, offset, html: content })
+        state.floats.push(id)
+        context.after(life, () => removeNow(context, state, id))
+        for (const stale of state.floats.splice(0, Math.max(0, state.floats.length - FLOAT_CAP))) removeNow(context, state, stale)
+        return id
       },
 
       /**

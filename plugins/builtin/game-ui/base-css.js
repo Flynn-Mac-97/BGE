@@ -51,6 +51,11 @@ export const BASE_CSS = `
 .ui-spin { animation: ui-spin 1s linear infinite; }
 .ui-blur { backdrop-filter: blur(8px); }
 .ui-grayscale { filter: grayscale(1); }
+@keyframes ui-rise { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 15% { opacity: 1; transform: translateY(-8px) scale(1.15); } 100% { opacity: 0; transform: translateY(-48px) scale(1); } }
+.ui-floating { animation: ui-rise var(--life, 1s) ease-out both; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px var(--ui-outline), 0 0 6px var(--ui-outline); }
+.ui-floating[data-tone="danger"] { color: var(--ui-danger); }
+.ui-floating[data-tone="good"] { color: var(--ui-good); }
+.ui-floating[data-tone="accent"] { color: var(--ui-accent); }
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; animation-delay: 0s !important; } }
 .ui-anchor { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; contain: layout style; pointer-events: none; }
 .ui-anchor[data-interactive] { pointer-events: auto; }

@@ -97,3 +97,28 @@ test('hidden anchors lose their elements once the layer holds more than it shoul
   assert.ok(hidden.every(anchor => anchor.element === null && anchor.written === null), 'over it, hidden ones go')
   assert.ok(shown.element, 'and a drawn one stays')
 })
+
+test('float shows escaped text at a point, once read, and takes it down after its life', () => {
+  const timers = []
+  const enemy = { id: 'e1', x: 1, y: 2, z: 3 }
+  const context = { bus: makeBus(), world: { byId: id => (id === 'e1' ? enemy : undefined) }, after: (seconds, run) => timers.push({ seconds, run }) }
+  gameUi.onLoad(context)
+  const id = context.gameUi.float('-12 <crit>', { at: 'e1', life: 0.8, tone: 'danger' })
+  assert.match(id, /^float:/)
+  assert.equal(context.gameUi.read(id), '-12 <crit>', 'text is shown as text, not markup')
+  assert.deepEqual(timers.map(timer => timer.seconds), [0.8])
+  enemy.x = 99
+  assert.equal(context.gameUi.isShowing(id), true)
+  timers[0].run()
+  assert.equal(context.gameUi.isShowing(id), false, 'gone after its life')
+  assert.equal(context.gameUi.float('x', { at: 'nobody' }), '', 'no point, no text')
+})
+
+test('a burst of floating text keeps only the newest 200', () => {
+  const context = { bus: makeBus(), world: { byId: () => undefined }, after() {} }
+  gameUi.onLoad(context)
+  for (let count = 0; count < 230; count++) context.gameUi.float(String(count), { at: [0, 0, 0] })
+  assert.equal(context.gameUi.shown().length, 200)
+  assert.equal(context.gameUi.read('float:229'), '229')
+  assert.equal(context.gameUi.isShowing('float:0'), false)
+})
