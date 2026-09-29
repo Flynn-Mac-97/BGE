@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { chromeForTesting, findChrome, INSTALLED_CHROME_PLACES } from '../engine/chrome-path.mjs'
+import { chromeForTesting, findChrome, playwrightChrome, INSTALLED_CHROME_PLACES } from '../engine/chrome-path.mjs'
 
 /** The executable name Chrome for Testing unpacks to, for this platform. */
 const executable = process.platform === 'win32' ? 'chrome.exe'
@@ -99,4 +99,38 @@ test('a bare CHROME_PATH name is left to the spawn to resolve', t => {
   const root = checkout(t)
   withChromePath(t, 'chromium')
   assert.equal(findChrome(root), 'chromium')
+})
+
+/** Write a fake Playwright build into a cache and return its executable. */
+function installPlaywrightBuild(cache, folder) {
+  const exe = path.join(cache, folder, 'chrome-linux', 'chrome')
+  fs.mkdirSync(path.dirname(exe), { recursive: true })
+  fs.writeFileSync(exe, '')
+  return exe
+}
+
+const onLinux = { skip: process.platform !== 'linux' && 'the fake cache is laid out for Linux' }
+
+test('the newest Playwright Chromium is found, and a headless shell is not', onLinux, t => {
+  const cache = checkout(t)
+  installPlaywrightBuild(cache, 'chromium-999')
+  const newest = installPlaywrightBuild(cache, 'chromium-1194')
+  installPlaywrightBuild(cache, 'chromium_headless_shell-9999')
+  assert.equal(playwrightChrome(cache), newest)
+})
+
+test('an empty or missing Playwright cache has no Chrome', t => {
+  assert.equal(playwrightChrome(checkout(t)), null)
+  assert.equal(playwrightChrome(path.join(checkout(t), 'absent')), null)
+  assert.equal(playwrightChrome(''), null)
+})
+
+test('a Playwright Chromium is preferred over an installed Chrome', onLinux, t => {
+  const root = checkout(t)
+  const exe = installPlaywrightBuild(path.join(root, 'cache'), 'chromium-1194')
+  withChromePath(t, undefined)
+  const had = process.env.PLAYWRIGHT_BROWSERS_PATH
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(root, 'cache')
+  t.after(() => { if (had === undefined) delete process.env.PLAYWRIGHT_BROWSERS_PATH; else process.env.PLAYWRIGHT_BROWSERS_PATH = had })
+  assert.equal(findChrome(root), exe)
 })

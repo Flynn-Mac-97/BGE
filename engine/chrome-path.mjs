@@ -11,6 +11,10 @@
  *
  * `npx @puppeteer/browsers install chrome@stable --path .browsers` puts one
  * there. CHROME_PATH names a browser instead and wins over both.
+ *
+ * A Playwright browser cache (`PLAYWRIGHT_BROWSERS_PATH`) comes after Chrome for
+ * Testing and before an installed Chrome. It is a separate binary too, and a
+ * cloud session image ships one, so a lane starts there with nothing set up.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -77,12 +81,46 @@ export function chromeForTesting(from = process.cwd()) {
   return null
 }
 
+/** Where a Playwright Chromium build keeps its executable, by platform. */
+const PLAYWRIGHT_EXECUTABLES = {
+  win32: ['chrome-win64/chrome.exe', 'chrome-win/chrome.exe'],
+  darwin: ['chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium'],
+  linux: ['chrome-linux64/chrome', 'chrome-linux/chrome']
+}
+
+/**
+ * The newest Chromium in the Playwright browser cache, or null.
+ *
+ * Builds are folders named `chromium-<revision>`; the highest revision wins.
+ * `chromium_headless_shell-*` and the other browsers do not match, because they
+ * cannot open the debugging page a lane needs.
+ */
+export function playwrightChrome(cache = process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  if (!cache) return null
+  const executables = PLAYWRIGHT_EXECUTABLES[process.platform] || PLAYWRIGHT_EXECUTABLES.linux
+  let builds
+  try {
+    builds = fs.readdirSync(cache).filter(name => /^chromium-\d+$/.test(name))
+  } catch {
+    return null
+  }
+  const revision = name => Number(name.slice('chromium-'.length))
+  for (const build of builds.sort((first, second) => revision(second) - revision(first))) {
+    for (const executable of executables) {
+      const exe = path.join(cache, build, executable)
+      if (fs.existsSync(exe)) return exe
+    }
+  }
+  return null
+}
+
 /** The first installed Chrome that exists, or null. */
 export const installedChrome = () => INSTALLED_CHROME_PLACES.find(place => fs.existsSync(place)) || null
 
 /**
- * The browser to start: CHROME_PATH, else Chrome for Testing, else an installed
- * Chrome. Throws naming every place tried when there is none.
+ * The browser to start: CHROME_PATH, else Chrome for Testing, else a Playwright
+ * Chromium, else an installed Chrome. Throws naming every place tried when there
+ * is none.
  *
  * `from` is the directory the `.browsers` search starts at — a lane's worktree
  * is fine, because the search walks up to the checkout that holds one.
@@ -95,11 +133,12 @@ export function findChrome(from = process.cwd()) {
   if (named && /[\\/]/.test(named) && !fs.existsSync(named)) {
     throw new Error(`CHROME_PATH names ${named}, which does not exist`)
   }
-  const found = named || chromeForTesting(from) || installedChrome()
+  const found = named || chromeForTesting(from) || playwrightChrome() || installedChrome()
   if (!found) {
     throw new Error(
       `no Chrome found. Tried .browsers under ${path.resolve(from)} and above it, then:\n  ` +
         INSTALLED_CHROME_PLACES.join('\n  ') +
+        '\nand the Playwright cache in PLAYWRIGHT_BROWSERS_PATH' +
         '\nInstall one with: npx @puppeteer/browsers install chrome@stable --path .browsers' +
         '\nOr set CHROME_PATH to point at one.'
     )
