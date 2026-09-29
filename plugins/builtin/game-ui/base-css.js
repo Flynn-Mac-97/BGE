@@ -93,7 +93,7 @@ export const BASE_CSS = `
 
 /* Animation and effect utilities. Add one as a class. \`--i\` staggers a row: style: '--i:3'. */
 /* Drag and drop: a source is grabbed, a zone under the pointer is hot, a copy follows the pointer. */
-[data-drag] { cursor: grab; }
+[data-drag] { cursor: grab; touch-action: none; }
 [data-dragging] { opacity: 0.35; }
 [data-drop-hot] { outline: 2px dashed var(--ui-accent); outline-offset: 2px; }
 .ui-drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0.92; transform-origin: 0 0; filter: drop-shadow(0 6px 10px var(--ui-outline)); }
@@ -209,4 +209,7 @@ export const BASE_CSS = `
 .ui-fx-blur { backdrop-filter: blur(calc(var(--strength, 0.5) * 16px)); }
 .ui-fx-scanlines { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, var(--strength, 0.3)) 0 1px, transparent 1px 3px); }
 .ui-fx-tint { background: var(--color, #6ea8ff); opacity: var(--strength, 0.25); mix-blend-mode: multiply; }
+
+/* A finger needs bigger targets than a mouse. */
+@media (pointer: coarse) { .ui-button, .ui-tab, .ui-row-item, .ui-accordion-head, .ui-select, .ui-input { min-height: 44px; } .ui-slider { min-height: 32px; } .ui-toggle input { width: 1.6em; height: 1.6em; } }
 `

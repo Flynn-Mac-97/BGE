@@ -16,14 +16,14 @@ const FOCUS_DIRECTIONS = { uiUp: -1, uiLeft: -1, uiDown: 1, uiRight: 1 }
 /** Left and right also step a slider or a select; up and down only move focus. */
 const STEPPING_ACTIONS = new Set(['uiLeft', 'uiRight'])
 
-/** The keys the menu actions start on. */
+/** The keys the menu actions start on: the keyboard, and a gamepad's virtual codes (gamepad.js). */
 const MENU_KEYS = {
-  uiUp: ['ArrowUp'],
-  uiDown: ['ArrowDown'],
-  uiLeft: ['ArrowLeft'],
-  uiRight: ['ArrowRight'],
-  uiConfirm: ['Enter', 'NumpadEnter'],
-  uiBack: ['Escape']
+  uiUp: ['ArrowUp', 'GamepadUp'],
+  uiDown: ['ArrowDown', 'GamepadDown'],
+  uiLeft: ['ArrowLeft', 'GamepadLeft'],
+  uiRight: ['ArrowRight', 'GamepadRight'],
+  uiConfirm: ['Enter', 'NumpadEnter', 'GamepadA'],
+  uiBack: ['Escape', 'GamepadB']
 }
 
 /** What confirming a focused control reports, by kind. A kind absent here is not confirmed. */

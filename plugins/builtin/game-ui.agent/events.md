@@ -16,3 +16,9 @@
 - The game decides what a drop means: nothing moves until your handler moves it.
 - It follows the mouse, not touch. It uses `mousedown`, so it works while a game plays.
 - Test: `gameUi.drags(id)`, `gameUi.drops(id)`, and `gameUi.drop(id, action, payload, dropValue)`, then step once.
+
+## Gamepad and touch
+
+- **Gamepad:** each frame the pads' buttons and left stick become key codes through `input.press` and `input.release`, so a run records and replays them. Codes: `GamepadA B X Y LB RB Back Start Up Down Left Right`. A held direction repeats after 0.4 s, every 0.1 s. The menu actions are bound to them by default (`uiConfirm` is A, `uiBack` is B), and a game binds them like any key: `input.bind('jump', ['Space', 'GamepadA'])`.
+- **Touch:** a tap is a `click`, so every control works. Drag and drop follows a finger too, and a dragged element is `touch-action: none`. Targets grow to 44 px on a coarse pointer (`@media (pointer: coarse)`).
+- `pointerdown` still does not reach the UI while a game plays (Mouse Look); use `click`, or `touchstart` for a raw touch.

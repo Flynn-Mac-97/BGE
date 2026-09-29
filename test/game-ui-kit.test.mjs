@@ -10,6 +10,7 @@ import gameUi from '../plugins/builtin/game-ui.js'
 import { keyName, kit } from '../plugins/builtin/game-ui/components.js'
 import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
 import { BASE_CSS } from '../plugins/builtin/game-ui/base-css.js'
+import { heldPadCodes, pollGamepad } from '../plugins/builtin/game-ui/gamepad.js'
 import { menuPlacement } from '../plugins/builtin/game-ui/popup.js'
 import { soundOfEvent } from '../plugins/builtin/game-ui/sounds.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
@@ -158,7 +159,7 @@ test('menu actions are bound once, and never over a game that bound them', () =>
   context.gameUi.show('shop', { isInteractive: true, html: shop() })
   step()
   assert.deepEqual(bound.uiConfirm, ['KeyE'])
-  assert.deepEqual(bound.uiUp, ['ArrowUp'])
+  assert.deepEqual(bound.uiUp, ['ArrowUp', 'GamepadUp'], 'the keyboard, and the pad as virtual codes')
 })
 
 test('a theme file sets tokens; :root becomes :host so a panel can use it', () => {
@@ -658,4 +659,32 @@ test('a UI sound still plays after game time goes back, as it does on a level re
   context.time = 0.5
   assert.equal(context.gameUi.playSound('click'), 'c.wav', 'time went back to before the last play')
   assert.equal(plays.length, 2)
+})
+
+/** A gamepad as `navigator.getGamepads` reports one: buttons with `pressed`, and axes. */
+const pad = ({ pressed = [], axes = [0, 0] } = {}) => ({ buttons: Array.from({ length: 16 }, (unused, index) => ({ pressed: pressed.includes(index) })), axes })
+
+test('a gamepad becomes key codes: buttons, the d-pad and the left stick', () => {
+  assert.deepEqual([...heldPadCodes([pad({ pressed: [0, 12] })])].sort(), ['GamepadA', 'GamepadUp'])
+  assert.deepEqual([...heldPadCodes([pad({ axes: [-0.9, 0.1] })])], ['GamepadLeft'])
+  assert.deepEqual([...heldPadCodes([pad({ axes: [0.3, 0.4] })])], [], 'a small lean is not a direction')
+  assert.deepEqual([...heldPadCodes([null, pad({ pressed: [1] })])], ['GamepadB'], 'an empty slot is skipped')
+  assert.deepEqual([...heldPadCodes([pad({ pressed: [6, 7, 10] })])], [], 'buttons with no code are ignored')
+})
+
+test('polling presses what became held, releases what was let go, and repeats a held direction', () => {
+  const calls = []
+  const context = { input: { press: code => calls.push('+' + code), release: code => calls.push('-' + code) } }
+  const state = { padHeld: new Map() }
+  pollGamepad(context, state, [pad({ pressed: [0, 13] })], 0.016)
+  assert.deepEqual(calls, ['+GamepadA', '+GamepadDown'])
+  calls.length = 0
+  pollGamepad(context, state, [pad({ pressed: [0, 13] })], 0.2)
+  assert.deepEqual(calls, [], 'held, and not yet time to repeat')
+  pollGamepad(context, state, [pad({ pressed: [0, 13] })], 0.3)
+  assert.deepEqual(calls, ['-GamepadDown', '+GamepadDown'], 'a held direction repeats; a held button does not')
+  calls.length = 0
+  pollGamepad(context, state, [pad()], 0.016)
+  assert.deepEqual(calls.sort(), ['-GamepadA', '-GamepadDown'])
+  assert.equal(state.padHeld.size, 0)
 })

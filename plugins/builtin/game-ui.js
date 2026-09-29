@@ -36,6 +36,7 @@ import { assetPath, assetURL } from '../../engine/asset-path.js'
 import { escapeHtml, kit } from './game-ui/components.js'
 import { dragsOf, dropsOf, TRIGGER } from './game-ui/controls.js'
 import { drawFrame } from './game-ui/draw.js'
+import { pollGamepad } from './game-ui/gamepad.js'
 import { makeEffects } from './game-ui/effects.js'
 import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { makeNotifications } from './game-ui/notifications.js'
@@ -81,6 +82,7 @@ export default {
       floatCount: 0,
       floats: [],
       capture: null,
+      padHeld: new Map(),
       // `limit` is the most anchors drawn at once; past it, the nearest to the view are kept.
       // `drawn` is how many the last frame drew.
       world: { limit: 48, drawn: 0 }
@@ -347,6 +349,7 @@ export default {
       run(world, seconds, context) {
         const state = stateOf.get(context)
         if (!state || !context.ui || typeof document === 'undefined') return
+        if (context.input && typeof navigator !== 'undefined' && navigator.getGamepads) pollGamepad(context, state, navigator.getGamepads(), seconds)
         drawFrame(context, state, seconds)
       }
     }
