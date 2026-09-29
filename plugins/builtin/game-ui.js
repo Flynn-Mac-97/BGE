@@ -78,6 +78,7 @@ export default {
       shownCount: 0,
       floatCount: 0,
       floats: [],
+      capture: null,
       // `limit` is the most anchors drawn at once; past it, the nearest to the view are kept.
       // `drawn` is how many the last frame drew.
       world: { limit: 48, drawn: 0 }
@@ -233,6 +234,26 @@ export default {
       /** Open a menu of choices at `at` (`{ x, y }`, as a pointer event has), and run `onPick(value)` on a pick. See game-ui/popup.js. */
       menu: options => openMenu(context, options),
 
+      /**
+       * Take the next key press for `callback(code)` on the next fixed step:
+       * for a rebinding row. Esc cancels with `null`. While waiting, Game UI
+       * keeps the key from its own menu, and `isCapturing()` is true so a game
+       * can ignore its bindings. Replaces a capture already waiting.
+       */
+      captureKey(callback) {
+        state.capture = callback
+      },
+      isCapturing: () => Boolean(state.capture),
+
+      /** Give a key press to a waiting `captureKey`, as the page's keydown does. True when it was taken. */
+      feedKey(code) {
+        if (!state.capture) return false
+        const callback = state.capture
+        state.capture = null
+        state.queue.push({ ...makeUiEvent('ui:capture', 'captured', code === 'Escape' ? null : code, 'key', { type: 'key' }), callback })
+        return true
+      },
+
       /** The payloads a panel or anchor lets a person drag, and the drop zones it offers as `{ action, value }`. */
       drags: id => dragsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
       drops: id => dropsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
@@ -262,9 +283,19 @@ export default {
       asset: assetURL
     }
 
+    // The page's keys go to a waiting capture first, so a rebinding row gets the key and nothing else does.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', event => {
+        if (!context.gameUi.feedKey(event.code)) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      }, { capture: true })
+    }
+
     const clearRun = () => {
       for (const id of [...state.panels.keys(), ...state.anchors.keys()]) remove(id)
       state.queue.length = 0
+      state.capture = null
       notifications.clear()
     }
     context.bus.on('play:stopped', clearRun)
@@ -325,6 +356,10 @@ export default {
 /** Run this step's queued events. A handler that throws is named and skipped. */
 function runHandlers(context, state) {
   for (const event of state.queue.splice(0)) {
+    if (event.callback) {
+      try { event.callback(event.value) } catch (error) { console.error('[game-ui] a captured key handler failed', error) }
+      continue
+    }
     const record = state.panels.get(event.id) ?? state.anchors.get(event.id)
     const handler = record?.phase === 'leaving' ? undefined : record?.on[`${event.action}:${event.type}`] ?? record?.on[event.action]
     if (!handler) continue

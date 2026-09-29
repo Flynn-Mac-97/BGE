@@ -7,8 +7,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { makeBus } from '../engine/bus.js'
 import gameUi from '../plugins/builtin/game-ui.js'
-import { kit } from '../plugins/builtin/game-ui/components.js'
+import { keyName, kit } from '../plugins/builtin/game-ui/components.js'
 import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
+import { BASE_CSS } from '../plugins/builtin/game-ui/base-css.js'
 import { menuPlacement } from '../plugins/builtin/game-ui/popup.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
@@ -464,4 +465,69 @@ test('a context menu carries the classes its CSS needs, on the rows and on the o
   assert.match(html, /class="ui-menu-item ui-button"/)
   assert.match(html, /class="ui-menu-scrim"/)
   assert.match(html, /left:5px;top:6px/)
+})
+
+test('an accordion opens the sections named, and disables the controls in the closed ones', () => {
+  const html = kit.accordion([
+    { value: 'a', title: 'Audio', content: [kit.toggle('Music', { action: 'music', isOn: true })] },
+    { value: 'b', title: 'Video', content: [kit.button('Reset', { action: 'reset' })] }
+  ], { open: 'a' })
+  assert.equal((html.match(/data-open/g) ?? []).length, 1)
+  const { context, step } = loaded()
+  const seen = []
+  context.gameUi.show('menu', { html, on: { toggle: value => seen.push(value), reset: () => seen.push('reset') } })
+  assert.deepEqual(context.gameUi.controls('menu').map(control => [control.action, control.isDisabled]), [['toggle', false], ['music', false], ['toggle', false], ['reset', true]])
+  assert.equal(context.gameUi.click('menu', 'reset'), false, 'a closed section cannot be used')
+  context.gameUi.click('menu', 'toggle', 'b')
+  step()
+  assert.deepEqual(seen, ['b'])
+})
+
+test('a table shows text cells, marks the sorted column, and rows raise the action with their value', () => {
+  const columns = [{ key: 'name', label: 'Name', isSortable: true }, { key: 'score', label: 'Score', align: 'right', isSortable: true }]
+  const rows = [{ value: 'ada', name: 'Ada <A>', score: 90 }, { value: 'bo', name: 'Bo', score: 70 }]
+  const html = kit.table(columns, rows, { action: 'pick', selected: 'bo', sortKey: 'score', sortDirection: 'descending' })
+  assert.match(html, /aria-sort="descending"/)
+  assert.match(html, /Score ▼/)
+  assert.match(html, /Ada &lt;A&gt;/)
+  const { context, step } = loaded()
+  const seen = []
+  context.gameUi.show('board', { html, on: { pick: value => seen.push(value), sort: value => seen.push('sort:' + value) } })
+  context.gameUi.click('board', 'pick', 'ada')
+  context.gameUi.click('board', 'sort', 'name')
+  step()
+  assert.deepEqual(seen, ['ada', 'sort:name'])
+})
+
+test('an avatar falls back to initials, and a key code reads as a keycap', () => {
+  assert.match(kit.avatar({ name: 'ada lovelace byron', status: 'online' }), /ui-avatar-initials">AL</)
+  assert.match(kit.avatar({ image: 'ui/ada.png', name: 'Ada' }), /src="\/project\/assets\/ui\/ada.png"/)
+  assert.deepEqual(['KeyE', 'Digit3', 'ArrowUp', 'MouseLeft', 'Space', null].map(keyName), ['E', '3', '↑', 'LMB', 'Space', 'none'])
+})
+
+test('a keybind row waits for the next key, hands it to the callback on the fixed step, and Esc cancels', () => {
+  const { context, step } = loaded()
+  const got = []
+  assert.equal(context.gameUi.feedKey('KeyQ'), false, 'nothing waiting, nothing taken')
+  context.gameUi.captureKey(code => got.push(code))
+  assert.equal(context.gameUi.isCapturing(), true)
+  assert.equal(context.gameUi.feedKey('KeyQ'), true)
+  assert.equal(context.gameUi.isCapturing(), false)
+  assert.deepEqual(got, [], 'not until the fixed step')
+  step()
+  context.gameUi.captureKey(code => got.push(code))
+  context.gameUi.feedKey('Escape')
+  step()
+  assert.deepEqual(got, ['KeyQ', null])
+  assert.match(kit.keybind('Jump', 'Space', { isListening: true }), /Press a key…/)
+  assert.match(kit.keybind('Jump', 'Space'), />Space</)
+})
+
+test('the kit stylesheet lists the base components before the extensions that restyle them', () => {
+  // The same specificity is decided by order, so an extension written first loses to `.ui-button`.
+  const at = rule => BASE_CSS.indexOf(rule)
+  assert.ok(at('.ui-button {') > -1)
+  for (const extension of ['.ui-accordion-head', '.ui-menu-item', '.ui-keycap', '.ui-table-sort']) {
+    assert.ok(at(extension) > at('.ui-button {'), `${extension} comes after .ui-button`)
+  }
 })

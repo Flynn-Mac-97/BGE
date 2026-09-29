@@ -23,6 +23,10 @@
 | `pips(value, { max, glyph, emptyGlyph })` | hearts, ammo: `value` full of `max` |
 | `typewriter(text, { chars })` | text shown to `chars` characters; the rest is laid out but hidden, so the box never grows |
 | `dialogue({ speaker, text, chars, portrait, choices, advance, choose })` | a box that raises `advance` (click or Enter) and, once the text is complete, choice buttons that raise `choose` |
+| `accordion(sections, { open, action })` | sections `{ value, title, content }`; headers raise `toggle` with the value. The height animates; controls in closed sections are disabled, and `read` still shows their text |
+| `table(columns, rows, { action, selected, sortKey, sortDirection })` | columns `{ key, label, align, isSortable }`, rows `{ value, ...cells }`; a row raises `action`, a sortable header raises `sort` with its key, and you sort |
+| `avatar({ image, name, size, status })` | a round picture or initials; `status`: `online away busy` |
+| `keybind(label, code, { isListening })` | a label and a keycap; the keycap raises `rebind`. Then call `gameUi.captureKey` |
 | `contextMenu(items, { x, y })` | a menu at a point over an outside layer that dismisses it; rows are `{ label, value, isDisabled, kind }` or `{ isDivider: true }`. Use `gameUi.menu` |
 | `element(children, { as, attributes })` | any tag: the way to markup the kit has no name for |
 | `target(children, { action, value, triggers, as, attributes })` | any element that raises your event; `attributes` such as `data-hot` are for your CSS |
@@ -41,3 +45,7 @@ Read `remaining` from engine time so the sweep pauses with the game: `remaining 
 
 - `gameUi.notify(text, { tone, life })` adds a message to one stack (bottom right). It slides in, fades over its last 0.3 s, and goes after `life` seconds (default 3) of game time; a click dismisses it. Six at most; the oldest goes first. Style `.ui-notifications` and the toast in `theme.css`. Answers the id.
 - `gameUi.menu({ at, items, onPick })` opens a menu at `at` (`{ x, y }`; a pointer event has both, so `at: event` works), kept inside the viewport. It takes the pointer and the menu keys: arrows, Enter and Esc work, and a click outside dismisses it. `onPick(value)` runs on the next fixed step. One menu at a time. Panel ids `ui:notifications` and `ui:menu` are for tests: `gameUi.click('ui:menu', 'pick', value)`.
+
+## Rebinding a key
+
+In the `rebind` handler: `gameUi.captureKey(code => { ... })`. The next key press goes to the callback on the next fixed step (Esc gives `null`), and Game UI keeps that key from its own menu. Show `isListening: true` on the row meanwhile. A game can check `gameUi.isCapturing()` to ignore its own bindings while it waits. `gameUi.feedKey(code)` gives a key by hand, for tests. `keyName('KeyE')` is `E`.

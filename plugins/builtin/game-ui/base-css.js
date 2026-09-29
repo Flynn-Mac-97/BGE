@@ -12,90 +12,6 @@ export const BASE_CSS = `
 [data-disabled] { opacity: 0.4; pointer-events: none; }
 [hidden] { display: none !important; }
 
-/* Phases: a panel or anchor fades in when it appears and out when it is hidden with \`leave\`. */
-:host { transition: opacity var(--ui-duration) var(--ui-ease); }
-:host([data-phase="entering"]), :host([data-phase="leaving"]) { opacity: 0; }
-:host([data-phase="leaving"]), :host([data-phase="leaving"]) * { pointer-events: none !important; }
-.ui-anchor { transition: opacity var(--ui-duration) var(--ui-ease); }
-.ui-anchor[data-phase="entering"], .ui-anchor[data-phase="leaving"] { opacity: 0; }
-.ui-anchor[data-phase="leaving"], .ui-anchor[data-phase="leaving"] * { pointer-events: none !important; }
-
-/* Animation and effect utilities. Add one as a class. \`--i\` staggers a row: style: '--i:3'. */
-/* Drag and drop: a source is grabbed, a zone under the pointer is hot, a copy follows the pointer. */
-[data-drag] { cursor: grab; }
-[data-dragging] { opacity: 0.35; }
-[data-drop-hot] { outline: 2px dashed var(--ui-accent); outline-offset: 2px; }
-.ui-drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0.92; transform-origin: 0 0; filter: drop-shadow(0 6px 10px var(--ui-outline)); }
-[data-drag], [data-drop] { pointer-events: auto; }
-
-/* Rings, cooldowns and pips. --fraction is registered as a number (draw.js), so a ring eases between values. */
-.ui-ring { position: relative; width: var(--size, 64px); height: var(--size, 64px); border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--ui-accent) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); transition: --fraction var(--ui-duration) var(--ui-ease); }
-.ui-ring::before { content: ''; position: absolute; inset: calc(var(--size, 64px) * 0.12); border-radius: 50%; background: var(--ui-surface); }
-.ui-ring-label { position: relative; font-size: 0.8em; }
-.ui-ring[data-kind="health"] { background: conic-gradient(var(--ui-danger) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); }
-.ui-ring[data-kind="good"] { background: conic-gradient(var(--ui-good) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); }
-.ui-cooldown { position: relative; display: inline-block; }
-.ui-cooldown[data-cooling]::after { content: ''; position: absolute; inset: 0; border-radius: var(--ui-radius); pointer-events: none; background: conic-gradient(transparent calc((1 - var(--fraction, 0)) * 1turn), rgba(0, 0, 0, 0.62) 0); }
-.ui-cooldown-text { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-weight: 700; pointer-events: none; text-shadow: 0 1px 3px var(--ui-outline); }
-.ui-pips { display: inline-flex; gap: 0.15em; color: var(--ui-danger); }
-.ui-pip[data-full="false"] { opacity: 0.45; }
-
-/* Notifications stack and popup menu. */
-.ui-notifications { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ui-space); }
-.ui-notifications > [data-ui-control] { cursor: pointer; }
-.ui-menu { position: absolute; z-index: 1; min-width: 180px; padding: calc(var(--ui-space) * 0.5); display: flex; flex-direction: column; gap: 2px; background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); pointer-events: auto; animation: ui-pop var(--ui-duration) var(--ui-ease) both; }
-.ui-menu-item { justify-content: flex-start; background: transparent; border-color: transparent; }
-.ui-menu-item:hover, .ui-menu-item[data-focus] { background: var(--ui-track); }
-.ui-menu-scrim { position: absolute; inset: 0; }
-
-/* Dialogue and typewriter text. */
-.ui-untyped { visibility: hidden; }
-.ui-caret { display: inline-block; width: 0; overflow: visible; color: var(--ui-accent); animation: ui-blink 0.8s steps(1) infinite; }
-@keyframes ui-blink { 50% { opacity: 0; } }
-.ui-dialogue { display: flex; flex-direction: column; gap: var(--ui-space); }
-.ui-dialogue-box { display: flex; gap: calc(var(--ui-space) * 1.5); align-items: flex-start; padding: calc(var(--ui-space) * 2); background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); cursor: pointer; min-height: 5em; }
-.ui-dialogue-speaker { color: var(--ui-accent); font-weight: 700; margin-bottom: calc(var(--ui-space) * 0.5); }
-.ui-choices { display: flex; flex-wrap: wrap; gap: var(--ui-space); justify-content: flex-end; }
-
-@keyframes ui-fade-in { from { opacity: 0; } }
-@keyframes ui-fade-out { to { opacity: 0; } }
-@keyframes ui-slide-up { from { opacity: 0; transform: translateY(16px); } }
-@keyframes ui-slide-down { from { opacity: 0; transform: translateY(-16px); } }
-@keyframes ui-slide-left { from { opacity: 0; transform: translateX(16px); } }
-@keyframes ui-slide-right { from { opacity: 0; transform: translateX(-16px); } }
-@keyframes ui-pop { 0% { opacity: 0; transform: scale(0.85); } 60% { transform: scale(1.05); } }
-@keyframes ui-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
-@keyframes ui-pulse { 50% { transform: scale(1.06); } }
-@keyframes ui-glow-pulse { 50% { box-shadow: 0 0 18px 2px var(--ui-accent); } }
-@keyframes ui-shine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@keyframes ui-float { 50% { transform: translateY(-6px); } }
-@keyframes ui-spin { to { transform: rotate(1turn); } }
-.ui-fade-in, .ui-fade-out, .ui-slide-up, .ui-slide-down, .ui-slide-left, .ui-slide-right, .ui-pop { animation-duration: var(--ui-duration); animation-timing-function: var(--ui-ease); animation-fill-mode: both; animation-delay: calc(var(--i, 0) * 60ms); }
-.ui-fade-in { animation-name: ui-fade-in; }
-.ui-fade-out { animation-name: ui-fade-out; }
-.ui-slide-up { animation-name: ui-slide-up; }
-.ui-slide-down { animation-name: ui-slide-down; }
-.ui-slide-left { animation-name: ui-slide-left; }
-.ui-slide-right { animation-name: ui-slide-right; }
-.ui-pop { animation-name: ui-pop; }
-.ui-shake { animation: ui-shake 0.4s linear; }
-.ui-pulse { animation: ui-pulse 1s ease-in-out infinite; }
-.ui-glow { box-shadow: 0 0 14px 1px var(--ui-accent); }
-.ui-glow-pulse { animation: ui-glow-pulse 1.4s ease-in-out infinite; }
-.ui-shine { background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%); background-size: 200% 100%; animation: ui-shine 2.2s linear infinite; }
-.ui-float { animation: ui-float 2.4s ease-in-out infinite; }
-.ui-spin { animation: ui-spin 1s linear infinite; }
-.ui-blur { backdrop-filter: blur(8px); }
-.ui-grayscale { filter: grayscale(1); }
-@keyframes ui-rise { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 15% { opacity: 1; transform: translateY(-8px) scale(1.15); } 100% { opacity: 0; transform: translateY(-48px) scale(1); } }
-.ui-floating { animation: ui-rise var(--life, 1s) ease-out both; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px var(--ui-outline), 0 0 6px var(--ui-outline); }
-.ui-floating[data-tone="danger"] { color: var(--ui-danger); }
-.ui-floating[data-tone="good"] { color: var(--ui-good); }
-.ui-floating[data-tone="accent"] { color: var(--ui-accent); }
-@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; animation-delay: 0s !important; } }
-.ui-anchor { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; contain: layout style; pointer-events: none; }
-.ui-anchor[data-interactive] { pointer-events: auto; }
-
 .ui-stack, .ui-row, .ui-grid { display: flex; flex-direction: column; gap: calc(var(--ui-space) * var(--gap, 1)); }
 .ui-row { flex-direction: row; align-items: center; flex-wrap: wrap; }
 .ui-grid { display: grid; grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr)); }
@@ -166,4 +82,116 @@ export const BASE_CSS = `
 .ui-toast { display: inline-block; background: var(--ui-surface); border: 1px solid var(--ui-edge); border-left: 4px solid var(--ui-accent); border-radius: calc(var(--ui-radius) * 0.6); padding: var(--ui-space) calc(var(--ui-space) * 2); }
 .ui-toast[data-tone="good"] { border-left-color: var(--ui-good); }
 .ui-toast[data-tone="danger"] { border-left-color: var(--ui-danger); }
+
+/* Phases: a panel or anchor fades in when it appears and out when it is hidden with \`leave\`. */
+:host { transition: opacity var(--ui-duration) var(--ui-ease); }
+:host([data-phase="entering"]), :host([data-phase="leaving"]) { opacity: 0; }
+:host([data-phase="leaving"]), :host([data-phase="leaving"]) * { pointer-events: none !important; }
+.ui-anchor { transition: opacity var(--ui-duration) var(--ui-ease); }
+.ui-anchor[data-phase="entering"], .ui-anchor[data-phase="leaving"] { opacity: 0; }
+.ui-anchor[data-phase="leaving"], .ui-anchor[data-phase="leaving"] * { pointer-events: none !important; }
+
+/* Animation and effect utilities. Add one as a class. \`--i\` staggers a row: style: '--i:3'. */
+/* Drag and drop: a source is grabbed, a zone under the pointer is hot, a copy follows the pointer. */
+[data-drag] { cursor: grab; }
+[data-dragging] { opacity: 0.35; }
+[data-drop-hot] { outline: 2px dashed var(--ui-accent); outline-offset: 2px; }
+.ui-drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0.92; transform-origin: 0 0; filter: drop-shadow(0 6px 10px var(--ui-outline)); }
+[data-drag], [data-drop] { pointer-events: auto; }
+
+/* Rings, cooldowns and pips. --fraction is registered as a number (draw.js), so a ring eases between values. */
+.ui-ring { position: relative; width: var(--size, 64px); height: var(--size, 64px); border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--ui-accent) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); transition: --fraction var(--ui-duration) var(--ui-ease); }
+.ui-ring::before { content: ''; position: absolute; inset: calc(var(--size, 64px) * 0.12); border-radius: 50%; background: var(--ui-surface); }
+.ui-ring-label { position: relative; font-size: 0.8em; }
+.ui-ring[data-kind="health"] { background: conic-gradient(var(--ui-danger) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); }
+.ui-ring[data-kind="good"] { background: conic-gradient(var(--ui-good) calc(var(--fraction, 0) * 1turn), var(--ui-track) 0); }
+.ui-cooldown { position: relative; display: inline-block; }
+.ui-cooldown[data-cooling]::after { content: ''; position: absolute; inset: 0; border-radius: var(--ui-radius); pointer-events: none; background: conic-gradient(transparent calc((1 - var(--fraction, 0)) * 1turn), rgba(0, 0, 0, 0.62) 0); }
+.ui-cooldown-text { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-weight: 700; pointer-events: none; text-shadow: 0 1px 3px var(--ui-outline); }
+.ui-pips { display: inline-flex; gap: 0.15em; color: var(--ui-danger); }
+.ui-pip[data-full="false"] { opacity: 0.45; }
+
+/* Accordion, table, avatar and keybind. */
+.ui-accordion { display: flex; flex-direction: column; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); overflow: hidden; }
+.ui-accordion-item + .ui-accordion-item { border-top: 1px solid var(--ui-edge); }
+.ui-accordion-head { width: 100%; justify-content: space-between; border: 0; border-radius: 0; background: transparent; }
+.ui-accordion-head::after { content: '▸'; transition: transform var(--ui-duration) var(--ui-ease); }
+.ui-accordion-item[data-open] > .ui-accordion-head::after { transform: rotate(90deg); }
+.ui-accordion-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--ui-duration) var(--ui-ease); }
+.ui-accordion-item[data-open] > .ui-accordion-body { grid-template-rows: 1fr; }
+.ui-accordion-inner { overflow: hidden; padding: 0 calc(var(--ui-space) * 1.5); }
+.ui-accordion-item[data-open] > .ui-accordion-body > .ui-accordion-inner { padding-bottom: var(--ui-space); }
+.ui-table { width: 100%; border-collapse: collapse; }
+.ui-table th, .ui-table td { padding: calc(var(--ui-space) * 0.75) var(--ui-space); text-align: left; border-bottom: 1px solid var(--ui-edge); }
+.ui-table th { color: var(--ui-quiet); font-weight: 600; font-size: 0.85em; }
+.ui-table [data-align="right"] { text-align: right; }
+.ui-table [data-align="center"] { text-align: center; }
+.ui-table-row[data-ui-control] { cursor: pointer; }
+.ui-table-row[data-ui-control]:hover, .ui-table-row[data-selected] { background: var(--ui-track); }
+.ui-table-sort { padding: 0; }
+.ui-avatar { position: relative; display: inline-grid; place-items: center; width: var(--size, 40px); height: var(--size, 40px); border-radius: 50%; background: var(--ui-track); border: 1px solid var(--ui-edge); font-size: calc(var(--size, 40px) * 0.4); font-weight: 700; }
+.ui-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.ui-avatar-status { position: absolute; right: 0; bottom: 0; width: 26%; height: 26%; border-radius: 50%; border: 2px solid var(--ui-surface); background: var(--ui-quiet); }
+.ui-avatar[data-status="online"] .ui-avatar-status { background: var(--ui-good); }
+.ui-avatar[data-status="busy"] .ui-avatar-status { background: var(--ui-danger); }
+.ui-avatar[data-status="away"] .ui-avatar-status { background: var(--ui-accent); }
+.ui-keybind { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space); }
+.ui-keycap { min-width: 4em; border-bottom-width: 3px; }
+.ui-keycap.ui-listening { border-color: var(--ui-accent); color: var(--ui-accent); animation: ui-pulse 1s ease-in-out infinite; }
+
+/* Notifications stack and popup menu. */
+.ui-notifications { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ui-space); }
+.ui-notifications > [data-ui-control] { cursor: pointer; }
+.ui-menu { position: absolute; z-index: 1; min-width: 180px; padding: calc(var(--ui-space) * 0.5); display: flex; flex-direction: column; gap: 2px; background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); pointer-events: auto; animation: ui-pop var(--ui-duration) var(--ui-ease) both; }
+.ui-menu-item { justify-content: flex-start; background: transparent; border-color: transparent; }
+.ui-menu-item:hover, .ui-menu-item[data-focus] { background: var(--ui-track); }
+.ui-menu-scrim { position: absolute; inset: 0; }
+
+/* Dialogue and typewriter text. */
+.ui-untyped { visibility: hidden; }
+.ui-caret { display: inline-block; width: 0; overflow: visible; color: var(--ui-accent); animation: ui-blink 0.8s steps(1) infinite; }
+@keyframes ui-blink { 50% { opacity: 0; } }
+.ui-dialogue { display: flex; flex-direction: column; gap: var(--ui-space); }
+.ui-dialogue-box { display: flex; gap: calc(var(--ui-space) * 1.5); align-items: flex-start; padding: calc(var(--ui-space) * 2); background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); cursor: pointer; min-height: 5em; }
+.ui-dialogue-speaker { color: var(--ui-accent); font-weight: 700; margin-bottom: calc(var(--ui-space) * 0.5); }
+.ui-choices { display: flex; flex-wrap: wrap; gap: var(--ui-space); justify-content: flex-end; }
+
+@keyframes ui-fade-in { from { opacity: 0; } }
+@keyframes ui-fade-out { to { opacity: 0; } }
+@keyframes ui-slide-up { from { opacity: 0; transform: translateY(16px); } }
+@keyframes ui-slide-down { from { opacity: 0; transform: translateY(-16px); } }
+@keyframes ui-slide-left { from { opacity: 0; transform: translateX(16px); } }
+@keyframes ui-slide-right { from { opacity: 0; transform: translateX(-16px); } }
+@keyframes ui-pop { 0% { opacity: 0; transform: scale(0.85); } 60% { transform: scale(1.05); } }
+@keyframes ui-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes ui-pulse { 50% { transform: scale(1.06); } }
+@keyframes ui-glow-pulse { 50% { box-shadow: 0 0 18px 2px var(--ui-accent); } }
+@keyframes ui-shine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes ui-float { 50% { transform: translateY(-6px); } }
+@keyframes ui-spin { to { transform: rotate(1turn); } }
+.ui-fade-in, .ui-fade-out, .ui-slide-up, .ui-slide-down, .ui-slide-left, .ui-slide-right, .ui-pop { animation-duration: var(--ui-duration); animation-timing-function: var(--ui-ease); animation-fill-mode: both; animation-delay: calc(var(--i, 0) * 60ms); }
+.ui-fade-in { animation-name: ui-fade-in; }
+.ui-fade-out { animation-name: ui-fade-out; }
+.ui-slide-up { animation-name: ui-slide-up; }
+.ui-slide-down { animation-name: ui-slide-down; }
+.ui-slide-left { animation-name: ui-slide-left; }
+.ui-slide-right { animation-name: ui-slide-right; }
+.ui-pop { animation-name: ui-pop; }
+.ui-shake { animation: ui-shake 0.4s linear; }
+.ui-pulse { animation: ui-pulse 1s ease-in-out infinite; }
+.ui-glow { box-shadow: 0 0 14px 1px var(--ui-accent); }
+.ui-glow-pulse { animation: ui-glow-pulse 1.4s ease-in-out infinite; }
+.ui-shine { background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%); background-size: 200% 100%; animation: ui-shine 2.2s linear infinite; }
+.ui-float { animation: ui-float 2.4s ease-in-out infinite; }
+.ui-spin { animation: ui-spin 1s linear infinite; }
+.ui-blur { backdrop-filter: blur(8px); }
+.ui-grayscale { filter: grayscale(1); }
+@keyframes ui-rise { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 15% { opacity: 1; transform: translateY(-8px) scale(1.15); } 100% { opacity: 0; transform: translateY(-48px) scale(1); } }
+.ui-floating { animation: ui-rise var(--life, 1s) ease-out both; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px var(--ui-outline), 0 0 6px var(--ui-outline); }
+.ui-floating[data-tone="danger"] { color: var(--ui-danger); }
+.ui-floating[data-tone="good"] { color: var(--ui-good); }
+.ui-floating[data-tone="accent"] { color: var(--ui-accent); }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; animation-delay: 0s !important; } }
+.ui-anchor { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; contain: layout style; pointer-events: none; }
+.ui-anchor[data-interactive] { pointer-events: auto; }
 `

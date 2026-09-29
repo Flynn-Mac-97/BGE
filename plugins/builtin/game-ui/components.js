@@ -36,6 +36,19 @@ const join = children => [].concat(children ?? []).join('')
 /** `value` as a share of `max`, from 0 to 1, to three decimals so an unchanged bar writes an unchanged string. */
 const fractionOf = (value, max) => Math.round(Math.min(Math.max(Number(value) / Number(max) || 0, 0), 1) * 1000) / 1000
 
+/** What a key code reads as on a keycap. A code not listed loses its `Key`, `Digit` or `Numpad` prefix. */
+const KEY_NAMES = {
+  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space', Escape: 'Esc', Enter: 'Enter', Tab: 'Tab', Backspace: 'Bksp',
+  ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl', AltLeft: 'Alt', AltRight: 'Alt',
+  MouseLeft: 'LMB', MouseRight: 'RMB', MouseMiddle: 'MMB'
+}
+
+/** A key code as a person reads it: `KeyE` is `E`, `ArrowUp` is `↑`, `none` when there is no key. */
+export const keyName = code => (code ? KEY_NAMES[code] ?? String(code).replace(/^(Key|Digit|Numpad)/, '') : 'none')
+
+/** Up to two capital letters from a name: `Ada Lovelace` is `AL`. */
+const initialsOf = name => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0].toUpperCase()).join('')
+
 /** A CSS custom property for the style attribute, or nothing. Only plain numbers and lengths pass. */
 const variable = (name, value) => (/^[\w.%-]+$/.test(String(value ?? '')) ? `--${name}:${value}` : undefined)
 const styleOf = (...declarations) => declarations.filter(Boolean).join(';') || undefined
@@ -150,6 +163,54 @@ const components = {
   pips: (value, { max = 5, glyph = '●', emptyGlyph = '○' } = {}) =>
     tag('span', { class: 'ui-pips', role: 'meter', 'aria-valuenow': value, 'aria-valuemax': max },
       Array.from({ length: max }, (unused, index) => tag('span', { class: 'ui-pip', 'data-full': String(index < value) }, escapeHtml(index < value ? glyph : emptyGlyph))).join('')),
+
+  /**
+   * Sections that open and close. Each header raises `action` (default `toggle`)
+   * with the section's `value`; `open` is one value or a list of them. A closed
+   * section keeps its content, so CSS can animate the height, but its controls
+   * are disabled. `gameUi.read` therefore reads closed text too.
+   */
+  accordion: (sections, { action = 'toggle', open = [] } = {}) => {
+    const openValues = [].concat(open)
+    return tag('div', { class: 'ui-accordion' }, sections.map(section => {
+      const isOpen = openValues.includes(section.value)
+      const content = isOpen ? join(section.content) : join(section.content).replace(/\sdata-ui-control=/g, ' data-disabled data-ui-control=')
+      return tag('section', { class: 'ui-accordion-item', 'data-open': isOpen },
+        kit.button(section.title, { action, value: section.value, class: 'ui-accordion-head' })
+        + tag('div', { class: 'ui-accordion-body', 'aria-hidden': String(!isOpen) }, tag('div', { class: 'ui-accordion-inner' }, content)))
+    }).join(''))
+  },
+
+  /**
+   * A table. `columns` are `{ key, label, align, isSortable }`; `rows` are
+   * records with a `value` (the row's id) and a cell for each column key. With
+   * `action` a row is clickable and raises it with its `value`; a sortable
+   * header raises `sortAction` with its key, and the game sorts. Cells are text.
+   */
+  table: (columns, rows, { action, selected, sortKey, sortDirection = 'ascending', sortAction = 'sort' } = {}) => {
+    const head = columns.map(column => tag('th', { 'data-align': column.align, 'aria-sort': column.key === sortKey ? sortDirection : undefined },
+      column.isSortable ? kit.button(column.label + (column.key === sortKey ? (sortDirection === 'ascending' ? ' ▲' : ' ▼') : ''), { action: sortAction, value: column.key, kind: 'quiet', class: 'ui-table-sort' }) : escapeHtml(column.label))).join('')
+    const body = rows.map(row => {
+      const attributes = { class: 'ui-table-row', 'data-selected': row.value === selected }
+      const cells = columns.map(column => tag('td', { 'data-align': column.align }, escapeHtml(row[column.key] ?? ''))).join('')
+      return tag('tr', action ? { ...attributes, ...controlAttributes('row', { action, value: row.value, label: String(row.label ?? row.value) }) } : attributes, cells)
+    }).join('')
+    return tag('table', { class: 'ui-table' }, tag('thead', {}, tag('tr', {}, head)) + tag('tbody', {}, body))
+  },
+
+  /** A round picture, or the name's initials when there is none. `status` is `online`, `away` or `busy`. */
+  avatar: ({ image, name = '', size = 40, status } = {}) =>
+    tag('span', { class: 'ui-avatar', title: name, 'data-status': status, style: `--size:${Number(size) || 40}px` },
+      (image ? tag('img', { src: assetURL(image), alt: name }) : tag('span', { class: 'ui-avatar-initials' }, escapeHtml(initialsOf(name)))) + (status ? tag('span', { class: 'ui-avatar-status' }) : '')),
+
+  /**
+   * A rebinding row: a label and a keycap showing `code`. The keycap raises
+   * `action` (default `rebind`) with `value`; the game then calls
+   * `gameUi.captureKey` and shows `isListening` until a key comes.
+   */
+  keybind: (label, code, { action = 'rebind', value, isListening = false } = {}) =>
+    tag('div', { class: 'ui-keybind' }, tag('span', { class: 'ui-keybind-label' }, escapeHtml(label))
+      + kit.button(isListening ? 'Press a key…' : keyName(code), { action, value: value ?? label, class: isListening ? 'ui-keycap ui-listening' : 'ui-keycap' })),
 
   /**
    * Text revealed up to `chars` characters. The rest is laid out but hidden, so
