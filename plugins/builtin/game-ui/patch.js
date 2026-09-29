@@ -26,7 +26,8 @@ function patchChildren(parent, source, root) {
   for (const [index, node] of wanted.entries()) {
     const existing = current[index]
     if (!existing) { parent.append(node); continue }
-    if (existing.nodeName !== node.nodeName) { existing.replaceWith(node); continue }
+    // A changed `data-key` is a new element, so its CSS animation plays again.
+    if (existing.nodeName !== node.nodeName || existing.getAttribute?.('data-key') !== node.getAttribute?.('data-key')) { existing.replaceWith(node); continue }
     patchNode(existing, node, root)
   }
   for (const stale of current.slice(wanted.length)) stale.remove()

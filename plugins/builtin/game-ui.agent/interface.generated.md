@@ -1,4 +1,4 @@
-<!--56129d79-->
+<!--537a1325-->
 parsed from source
   plugin Game UI
   category game
@@ -12,4 +12,4 @@ parsed from source
   context gameUi
   systems fixed, frame
   listens hot:applied, level:loaded, play:stopped
-  source 355 lines
+  source 381 lines

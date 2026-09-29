@@ -148,13 +148,15 @@ const components = {
 /**
  * Add the caller's `class` and `style` to the first tag of `html`. Every
  * component takes them, so a game restyles one element with no new rule. The
- * caller's style comes last and so wins over the kit's inline style.
+ * caller's style comes last and so wins over the kit's inline style. A `key`
+ * becomes `data-key`; changing it replaces the element, which replays its CSS animation.
  */
 export function decorate(html, options) {
-  if (!options?.class && !options?.style) return html
+  if (!options?.class && !options?.style && options?.key === undefined) return html
   return html.replace(/^<([a-z0-9-]+)((?:\s[^>]*)?)>/, (whole, name, attributes) => {
     let head = attributes
     if (options.class) head = /\sclass="/.test(head) ? head.replace(/(\sclass=")/, (match, open) => `${open}${escapeHtml(options.class)} `) : `${head} class="${escapeHtml(options.class)}"`
+    if (options.key !== undefined) head += ` data-key="${escapeHtml(options.key)}"`
     if (options.style) head = /\sstyle="/.test(head) ? head.replace(/(\sstyle="[^"]*)"/, (match, open) => `${open};${escapeHtml(options.style)}"`) : `${head} style="${escapeHtml(options.style)}"`
     return `<${name}${head}>`
   })

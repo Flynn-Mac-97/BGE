@@ -16,11 +16,13 @@
 import { controlsOf } from './controls.js'
 
 /**
- * A panel, before its element exists. `phase` staggers its `every` so panels
- * that share a period do not all draw on one frame.
+ * A panel, before its element exists. `stagger` offsets its `every` so panels
+ * that share a period do not all draw on one frame. `leave` is the seconds a
+ * hidden panel stays on screen in the `leaving` phase, for an exit animation.
  */
-export const makePanel = ({ html, css = '', isInteractive = false, takesKeys = false, on = {}, every = 1 }, phase) => ({
-  kind: 'panel', html, css, isInteractive, takesKeys, on, every, phase,
+export const makePanel = ({ html, css = '', isInteractive = false, takesKeys = false, on = {}, every = 1, leave = 0 }, stagger) => ({
+  kind: 'panel', html, css, isInteractive, takesKeys, on, every, stagger, leave,
+  phase: 'entering', leaveLeft: 0, drawnFrame: -1,
   element: null, root: null, sheet: null, written: null, hovered: null, focusIndex: -1, lastHtml: null, lastControls: []
 })
 
@@ -31,8 +33,9 @@ export const makePanel = ({ html, css = '', isInteractive = false, takesKeys = f
  * (`[0.5, 1]` is bottom centre); `maxDistance` culls it beyond that many world
  * units from the view; `scaleByDistance: d` scales it by `d / distance`.
  */
-export const makeAnchor = ({ to, html, on = {}, offset = [0, 0, 0], pivot = [0.5, 1], maxDistance = Infinity, scaleByDistance = 0, isInteractive = false, every = 1 }, phase) => ({
-  kind: 'anchor', to, html, on, offset, pivot, maxDistance, scaleByDistance, isInteractive, every, phase,
+export const makeAnchor = ({ to, html, on = {}, offset = [0, 0, 0], pivot = [0.5, 1], maxDistance = Infinity, scaleByDistance = 0, isInteractive = false, every = 1, leave = 0 }, stagger) => ({
+  kind: 'anchor', to, html, on, offset, pivot, maxDistance, scaleByDistance, isInteractive, every, stagger, leave,
+  phase: 'entering', leaveLeft: 0, drawnFrame: -1,
   element: null, written: null, hovered: null, isHidden: null, placedTransform: '', lastHtml: null, lastControls: []
 })
 
@@ -53,6 +56,29 @@ export function htmlOf(record, target) {
   }
 }
 
+/**
+ * A record's phase is `entering` (its element just appeared), `open`, or
+ * `leaving` (hidden, waiting out `leave` seconds). The element carries it as
+ * `data-phase`, so CSS animates each one. This begins the exit of a record
+ * whose `leave` is more than zero.
+ */
+export function startLeaving(record) {
+  record.phase = 'leaving'
+  record.leaveLeft = record.leave
+}
+
+/**
+ * Move a record along its phases for one frame; true when it is done leaving.
+ * A record opens on the frame after its element first appears, so a CSS
+ * transition has an `entering` state to start from.
+ */
+export function advancePhase(record, frame, seconds) {
+  if (record.phase === 'entering' && record.element && frame > record.drawnFrame) record.phase = 'open'
+  if (record.phase !== 'leaving') return false
+  record.leaveLeft -= seconds
+  return record.leaveLeft <= 0
+}
+
 /** Ask for the HTML, and re-read its controls only when the string changed. */
 export function refresh(record, target) {
   const html = htmlOf(record, target)
@@ -64,7 +90,7 @@ export function refresh(record, target) {
 }
 
 /** Whether a frame should ask this record for its HTML: the first time, then every `every`-th frame. */
-export const isDue = (record, frame) => record.lastHtml === null || record.every <= 1 || (frame + record.phase) % record.every === 0
+export const isDue = (record, frame) => record.lastHtml === null || record.every <= 1 || (frame + record.stagger) % record.every === 0
 
 /** The words a record shows: tags dropped, entities for the common few read back, space folded. */
 export function textOf(html) {

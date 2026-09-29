@@ -38,7 +38,7 @@ const CONFIRMED_VALUES = {
 
 /** The `[id, panel]` that takes the menu keys (an interactive panel, or one with `takesKeys`), or undefined. */
 export function scopeOf(panels) {
-  return [...panels].reverse().find(([, panel]) => (panel.isInteractive || panel.takesKeys) && panel.lastControls.some(control => !control.isDisabled))
+  return [...panels].reverse().find(([, panel]) => panel.phase !== 'leaving' && (panel.isInteractive || panel.takesKeys) && panel.lastControls.some(control => !control.isDisabled))
 }
 
 /** The focused control's index: the stored one while it still can be used, else the first that can. */
@@ -59,7 +59,7 @@ export function bindMenuKeys(context, state) {
 export function moveFocus(context, state) {
   if (!context.input) return
   // Read now, so a value the last handler changed is what a step or a confirm sees.
-  for (const panel of state.panels.values()) if (panel.isInteractive || panel.takesKeys) refresh(panel)
+  for (const panel of state.panels.values()) if (panel.phase !== 'leaving' && (panel.isInteractive || panel.takesKeys)) refresh(panel)
   const scope = scopeOf(state.panels)
   if (!scope) return
   const [id, panel] = scope

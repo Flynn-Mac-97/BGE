@@ -28,7 +28,9 @@ export const DEFAULT_TOKENS = {
   font: "ui-monospace, 'SF Mono', Menlo, monospace",
   size: '16px',
   radius: '10px',
-  space: '8px'
+  space: '8px',
+  duration: '0.2s',
+  ease: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 }
 
 /** Screen's palette key → the token that colours it. */

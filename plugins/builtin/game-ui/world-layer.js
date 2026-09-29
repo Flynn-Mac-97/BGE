@@ -83,19 +83,21 @@ export function createWorldLayer({ report, hover }) {
 }
 
 /** Put an anchor's element in the layer the first time it is seen. */
-function ensureAnchorElement(layer, id, anchor) {
+function ensureAnchorElement(layer, id, anchor, frame) {
   if (anchor.element) return
   anchor.element = document.createElement('div')
   anchor.element.className = 'ui-anchor'
   anchor.element.dataset.anchor = id
+  anchor.element.dataset.phase = anchor.phase
+  anchor.drawnFrame = frame
   if (anchor.isInteractive) anchor.element.dataset.interactive = ''
   layer.root.append(anchor.element)
 }
 
 /** Show one placed anchor: its HTML when it changed, and its transform when the pixel moved. */
-export function drawAnchor(layer, placement, html) {
+export function drawAnchor(layer, placement, html, frame) {
   const { id, anchor } = placement
-  ensureAnchorElement(layer, id, anchor)
+  ensureAnchorElement(layer, id, anchor, frame)
   if (anchor.isHidden !== false) {
     anchor.element.hidden = false
     anchor.isHidden = false

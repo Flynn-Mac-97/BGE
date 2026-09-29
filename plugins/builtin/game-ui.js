@@ -38,7 +38,7 @@ import { controlsOf, TRIGGER, withFocus } from './game-ui/controls.js'
 import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { createPanelElement } from './game-ui/panel-element.js'
 import { patchInto } from './game-ui/patch.js'
-import { htmlOf, isDue, makeAnchor, makePanel, makeUiEvent, refresh, textOf } from './game-ui/records.js'
+import { advancePhase, htmlOf, isDue, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, sheetText, tokensOf } from './game-ui/theme.js'
 import { createWorldLayer, drawAnchor, hideAnchor, placeAnchors, pruneHidden, removeAnchorElement, resolveTarget } from './game-ui/world-layer.js'
 
@@ -87,15 +87,7 @@ export default {
     /** What an anchor follows now, so its `html` and handlers can be given the entity. Panels have none. */
     const targetOf = record => (record?.kind === 'anchor' ? resolveTarget(record.to, context.world).entity : undefined)
 
-    const remove = id => {
-      const record = recordOf(id)
-      if (!record) return false
-      if (record.kind === 'panel' && record.element) context.ui?.unmount(record.element)
-      if (record.kind === 'anchor') removeAnchorElement(record)
-      state.panels.delete(id)
-      state.anchors.delete(id)
-      return true
-    }
+    const remove = id => removeNow(context, state, id)
 
     const useTheme = (css, kind, name) => {
       state.theme = makeTheme({ css, kind, name, version: state.theme.version + 1 })
@@ -108,7 +100,7 @@ export default {
     /** The enabled control an action names, taking the one with this value when several share the action. */
     const controlFor = (id, action, value) => {
       const record = recordOf(id)
-      if (!record) return undefined
+      if (!record || record.phase === 'leaving') return undefined
       refresh(record, targetOf(record))
       const candidates = record.lastControls.filter(control => control.action === action && !control.isDisabled)
       return candidates.find(control => String(control.value) === String(value)) ?? candidates[0]
@@ -141,13 +133,23 @@ export default {
         state.anchors.set(id, makeAnchor(options, state.shownCount++))
       },
 
-      /** Take a panel or an anchor down. False when there was none. */
-      hide: remove,
-      isShowing: id => Boolean(recordOf(id)),
+      /**
+       * Take a panel or an anchor down. One made with `leave: seconds` stays
+       * for that long in its `leaving` phase, so CSS can animate it out.
+       * False when there was none.
+       */
+      hide(id) {
+        const record = recordOf(id)
+        if (!record || record.phase === 'leaving') return false
+        if (record.leave > 0 && record.element) startLeaving(record)
+        else remove(id)
+        return true
+      },
+      isShowing: id => Boolean(recordOf(id)) && recordOf(id).phase !== 'leaving',
 
       /** The `data-ui` name of the element under the pointer in a panel or anchor, or null. */
       hovered: id => recordOf(id)?.hovered ?? null,
-      shown: () => [...state.panels.keys(), ...state.anchors.keys()],
+      shown: () => [...state.panels, ...state.anchors].filter(([, record]) => record.phase !== 'leaving').map(([id]) => id),
 
       /** Anchor cost: `world.limit` is the most drawn at once, `world.drawn` what the last frame drew. */
       world: state.world,
@@ -198,7 +200,7 @@ export default {
     }
 
     const clearRun = () => {
-      for (const id of context.gameUi.shown()) remove(id)
+      for (const id of [...state.panels.keys(), ...state.anchors.keys()]) remove(id)
       state.queue.length = 0
     }
     context.bus.on('play:stopped', clearRun)
@@ -234,6 +236,7 @@ export default {
         const state = stateOf.get(context)
         if (!state || !context.ui || typeof document === 'undefined') return
         state.frame++
+        runPhases(context, state, seconds)
         const sheet = themeSheet(state)
         drawPanels(context, state, sheet)
         drawAnchors(context, state, sheet)
@@ -263,7 +266,7 @@ export default {
 function runHandlers(context, state) {
   for (const event of state.queue.splice(0)) {
     const record = state.panels.get(event.id) ?? state.anchors.get(event.id)
-    const handler = record?.on[`${event.action}:${event.type}`] ?? record?.on[event.action]
+    const handler = record?.phase === 'leaving' ? undefined : record?.on[`${event.action}:${event.type}`] ?? record?.on[event.action]
     if (!handler) continue
     const entity = record.kind === 'anchor' ? resolveTarget(record.to, context.world).entity : null
     try { handler(event.value, { ...event, entity }) } catch (error) {
@@ -274,7 +277,28 @@ function runHandlers(context, state) {
 
 /** Take down the anchor of an entity that no longer exists. Here and not in the frame, so a headless run does it too. */
 function dropGoneAnchors(context, state) {
-  for (const [id, anchor] of state.anchors) if (resolveTarget(anchor.to, context.world).isGone) context.gameUi.hide(id)
+  for (const [id, anchor] of state.anchors) if (resolveTarget(anchor.to, context.world).isGone) removeNow(context, state, id)
+}
+
+/** Take a panel or anchor down at once, whatever its `leave`. */
+function removeNow(context, state, id) {
+  const record = state.panels.get(id) ?? state.anchors.get(id)
+  if (!record) return false
+  if (record.kind === 'panel' && record.element) context.ui?.unmount(record.element)
+  if (record.kind === 'anchor') removeAnchorElement(record)
+  state.panels.delete(id)
+  state.anchors.delete(id)
+  return true
+}
+
+/** Advance every record's phase for a frame, remove those done leaving, and mirror the phase onto each element. */
+function runPhases(context, state, seconds) {
+  for (const records of [state.panels, state.anchors]) {
+    for (const [id, record] of records) {
+      if (advancePhase(record, state.frame, seconds)) removeNow(context, state, id)
+      else if (record.element && record.element.dataset.phase !== record.phase) record.element.dataset.phase = record.phase
+    }
+  }
 }
 
 // ---------------------------------------------------------------- drawing
@@ -300,6 +324,8 @@ function writePanel(context, state, id, panel, { sheet, scope }) {
   if (!panel.element) {
     const report = details => state.queue.push(makeUiEvent(id, details.action, details.value, details.kind, details))
     Object.assign(panel, createPanelElement(id, panel, report))
+    panel.element.dataset.phase = panel.phase
+    panel.drawnFrame = state.frame
     panel.sheet = new CSSStyleSheet()
     panel.sheet.replaceSync(panel.css)
     // The theme first, so the panel's own css wins.
@@ -336,7 +362,7 @@ function drawAnchors(context, state, sheet) {
   for (const { anchor } of entries) if (!placedAnchors.has(anchor)) hideAnchor(anchor)
   for (const placement of placed) {
     if (isDue(placement.anchor, state.frame)) refresh(placement.anchor, placement.entity)
-    drawAnchor(layer, placement, placement.anchor.lastHtml)
+    drawAnchor(layer, placement, placement.anchor.lastHtml, state.frame)
   }
   pruneHidden(layer, state.anchors.values(), state.world.limit * 2 + 16)
 }

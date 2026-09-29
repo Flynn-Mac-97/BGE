@@ -11,6 +11,47 @@ export const BASE_CSS = `
 [data-focus] { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 [data-disabled] { opacity: 0.4; pointer-events: none; }
 [hidden] { display: none !important; }
+
+/* Phases: a panel or anchor fades in when it appears and out when it is hidden with \`leave\`. */
+:host { transition: opacity var(--ui-duration) var(--ui-ease); }
+:host([data-phase="entering"]), :host([data-phase="leaving"]) { opacity: 0; }
+:host([data-phase="leaving"]), :host([data-phase="leaving"]) * { pointer-events: none !important; }
+.ui-anchor { transition: opacity var(--ui-duration) var(--ui-ease); }
+.ui-anchor[data-phase="entering"], .ui-anchor[data-phase="leaving"] { opacity: 0; }
+.ui-anchor[data-phase="leaving"], .ui-anchor[data-phase="leaving"] * { pointer-events: none !important; }
+
+/* Animation and effect utilities. Add one as a class. \`--i\` staggers a row: style: '--i:3'. */
+@keyframes ui-fade-in { from { opacity: 0; } }
+@keyframes ui-fade-out { to { opacity: 0; } }
+@keyframes ui-slide-up { from { opacity: 0; transform: translateY(16px); } }
+@keyframes ui-slide-down { from { opacity: 0; transform: translateY(-16px); } }
+@keyframes ui-slide-left { from { opacity: 0; transform: translateX(16px); } }
+@keyframes ui-slide-right { from { opacity: 0; transform: translateX(-16px); } }
+@keyframes ui-pop { 0% { opacity: 0; transform: scale(0.85); } 60% { transform: scale(1.05); } }
+@keyframes ui-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes ui-pulse { 50% { transform: scale(1.06); } }
+@keyframes ui-glow-pulse { 50% { box-shadow: 0 0 18px 2px var(--ui-accent); } }
+@keyframes ui-shine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes ui-float { 50% { transform: translateY(-6px); } }
+@keyframes ui-spin { to { transform: rotate(1turn); } }
+.ui-fade-in, .ui-fade-out, .ui-slide-up, .ui-slide-down, .ui-slide-left, .ui-slide-right, .ui-pop { animation-duration: var(--ui-duration); animation-timing-function: var(--ui-ease); animation-fill-mode: both; animation-delay: calc(var(--i, 0) * 60ms); }
+.ui-fade-in { animation-name: ui-fade-in; }
+.ui-fade-out { animation-name: ui-fade-out; }
+.ui-slide-up { animation-name: ui-slide-up; }
+.ui-slide-down { animation-name: ui-slide-down; }
+.ui-slide-left { animation-name: ui-slide-left; }
+.ui-slide-right { animation-name: ui-slide-right; }
+.ui-pop { animation-name: ui-pop; }
+.ui-shake { animation: ui-shake 0.4s linear; }
+.ui-pulse { animation: ui-pulse 1s ease-in-out infinite; }
+.ui-glow { box-shadow: 0 0 14px 1px var(--ui-accent); }
+.ui-glow-pulse { animation: ui-glow-pulse 1.4s ease-in-out infinite; }
+.ui-shine { background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%); background-size: 200% 100%; animation: ui-shine 2.2s linear infinite; }
+.ui-float { animation: ui-float 2.4s ease-in-out infinite; }
+.ui-spin { animation: ui-spin 1s linear infinite; }
+.ui-blur { backdrop-filter: blur(8px); }
+.ui-grayscale { filter: grayscale(1); }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; animation-delay: 0s !important; } }
 .ui-anchor { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; contain: layout style; pointer-events: none; }
 .ui-anchor[data-interactive] { pointer-events: auto; }
 

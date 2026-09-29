@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { makeBus } from '../engine/bus.js'
 import gameUi from '../plugins/builtin/game-ui.js'
 import { kit } from '../plugins/builtin/game-ui/components.js'
-import { isDue } from '../plugins/builtin/game-ui/records.js'
+import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
 
 const fixedSystem = gameUi.systems.find(system => system.phase === 'fixed')
@@ -225,7 +225,7 @@ test('a target raises the game\'s own event on the DOM events it names, and hand
 })
 
 test('a panel asked every third frame is asked on the first frame and then every third', () => {
-  const panel = { lastHtml: null, every: 3, phase: 0 }
+  const panel = { lastHtml: null, every: 3, stagger: 0 }
   const due = []
   for (let frame = 1; frame <= 7; frame++) {
     if (isDue(panel, frame)) { due.push(frame); panel.lastHtml = 'x' }
@@ -239,4 +239,52 @@ test('a takesKeys panel is navigated by the menu keys without taking the whole p
   context.gameUi.show('card', { takesKeys: true, html: kit.button('A', { action: 'a' }), on: { a: () => seen.push('a') } })
   step('uiConfirm')
   assert.deepEqual(seen, ['a'])
+})
+
+test('a class key replays an animation: a changed key is a different element in the HTML', () => {
+  assert.match(kit.text('Hit', { class: 'ui-shake', key: 3 }), /class="ui-shake ui-text" data-key="3"/)
+})
+
+test('a record opens the frame after its element appears, and leaves after its leave seconds', () => {
+  const record = { phase: 'entering', element: null, drawnFrame: -1, leave: 0.25, leaveLeft: 0 }
+  assert.equal(advancePhase(record, 1, 0.016), false)
+  assert.equal(record.phase, 'entering', 'no element yet, so it stays entering')
+  record.element = {}
+  record.drawnFrame = 2
+  advancePhase(record, 2, 0.016)
+  assert.equal(record.phase, 'entering', 'the frame the element appeared on')
+  advancePhase(record, 3, 0.016)
+  assert.equal(record.phase, 'open')
+  startLeaving(record)
+  assert.deepEqual([advancePhase(record, 4, 0.1), advancePhase(record, 5, 0.1), advancePhase(record, 6, 0.1)], [false, false, true])
+})
+
+test('hide with no element on the page removes at once; with one, it waits out its leave time and takes no clicks', () => {
+  const { context } = loaded()
+  context.gameUi.show('a', { html: kit.button('A', { action: 'a' }), leave: 0.25 })
+  assert.equal(context.gameUi.hide('a'), true)
+  assert.equal(context.gameUi.isShowing('a'), false, 'never drawn, so nothing to animate out')
+  const root = { addEventListener() {}, contains: () => false, childNodes: [], append() {} }
+  const element = { dataset: {}, style: {}, isConnected: true, attachShadow: () => root }
+  const unmounted = []
+  context.ui = { mount() {}, unmount: item => unmounted.push(item) }
+  const saved = { document: globalThis.document, sheet: globalThis.CSSStyleSheet }
+  globalThis.document = { createElement: name => (name === 'template' ? { content: { childNodes: [] } } : element) }
+  globalThis.CSSStyleSheet = class { replaceSync() {} }
+  const frameSystem = gameUi.systems.find(system => system.phase === 'frame')
+  const frame = seconds => frameSystem.run(null, seconds, context)
+  context.gameUi.show('b', { html: kit.button('B', { action: 'b' }), leave: 0.25, on: { b: () => {} } })
+  frame(0.1)
+  assert.equal(element.dataset.phase, 'entering')
+  frame(0.1)
+  assert.equal(element.dataset.phase, 'open')
+  context.gameUi.hide('b')
+  assert.equal(context.gameUi.isShowing('b'), false)
+  assert.equal(context.gameUi.click('b', 'b'), false, 'a leaving panel takes no clicks')
+  frame(0.1)
+  assert.equal(element.dataset.phase, 'leaving')
+  assert.deepEqual(unmounted, [], 'still on the page while it animates out')
+  frame(0.2)
+  assert.deepEqual(unmounted, [element], 'and taken off when its time is up')
+  Object.assign(globalThis, { document: saved.document, CSSStyleSheet: saved.sheet })
 })
