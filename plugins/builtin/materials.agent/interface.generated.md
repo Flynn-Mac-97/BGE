@@ -1,4 +1,4 @@
-<!--dc93f766-->
+<!--bdfe8250-->
 parsed from source
   plugin Materials
   category visuals
@@ -9,4 +9,4 @@ parsed from source
   systems frame
   listens level:loaded, shell:ready
   emits world:changed
-  source 879 lines
+  source 880 lines

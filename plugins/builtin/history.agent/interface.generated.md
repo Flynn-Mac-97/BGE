@@ -1,4 +1,4 @@
-<!--300e4dba-->
+<!--ce49e61d-->
 parsed from source
   plugin History
   category editor
@@ -11,4 +11,4 @@ parsed from source
   arguments history.undo:;history.redo:;history.jump: index;history.list:;history.clear:
   listens files:written, level:loaded, play:started, play:stopped, selection:changed, world:changed, world:cleared
   emits world:changed
-  source 484 lines
+  source 485 lines

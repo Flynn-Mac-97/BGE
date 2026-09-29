@@ -7,15 +7,25 @@
  * stays as plain as it looks.
  *
  * The dock sizes live in `shell-layout.js`, the keyboard in
- * `shell-shortcuts.js`, and the regions a plugin mounts DOM into in
- * `shell-regions.js`; this file builds the frame and draws it.
+ * `shell-shortcuts.js`, the regions a plugin mounts DOM into in
+ * `shell-regions.js`, and which panels are folded in `shell-panels.js`; this
+ * file builds the frame and draws it.
  */
 import { makeUI } from './ui.js'
 import { makeLayout } from './shell-layout.js'
 import { makeShortcuts } from './shell-shortcuts.js'
 import { makeRegions } from './shell-regions.js'
+import { makeFolds } from './shell-panels.js'
 
 export { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from './shell-shortcuts.js'
+
+/**
+ * Whether a panel can fold to its header. The bottom dock lays its panels side
+ * by side, so a header row has no meaning there.
+ */
+function isFoldable(panel) {
+  return panel.dock !== 'bottom'
+}
 
 /** What the status line says about the level being on disk. */
 function saveStatus(editor, files) {
@@ -67,6 +77,7 @@ export function makeShell(root, context) {
   const regions = makeRegions({ overlay: element('viewport-ui') })
   context.ui = { mount: regions.mount, unmount: regions.unmount, regions: regions.names }
   const layout = makeLayout(root, frame, () => rend()?.resize())
+  const folds = makeFolds()
   layout.applyLayout()
   layout.installResizer('resize-left', 'left', 'x', 1)
   layout.installResizer('resize-right', 'right', 'x', -1)
@@ -115,55 +126,93 @@ export function makeShell(root, context) {
   }
 
   /**
-   * Build one panel element and run its `render` with a state bag that survives
-   * a redraw.
+   * Redraw one dock after a fold, and keep keyboard focus on the same panel.
    *
-   * A panel that throws disables its plugin and says so in its body, so one
-   * broken panel does not take the rest of the editor down.
+   * Only that dock is rebuilt, and at once: the rebuild drops the button the
+   * person just pressed, so focus is put back on its replacement.
    */
-  function drawPanel(panel) {
-    if (!panelState.has(panel.id)) panelState.set(panel.id, {})
-    const state = panelState.get(panel.id)
+  function toggleFold(panel) {
+    folds.toggle(panel)
+    drawDock(panel.dock)
+    element('dock-' + panel.dock)
+      .querySelector(`[data-panel="${panel.id}"] .panel-fold`)
+      ?.focus()
+  }
 
-    const wrap = document.createElement('section')
-    wrap.className = 'panel'
-    wrap.dataset.panel = panel.id
+  /** The panel title: a fold button where the panel can fold, plain text where not. */
+  function drawPanelTitle(panel) {
+    const title = document.createElement(isFoldable(panel) ? 'button' : 'span')
+    title.className = 't'
+    title.textContent = panel.title
+    if (!isFoldable(panel)) return title
 
+    title.classList.add('panel-fold')
+    title.setAttribute('aria-expanded', String(!folds.isFolded(panel)))
+    title.title = folds.isFolded(panel) ? 'Open panel' : 'Fold panel to its header'
+    title.onclick = () => toggleFold(panel)
+    return title
+  }
+
+  /** The panel header: the title, the plugin credit and the actions. */
+  function drawPanelHead(panel) {
     const head = document.createElement('div')
     head.className = 'panel-head'
-    head.innerHTML = `<span class="t">${panel.title}</span>`
+    head.append(drawPanelTitle(panel))
     // A panel from the project is credited to the plugin that added it. A
     // built-in one is not, because "Inspector Panel · Inspector Panel" says
     // nothing twice.
     if (panel.plugin && !panel.builtin) {
       head.insertAdjacentHTML('beforeend', `<span class="by">${panel.plugin}</span>`)
     }
-    if (panel.actions) {
-      for (const action of panel.actions) {
-        const button = document.createElement('button')
-        button.className = 'panel-act'
-        button.textContent = action.label
-        button.title = action.title || action.label
-        button.onclick = () => {
-          action.run(context)
-          draw()
-        }
-        head.append(button)
+    for (const action of panel.actions || []) {
+      const button = document.createElement('button')
+      button.className = 'panel-act'
+      button.textContent = action.label
+      button.title = action.title || action.label
+      button.onclick = () => {
+        action.run(context)
+        draw()
       }
+      head.append(button)
     }
-    wrap.append(head)
+    return head
+  }
 
-    const bodyEl = document.createElement('div')
-    bodyEl.className = 'panel-body' + (panel.scroll === false ? '' : ' scroll')
+  /**
+   * Run a panel's `render` with a state bag that survives a redraw.
+   *
+   * A panel that throws disables its plugin and says so in its body, so one
+   * broken panel does not take the rest of the editor down.
+   */
+  function drawPanelBody(panel) {
+    if (!panelState.has(panel.id)) panelState.set(panel.id, {})
+    const state = panelState.get(panel.id)
+
+    const body = document.createElement('div')
+    body.className = 'panel-body' + (panel.scroll === false ? '' : ' scroll')
     try {
       const ui = makeUI(state, () => draw())
       const node = panel.render(ui, { ...context, state })
-      if (node) bodyEl.append(node)
+      if (node) body.append(node)
     } catch (error) {
       loader.fail(panel.plugin, error)
-      bodyEl.innerHTML = `<div class="u-empty">panel failed — plugin disabled</div>`
+      body.innerHTML = `<div class="u-empty">panel failed — plugin disabled</div>`
     }
-    wrap.append(bodyEl)
+    return body
+  }
+
+  /** Build one panel element: its header, and its body unless it is folded. */
+  function drawPanel(panel) {
+    const isFolded = isFoldable(panel) && folds.isFolded(panel)
+
+    const wrap = document.createElement('section')
+    wrap.className = 'panel' + (isFolded ? ' folded' : '')
+    wrap.dataset.panel = panel.id
+    if (panel.minHeight) wrap.style.setProperty('--panel-min', `${panel.minHeight}px`)
+    wrap.append(drawPanelHead(panel))
+    // A folded panel builds no body: its state bag keeps what it was holding, and
+    // a redraw then costs nothing for panels that are out of sight.
+    if (!isFolded) wrap.append(drawPanelBody(panel))
     return wrap
   }
 
@@ -171,6 +220,9 @@ export function makeShell(root, context) {
   function drawDock(dock) {
     const host = element('dock-' + dock)
     const list = panelsFor(dock)
+    // A dock scrolls when its panels do not fit, and a rebuild would put it back
+    // at the top on every selection.
+    const scrolled = host.scrollTop
     host.innerHTML = ''
     host.classList.toggle('hidden', list.length === 0)
     if (dock === 'left' || dock === 'right') {
@@ -186,6 +238,35 @@ export function makeShell(root, context) {
       element('resize-bottom').classList.toggle('hidden', list.length === 0)
     }
     for (const panel of list) host.append(drawPanel(panel))
+    host.scrollTop = scrolled
+  }
+
+  /** Every drawn panel with its dock, whether it is folded, and its height in pixels. */
+  function panelReport() {
+    return [...root.querySelectorAll('.panel')].map(node => ({
+      id: node.dataset.panel,
+      dock: node.parentElement.id.replace('dock-', ''),
+      folded: node.classList.contains('folded'),
+      height: Math.round(node.getBoundingClientRect().height)
+    }))
+  }
+
+  /**
+   * Fold or open one panel by id for a terminal. `wanted` is `'folded'` or `'open'`;
+   * anything else flips it. Answers with the panel's state, or an error naming
+   * the panels there are.
+   */
+  function foldPanel(id, wanted) {
+    const panel = loader.contributions.panels.find(candidate => candidate.id === id)
+    if (!panel || !isFoldable(panel)) {
+      const foldable = loader.contributions.panels.filter(isFoldable).map(candidate => candidate.id)
+      return { error: `no foldable panel called ${JSON.stringify(id)} — one of ${foldable.join(', ')}` }
+    }
+    const change = { folded: folds.fold, open: folds.open }[wanted] ?? folds.toggle
+    const folded = change(panel)
+    // At once, not queued: a terminal reads the page right after this answers.
+    drawDock(panel.dock)
+    return { id, folded }
   }
 
   /** The play/stop button. */
@@ -333,7 +414,15 @@ export function makeShell(root, context) {
     focus,
     layout: layout.snapshot,
     setLayout: layout.setLayout,
-    resetLayout: layout.resetLayout,
+    // Sizes and folds are one layout, so a reset puts back both.
+    resetLayout() {
+      folds.reset()
+      const sizes = layout.resetLayout()
+      paint()
+      return sizes
+    },
+    panels: panelReport,
+    foldPanel,
     // What is bound right now, so an agent can ask which keys are taken instead
     // of pressing them to find out.
     shortcuts: keyboard.list,

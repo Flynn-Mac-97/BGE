@@ -258,6 +258,7 @@ export default {
     id: 'glsl',
     title: 'GLSL',
     dock: 'right',
+    collapsed: true,
     order: 44,
 
     render(ui, context) {

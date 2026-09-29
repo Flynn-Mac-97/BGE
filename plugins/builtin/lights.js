@@ -317,6 +317,7 @@ export default {
     id: 'lights',
     title: 'Lights',
     dock: 'right',
+    collapsed: true,
     order: 41,
     // The right dock is shared, and every panel in it takes height from the
     // others. A level with no lights has nothing to show, so it takes none.

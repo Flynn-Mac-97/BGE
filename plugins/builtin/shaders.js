@@ -85,6 +85,7 @@ export default {
     id: 'shaders',
     title: 'Shaders',
     dock: 'right',
+    collapsed: true,
     order: 42,
 
     render(ui, context) {

@@ -94,6 +94,7 @@ export default {
     id: 'live-camera',
     title: 'Cameras',
     dock: 'right',
+    collapsed: true,
     order: 60,
     actions: [{ label: 'Refresh', run: context => context.redraw?.() }],
     render(ui, context) {

@@ -41,7 +41,7 @@ in `ARCHITECTURE.md`.
 | `loader.js` | plugin order, contribution points, failure containment | any specific plugin |
 | `render.js` | one GL context, one draw order | game rules, or where the camera is |
 | `ui.js` | the vocabulary panels compose from | any specific panel |
-| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js`, the keyboard is `shell-shortcuts.js`, and the mountable regions are `shell-regions.js` |
+| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js`, the folded panels are `shell-panels.js`, the keyboard is `shell-shortcuts.js`, and the mountable regions are `shell-regions.js` |
 | `inspect.js` | the read-and-drive surface | whether anything is drawing |
 | `start-world.js` | boot, and the `context` everything receives | screens |
 | `index.js` | the browser: shell, renderer, the paint loop | game rules |
@@ -67,6 +67,7 @@ in `ARCHITECTURE.md`.
 | `loop-input.js` | the input record and its replay | what an input means |
 | `loop-timers.js` | timers on the fixed clock | the wall clock |
 | `shell-layout.js` | the dock sizes and the four resize handles | what goes in the docks |
+| `shell-panels.js` | which panels are folded to their header, and the stored choices | what a panel shows |
 | `shell-shortcuts.js` | the shortcut table, and the one keyboard listener | what a key does |
 | `shell-regions.js` | the named regions a plugin mounts DOM into, their order, and when a mount leaves | what the DOM is, or what a key does |
 | `log.js` | the process-wide error channels, and how a world's log reads them | what an error means |
@@ -139,6 +140,14 @@ The shell also owns four dock resize handles because they change the frame, not
 panel content. Sizes are browser-local layout state and survive reloads; they
 never enter project files. `Panel Layout` exposes the same state through
 `layout.read`, `layout.set`, and `layout.reset` for terminal inspection.
+
+A dock is a scrolling column, not a fixed split. Each open panel keeps at least
+`minHeight` (default 140px) and the dock scrolls when they do not fit, so a
+crowded dock is longer and never unreadable. A panel folds to its header on a
+click, and a plugin sets `collapsed: true` to start that way; the person's
+choice wins and is stored in the browser (`shell-panels.js`). A folded panel
+builds no body. Panels in the bottom dock sit side by side and do not fold.
+`layout.panels` and `layout.fold` answer both from a terminal.
 
 Two things moved out of `render.js` to make that work. `view` — where the camera
 is looking — and `viewport` — how big the picture is — are session state now,

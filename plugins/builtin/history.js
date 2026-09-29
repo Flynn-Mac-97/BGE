@@ -137,6 +137,7 @@ export default {
     title: 'History · step',
     dock: 'right',
     order: 20,
+    collapsed: true,
 
     actions: [
       { label: 'Back', title: 'Step back (ctrl+z)', run: context => drive(context, 'history.undo') },

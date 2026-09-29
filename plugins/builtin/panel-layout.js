@@ -1,4 +1,4 @@
-/** Terminal inspection for the resize handles owned by the shell. */
+/** Terminal inspection for the resize handles and the folded panels owned by the shell. */
 export default {
   name: 'Panel Layout',
 
@@ -18,8 +18,21 @@ export default {
       }
     },
     {
+      id: 'layout.panels',
+      label: 'Read panels',
+      run: context => context.shell?.panels() || { screen: false }
+    },
+    {
+      id: 'layout.fold',
+      label: 'Fold or open a panel',
+      run: (context, values) => {
+        if (!context.shell) return { screen: false }
+        return context.shell.foldPanel(values?.id, values?.to)
+      }
+    },
+    {
       id: 'layout.reset',
-      label: 'Reset panel sizes',
+      label: 'Reset panel sizes and folds',
       run: context => context.shell?.resetLayout() || { screen: false }
     }
   ]

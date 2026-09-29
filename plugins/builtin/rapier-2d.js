@@ -104,6 +104,7 @@ export default {
     id: 'rapier-2d',
     title: 'Rapier 2D',
     dock: 'right',
+    collapsed: true,
     order: 45,
 
     render(ui, context) {

@@ -1,4 +1,4 @@
-<!--95bffef1-->
+<!--b5f07c23-->
 parsed from source
   plugin Live Camera
   category engine
@@ -10,4 +10,4 @@ parsed from source
   context cameras
   systems frame
   listens level:loaded, play:started, play:stopped
-  source 185 lines
+  source 186 lines

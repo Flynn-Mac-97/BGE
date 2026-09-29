@@ -136,6 +136,7 @@ export default {
     id: 'shader-languages',
     title: 'Shader Language',
     dock: 'right',
+    collapsed: true,
     order: 43,
 
     render(ui, context) {
