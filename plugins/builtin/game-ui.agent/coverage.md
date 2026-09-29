@@ -19,7 +19,7 @@ The loop that grows Game UI stops when every row is `done`. `done` means: a kit 
 | Cooldown, ring and radial progress | done | `ring`, `cooldown`, `pips` |
 | Notifications stack, context menu | done | `notify`, `menu` |
 | Accordion, table, avatar, keybind | done | kit components, `captureKey` |
-| Screen effects (flash, vignette, shake) | planned | full-viewport effect layer |
+| Screen effects (flash, vignette, fade, letterbox) | done | `effect`, `clearEffect`, `.ui-fx-<name>` |
 | Demo shows all of it | ongoing | `ui-kit-demo` tabs |
 
 ## Rules for the loop

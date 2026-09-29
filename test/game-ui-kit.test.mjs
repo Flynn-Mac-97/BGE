@@ -531,3 +531,38 @@ test('the kit stylesheet lists the base components before the extensions that re
     assert.ok(at(extension) > at('.ui-button {'), `${extension} comes after .ui-button`)
   }
 })
+
+test('an effect with a life removes itself, one without stays until cleared and fades out first', () => {
+  const { context, advance } = timed()
+  const flash = context.gameUi.effect('flash', { color: 'danger', strength: 0.4, life: 0.35 })
+  const vignette = context.gameUi.effect('vignette', { color: '#112233', strength: 0.6, class: 'ui-pulse' })
+  assert.deepEqual(context.gameUi.effects().map(effect => effect.name), ['flash', 'vignette'])
+  assert.equal(context.gameUi.isShowing('ui:effects'), true)
+  advance(0.4)
+  assert.deepEqual(context.gameUi.effects().map(effect => effect.name), ['vignette'], 'the flash is gone after its life')
+  context.gameUi.clearEffect('vignette')
+  assert.equal(context.gameUi.effects()[0].isLeaving, true, 'clearing starts the fade, it does not cut')
+  advance(0.5)
+  assert.deepEqual(context.gameUi.effects(), [])
+  assert.equal(context.gameUi.isShowing('ui:effects'), false, 'no effects, no layer')
+  assert.match(flash, /^fx:/)
+  assert.notEqual(flash, vignette)
+})
+
+test('an effect name must be a class-safe word, and a colour is a theme token or a plain CSS colour', () => {
+  const { context } = timed()
+  assert.equal(context.gameUi.effect('Bad Name'), '')
+  assert.equal(context.gameUi.effect('x" onmouseover="'), '')
+  assert.equal(context.gameUi.effects().length, 0)
+  context.gameUi.effect('tint', { color: 'expression(alert(1));}' })
+  context.gameUi.effect('my-glow', { color: 'good', strength: 2 })
+  assert.equal(context.gameUi.effects().length, 2)
+})
+
+test('effects and a run ending: the list is empty for the next run', () => {
+  const { context } = timed()
+  context.gameUi.effect('fade', { color: '#000' })
+  context.bus.emit('play:stopped')
+  assert.deepEqual(context.gameUi.effects(), [])
+  assert.equal(context.gameUi.isShowing('ui:effects'), false)
+})

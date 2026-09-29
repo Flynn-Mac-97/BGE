@@ -194,4 +194,19 @@ export const BASE_CSS = `
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; animation-delay: 0s !important; } }
 .ui-anchor { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; contain: layout style; pointer-events: none; }
 .ui-anchor[data-interactive] { pointer-events: auto; }
+
+/* Screen effects. --color, --strength and --life come from gameUi.effect; a game adds its own as .ui-fx-<name> in theme.css. */
+.ui-fx { position: absolute; inset: 0; pointer-events: none; }
+.ui-fx[data-leaving] { animation: ui-fade-out var(--life, 0.4s) ease forwards; }
+@keyframes ui-fx-flash { from { opacity: var(--strength, 0.5); } to { opacity: 0; } }
+.ui-fx-flash { background: var(--color, #fff); animation: ui-fx-flash var(--life, 0.3s) ease-out both; }
+.ui-fx-vignette { background: radial-gradient(ellipse at center, transparent calc(75% - var(--strength, 0.5) * 45%), var(--color, rgba(0, 0, 0, 0.75)) 130%); animation: ui-fade-in var(--ui-duration) both; }
+.ui-fx-vignette.ui-pulse { animation: ui-fade-in var(--ui-duration) both, ui-pulse 1.4s ease-in-out infinite; }
+.ui-fx-fade { background: var(--color, #000); animation: ui-fade-in var(--life, 0.6s) ease both; }
+.ui-fx-letterbox::before, .ui-fx-letterbox::after { content: ''; position: absolute; left: 0; right: 0; height: calc(var(--strength, 0.12) * 100%); background: var(--color, #000); animation: ui-fade-in var(--ui-duration) both; }
+.ui-fx-letterbox::before { top: 0; }
+.ui-fx-letterbox::after { bottom: 0; }
+.ui-fx-blur { backdrop-filter: blur(calc(var(--strength, 0.5) * 16px)); }
+.ui-fx-scanlines { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, var(--strength, 0.3)) 0 1px, transparent 1px 3px); }
+.ui-fx-tint { background: var(--color, #6ea8ff); opacity: var(--strength, 0.25); mix-blend-mode: multiply; }
 `

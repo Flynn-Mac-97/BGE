@@ -25,3 +25,13 @@ An animation plays when its element appears, not when a class stays. Give the el
 ## Your own
 
 Write `@keyframes` and rules in `theme.css` like any page. Custom properties (`--ui-*`), `filter`, `backdrop-filter`, `mask`, `clip-path` and `@property` all work: it is a real browser page.
+
+## Screen effects
+
+`gameUi.effect(name, { life, color, strength, class })` puts a full-viewport layer over the game and under your panels. Answers an id.
+
+- Presets: `flash` (fades out over `life`), `vignette` (add `class: 'ui-pulse'` to throb), `fade` (to `color`, holds), `letterbox` (`strength` is the bar height, 0.12 = 12%), `blur` (behind, `strength` 0 to 1), `scanlines`, `tint`.
+- `color` is `danger good accent ink scrim` or a plain CSS colour; `strength` is 0 to 1.
+- With `life` it removes itself after that many seconds of game time. Without, it stays: `gameUi.clearEffect(idOrName, { leave })` fades it out over `leave` (default 0.4) and removes it.
+- Your own: `gameUi.effect('rain')` uses the class `ui-fx-rain`, so write `.ui-fx-rain { background: ... }` in `theme.css`. `--color`, `--strength` and `--life` are set on it. The name is letters, digits and dashes.
+- `gameUi.effects()` lists what runs, for tests. A world shake is the Camera's (`context.camera.shake`); shake a UI element with `ui-shake`.

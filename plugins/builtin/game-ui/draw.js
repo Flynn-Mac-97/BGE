@@ -72,7 +72,7 @@ function writePanel(context, state, id, panel, { sheet, scope }) {
   }
   // Also when the page took it off since: a panel that still says it is showing
   // must be on the page. Seen once right after play started, cause not found.
-  if (!panel.element.isConnected) context.ui.mount(REGION, panel.element, { plugin: 'Game UI' })
+  if (!panel.element.isConnected) context.ui.mount(REGION, panel.element, { plugin: 'Game UI', order: panel.order })
   const html = panel === scope ? withFocus(panel.lastHtml, settledFocus(panel, panel.lastControls)) : panel.lastHtml
   if (html === panel.written) return
   panel.written = html

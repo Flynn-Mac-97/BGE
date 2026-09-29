@@ -36,6 +36,7 @@ import { assetPath, assetURL } from '../../engine/asset-path.js'
 import { escapeHtml, kit } from './game-ui/components.js'
 import { dragsOf, dropsOf, TRIGGER } from './game-ui/controls.js'
 import { drawFrame } from './game-ui/draw.js'
+import { makeEffects } from './game-ui/effects.js'
 import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { makeNotifications } from './game-ui/notifications.js'
 import { openMenu } from './game-ui/popup.js'
@@ -86,6 +87,7 @@ export default {
     stateOf.set(context, state)
 
     const notifications = makeNotifications(context, state)
+    const effects = makeEffects(context, state)
 
     const recordOf = id => state.panels.get(id) ?? state.anchors.get(id)
 
@@ -231,6 +233,11 @@ export default {
       /** Show a message in the notifications stack, for `life` seconds of game time. See game-ui/notifications.js. */
       notify: notifications.notify,
 
+      /** Start a full-viewport effect (`flash`, `vignette`, `fade`, `letterbox`, `blur`, `scanlines`, `tint`, or your own). See game-ui/effects.js. */
+      effect: effects.effect,
+      clearEffect: effects.clearEffect,
+      effects: effects.effects,
+
       /** Open a menu of choices at `at` (`{ x, y }`, as a pointer event has), and run `onPick(value)` on a pick. See game-ui/popup.js. */
       menu: options => openMenu(context, options),
 
@@ -297,6 +304,7 @@ export default {
       state.queue.length = 0
       state.capture = null
       notifications.clear()
+      effects.clear()
     }
     context.bus.on('play:stopped', clearRun)
     context.bus.on('level:loaded', () => {

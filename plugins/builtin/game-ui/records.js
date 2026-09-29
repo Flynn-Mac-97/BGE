@@ -19,9 +19,10 @@ import { controlsOf } from './controls.js'
  * A panel, before its element exists. `stagger` offsets its `every` so panels
  * that share a period do not all draw on one frame. `leave` is the seconds a
  * hidden panel stays on screen in the `leaving` phase, for an exit animation.
+ * `order` is its place in the overlay: lower is under (anchors are 40, panels 50).
  */
-export const makePanel = ({ html, css = '', isInteractive = false, takesKeys = false, on = {}, every = 1, leave = 0 }, stagger) => ({
-  kind: 'panel', html, css, isInteractive, takesKeys, on, every, stagger, leave,
+export const makePanel = ({ html, css = '', isInteractive = false, takesKeys = false, on = {}, every = 1, leave = 0, order = 50 }, stagger) => ({
+  kind: 'panel', html, css, isInteractive, takesKeys, on, every, stagger, leave, order,
   phase: 'entering', leaveLeft: 0, drawnFrame: -1,
   element: null, root: null, sheet: null, written: null, hovered: null, focusIndex: -1, lastHtml: null, lastControls: []
 })
