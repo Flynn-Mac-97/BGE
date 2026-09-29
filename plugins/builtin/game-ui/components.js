@@ -109,11 +109,11 @@ const components = {
     tag('div', { class: 'ui-tabs', role: 'tablist' }, items.map(optionOf).map(item =>
       tag('button', { class: 'ui-tab', type: 'button', 'data-selected': item.value === value, ...controlAttributes('tab', { action, value: item.value, label: item.label }) }, escapeHtml(item.label))).join('')),
 
-  bar: (value, { max = 1, label, kind } = {}) => {
+  bar: (value, { max = 1, label, kind, trail = true } = {}) => {
     const fraction = Math.min(Math.max(Number(value) / Number(max) || 0, 0), 1)
     const head = label ? tag('div', { class: 'ui-bar-head' }, tag('span', {}, escapeHtml(label)) + tag('span', {}, `${escapeHtml(value)} / ${escapeHtml(max)}`)) : ''
     return tag('div', { class: 'ui-bar', 'data-kind': kind, role: 'progressbar', 'aria-valuenow': value, 'aria-valuemax': max },
-      head + tag('div', { class: 'ui-bar-track' }, tag('div', { class: 'ui-bar-fill', style: `--fraction:${fraction}` })))
+      head + tag('div', { class: 'ui-bar-track', style: `--fraction:${fraction}` }, (trail ? tag('div', { class: 'ui-bar-trail' }) : '') + tag('div', { class: 'ui-bar-fill' })))
   },
 
   slot: ({ glyph, image, count, action, value, label, isSelected, isDisabled, triggers } = {}) => {

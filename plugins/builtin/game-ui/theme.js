@@ -25,6 +25,7 @@ export const DEFAULT_TOKENS = {
   outline: 'rgba(0, 0, 0, 0.75)',
   good: '#06d6a0',
   danger: '#ef476f',
+  trail: 'rgba(255, 255, 255, 0.6)',
   font: "ui-monospace, 'SF Mono', Menlo, monospace",
   size: '16px',
   radius: '10px',

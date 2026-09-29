@@ -288,3 +288,11 @@ test('hide with no element on the page removes at once; with one, it waits out i
   assert.deepEqual(unmounted, [element], 'and taken off when its time is up')
   Object.assign(globalThis, { document: saved.document, CSSStyleSheet: saved.sheet })
 })
+
+test('a bar carries its fraction once, on the track, and has a trail unless asked not to', () => {
+  const html = kit.bar(30, { max: 120, label: 'HP', kind: 'health' })
+  assert.match(html, /class="ui-bar-track" style="--fraction:0.25"/)
+  assert.match(html, /ui-bar-trail/)
+  assert.doesNotMatch(kit.bar(1, { trail: false }), /ui-bar-trail/)
+  assert.match(kit.bar(500, { max: 100 }), /--fraction:1"/, 'clamped to a full bar')
+})

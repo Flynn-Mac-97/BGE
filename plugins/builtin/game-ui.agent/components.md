@@ -11,7 +11,7 @@
 | `heading(text, { level })` `text(text, { tone })` | tone: `quiet accent good danger` |
 | `icon(glyph)` `portrait(assetName, { size })` `keyHint('E', 'Open')` | |
 | `badge(text, { tone })` `toast(text, { tone })` `tooltip(children, text)` | |
-| `bar(value, { max, label, kind })` | kind: `health good` or the accent |
+| `bar(value, { max, label, kind, trail })` | kind: `health good` or the accent. The fill eases; the `.ui-bar-trail` lags a drop (`trail: false` removes it) |
 | `button(label, { action, value, kind, icon, isDisabled, triggers })` | kind: `primary danger quiet` |
 | `toggle(label, { action, isOn })` | sends a boolean |
 | `slider(label, { action, value, min, max, step })` | sends a number |

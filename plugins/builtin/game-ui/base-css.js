@@ -100,8 +100,11 @@ export const BASE_CSS = `
 
 .ui-bar { display: flex; flex-direction: column; gap: calc(var(--ui-space) * 0.5); min-width: 8em; }
 .ui-bar-head { display: flex; justify-content: space-between; font-size: 0.85em; color: var(--ui-quiet); }
-.ui-bar-track { height: 0.8em; background: var(--ui-track); border-radius: 999px; overflow: hidden; }
-.ui-bar-fill { height: 100%; width: calc(var(--fraction, 0) * 100%); background: var(--ui-accent); border-radius: inherit; }
+.ui-bar-track { position: relative; height: 0.8em; background: var(--ui-track); border-radius: 999px; overflow: hidden; }
+.ui-bar-fill, .ui-bar-trail { position: absolute; left: 0; top: 0; height: 100%; width: calc(var(--fraction, 0) * 100%); border-radius: inherit; }
+.ui-bar-fill { background: var(--ui-accent); transition: width var(--ui-duration) var(--ui-ease); }
+/* The trail is the value a moment ago: it follows the fill down late, so a drop shows how much was lost. */
+.ui-bar-trail { background: var(--ui-trail); transition: width 0.7s ease-out 0.35s; }
 .ui-bar[data-kind="health"] .ui-bar-fill { background: var(--ui-danger); }
 .ui-bar[data-kind="good"] .ui-bar-fill { background: var(--ui-good); }
 .ui-slot { position: relative; width: 4em; height: 4em; display: flex; align-items: center; justify-content: center; font: inherit; color: var(--ui-ink); background: var(--ui-track); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); cursor: pointer; padding: 0; }
