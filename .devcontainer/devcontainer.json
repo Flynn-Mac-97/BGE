@@ -1,0 +1,25 @@
+{
+  "name": "Browser Game Engine",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "codespaces": {
+      "repositories": {
+        "Flynn-Mac-97/BGE-projects": { "permissions": { "contents": "write" } }
+      }
+    }
+  },
+  "containerEnv": {
+    "ENGINE_PROJECTS_ROOT": "/workspaces/engine-projects",
+    "CHROME_PATH": "/usr/local/bin/chrome-in-container"
+  },
+  "forwardPorts": [5180],
+  "portsAttributes": {
+    "5180": { "label": "Engine editor", "onAutoForward": "openBrowser" }
+  },
+  "postCreateCommand": "bash tools/codespace-setup.sh",
+  "postAttachCommand": "bash tools/codespace-setup.sh --check"
+}

@@ -548,6 +548,17 @@ editor on one, `s` to stop one, `a` to stop all and `q` to quit.
 `npm run dev` still starts Vite and opens the editor directly. Use the
 supervisor so the process is recorded and stoppable.
 
+### In a GitHub Codespace
+
+`.devcontainer/devcontainer.json` sets up Node 24, the packages, Chrome and the
+games: `tools/codespace-setup.sh` clones the projects repo
+(`ENGINE_PROJECTS_REPO`, default `Flynn-Mac-97/BGE-projects`) to
+`/workspaces/engine-projects`, where `ENGINE_PROJECTS_ROOT` points. Start the
+editor with `node bin/engine.mjs supervisor.open dev-server`; port 5180 opens in
+the browser. `bash tools/codespace-setup.sh --check` says what is ready.
+Kimodo, SAM 3D Body and Blender need a GPU or a local install and stay on the
+desktop; `.blend` sources are not in the projects repo.
+
 ### Headless — and running many at once
 
 `--headless` starts a world inside the CLI process. No dev server, no port, no
