@@ -14,7 +14,7 @@ The loop that grows Game UI stops when every row is `done`. `done` means: a kit 
 | Animation and effect utilities | done | keyframes, glow, shake, pulse, shine, reduced motion |
 | Bars that ease, with a damage trail | done | CSS transition and ghost fill |
 | Floating text (damage, pickups) | done | `float`, anchors with a lifetime |
-| Drag and drop (inventory, hotbar) | planned | pointer drag with payload |
+| Drag and drop (inventory, hotbar) | done | `drag`, `drop`, ghost, zones across panels |
 | Dialogue and typewriter text | planned | `kit.dialogue` |
 | Cooldown, ring and radial progress | planned | conic-gradient parts |
 | Notifications stack, context menu | planned | queue and pointer-placed menu |

@@ -21,6 +21,13 @@ export const BASE_CSS = `
 .ui-anchor[data-phase="leaving"], .ui-anchor[data-phase="leaving"] * { pointer-events: none !important; }
 
 /* Animation and effect utilities. Add one as a class. \`--i\` staggers a row: style: '--i:3'. */
+/* Drag and drop: a source is grabbed, a zone under the pointer is hot, a copy follows the pointer. */
+[data-drag] { cursor: grab; }
+[data-dragging] { opacity: 0.35; }
+[data-drop-hot] { outline: 2px dashed var(--ui-accent); outline-offset: 2px; }
+.ui-drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0.92; transform-origin: 0 0; filter: drop-shadow(0 6px 10px var(--ui-outline)); }
+[data-drag], [data-drop] { pointer-events: auto; }
+
 @keyframes ui-fade-in { from { opacity: 0; } }
 @keyframes ui-fade-out { to { opacity: 0; } }
 @keyframes ui-slide-up { from { opacity: 0; transform: translateY(16px); } }

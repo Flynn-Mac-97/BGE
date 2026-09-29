@@ -34,22 +34,16 @@
  */
 import { assetPath, assetURL } from '../../engine/asset-path.js'
 import { escapeHtml, kit } from './game-ui/components.js'
-import { controlsOf, TRIGGER, withFocus } from './game-ui/controls.js'
+import { dragsOf, dropsOf, TRIGGER } from './game-ui/controls.js'
+import { drawFrame } from './game-ui/draw.js'
+import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
-import { createPanelElement } from './game-ui/panel-element.js'
-import { patchInto } from './game-ui/patch.js'
-import { advancePhase, htmlOf, isDue, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
-import { hudPaletteOf, screenPaletteOf, sheetText, tokensOf } from './game-ui/theme.js'
-import { createWorldLayer, drawAnchor, hideAnchor, placeAnchors, pruneHidden, removeAnchorElement, resolveTarget } from './game-ui/world-layer.js'
+import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
+import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
+import { resolveTarget } from './game-ui/world-layer.js'
 
 /** The most floating texts alive at once. The oldest go first, so a burst of hits cannot grow the page. */
 const FLOAT_CAP = 200
-
-/** Where panels mount, and above what. Screen's canvas layer draws under the overlay. */
-const REGION = 'overlay'
-
-/** Mount order in the region: anchors under panels, so a menu covers a nameplate. */
-const WORLD_ORDER = 40
 
 /** The game's stylesheet, as an asset name. */
 const THEME_FILE = 'ui/theme.css'
@@ -210,6 +204,22 @@ export default {
         return true
       },
 
+      /** The payloads a panel or anchor lets a person drag, and the drop zones it offers as `{ action, value }`. */
+      drags: id => dragsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
+      drops: id => dropsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
+
+      /**
+       * Drop a payload on a zone as a person would: the handler for the zone's
+       * `action` gets `{ drag, drop }` on the next fixed step. False when the
+       * panel has no such zone.
+       */
+      drop(id, action, drag, dropValue = '') {
+        const zone = context.gameUi.drops(id).find(candidate => candidate.action === action && String(candidate.value) === String(dropValue))
+        if (!zone || recordOf(id).phase === 'leaving') return false
+        state.queue.push(makeUiEvent(id, action, { drag, drop: zone.value }, 'drop', { type: 'drop' }))
+        return true
+      },
+
       /** The theme: `use(css)` applies text, `load(name)` reads an asset, `tokens()` is what Screen and the HUD read. */
       theme: {
         use: css => useTheme(css, 'code', ''),
@@ -259,11 +269,7 @@ export default {
       run(world, seconds, context) {
         const state = stateOf.get(context)
         if (!state || !context.ui || typeof document === 'undefined') return
-        state.frame++
-        runPhases(context, state, seconds)
-        const sheet = themeSheet(state)
-        drawPanels(context, state, sheet)
-        drawAnchors(context, state, sheet)
+        drawFrame(context, state, seconds)
       }
     }
   ],
@@ -297,108 +303,4 @@ function runHandlers(context, state) {
       console.error(`[game-ui] the "${event.action}" handler of "${event.id}" failed`, error)
     }
   }
-}
-
-/** Take down the anchor of an entity that no longer exists. Here and not in the frame, so a headless run does it too. */
-function dropGoneAnchors(context, state) {
-  for (const [id, anchor] of state.anchors) if (resolveTarget(anchor.to, context.world).isGone) removeNow(context, state, id)
-}
-
-/** Take a panel or anchor down at once, whatever its `leave`. */
-function removeNow(context, state, id) {
-  const record = state.panels.get(id) ?? state.anchors.get(id)
-  if (!record) return false
-  if (record.kind === 'panel' && record.element) context.ui?.unmount(record.element)
-  if (record.kind === 'anchor') removeAnchorElement(record)
-  state.panels.delete(id)
-  state.anchors.delete(id)
-  return true
-}
-
-/** Advance every record's phase for a frame, remove those done leaving, and mirror the phase onto each element. */
-function runPhases(context, state, seconds) {
-  for (const records of [state.panels, state.anchors]) {
-    for (const [id, record] of records) {
-      if (advancePhase(record, state.frame, seconds)) removeNow(context, state, id)
-      else if (record.element && record.element.dataset.phase !== record.phase) record.element.dataset.phase = record.phase
-    }
-  }
-}
-
-// ---------------------------------------------------------------- drawing
-
-/** The one stylesheet every panel and anchor adopts. Made on first use, and rewritten in place when the theme changes. */
-function themeSheet(state) {
-  if (!state.sheet) state.sheet = new CSSStyleSheet()
-  if (state.sheetVersion !== state.theme.version) {
-    state.sheet.replaceSync(sheetText(state.theme.css))
-    state.sheetVersion = state.theme.version
-  }
-  return state.sheet
-}
-
-function drawPanels(context, state, sheet) {
-  for (const panel of state.panels.values()) if (isDue(panel, state.frame)) refresh(panel)
-  const scope = scopeOf(state.panels)?.[1]
-  for (const [id, panel] of state.panels) writePanel(context, state, id, panel, { sheet, scope })
-}
-
-/** Mount a panel on first sight, and patch its HTML only when it changed. */
-function writePanel(context, state, id, panel, { sheet, scope }) {
-  if (!panel.element) {
-    const report = details => state.queue.push(makeUiEvent(id, details.action, details.value, details.kind, details))
-    Object.assign(panel, createPanelElement(id, panel, report))
-    panel.element.dataset.phase = panel.phase
-    panel.drawnFrame = state.frame
-    panel.sheet = new CSSStyleSheet()
-    panel.sheet.replaceSync(panel.css)
-    // The theme first, so the panel's own css wins.
-    panel.root.adoptedStyleSheets = [sheet, panel.sheet]
-  }
-  // Also when the page took it off since: a panel that still says it is showing
-  // must be on the page. Seen once right after play started, cause not found.
-  if (!panel.element.isConnected) context.ui.mount(REGION, panel.element, { plugin: 'Game UI' })
-  const html = panel === scope ? withFocus(panel.lastHtml, settledFocus(panel, panel.lastControls)) : panel.lastHtml
-  if (html === panel.written) return
-  panel.written = html
-  patchInto(panel.root, html)
-  // An interactive panel with nothing on it would still take every click.
-  panel.element.style.pointerEvents = panel.isInteractive && html.trim() ? 'auto' : 'none'
-}
-
-/** Project every anchor, then write only the ones placed this frame. Nothing runs when there are none. */
-function drawAnchors(context, state, sheet) {
-  if (!state.anchors.size || !context.renderer?.toScreen) {
-    state.world.drawn = 0
-    return
-  }
-  const layer = worldLayerOf(context, state, sheet)
-  const entries = []
-  for (const [id, anchor] of state.anchors) {
-    const target = resolveTarget(anchor.to, context.world)
-    if (target.point) entries.push({ id, anchor, entity: target.entity, point: target.point.map((value, axis) => value + anchor.offset[axis]) })
-    else hideAnchor(anchor)
-  }
-
-  const placed = placeAnchors(entries, { project: context.renderer.toScreen, view: context.view, viewport: context.viewport, limit: state.world.limit })
-  state.world.drawn = placed.length
-  const placedAnchors = new Set(placed.map(placement => placement.anchor))
-  for (const { anchor } of entries) if (!placedAnchors.has(anchor)) hideAnchor(anchor)
-  for (const placement of placed) {
-    if (isDue(placement.anchor, state.frame)) refresh(placement.anchor, placement.entity)
-    drawAnchor(layer, placement, placement.anchor.lastHtml, state.frame)
-  }
-  pruneHidden(layer, state.anchors.values(), state.world.limit * 2 + 16)
-}
-
-/** The layer that holds every anchor, made and mounted when the first anchor is drawn. */
-function worldLayerOf(context, state, sheet) {
-  if (!state.layer) {
-    const report = details => state.queue.push(makeUiEvent(details.id, details.action, details.value, details.kind, details))
-    const hover = (id, name) => { const anchor = state.anchors.get(id); if (anchor) anchor.hovered = name }
-    state.layer = createWorldLayer({ report, hover })
-    state.layer.root.adoptedStyleSheets = [sheet]
-  }
-  if (!state.layer.element.isConnected) context.ui.mount(REGION, state.layer.element, { plugin: 'Game UI', order: WORLD_ORDER })
-  return state.layer
 }

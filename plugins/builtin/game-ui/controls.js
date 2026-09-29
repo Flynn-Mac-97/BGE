@@ -87,3 +87,13 @@ const STEPPERS = {
 
 /** The value one notch along, or `undefined` when this kind of control has none. */
 export const steppedValue = (control, direction) => STEPPERS[control.kind]?.(control, direction)
+
+const DRAG_TAG = /<[a-z][a-z0-9]*\b[^>]*\sdata-drag="[^"]*"[^>]*>/g
+const DROP_TAG = /<[a-z][a-z0-9]*\b[^>]*\sdata-drop="[^"]*"[^>]*>/g
+
+/** The payload of each draggable element in a panel's HTML, in order. */
+export const dragsOf = html => [...html.matchAll(DRAG_TAG)].map(([tagText]) => attributesFrom(tagText)['data-drag'])
+
+/** The drop zones in a panel's HTML, in order: `{ action, value }`. */
+export const dropsOf = html =>
+  [...html.matchAll(DROP_TAG)].map(([tagText]) => attributesFrom(tagText)).map(attributes => ({ action: attributes['data-drop'], value: attributes['data-drop-value'] ?? '' }))

@@ -296,3 +296,27 @@ test('a bar carries its fraction once, on the track, and has a trail unless aske
   assert.doesNotMatch(kit.bar(1, { trail: false }), /ui-bar-trail/)
   assert.match(kit.bar(500, { max: 100 }), /--fraction:1"/, 'clamped to a full bar')
 })
+
+test('drag and drop: sources and zones read back, and a drop reaches the zone action with both sides', () => {
+  const { context, step } = loaded()
+  const seen = []
+  context.gameUi.show('bag', {
+    html: kit.row([
+      kit.slot({ glyph: 'S', action: 'slot', value: 'sword', drag: 'sword', drop: 'move', dropValue: 0 }),
+      kit.slot({ glyph: '', drop: 'move', dropValue: 1 }),
+      kit.target('bin', { action: 'noop', drop: 'discard' })
+    ]),
+    on: { 'move:drop': value => seen.push(['move', value]), discard: value => seen.push(['discard', value]) }
+  })
+  assert.deepEqual(context.gameUi.drags('bag'), ['sword'])
+  assert.deepEqual(context.gameUi.drops('bag'), [{ action: 'move', value: '0' }, { action: 'move', value: '1' }, { action: 'discard', value: '' }])
+  assert.equal(context.gameUi.drop('bag', 'move', 'sword', 1), true)
+  assert.equal(context.gameUi.drop('bag', 'discard', 'sword'), true)
+  assert.equal(context.gameUi.drop('bag', 'move', 'sword', 9), false, 'no such zone')
+  step()
+  assert.deepEqual(seen, [['move', { drag: 'sword', drop: '1' }], ['discard', { drag: 'sword', drop: '' }]])
+})
+
+test('drag and drop attributes are escaped', () => {
+  assert.match(kit.text('x', { drag: 'a"b' }), /data-drag="a&quot;b"/)
+})

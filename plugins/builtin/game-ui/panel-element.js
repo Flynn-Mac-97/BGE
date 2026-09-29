@@ -4,11 +4,12 @@
  *
  * A root keeps the game's styles and the editor's apart, reports which `data-ui`
  * element the pointer is over, and turns a person's use of a kit control into
- * one report: `report({ action, value, kind, type, x, y, target })`. Nothing
+ * one report: `report({ action, value, kind, type, x, y, target })`. Drags start here too (drag.js). Nothing
  * here runs the game's handler; the plugin queues the report and runs it on a
  * fixed step. Browser only.
  */
 import { TRIGGER } from './controls.js'
+import { watchDrag } from './drag.js'
 
 /** Every DOM event a control can be triggered by. Each bubbles, so one listener per type on the root is enough. */
 const EVENT_TYPES = ['click', 'dblclick', 'contextmenu', 'pointerdown', 'pointerup', 'pointerover', 'pointerout', 'input', 'change']
@@ -44,6 +45,7 @@ export function watchRoot(root, { report, hover }) {
   root.addEventListener('pointerover', event => hover(event.target.closest?.('[data-ui]')?.dataset.ui ?? null, event.target))
   root.addEventListener('pointerout', event => { if (!event.relatedTarget || !root.contains(event.relatedTarget)) hover(null, event.target) })
   for (const type of EVENT_TYPES) root.addEventListener(type, event => routeControlEvent(event, report))
+  watchDrag(root, report)
 }
 
 /** Build a panel's element. `panel.hovered` is kept up to date on the record. */

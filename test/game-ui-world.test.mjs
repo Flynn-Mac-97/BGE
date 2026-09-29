@@ -122,3 +122,37 @@ test('a burst of floating text keeps only the newest 200', () => {
   assert.equal(context.gameUi.read('float:229'), '229')
   assert.equal(context.gameUi.isShowing('float:0'), false)
 })
+
+test('a drawn frame projects an anchor, writes its transform once, and hides it when it goes behind the camera', () => {
+  const made = []
+  const fakeElement = () => {
+    const element = { dataset: {}, style: {}, childNodes: [], classList: { add() {} }, append() {}, remove() {}, hidden: false, isConnected: true, className: '' }
+    element.attachShadow = () => ({ addEventListener() {}, contains: () => false, append: child => made.push(child), childNodes: [], childElementCount: 0 })
+    return element
+  }
+  const saved = { document: globalThis.document, sheet: globalThis.CSSStyleSheet }
+  globalThis.document = { createElement: name => (name === 'template' ? { content: { childNodes: [] } } : fakeElement()) }
+  globalThis.CSSStyleSheet = class { replaceSync() {} }
+  let pixel = { x: 120.4, y: 80.2, behind: false }
+  const context = {
+    bus: makeBus(),
+    world: { byId: () => undefined },
+    view: { x: 0, y: 0, z: 0 },
+    viewport,
+    renderer: { toScreen: () => pixel },
+    ui: { mount() {}, unmount() {} },
+    after() {}
+  }
+  gameUi.onLoad(context)
+  context.gameUi.anchor('a', { to: [1, 2, 3], html: 'hi' })
+  const drawFrame = () => gameUi.systems.find(system => system.phase === 'frame').run(null, 0.016, context)
+  drawFrame()
+  assert.equal(made.length, 1, 'one element for one anchor')
+  assert.equal(made[0].style.transform, 'translate3d(120px, 80px, 0) scale(1.00) translate(-50%, -100%)')
+  assert.equal(context.gameUi.world.drawn, 1)
+  pixel = { x: 0, y: 0, behind: true }
+  drawFrame()
+  assert.equal(made[0].hidden, true, 'behind the camera: hidden, and not drawn')
+  assert.equal(context.gameUi.world.drawn, 0)
+  Object.assign(globalThis, { document: saved.document, CSSStyleSheet: saved.sheet })
+})
