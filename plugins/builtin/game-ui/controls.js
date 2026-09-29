@@ -6,7 +6,8 @@
  * panel's controls, how keyboard focus finds the next one, and how a focus ring
  * is added to the HTML before it is written. All functions are pure.
  *
- * A control is `{ kind, action, label, value, isDisabled, triggers, options, min, max, step }`.
+ * A control is `{ kind, action, label, value, isDisabled, isPassive, triggers, options, min, max, step }`.
+ * A passive control (`data-passive`) can be clicked but is never focused: the dismiss layer behind a menu.
  * `triggers` are the DOM events that raise it: its kind's own, unless `data-trigger` lists others.
  * `value` is a boolean for a toggle, a number for a slider and text otherwise.
  */
@@ -36,6 +37,7 @@ function controlFrom(tagText) {
     label: attributes['data-label'] ?? '',
     value: (VALUE_READERS[kind] ?? (text => text))(attributes['data-value'] ?? ''),
     isDisabled: 'data-disabled' in attributes,
+    isPassive: 'data-passive' in attributes,
     triggers: (attributes['data-trigger'] ?? TRIGGER[kind] ?? '').split(' ').filter(Boolean),
     options: attributes['data-options'] ? JSON.parse(attributes['data-options']) : [],
     min: Number(attributes['data-min'] ?? 0),
@@ -67,11 +69,14 @@ export function withFocus(html, index) {
   return html.replace(CONTROL_TAG, tagText => (++seen === index ? tagText.replace(/^<\w+/, '$& data-focus') : tagText))
 }
 
-/** The nearest enabled control from `from` in a direction (1 or -1), wrapping. -1 when none is enabled. */
+/** Whether keyboard focus may rest on a control: not disabled, and not a passive layer. */
+export const isFocusable = control => !control.isDisabled && !control.isPassive
+
+/** The nearest focusable control from `from` in a direction (1 or -1), wrapping. -1 when none is. */
 export function nextEnabled(controls, from, direction) {
   for (let step = 1; step <= controls.length; step++) {
     const index = (((from + direction * step) % controls.length) + controls.length) % controls.length
-    if (!controls[index].isDisabled) return index
+    if (isFocusable(controls[index])) return index
   }
   return -1
 }

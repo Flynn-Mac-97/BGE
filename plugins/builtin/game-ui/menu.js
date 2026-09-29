@@ -7,7 +7,7 @@
  * into the panel's controls, stored on the panel, so the mark survives a
  * redraw that changes the HTML. Runs on the fixed step.
  */
-import { nextEnabled, steppedValue } from './controls.js'
+import { isFocusable, nextEnabled, steppedValue } from './controls.js'
 import { makeUiEvent, refresh } from './records.js'
 
 /** The input actions that move focus, and the way each moves it. */
@@ -36,15 +36,21 @@ const CONFIRMED_VALUES = {
   toggle: control => !control.value
 }
 
+/** The event confirming a control raises, or null for a kind that is not confirmed. */
+export function confirmEvent(id, control) {
+  const value = CONFIRMED_VALUES[control.kind]
+  return value ? makeUiEvent(id, control.action, value(control), control.kind, { type: 'key' }) : null
+}
+
 /** The `[id, panel]` that takes the menu keys (an interactive panel, or one with `takesKeys`), or undefined. */
 export function scopeOf(panels) {
-  return [...panels].reverse().find(([, panel]) => panel.phase !== 'leaving' && (panel.isInteractive || panel.takesKeys) && panel.lastControls.some(control => !control.isDisabled))
+  return [...panels].reverse().find(([, panel]) => panel.phase !== 'leaving' && (panel.isInteractive || panel.takesKeys) && panel.lastControls.some(isFocusable))
 }
 
 /** The focused control's index: the stored one while it still can be used, else the first that can. */
 export function settledFocus(panel, controls) {
   const stored = controls[panel.focusIndex]
-  return stored && !stored.isDisabled ? panel.focusIndex : nextEnabled(controls, -1, 1)
+  return stored && isFocusable(stored) ? panel.focusIndex : nextEnabled(controls, -1, 1)
 }
 
 /** Menu actions are input actions; bind the ones a game has not. Done once, on the first step. */

@@ -34,15 +34,15 @@
  */
 import { assetPath, assetURL } from '../../engine/asset-path.js'
 import { escapeHtml, kit } from './game-ui/components.js'
-import { dragsOf, dropsOf, TRIGGER } from './game-ui/controls.js'
+import { dragsOf, dropsOf, isFocusable, TRIGGER } from './game-ui/controls.js'
 import { drawFrame } from './game-ui/draw.js'
 import { pollGamepad } from './game-ui/gamepad.js'
 import { makeEffects } from './game-ui/effects.js'
 import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { makeNotifications } from './game-ui/notifications.js'
-import { openMenu } from './game-ui/popup.js'
+import { openMenu, openRadial } from './game-ui/popup.js'
 import { makeSounds, soundOfEvent } from './game-ui/sounds.js'
-import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
+import { bindMenuKeys, confirmEvent, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
 import { revealedChars } from './game-ui/typewriter.js'
@@ -272,6 +272,24 @@ export default {
         return true
       },
 
+      /** Open a wheel of choices around a point. See game-ui/popup.js. */
+      radial: options => openRadial(context, options),
+
+      /**
+       * Confirm the control that has focus in a panel, as the confirm key does:
+       * for a wheel that picks when its opening key is let go. False when
+       * nothing there can be confirmed.
+       */
+      pickFocused(id) {
+        const panel = state.panels.get(id)
+        if (!panel || panel.phase === 'leaving') return false
+        refresh(panel)
+        const control = panel.lastControls[settledFocus(panel, panel.lastControls)]
+        const event = control && isFocusable(control) ? confirmEvent(id, control) : null
+        if (event) state.queue.push(event)
+        return Boolean(event)
+      },
+
       /** The payloads a panel or anchor lets a person drag, and the drop zones it offers as `{ action, value }`. */
       drags: id => dragsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
       drops: id => dropsOf(htmlOf(recordOf(id), targetOf(recordOf(id)))),
@@ -381,6 +399,11 @@ function runHandlers(context, state) {
       continue
     }
     const record = state.panels.get(event.id) ?? state.anchors.get(event.id)
+    if (event.kind === 'hoverfocus') {
+      // The pointer entered a control: it becomes the focused one, so mouse, keys and stick share a selection.
+      if (record && (record.isInteractive || record.takesKeys)) record.focusIndex = event.value
+      continue
+    }
     if (record && record.phase !== 'leaving') state.sounds.play(soundOfEvent(event))
     const handler = record?.phase === 'leaving' ? undefined : record?.on[`${event.action}:${event.type}`] ?? record?.on[event.action]
     if (!handler) continue

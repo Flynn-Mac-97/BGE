@@ -212,4 +212,11 @@ export const BASE_CSS = `
 
 /* A finger needs bigger targets than a mouse. */
 @media (pointer: coarse) { .ui-button, .ui-tab, .ui-row-item, .ui-accordion-head, .ui-select, .ui-input { min-height: 44px; } .ui-slider { min-height: 32px; } .ui-toggle input { width: 1.6em; height: 1.6em; } }
+
+/* Radial menu: items sit on a circle around the centre point (kit.radial). */
+.ui-radial { position: absolute; width: 0; height: 0; z-index: 1; }
+.ui-radial-item { position: absolute; transform: translate(-50%, -50%); flex-direction: column; gap: 0.15em; width: 5.5em; height: 5.5em; padding: 0.4em; border-radius: 50%; background: var(--ui-surface); border: 1px solid var(--ui-edge); font-size: 0.8em; pointer-events: auto; animation: ui-pop var(--ui-duration) var(--ui-ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.ui-radial-item .ui-icon { font-size: 1.8em; line-height: 1; }
+.ui-radial-item:hover, .ui-radial-item[data-focus] { border-color: var(--ui-accent); background: var(--ui-track); }
+.ui-radial-scrim { position: absolute; inset: 0; }
 `

@@ -27,6 +27,7 @@
 | `table(columns, rows, { action, selected, sortKey, sortDirection })` | columns `{ key, label, align, isSortable }`, rows `{ value, ...cells }`; a row raises `action`, a sortable header raises `sort` with its key, and you sort |
 | `avatar({ image, name, size, status })` | a round picture or initials; `status`: `online away busy` |
 | `keybind(label, code, { isListening })` | a label and a keycap; the keycap raises `rebind`. Then call `gameUi.captureKey` |
+| `radial(items, { x, y, radius })` | items `{ label, value, glyph, isDisabled }` on a circle clockwise from the top. Use `gameUi.radial` |
 | `contextMenu(items, { x, y })` | a menu at a point over an outside layer that dismisses it; rows are `{ label, value, isDisabled, kind }` or `{ isDivider: true }`. Use `gameUi.menu` |
 | `element(children, { as, attributes })` | any tag: the way to markup the kit has no name for |
 | `target(children, { action, value, triggers, as, attributes })` | any element that raises your event; `attributes` such as `data-hot` are for your CSS |
@@ -49,3 +50,7 @@ Read `remaining` from engine time so the sweep pauses with the game: `remaining 
 ## Rebinding a key
 
 In the `rebind` handler: `gameUi.captureKey(code => { ... })`. The next key press goes to the callback on the next fixed step (Esc gives `null`), and Game UI keeps that key from its own menu. Show `isListening: true` on the row meanwhile. A game can check `gameUi.isCapturing()` to ignore its own bindings while it waits. `gameUi.feedKey(code)` gives a key by hand, for tests. `keyName('KeyE')` is `E`.
+
+## Weapon wheels
+
+`gameUi.radial({ at, items, radius, onPick })` opens a wheel around `at` (`{ x, y }`, the viewport's middle by default), kept on screen. Pointer hover, arrows and a gamepad stick all move one focus, and a click or the confirm key picks. For a wheel held open by a key: open it on press and call `gameUi.pickFocused('ui:radial')` on release; it confirms whatever the pointer or stick is on. A background layer (`data-passive` on a control) is clickable but never focused, so a release with nothing chosen picks nothing.

@@ -11,7 +11,7 @@ import { keyName, kit } from '../plugins/builtin/game-ui/components.js'
 import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
 import { BASE_CSS } from '../plugins/builtin/game-ui/base-css.js'
 import { heldPadCodes, pollGamepad } from '../plugins/builtin/game-ui/gamepad.js'
-import { menuPlacement } from '../plugins/builtin/game-ui/popup.js'
+import { menuPlacement, radialPlacement } from '../plugins/builtin/game-ui/popup.js'
 import { soundOfEvent } from '../plugins/builtin/game-ui/sounds.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
@@ -687,4 +687,52 @@ test('polling presses what became held, releases what was let go, and repeats a 
   pollGamepad(context, state, [pad()], 0.016)
   assert.deepEqual(calls.sort(), ['-GamepadA', '-GamepadDown'])
   assert.equal(state.padHeld.size, 0)
+})
+
+test('a wheel puts its items on a circle clockwise from the top, and keeps the whole wheel on screen', () => {
+  const html = kit.radial([{ label: 'A', value: 'a', glyph: '1' }, { label: 'B', value: 'b' }, { label: 'C', value: 'c' }, { label: 'D', value: 'd' }], { x: 300, y: 200, radius: 100 })
+  assert.match(html, /left:300px;top:200px/)
+  const offsets = [...html.matchAll(/left:(-?\d+)px;top:(-?\d+)px;--i:(\d)/g)].map(match => [Number(match[1]), Number(match[2])])
+  assert.deepEqual(offsets, [[0, -100], [100, 0], [0, 100], [-100, 0]], 'top, right, bottom, left')
+  assert.match(html, /class="ui-radial-item ui-button"/)
+  assert.match(html, /class="ui-radial-scrim"/)
+  const viewport = { width: 800, height: 600 }
+  assert.deepEqual(radialPlacement({ x: 10, y: 590 }, 100, viewport), { x: 148, y: 452 })
+  assert.deepEqual(radialPlacement({ x: 400, y: 300 }, 100, viewport), { x: 400, y: 300 })
+})
+
+test('a wheel picks by click, and picks the focused item on demand for a hold-to-open wheel', () => {
+  const { context, step } = loaded()
+  context.viewport = { width: 800, height: 600 }
+  const picked = []
+  context.gameUi.radial({ items: [{ label: 'Sword', value: 'sword' }, { label: 'Bow', value: 'bow' }, { label: 'Bomb', value: 'bomb', isDisabled: true }, { label: 'Rod', value: 'rod' }], onPick: value => picked.push(value) })
+  assert.equal(context.gameUi.isShowing('ui:radial'), true)
+  assert.equal(context.gameUi.controls('ui:radial')[0].isFocused, true)
+  step('uiRight')
+  step('uiRight')
+  assert.equal(context.gameUi.controls('ui:radial').find(control => control.isFocused).label, 'Rod', 'the disabled item is skipped')
+  assert.equal(context.gameUi.pickFocused('ui:radial'), true, 'as on the release of the key that opened it')
+  step()
+  assert.deepEqual(picked, ['rod'])
+  assert.equal(context.gameUi.isShowing('ui:radial'), false, 'a pick closes the wheel')
+  assert.equal(context.gameUi.pickFocused('ui:radial'), false, 'and there is nothing left to pick')
+  context.gameUi.radial({ items: [{ label: 'A', value: 'a' }], onPick: value => picked.push(value) })
+  context.gameUi.click('ui:radial', 'dismiss')
+  step()
+  assert.deepEqual(picked, ['rod'], 'dismissing picks nothing')
+})
+
+test('the layer behind a menu or wheel can be clicked but is never focused, so a pick cannot land on it', () => {
+  const { context, step } = loaded()
+  context.viewport = { width: 800, height: 600 }
+  const picked = []
+  context.gameUi.radial({ items: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }], onPick: value => picked.push(value) })
+  const controls = context.gameUi.controls('ui:radial')
+  assert.equal(controls.at(-1).isPassive, true)
+  assert.equal(controls.at(-1).isDisabled, false, 'it still takes a click')
+  step('uiUp')
+  assert.equal(context.gameUi.controls('ui:radial').find(control => control.isFocused).label, 'B', 'up from the first wraps to the last item, not to the layer')
+  assert.equal(context.gameUi.pickFocused('ui:radial'), true)
+  step()
+  assert.deepEqual(picked, ['b'])
 })

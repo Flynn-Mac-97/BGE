@@ -245,7 +245,23 @@ const components = {
     tag('div', { class: 'ui-menu', role: 'menu', style: `left:${Number(x)}px;top:${Number(y)}px` },
       items.map(item => (item.isDivider ? '<hr class="ui-divider">' : kit.button(item.label, { action: pick, value: item.value, kind: item.kind, isDisabled: item.isDisabled, class: 'ui-menu-item' }))).join(''))
     // `kit`, not `components`: only the kit's functions take a class.
-    + kit.target('', { action: dismiss, triggers: ['click', 'contextmenu'], class: 'ui-menu-scrim' }),
+    + kit.target('', { action: dismiss, triggers: ['click', 'contextmenu'], class: 'ui-menu-scrim', attributes: { 'data-passive': true } }),
+
+  /**
+   * Items around a point, clockwise from the top: a weapon wheel. `x`, `y` is
+   * the centre in pixels and `radius` how far the items sit from it. An item is
+   * `{ label, value, glyph, isDisabled }` and raises `pick` with its value; the
+   * layer behind raises `dismiss`. Pointer hover, arrows and a stick all move
+   * the same focus, so a game can `pickFocused` on a key's release.
+   */
+  radial: (items, { x = 0, y = 0, radius = 110, pick = 'pick', dismiss = 'dismiss' } = {}) =>
+    tag('div', { class: 'ui-radial', role: 'menu', style: `left:${Number(x)}px;top:${Number(y)}px` },
+      items.map((item, index) => {
+        const angle = -Math.PI / 2 + (index * 2 * Math.PI) / items.length
+        const offset = `left:${Math.round(Math.cos(angle) * radius)}px;top:${Math.round(Math.sin(angle) * radius)}px;--i:${index}`
+        return kit.button(item.label, { action: pick, value: item.value, icon: item.glyph, isDisabled: item.isDisabled, class: 'ui-radial-item', style: offset })
+      }).join(''))
+    + kit.target('', { action: dismiss, triggers: ['click', 'contextmenu'], class: 'ui-radial-scrim', attributes: { 'data-passive': true } }),
 
   /** Any element: a tag from a safe set of characters, extra attributes, and children. The way to CSS the kit has no class for. */
   element: (children, { as = 'div', attributes = {} } = {}) => tag(/^[a-z][a-z0-9-]*$/.test(as) ? as : 'div', attributes, join(children)),

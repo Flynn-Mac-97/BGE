@@ -55,7 +55,14 @@ export function createPanelElement(id, panel, report) {
   // The overlay lets clicks through. An interactive panel takes them back once it has content (game-ui.js).
   element.style.cssText = 'position:absolute;inset:0;pointer-events:none'
   const root = element.attachShadow({ mode: 'open' })
-  const hover = name => {
+  let hoveredControl = null
+  const hover = (name, target) => {
+    // Entering a different control says which one, so the focus follows the pointer.
+    const found = target?.closest?.('[data-ui-control]') ?? null
+    // A passive layer is not something to focus.
+    const control = found?.hasAttribute('data-passive') ? null : found
+    if (control && control !== hoveredControl) report({ action: '', value: [...root.querySelectorAll('[data-ui-control]')].indexOf(control), kind: 'hoverfocus', type: 'hoverfocus' })
+    hoveredControl = control
     // Entering a named element says so once, for its sound; moving inside it does not.
     if (name && name !== panel.hovered) report({ action: '', value: name, kind: 'hover', type: 'hover' })
     panel.hovered = name
