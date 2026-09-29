@@ -11,6 +11,7 @@ import { keyName, kit } from '../plugins/builtin/game-ui/components.js'
 import { advancePhase, isDue, startLeaving } from '../plugins/builtin/game-ui/records.js'
 import { BASE_CSS } from '../plugins/builtin/game-ui/base-css.js'
 import { menuPlacement } from '../plugins/builtin/game-ui/popup.js'
+import { soundOfEvent } from '../plugins/builtin/game-ui/sounds.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
 import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
 
@@ -565,4 +566,96 @@ test('effects and a run ending: the list is empty for the next run', () => {
   context.bus.emit('play:stopped')
   assert.deepEqual(context.gameUi.effects(), [])
   assert.equal(context.gameUi.isShowing('ui:effects'), false)
+})
+
+/** A timed context with a `play` that records what it was asked to play. */
+function heard() {
+  const made = timed()
+  const plays = []
+  made.context.play = (file, options) => plays.push([file, options.volume])
+  return { ...made, plays }
+}
+
+test('UI sounds come from the theme tokens or from code, and a name with no file is silent', () => {
+  const { context, step, advance, plays } = heard()
+  context.gameUi.show('bar', { html: kit.button('Go', { action: 'go' }), on: { go() {} } })
+  context.gameUi.click('bar', 'go')
+  step()
+  assert.deepEqual(plays, [], 'no sound set, no sound')
+  context.gameUi.theme.use(':root { --ui-sound-click: "ui/click.wav"; --ui-sound-volume: 0.5 }')
+  advance(1)
+  context.gameUi.click('bar', 'go')
+  step()
+  assert.deepEqual(plays, [['ui/click.wav', 0.5]], 'the theme names the file and the volume, and quotes are dropped')
+  context.gameUi.sounds({ click: 'mine.wav' })
+  advance(1)
+  context.gameUi.click('bar', 'go')
+  step()
+  assert.equal(plays.at(-1)[0], 'mine.wav', 'code overrides the theme')
+})
+
+test('each event makes its own sound, falling back to click, and the same sound waits 0.05 s', () => {
+  const { context, step, advance, plays } = heard()
+  context.gameUi.sounds({ click: 'c.wav', toggle: 't.wav', notify: 'n.wav' })
+  context.gameUi.show('panel', {
+    html: kit.stack([kit.toggle('T', { action: 'toggle-it' }), kit.tabs(['a', 'b'], { action: 'tab', value: 'a' }), kit.slider('S', { action: 'slide-it' })]),
+    on: {}
+  })
+  context.gameUi.click('panel', 'toggle-it', true)
+  context.gameUi.click('panel', 'tab', 'b')
+  context.gameUi.click('panel', 'slide-it', 0.5)
+  step()
+  assert.deepEqual(plays.map(play => play[0]), ['t.wav', 'c.wav'], 'a toggle has its own; a tab falls back to click; a slider has none and does not click')
+  context.gameUi.click('panel', 'tab', 'b')
+  step()
+  assert.equal(plays.length, 2, 'the same sound inside 0.05 s is dropped')
+  advance(0.1)
+  context.gameUi.click('panel', 'tab', 'b')
+  step()
+  assert.equal(plays.length, 3)
+  context.gameUi.notify('Hi', { tone: 'good' })
+  assert.equal(plays.at(-1)[0], 'n.wav', 'notify-good falls back to notify')
+})
+
+test('opening and closing an interactive panel, and a leaving panel, make their sounds', () => {
+  const { context, plays } = heard()
+  context.gameUi.sounds({ open: 'open.wav', close: 'close.wav' })
+  context.gameUi.show('card', { html: 'x' })
+  assert.deepEqual(plays, [], 'a panel that lets clicks through is not opened with a sound')
+  context.gameUi.show('menu', { isInteractive: true, html: kit.button('A', { action: 'a' }) })
+  context.gameUi.hide('menu')
+  assert.deepEqual(plays.map(play => play[0]), ['open.wav', 'close.wav'])
+})
+
+test('hover and focus moves queue their sounds; a press on a control that was hidden makes none', () => {
+  const { context, step, advance, plays } = heard()
+  context.gameUi.sounds({ focus: 'f.wav', click: 'c.wav' })
+  context.gameUi.show('menu', { takesKeys: true, html: kit.row([kit.button('A', { action: 'a' }), kit.button('B', { action: 'b' })]), on: {} })
+  step('uiDown')
+  assert.deepEqual(plays.map(play => play[0]), ['f.wav'], 'moving focus makes the focus sound')
+  advance(0.1)
+  context.gameUi.click('menu', 'b')
+  context.gameUi.hide('menu')
+  step()
+  assert.equal(plays.length, 1, 'the panel went while the click was queued, so no click sound')
+})
+
+test('soundOfEvent: types beat kinds, pointer enter and leave are silent', () => {
+  assert.equal(soundOfEvent({ type: 'dragstart', kind: 'drag' }), 'pickup')
+  assert.equal(soundOfEvent({ type: 'drop', kind: 'drop' }), 'drop')
+  assert.equal(soundOfEvent({ type: 'click', kind: 'button' }), 'click')
+  assert.equal(soundOfEvent({ type: 'change', kind: 'toggle' }), 'toggle')
+  assert.equal(soundOfEvent({ type: 'key', kind: 'key' }), 'close')
+  assert.equal(soundOfEvent({ type: 'pointerover', kind: 'target' }), '')
+  assert.equal(soundOfEvent({ type: 'dragend', kind: 'drag' }), '')
+})
+
+test('a UI sound still plays after game time goes back, as it does on a level reload', () => {
+  const { context, plays } = heard()
+  context.gameUi.sounds({ click: 'c.wav' })
+  context.time = 10
+  assert.equal(context.gameUi.playSound('click'), 'c.wav')
+  context.time = 0.5
+  assert.equal(context.gameUi.playSound('click'), 'c.wav', 'time went back to before the last play')
+  assert.equal(plays.length, 2)
 })

@@ -110,7 +110,12 @@ function drawAnchors(context, state, sheet) {
 function worldLayerOf(context, state, sheet) {
   if (!state.layer) {
     const report = details => state.queue.push(makeUiEvent(details.id, details.action, details.value, details.kind, details))
-    const hover = (id, name) => { const anchor = state.anchors.get(id); if (anchor) anchor.hovered = name }
+    const hover = (id, name) => {
+      const anchor = state.anchors.get(id)
+      if (!anchor) return
+      if (name && name !== anchor.hovered) state.queue.push(makeUiEvent(id, '', name, 'hover', { type: 'hover' }))
+      anchor.hovered = name
+    }
     state.layer = createWorldLayer({ report, hover })
     state.layer.root.adoptedStyleSheets = [sheet]
   }

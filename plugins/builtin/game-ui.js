@@ -40,6 +40,7 @@ import { makeEffects } from './game-ui/effects.js'
 import { dropGoneAnchors, removeNow } from './game-ui/lifecycle.js'
 import { makeNotifications } from './game-ui/notifications.js'
 import { openMenu } from './game-ui/popup.js'
+import { makeSounds, soundOfEvent } from './game-ui/sounds.js'
 import { bindMenuKeys, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
@@ -88,6 +89,8 @@ export default {
 
     const notifications = makeNotifications(context, state)
     const effects = makeEffects(context, state)
+    const sounds = makeSounds(context, state)
+    state.sounds = sounds
 
     const recordOf = id => state.panels.get(id) ?? state.anchors.get(id)
 
@@ -130,6 +133,7 @@ export default {
       show(id, options) {
         remove(id)
         state.panels.set(id, makePanel(options, state.shownCount++))
+        if (options.isInteractive) sounds.play('open')
       },
 
       /**
@@ -169,6 +173,7 @@ export default {
       hide(id) {
         const record = recordOf(id)
         if (!record || record.phase === 'leaving') return false
+        if (record.isInteractive) sounds.play('close')
         if (record.leave > 0 && record.element) startLeaving(record)
         else remove(id)
         return true
@@ -229,6 +234,10 @@ export default {
           restart(next) { Object.assign(line, { text: next ?? line.text, startedAt: context.time }) }
         }
       },
+
+      /** Files for UI sounds by name (`click`, `hover`, `open`...), over the theme's `--ui-sound-*` tokens. See game-ui/sounds.js. */
+      sounds: sounds.set,
+      playSound: sounds.play,
 
       /** Show a message in the notifications stack, for `life` seconds of game time. See game-ui/notifications.js. */
       notify: notifications.notify,
@@ -369,6 +378,7 @@ function runHandlers(context, state) {
       continue
     }
     const record = state.panels.get(event.id) ?? state.anchors.get(event.id)
+    if (record && record.phase !== 'leaving') state.sounds.play(soundOfEvent(event))
     const handler = record?.phase === 'leaving' ? undefined : record?.on[`${event.action}:${event.type}`] ?? record?.on[event.action]
     if (!handler) continue
     const entity = record.kind === 'anchor' ? resolveTarget(record.to, context.world).entity : null

@@ -55,6 +55,11 @@ export function createPanelElement(id, panel, report) {
   // The overlay lets clicks through. An interactive panel takes them back once it has content (game-ui.js).
   element.style.cssText = 'position:absolute;inset:0;pointer-events:none'
   const root = element.attachShadow({ mode: 'open' })
-  watchRoot(root, { report, hover: name => { panel.hovered = name } })
+  const hover = name => {
+    // Entering a named element says so once, for its sound; moving inside it does not.
+    if (name && name !== panel.hovered) report({ action: '', value: name, kind: 'hover', type: 'hover' })
+    panel.hovered = name
+  }
+  watchRoot(root, { report, hover })
   return { element, root }
 }

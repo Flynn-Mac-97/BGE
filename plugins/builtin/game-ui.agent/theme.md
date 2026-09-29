@@ -8,3 +8,4 @@
 - Styling hooks on every control: `[data-focus]` (keyboard focus), `[data-selected]`, `[data-disabled]`, `[data-kind]`, `[data-tone]`.
 - Classes: `ui-stack ui-row ui-grid ui-scroll ui-panel ui-button ui-toggle ui-field ui-slider ui-select ui-input ui-tabs ui-tab ui-bar ui-slot ui-badge ui-list ui-row-item ui-tip ui-modal ui-toast ui-anchor`.
 - `gameUi.theme.use(cssText)` sets a theme from code (kept across levels). `.load('ui/parchment.css')` reads another asset. `.tokens()` answers what is in force.
+- `--ui-sound-click` and its kin name the sounds the UI plays, and `--ui-sound-volume` sets their volume. See `sounds.md`.

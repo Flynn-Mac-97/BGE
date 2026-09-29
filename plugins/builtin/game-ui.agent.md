@@ -28,5 +28,6 @@ context.gameUi.anchor('tag:7', { to: 'enemy7', offset: [0, 2, 0], html: enemy =>
 - `game-ui.agent/theme.md` — tokens, styling hooks, writing theme.css
 - `game-ui.agent/world-space.md` — anchors, culling, limits, cost
 - `game-ui.agent/events.md` — actions, triggers, typed handlers, focus
-- `game-ui.agent/motion.md` — phases, `leave`, effect classes, replaying
+- `game-ui.agent/motion.md` — phases, `leave`, effect classes, screen effects
+- `game-ui.agent/sounds.md` — UI sounds from the theme
 - `game-ui.agent/coverage.md` — what a game's UI needs, and what is done

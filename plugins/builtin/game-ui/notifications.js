@@ -40,6 +40,7 @@ export function makeNotifications(context, state) {
       if (!state.panels.has(PANEL)) {
         context.gameUi.show(PANEL, { html: () => kit.element(notes.map(noteHtml), { class: 'ui-notifications' }), on: { dismiss } })
       }
+      context.gameUi.playSound(tone ? `notify-${tone}` : 'notify')
       context.after(life, () => dismiss(id))
       return id
     },

@@ -82,4 +82,5 @@ export function moveFocus(context, state) {
     return
   }
   panel.focusIndex = nextEnabled(controls, panel.focusIndex, direction)
+  state.queue.push(makeUiEvent(id, '', undefined, 'focus', { type: 'focus' }))
 }
