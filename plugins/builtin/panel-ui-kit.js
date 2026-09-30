@@ -92,7 +92,7 @@ export default {
       title: 'UI kit',
       dock: 'right',
       order: 40,
-      minHeight: 480,
+      minHeight: 800,
 
       render(ui, context) {
         const state = context.state
