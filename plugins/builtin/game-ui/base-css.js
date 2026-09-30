@@ -5,10 +5,10 @@
  * colour: a rule that did could not be themed.
  */
 export const BASE_CSS = `
-:host { font: var(--ui-size) / 1.35 var(--ui-font); color: var(--ui-ink); }
+:host { font: var(--ui-size) / 1.35 var(--ui-font); color: var(--ui-ink); font-variant-numeric: tabular-nums; }
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--ui-edge) transparent; }
 [data-ui-control], .ui-panel, .ui-tip { pointer-events: auto; }
-[data-focus] { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+[data-focus], :focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 [data-disabled] { opacity: 0.4; pointer-events: none; }
 [hidden] { display: none !important; }
 
@@ -22,8 +22,11 @@ export const BASE_CSS = `
 .ui-spacer { flex: 1; min-width: calc(var(--ui-space) * var(--size, 1)); min-height: calc(var(--ui-space) * var(--size, 1)); }
 .ui-divider { border: 0; border-top: 1px solid var(--ui-edge); width: 100%; margin: 0; }
 
-.ui-panel { background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); padding: calc(var(--ui-space) * 2); display: flex; flex-direction: column; gap: var(--ui-space); }
-.ui-panel-title, .ui-heading { margin: 0; font-weight: 700; }
+.ui-panel { background: var(--ui-surface); border: 1px solid var(--ui-edge); border-top: 2px solid var(--ui-accent); border-radius: var(--ui-radius); padding: calc(var(--ui-space) * 2); display: flex; flex-direction: column; gap: var(--ui-space); }
+.ui-panel-title, .ui-heading { margin: 0; font-weight: 700; letter-spacing: 0.01em; }
+/* A panel title is a label, not a headline: small, spaced capitals after an accent tick. */
+.ui-panel-title { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ui-quiet); display: flex; align-items: center; gap: var(--ui-space); }
+.ui-panel-title::before { content: ''; width: 0.9em; height: 2px; background: var(--ui-accent); }
 .ui-heading[data-level="1"] { font-size: 1.75em; }
 .ui-heading[data-level="2"] { font-size: 1.35em; }
 .ui-heading[data-level="3"] { font-size: 1.1em; }
@@ -37,14 +40,16 @@ export const BASE_CSS = `
 .ui-key { display: inline-flex; align-items: center; gap: var(--ui-space); color: var(--ui-quiet); }
 .ui-key kbd { font: inherit; padding: 0 calc(var(--ui-space) * 0.75); border: 1px solid var(--ui-edge); border-bottom-width: 3px; border-radius: calc(var(--ui-radius) * 0.5); color: var(--ui-ink); background: var(--ui-track); }
 
-.ui-button { font: inherit; color: var(--ui-ink); background: var(--ui-track); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); padding: var(--ui-space) calc(var(--ui-space) * 2); cursor: pointer; display: inline-flex; gap: var(--ui-space); align-items: center; justify-content: center; }
-.ui-button:hover { border-color: var(--ui-accent); }
+.ui-button { font: inherit; font-size: 0.88em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ui-ink); background: var(--ui-track); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); padding: calc(var(--ui-space) * 1.1) calc(var(--ui-space) * 2); cursor: pointer; display: inline-flex; gap: var(--ui-space); align-items: center; justify-content: center; box-shadow: inset 0 0 0 0 var(--ui-accent); transition: box-shadow var(--ui-duration) var(--ui-ease), border-color var(--ui-duration) var(--ui-ease); }
+/* Hover and focus draw an accent rule down the left edge rather than a glow. */
+.ui-button:hover, .ui-button[data-focus] { border-color: var(--ui-accent); box-shadow: inset 3px 0 0 0 var(--ui-accent); }
 .ui-button:active { transform: translateY(1px); }
 .ui-button[data-kind="primary"] { background: var(--ui-accent); color: var(--ui-on-accent); border-color: var(--ui-accent); font-weight: 700; }
+.ui-button[data-kind="primary"]:hover, .ui-button[data-kind="primary"][data-focus] { box-shadow: inset 0 -3px 0 0 var(--ui-on-accent); }
 .ui-button[data-kind="danger"] { border-color: var(--ui-danger); color: var(--ui-danger); }
 .ui-button[data-kind="quiet"] { background: transparent; border-color: transparent; color: var(--ui-quiet); }
 .ui-field { display: flex; flex-direction: column; gap: calc(var(--ui-space) * 0.5); }
-.ui-field-label { color: var(--ui-quiet); font-size: 0.85em; }
+.ui-field-label { color: var(--ui-quiet); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.14em; }
 .ui-field-row { display: flex; align-items: center; gap: var(--ui-space); }
 .ui-input, .ui-select { font: inherit; color: var(--ui-ink); background: var(--ui-track); border: 1px solid var(--ui-edge); border-radius: calc(var(--ui-radius) * 0.6); padding: calc(var(--ui-space) * 0.75) var(--ui-space); min-width: 8em; }
 .ui-input:focus { outline: 2px solid var(--ui-accent); }
@@ -52,23 +57,23 @@ export const BASE_CSS = `
 .ui-toggle { display: inline-flex; align-items: center; gap: var(--ui-space); cursor: pointer; }
 .ui-toggle input { accent-color: var(--ui-accent); width: 1.1em; height: 1.1em; }
 .ui-tabs { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space) * 0.5); border-bottom: 1px solid var(--ui-edge); }
-.ui-tab { font: inherit; color: var(--ui-quiet); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: var(--ui-space) calc(var(--ui-space) * 1.5); cursor: pointer; }
+.ui-tab { font: inherit; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-quiet); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: var(--ui-space) calc(var(--ui-space) * 1.5); cursor: pointer; }
 .ui-tab[data-selected] { color: var(--ui-ink); border-bottom-color: var(--ui-accent); }
 
 .ui-bar { display: flex; flex-direction: column; gap: calc(var(--ui-space) * 0.5); min-width: 8em; }
-.ui-bar-head { display: flex; justify-content: space-between; font-size: 0.85em; color: var(--ui-quiet); }
-.ui-bar-track { position: relative; height: 0.8em; background: var(--ui-track); border-radius: 999px; overflow: hidden; }
+.ui-bar-head { display: flex; justify-content: space-between; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ui-quiet); }
+.ui-bar-track { position: relative; height: 0.6em; background: var(--ui-track); border-radius: var(--ui-radius); overflow: hidden; }
 .ui-bar-fill, .ui-bar-trail { position: absolute; left: 0; top: 0; height: 100%; width: calc(var(--fraction, 0) * 100%); border-radius: inherit; }
-.ui-bar-fill { background: var(--ui-accent); transition: width var(--ui-duration) var(--ui-ease); }
+.ui-bar-fill { background: var(--ui-accent); box-shadow: inset -2px 0 0 0 var(--ui-ink); transition: width var(--ui-duration) var(--ui-ease); }
 /* The trail is the value a moment ago: it follows the fill down late, so a drop shows how much was lost. */
 .ui-bar-trail { background: var(--ui-trail); transition: width 0.7s ease-out 0.35s; }
 .ui-bar[data-kind="health"] .ui-bar-fill { background: var(--ui-danger); }
 .ui-bar[data-kind="good"] .ui-bar-fill { background: var(--ui-good); }
 .ui-slot { position: relative; width: 4em; height: 4em; display: flex; align-items: center; justify-content: center; font: inherit; color: var(--ui-ink); background: var(--ui-track); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); cursor: pointer; padding: 0; }
-.ui-slot[data-selected] { border-color: var(--ui-accent); }
+.ui-slot[data-selected] { border-color: var(--ui-accent); box-shadow: inset 0 -3px 0 0 var(--ui-accent); }
 .ui-slot-glyph { font-size: 1.6em; }
 .ui-slot-count { position: absolute; right: 0.3em; bottom: 0.1em; font-size: 0.8em; }
-.ui-badge { display: inline-block; padding: 0 calc(var(--ui-space) * 1); border-radius: 999px; background: var(--ui-track); border: 1px solid var(--ui-edge); font-size: 0.8em; }
+.ui-badge { text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.72em; display: inline-block; padding: 0 calc(var(--ui-space) * 1); border-radius: var(--ui-radius); background: var(--ui-track); border: 1px solid var(--ui-edge); }
 .ui-badge[data-tone="accent"] { background: var(--ui-accent); color: var(--ui-on-accent); }
 .ui-list { display: flex; flex-direction: column; border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); overflow: hidden; }
 .ui-row-item { display: flex; justify-content: space-between; gap: var(--ui-space); font: inherit; color: var(--ui-ink); background: transparent; border: 0; border-bottom: 1px solid var(--ui-edge); padding: var(--ui-space) calc(var(--ui-space) * 1.5); text-align: left; cursor: pointer; }

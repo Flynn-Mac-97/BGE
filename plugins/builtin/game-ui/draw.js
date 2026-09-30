@@ -44,12 +44,17 @@ export function drawFrame(context, state, seconds) {
   runTooltip(context, state, seconds)
 }
 
-/** The one stylesheet every panel and anchor adopts. Made on first use, and rewritten in place when the theme changes. */
+/**
+ * The one stylesheet every panel and anchor adopts. Made on first use, and
+ * rewritten in place when the theme or a component file changes. The
+ * components' CSS comes before the theme, so the theme can restyle a component.
+ */
 function themeSheet(state) {
   if (!state.sheet) state.sheet = new CSSStyleSheet()
-  if (state.sheetVersion !== state.theme.version) {
-    state.sheet.replaceSync(sheetText(state.theme.css))
-    state.sheetVersion = state.theme.version
+  const version = `${state.theme.version}:${state.components.version}`
+  if (state.sheetVersion !== version) {
+    state.sheet.replaceSync(sheetText(`${state.components.css}\n${state.theme.css}`))
+    state.sheetVersion = version
   }
   return state.sheet
 }

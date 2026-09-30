@@ -173,6 +173,13 @@ export function makeUI(state, redraw) {
     /** Even columns of picture cells. Layout only — `grid` is for picking. */
     gallery: children => append(makeElement('div', 'u-gallery'), children),
 
+    /** Side-by-side columns; `o.widths` is a CSS grid track list such as `'1fr 360px'`. Each column scrolls on its own. */
+    columns(children, options = {}) {
+      const element = makeElement('div', 'u-columns')
+      if (options.widths) element.style.gridTemplateColumns = options.widths
+      return append(element, children)
+    },
+
     scroll: children => append(makeElement('div', 'u-scroll'), children),
 
     // ---- text ----
@@ -332,13 +339,21 @@ export function makeUI(state, redraw) {
         placeholder: options.placeholder || ''
       })
       element.value = String(options.value ?? '')
+      if (options.readOnly) element.readOnly = true
+      if (options.rows) {
+        element.rows = options.rows
+        element.style.minHeight = 'auto'
+      }
+      if (options.label) element.setAttribute('aria-label', options.label)
       bindable(options, element, 'input', target => target.value)
       return element
     },
 
     /**
      * Markup shown in a shadow root, so its stylesheet and the editor's cannot
-     * reach each other. `options.background` sets the colour behind it. `restyle(css)` swaps the sheet and `reshow(html)` swaps
+     * reach each other. `options.background` sets the colour behind it.
+     * `options.onPick(value)` hears a click, or Enter on a focused element, on
+     * anything inside marked `data-pick="value"`. `restyle(css)` swaps the sheet and `reshow(html)` swaps
      * the markup, both without redrawing the panel.
      */
     sandbox(options = {}) {
@@ -348,7 +363,19 @@ export function makeUI(state, redraw) {
       style.textContent = options.css ?? ''
       const body = document.createElement('div')
       body.innerHTML = options.html ?? ''
-      element.attachShadow({ mode: 'open' }).append(style, body)
+      const root = element.attachShadow({ mode: 'open' })
+      root.append(style, body)
+      if (options.onPick) {
+        const picked = event => event.target.closest?.('[data-pick]')?.dataset.pick
+        root.addEventListener('click', event => {
+          const value = picked(event)
+          if (value !== undefined) options.onPick(value)
+        })
+        root.addEventListener('keydown', event => {
+          const value = event.key === 'Enter' && event.target.matches?.('[data-pick]') ? picked(event) : undefined
+          if (value !== undefined) options.onPick(value)
+        })
+      }
       element.restyle = css => {
         style.textContent = css
       }

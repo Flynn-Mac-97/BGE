@@ -1,11 +1,14 @@
-<!--27c0dc5f-->
+<!--b071599d-->
 parsed from source
   plugin UI Kit Panel
   category editor
   needs Game UI
   points 1 panel
   commands uikit.list
-  uikit.css
+  uikit.get
+  uikit.new
   uikit.set
-  arguments uikit.list:;uikit.css: argument;uikit.set: { element, css }
-  source 147 lines
+  uikit.audit
+  uikit.expand
+  arguments uikit.list: read run in source;uikit.get: read run in source;uikit.new: read run in source;uikit.set: read run in source;uikit.audit: read run in source;uikit.expand: read run in source
+  source 197 lines

@@ -65,7 +65,8 @@ function controlAttributes(kind, { action, value, label, isDisabled, triggers })
     'data-action': action,
     'data-value': value,
     'data-label': label,
-    'data-disabled': isDisabled === true
+    'data-disabled': isDisabled === true,
+    'aria-disabled': isDisabled === true ? 'true' : undefined
   }
 }
 
@@ -87,14 +88,14 @@ const components = {
 
   heading: (text, { level = 1 } = {}) => tag('h' + Math.min(Math.max(level, 1), 3), { class: 'ui-heading', 'data-level': level }, escapeHtml(text)),
   text: (text, { tone } = {}) => tag('p', { class: 'ui-text', 'data-tone': tone }, escapeHtml(text)),
-  icon: glyph => tag('span', { class: 'ui-icon' }, escapeHtml(glyph)),
+  icon: glyph => tag('span', { class: 'ui-icon', 'aria-hidden': 'true' }, escapeHtml(glyph)),
   portrait: (source, { size, alt = '' } = {}) => tag('img', { class: 'ui-portrait', src: assetURL(source), alt, style: styleOf(variable('size', size)) }),
   keyHint: (key, label) => tag('span', { class: 'ui-key' }, tag('kbd', {}, escapeHtml(key)) + escapeHtml(label)),
   badge: (text, { tone } = {}) => tag('span', { class: 'ui-badge', 'data-tone': tone }, escapeHtml(text)),
   toast: (text, { tone } = {}) => tag('div', { class: 'ui-toast', role: 'status', 'data-tone': tone }, escapeHtml(text)),
   tooltip: (content, tip) => tag('span', { class: 'ui-tip' }, join(content) + tag('span', { class: 'ui-tip-body' }, escapeHtml(tip))),
   modal: (children, { title } = {}) =>
-    tag('div', { class: 'ui-modal-scrim' }, tag('section', { class: 'ui-panel ui-modal', role: 'dialog' },
+    tag('div', { class: 'ui-modal-scrim' }, tag('section', { class: 'ui-panel ui-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
       (title ? tag('h2', { class: 'ui-panel-title' }, escapeHtml(title)) : '') + join(children))),
 
   button: (label, { action, value, kind, icon, isDisabled, triggers } = {}) =>
@@ -103,7 +104,7 @@ const components = {
 
   toggle: (label, { action, isOn = false, isDisabled } = {}) =>
     tag('label', { class: 'ui-toggle', ...controlAttributes('toggle', { action, value: String(isOn), label, isDisabled }) },
-      tag('input', { type: 'checkbox', checked: isOn }) + tag('span', {}, escapeHtml(label))),
+      tag('input', { type: 'checkbox', role: 'switch', checked: isOn }) + tag('span', {}, escapeHtml(label))),
 
   slider: (label, { action, value = 0, min = 0, max = 1, step = 0.1, isDisabled } = {}) =>
     tag('label', { class: 'ui-field', 'data-min': min, 'data-max': max, 'data-step': step, ...controlAttributes('slider', { action, value, label, isDisabled }) },
@@ -123,27 +124,27 @@ const components = {
 
   tabs: (items, { action, value } = {}) =>
     tag('div', { class: 'ui-tabs', role: 'tablist' }, items.map(optionOf).map(item =>
-      tag('button', { class: 'ui-tab', type: 'button', 'data-selected': item.value === value, ...controlAttributes('tab', { action, value: item.value, label: item.label }) }, escapeHtml(item.label))).join('')),
+      tag('button', { class: 'ui-tab', type: 'button', role: 'tab', 'aria-selected': String(item.value === value), 'data-selected': item.value === value, ...controlAttributes('tab', { action, value: item.value, label: item.label }) }, escapeHtml(item.label))).join('')),
 
   bar: (value, { max = 1, label, kind, trail = true } = {}) => {
     const fraction = fractionOf(value, max)
     const head = label ? tag('div', { class: 'ui-bar-head' }, tag('span', {}, escapeHtml(label)) + tag('span', {}, `${escapeHtml(value)} / ${escapeHtml(max)}`)) : ''
-    return tag('div', { class: 'ui-bar', 'data-kind': kind, role: 'progressbar', 'aria-valuenow': value, 'aria-valuemax': max },
+    return tag('div', { class: 'ui-bar', 'data-kind': kind, role: 'progressbar', 'aria-label': label, 'aria-valuenow': value, 'aria-valuemin': 0, 'aria-valuemax': max },
       head + tag('div', { class: 'ui-bar-track', style: `--fraction:${fraction}` }, (trail ? tag('div', { class: 'ui-bar-trail' }) : '') + tag('div', { class: 'ui-bar-fill' })))
   },
 
   slot: ({ glyph, image, count, action, value, label, isSelected, isDisabled, triggers } = {}) => {
     const inner = (image ? tag('img', { class: 'ui-portrait', src: assetURL(image), alt: label ?? '' }) : tag('span', { class: 'ui-slot-glyph' }, escapeHtml(glyph ?? '')))
       + (count > 1 ? tag('span', { class: 'ui-slot-count' }, escapeHtml(count)) : '')
-    const attributes = { class: 'ui-slot', 'data-selected': isSelected === true }
+    const attributes = { class: 'ui-slot', 'data-selected': isSelected === true, 'aria-label': label }
     if (!action) return tag('div', attributes, inner)
-    return tag('button', { ...attributes, type: 'button', ...controlAttributes('slot', { action, value, label, isDisabled, triggers }) }, inner)
+    return tag('button', { ...attributes, type: 'button', 'aria-pressed': String(isSelected === true), ...controlAttributes('slot', { action, value, label, isDisabled, triggers }) }, inner)
   },
 
   /** A circular progress: `value` of `max`, the centre reads `label` or the percent. `size` is pixels. */
   ring: (value, { max = 1, size = 64, label, kind } = {}) => {
     const fraction = fractionOf(value, max)
-    return tag('div', { class: 'ui-ring', role: 'progressbar', 'aria-valuenow': value, 'aria-valuemax': max, 'data-kind': kind, style: `--fraction:${fraction};--size:${Number(size) || 64}px` },
+    return tag('div', { class: 'ui-ring', role: 'progressbar', 'aria-label': label, 'aria-valuenow': value, 'aria-valuemin': 0, 'aria-valuemax': max, 'data-kind': kind, style: `--fraction:${fraction};--size:${Number(size) || 64}px` },
       tag('span', { class: 'ui-ring-label' }, escapeHtml(label ?? `${Math.round(fraction * 100)}%`)))
   },
 
@@ -161,8 +162,8 @@ const components = {
 
   /** Discrete steps, such as hearts or ammo: `value` full out of `max`. */
   pips: (value, { max = 5, glyph = '●', emptyGlyph = '○' } = {}) =>
-    tag('span', { class: 'ui-pips', role: 'meter', 'aria-valuenow': value, 'aria-valuemax': max },
-      Array.from({ length: max }, (unused, index) => tag('span', { class: 'ui-pip', 'data-full': String(index < value) }, escapeHtml(index < value ? glyph : emptyGlyph))).join('')),
+    tag('span', { class: 'ui-pips', role: 'meter', 'aria-label': `${value} of ${max}`, 'aria-valuenow': value, 'aria-valuemin': 0, 'aria-valuemax': max },
+      Array.from({ length: max }, (unused, index) => tag('span', { class: 'ui-pip', 'aria-hidden': 'true', 'data-full': String(index < value) }, escapeHtml(index < value ? glyph : emptyGlyph))).join('')),
 
   /**
    * Sections that open and close. Each header raises `action` (default `toggle`)
@@ -262,7 +263,7 @@ const components = {
    */
   dialogue: ({ speaker, text, chars = text.length, portrait, choices = [], advance = 'advance', choose = 'choose' } = {}) => {
     const isDone = chars >= text.length
-    const box = tag('div', { class: 'ui-dialogue-box', ...controlAttributes('target', { action: advance, label: speaker, triggers: ['click'] }) },
+    const box = tag('div', { class: 'ui-dialogue-box', role: 'button', tabindex: '0', ...controlAttributes('target', { action: advance, label: speaker, triggers: ['click'] }) },
       (portrait ? tag('img', { class: 'ui-portrait', src: assetURL(portrait), alt: speaker ?? '' }) : '')
       + tag('div', { class: 'ui-dialogue-body' }, (speaker ? tag('div', { class: 'ui-dialogue-speaker' }, escapeHtml(speaker)) : '') + components.typewriter(text, { chars })))
     const options = isDone && choices.length ? tag('div', { class: 'ui-choices' }, choices.map(choice => components.button(choice.label, { action: choose, value: choice.value })).join('')) : ''

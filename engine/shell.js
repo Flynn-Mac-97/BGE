@@ -15,6 +15,7 @@ import { makeUI } from './ui.js'
 import { makeLayout } from './shell-layout.js'
 import { makeShortcuts } from './shell-shortcuts.js'
 import { makeRegions } from './shell-regions.js'
+import { makeExpandedPanel } from './shell-expanded.js'
 import { makeFolds } from './shell-panels.js'
 
 export { shortcutFromEvent, readShortcut, typingIn, collectShortcuts } from './shell-shortcuts.js'
@@ -65,10 +66,19 @@ export function makeShell(root, context) {
       <div class="dock-resizer horizontal" id="resize-bottom" role="separator" tabindex="0" aria-label="Resize bottom panels" aria-orientation="horizontal"></div>
       <div class="dock bottom" id="dock-bottom"></div>
       <div class="status" id="status"></div>
+      <div class="expanded-host hidden" id="expanded"></div>
     </div>`
 
   const element = id => root.querySelector('#' + id)
   const frame = root.querySelector('.app')
+  // `drawPanel` and `paint` are function declarations below, so they exist by the time a button calls them.
+  const expanded = makeExpandedPanel({
+    host: element('expanded'),
+    frame,
+    panels: () => loader.contributions.panels,
+    drawPanel: panel => drawPanel(panel),
+    paint: () => paint()
+  })
 
   // The one region a plugin can mount DOM into today. The four docks still take
   // panels; a region is for DOM that is not a panel, and the overlay is the
@@ -122,6 +132,7 @@ export function makeShell(root, context) {
       .filter(panel => panel.dock === dock)
       .filter(panel => !panel.whenTool || panel.whenTool === editor.tool)
       .filter(panel => !panel.when || panel.when(context))
+      .filter(panel => panel.id !== expanded.id())
       .sort((first, second) => (first.order ?? 50) - (second.order ?? 50))
   }
 
@@ -164,6 +175,7 @@ export function makeShell(root, context) {
     if (panel.plugin && !panel.builtin) {
       head.insertAdjacentHTML('beforeend', `<span class="by">${panel.plugin}</span>`)
     }
+    if (panel.expandable) head.append(expanded.button(panel))
     for (const action of panel.actions || []) {
       const button = document.createElement('button')
       button.className = 'panel-act'
@@ -192,7 +204,8 @@ export function makeShell(root, context) {
     body.className = 'panel-body' + (panel.scroll === false ? '' : ' scroll')
     try {
       const ui = makeUI(state, () => draw())
-      const node = panel.render(ui, { ...context, state })
+      // `isExpanded` lets an `expandable` panel lay itself out for the whole editor.
+      const node = panel.render(ui, { ...context, state, isExpanded: panel.id === expanded.id() })
       if (node) body.append(node)
     } catch (error) {
       loader.fail(panel.plugin, error)
@@ -372,6 +385,7 @@ export function makeShell(root, context) {
     queued = false
     drawBar()
     for (const dock of ['left', 'right', 'centre', 'bottom']) drawDock(dock)
+    expanded.draw()
     drawStatus()
     rend()?.resize()
   }
@@ -423,6 +437,7 @@ export function makeShell(root, context) {
     },
     panels: panelReport,
     foldPanel,
+    expandPanel: expanded.expand,
     // What is bound right now, so an agent can ask which keys are taken instead
     // of pressing them to find out.
     shortcuts: keyboard.list,

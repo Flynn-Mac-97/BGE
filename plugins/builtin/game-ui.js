@@ -47,6 +47,7 @@ import { makeSounds, soundOfEvent } from './game-ui/sounds.js'
 import { bindMenuKeys, confirmEvent, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
 import { hudPaletteOf, screenPaletteOf, sheetText, tokensOf } from './game-ui/theme.js'
+import { COMPONENT_FOLDER, readComponents, renderComponent } from './game-ui/project-components.js'
 import { makeTipState, tipHtml } from './game-ui/tooltip.js'
 import { makeTypewriter } from './game-ui/typewriter.js'
 import { resolveTarget } from './game-ui/world-layer.js'
@@ -73,6 +74,8 @@ export default {
       anchors: new Map(),
       queue: [],
       theme: makeTheme({ css: '', kind: 'default', name: THEME_FILE, version: 0 }),
+      // The game's own components (game-ui/project-components.js); `version` moves when any file changes.
+      components: { byName: new Map(), css: '', version: 0 },
       sheet: null,
       sheetVersion: -1,
       layer: null,
@@ -108,6 +111,12 @@ export default {
     }
 
     const loadTheme = async (name = THEME_FILE) => useTheme(await context.files.read(assetPath(name)), 'file', name)
+
+    const loadComponents = async () => {
+      if (!context.files?.tree) return
+      const byName = await readComponents(context.files)
+      state.components = { byName, css: [...byName.values()].map(component => component.css).join('\n'), version: state.components.version + 1 }
+    }
 
     /** The enabled control an action names, taking the one with this value when several share the action. */
     const controlFor = (id, action, value, type) => {
@@ -283,6 +292,14 @@ export default {
         kind: () => state.theme.kind
       },
 
+      /** One of the game's components (`assets/ui/components/<name>.html`) as HTML, with these props over its defaults. '' when there is none. */
+      component: (name, props) => {
+        const component = state.components.byName.get(name)
+        return component ? renderComponent(component, props) : ''
+      },
+      /** The game's component records by name, and `load()` to read the files again. */
+      components: { list: () => [...state.components.byName.values()], load: loadComponents },
+
       /** The URL of a project asset, for an `<img src>`: `ui/portrait.png` is under `assets/`. */
       asset: assetURL
     }
@@ -302,10 +319,12 @@ export default {
       clearRun()
       // A theme given as text is the code's; only a file is read again.
       if (state.theme.kind !== 'code') loadTheme(state.theme.name).catch(() => {})
+      loadComponents().catch(() => {})
     })
     // A stylesheet the person edits reaches the open game with no reload.
     context.bus.on('hot:applied', change => {
       if (state.theme.kind !== 'code' && change.file?.endsWith(assetPath(state.theme.name))) loadTheme(state.theme.name).catch(() => {})
+      if (change.file?.includes(assetPath(COMPONENT_FOLDER))) loadComponents().catch(() => {})
     })
   },
 

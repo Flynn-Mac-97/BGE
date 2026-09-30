@@ -41,7 +41,7 @@ in `ARCHITECTURE.md`.
 | `loader.js` | plugin order, contribution points, failure containment | any specific plugin |
 | `render.js` | one GL context, one draw order | game rules, or where the camera is |
 | `ui.js` | the vocabulary panels compose from | any specific panel |
-| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js`, the folded panels are `shell-panels.js`, the keyboard is `shell-shortcuts.js`, and the mountable regions are `shell-regions.js` |
+| `shell.js` | the dock frame: a toolbar, four docks, the status line, the canvas | what goes in them, or what a key does; the dock sizes are `shell-layout.js`, the folded panels are `shell-panels.js`, the keyboard is `shell-shortcuts.js`, the mountable regions are `shell-regions.js`, and the expanded panel is `shell-expanded.js` |
 | `inspect.js` | the read-and-drive surface | whether anything is drawing |
 | `start-world.js` | boot, and the `context` everything receives | screens |
 | `index.js` | the browser: shell, renderer, the paint loop | game rules |
@@ -70,6 +70,7 @@ in `ARCHITECTURE.md`.
 | `shell-panels.js` | which panels are folded to their header, and the stored choices | what a panel shows |
 | `shell-shortcuts.js` | the shortcut table, and the one keyboard listener | what a key does |
 | `shell-regions.js` | the named regions a plugin mounts DOM into, their order, and when a mount leaves | what the DOM is, or what a key does |
+| `shell-expanded.js` | which `expandable` panel is drawn over the docks and viewport, its Expand button, and Esc to dock it | what the panel draws |
 | `log.js` | the process-wide error channels, and how a world's log reads them | what an error means |
 | `snapshot.js` | the snapshot projection | driving the engine |
 | `device-profile.js` | the screen shape a game declares | drawing it |

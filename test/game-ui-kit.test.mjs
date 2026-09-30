@@ -15,7 +15,7 @@ import { menuPlacement, radialPlacement } from '../plugins/builtin/game-ui/popup
 import { soundOfEvent } from '../plugins/builtin/game-ui/sounds.js'
 import { makeTipState, tipHooks, tipHtml, tipPlacement, runTooltip } from '../plugins/builtin/game-ui/tooltip.js'
 import { revealedChars } from '../plugins/builtin/game-ui/typewriter.js'
-import { sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
+import { DEFAULT_TOKENS, sheetText, tokensOf } from '../plugins/builtin/game-ui/theme.js'
 
 const fixedSystem = gameUi.systems.find(system => system.phase === 'fixed')
 
@@ -166,7 +166,7 @@ test('menu actions are bound once, and never over a game that bound them', () =>
 test('a theme file sets tokens; :root becomes :host so a panel can use it', () => {
   const css = ':root { --ui-accent: #ff0066; --ui-radius: 2px }\n.ui-button { border-width: 3px }'
   assert.equal(tokensOf(css).accent, '#ff0066')
-  assert.equal(tokensOf(css).ink, '#ffffff', 'a token the file leaves out keeps its default')
+  assert.equal(tokensOf(css).ink, DEFAULT_TOKENS.ink, 'a token the file leaves out keeps its default')
   const sheet = sheetText(css)
   assert.match(sheet, /:host \{ --ui-accent: #ff0066/)
   assert.ok(sheet.indexOf('.ui-button { border-width: 3px }') > sheet.indexOf('.ui-button {'), 'the game rules come after the kit rules')
@@ -196,7 +196,7 @@ test('a project with no theme file keeps the defaults', async () => {
   context.bus.emit('level:loaded', 'main')
   await new Promise(resolve => setTimeout(resolve, 0))
   assert.equal(context.gameUi.theme.kind(), 'default')
-  assert.equal(context.gameUi.theme.tokens().accent, '#ffd166')
+  assert.equal(context.gameUi.theme.tokens().accent, DEFAULT_TOKENS.accent)
 })
 
 test('every component takes class and style, and the caller wins over the kit', () => {

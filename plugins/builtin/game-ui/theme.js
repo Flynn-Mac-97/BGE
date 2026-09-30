@@ -14,24 +14,25 @@ import { BASE_CSS } from './base-css.js'
 
 /** Token name → value. A token is `--ui-<name>` in CSS; Screen and the HUD read the colours. */
 export const DEFAULT_TOKENS = {
-  ink: '#ffffff',
-  quiet: 'rgba(255, 255, 255, 0.55)',
-  surface: 'rgba(14, 17, 28, 0.90)',
-  edge: 'rgba(255, 255, 255, 0.16)',
-  accent: '#ffd166',
-  'on-accent': '#1b1b1b',
-  track: 'rgba(255, 255, 255, 0.14)',
-  scrim: 'rgba(6, 8, 14, 0.72)',
-  outline: 'rgba(0, 0, 0, 0.75)',
-  good: '#06d6a0',
-  danger: '#ef476f',
-  trail: 'rgba(255, 255, 255, 0.6)',
-  font: "ui-monospace, 'SF Mono', Menlo, monospace",
-  size: '16px',
-  radius: '10px',
+  ink: '#ede8dc',
+  quiet: 'rgba(237, 232, 220, 0.66)',
+  surface: 'rgba(17, 19, 22, 0.94)',
+  edge: 'rgba(237, 232, 220, 0.16)',
+  accent: '#ff8a3d',
+  'on-accent': '#16130f',
+  track: 'rgba(237, 232, 220, 0.10)',
+  scrim: 'rgba(8, 9, 11, 0.74)',
+  outline: 'rgba(0, 0, 0, 0.8)',
+  good: '#6ccb8a',
+  danger: '#ff5a5f',
+  trail: 'rgba(237, 232, 220, 0.55)',
+  // DIN-style faces a player's system already has: Windows ships Bahnschrift, macOS DIN Alternate.
+  font: "Bahnschrift, 'DIN Alternate', 'Barlow', 'Roboto Condensed', 'Segoe UI', system-ui, sans-serif",
+  size: '15px',
+  radius: '2px',
   space: '8px',
-  duration: '0.2s',
-  ease: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+  duration: '0.16s',
+  ease: 'cubic-bezier(0.2, 0.7, 0.1, 1)'
 }
 
 /** Screen's palette key → the token that colours it. */
