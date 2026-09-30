@@ -28,7 +28,7 @@ export const DEFAULT_TOKENS = {
   trail: 'rgba(255, 255, 255, 0.5)',
   font: 'system-ui, sans-serif',
   size: '16px',
-  radius: '4px',
+  radius: '0px',
   space: '8px',
   duration: '0.15s',
   ease: 'ease-out'

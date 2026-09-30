@@ -35,11 +35,10 @@ export const BASE_CSS = `
 .ui-icon { display: inline-block; min-width: 1.2em; text-align: center; }
 .ui-portrait { width: var(--size, 64px); height: var(--size, 64px); object-fit: cover; border-radius: var(--ui-radius); border: 1px solid var(--ui-edge); }
 .ui-key { display: inline-flex; align-items: center; gap: var(--ui-space); color: var(--ui-quiet); }
-.ui-key kbd { font: inherit; padding: 0 calc(var(--ui-space) * 0.75); border: 1px solid var(--ui-edge); border-bottom-width: 3px; border-radius: calc(var(--ui-radius) * 0.5); color: var(--ui-ink); background: var(--ui-track); }
+.ui-key kbd { font: inherit; padding: 0 calc(var(--ui-space) * 0.75); border: 1px solid var(--ui-edge); border-radius: calc(var(--ui-radius) * 0.5); color: var(--ui-ink); background: var(--ui-track); }
 
 .ui-button { font: inherit; color: var(--ui-ink); background: var(--ui-track); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); padding: var(--ui-space) calc(var(--ui-space) * 2); cursor: pointer; display: inline-flex; gap: var(--ui-space); align-items: center; justify-content: center; }
 .ui-button:hover { border-color: var(--ui-accent); }
-.ui-button:active { transform: translateY(1px); }
 .ui-button[data-kind="primary"] { background: var(--ui-accent); color: var(--ui-on-accent); border-color: var(--ui-accent); font-weight: 700; }
 .ui-button[data-kind="danger"] { border-color: var(--ui-danger); color: var(--ui-danger); }
 .ui-button[data-kind="quiet"] { background: transparent; border-color: transparent; color: var(--ui-quiet); }
@@ -79,9 +78,9 @@ export const BASE_CSS = `
 .ui-tip:hover .ui-tip-body { display: block; }
 .ui-modal-scrim { position: absolute; inset: 0; background: var(--ui-scrim); display: flex; align-items: center; justify-content: center; pointer-events: auto; }
 .ui-modal { min-width: 20em; max-width: 90%; }
-.ui-toast { display: inline-block; background: var(--ui-surface); border: 1px solid var(--ui-edge); border-left: 4px solid var(--ui-accent); border-radius: calc(var(--ui-radius) * 0.6); padding: var(--ui-space) calc(var(--ui-space) * 2); }
-.ui-toast[data-tone="good"] { border-left-color: var(--ui-good); }
-.ui-toast[data-tone="danger"] { border-left-color: var(--ui-danger); }
+.ui-toast { display: inline-block; background: var(--ui-surface); border: 1px solid var(--ui-edge); border-radius: var(--ui-radius); padding: var(--ui-space) calc(var(--ui-space) * 2); }
+.ui-toast[data-tone="good"] { border-color: var(--ui-good); }
+.ui-toast[data-tone="danger"] { border-color: var(--ui-danger); }
 
 /* Phases: a panel or anchor fades in when it appears and out when it is hidden with \`leave\`. */
 :host { transition: opacity var(--ui-duration) var(--ui-ease); }
@@ -129,14 +128,14 @@ export const BASE_CSS = `
 .ui-table-row[data-ui-control] { cursor: pointer; }
 .ui-table-row[data-ui-control]:hover, .ui-table-row[data-selected] { background: var(--ui-track); }
 .ui-table-sort { padding: 0; }
-.ui-avatar { position: relative; display: inline-grid; place-items: center; width: var(--size, 40px); height: var(--size, 40px); border-radius: 50%; background: var(--ui-track); border: 1px solid var(--ui-edge); font-size: calc(var(--size, 40px) * 0.4); font-weight: 700; }
-.ui-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.ui-avatar-status { position: absolute; right: 0; bottom: 0; width: 26%; height: 26%; border-radius: 50%; border: 2px solid var(--ui-surface); background: var(--ui-quiet); }
+.ui-avatar { position: relative; display: inline-grid; place-items: center; width: var(--size, 40px); height: var(--size, 40px); border-radius: var(--ui-radius); background: var(--ui-track); border: 1px solid var(--ui-edge); font-size: calc(var(--size, 40px) * 0.4); font-weight: 700; }
+.ui-avatar img { width: 100%; height: 100%; border-radius: var(--ui-radius); object-fit: cover; }
+.ui-avatar-status { position: absolute; right: 0; bottom: 0; width: 26%; height: 26%; border-radius: var(--ui-radius); border: 2px solid var(--ui-surface); background: var(--ui-quiet); }
 .ui-avatar[data-status="online"] .ui-avatar-status { background: var(--ui-good); }
 .ui-avatar[data-status="busy"] .ui-avatar-status { background: var(--ui-danger); }
 .ui-avatar[data-status="away"] .ui-avatar-status { background: var(--ui-accent); }
 .ui-keybind { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space); }
-.ui-keycap { min-width: 4em; border-bottom-width: 3px; }
+.ui-keycap { min-width: 4em; }
 .ui-keycap.ui-listening { border-color: var(--ui-accent); color: var(--ui-accent); animation: ui-pulse 1s ease-in-out infinite; }
 
 /* Notifications stack and popup menu. */
@@ -215,7 +214,7 @@ export const BASE_CSS = `
 
 /* Radial menu: items sit on a circle around the centre point (kit.radial). */
 .ui-radial { position: absolute; width: 0; height: 0; z-index: 1; }
-.ui-radial-item { position: absolute; transform: translate(-50%, -50%); flex-direction: column; gap: 0.15em; width: 5.5em; height: 5.5em; padding: 0.4em; border-radius: 50%; background: var(--ui-surface); border: 1px solid var(--ui-edge); font-size: 0.8em; pointer-events: auto; animation: ui-pop var(--ui-duration) var(--ui-ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.ui-radial-item { position: absolute; transform: translate(-50%, -50%); flex-direction: column; gap: 0.15em; width: 5.5em; height: 5.5em; padding: 0.4em; border-radius: var(--ui-radius); background: var(--ui-surface); border: 1px solid var(--ui-edge); font-size: 0.8em; pointer-events: auto; animation: ui-pop var(--ui-duration) var(--ui-ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
 .ui-radial-item .ui-icon { font-size: 1.8em; line-height: 1; }
 .ui-radial-item:hover, .ui-radial-item[data-focus] { border-color: var(--ui-accent); background: var(--ui-track); }
 .ui-radial-scrim { position: absolute; inset: 0; }
