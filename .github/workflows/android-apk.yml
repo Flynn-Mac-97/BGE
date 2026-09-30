@@ -13,6 +13,9 @@ on:
         required: false
         default: '.'
 
+permissions:
+  contents: read
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -30,9 +33,10 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: npm ci --ignore-scripts
-      - run: node bin/engine.mjs --project "$GITHUB_WORKSPACE/game-source/${{ inputs.game_folder }}" export --android --out "$GITHUB_WORKSPACE/game.apk"
+      - run: node bin/engine.mjs --project "$GITHUB_WORKSPACE/game-source/$GAME_FOLDER" export --android --out "$GITHUB_WORKSPACE/game.apk"
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          GAME_FOLDER: ${{ inputs.game_folder }}
       - uses: actions/upload-artifact@v4
         with:
           name: game-apk
