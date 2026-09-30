@@ -1,4 +1,4 @@
-<!--b123ee40-->
+<!--f70897c0-->
 parsed from source
   plugin Shader Languages
   category visuals
@@ -11,4 +11,4 @@ parsed from source
   context shaderLanguages
   listens shell:ready
   emits shader:swapped {moved}
-  source 186 lines
+  source 187 lines

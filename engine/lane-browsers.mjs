@@ -583,11 +583,19 @@ async function pickDebuggingPort(root, asked) {
 }
 
 /**
- * What Chrome is told to open. Separate from the start so a test can read it
- * without running a browser.
+ * The flag a root user needs. Chrome refuses to start as root with its sandbox
+ * on, and a container runs as root, so a lane there dies before it opens its
+ * debugging port. Nobody else gets the flag: the sandbox is a protection.
  */
-export const laneBrowserArguments = ({ port, profile, width, height, page }) => [
+const sandboxArguments = userId => (userId === 0 ? ['--no-sandbox'] : [])
+
+/**
+ * What Chrome is told to open. Separate from the start so a test can read it
+ * without running a browser. `userId` is the user the browser will run as.
+ */
+export const laneBrowserArguments = ({ port, profile, width, height, page, userId = process.getuid?.() }) => [
   '--headless=new',
+  ...sandboxArguments(userId),
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${profile}`,
   '--no-first-run',

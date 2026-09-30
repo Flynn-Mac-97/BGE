@@ -1,4 +1,4 @@
-<!--3a47feda-->
+<!--8ea5baac-->
 parsed from source
   plugin Lights
   category visuals
@@ -11,4 +11,4 @@ parsed from source
   systems fixed, frame
   listens entity:added, entity:removed, frame:painted, level:loaded, world:changed, world:cleared
   emits world:changed
-  source 1002 lines
+  source 1003 lines

@@ -30,11 +30,9 @@ class FakeElement {
   insertBefore(child, before) {
     if (child.parentNode) child.parentNode.removeChild(child)
     const index = this.children.indexOf(before)
-    if (index === -1) {
-      this.children.push(child)
-      child.parentNode = this
-      return
-    }
+    // A real DOM throws here, so the fake does too.
+    if (index === -1)
+      throw new Error('NotFoundError: the node before which the new node is to be inserted is not a child of this node')
     this.children.splice(index, 0, child)
     child.parentNode = this
   }
@@ -144,4 +142,21 @@ test('an unmounted or unknown region is refused, not thrown', () => {
   assert.equal(regions.mount('nowhere', new FakeElement('x')), null)
   assert.equal(regions.mount('overlay', null), null)
   assert.deepEqual(regions.names, ['overlay'])
+})
+
+test('mounting again after the page removed a later mount does not throw', () => {
+  const host = new FakeElement('overlay')
+  const regions = makeRegions({ overlay: host })
+  const first = new FakeElement('first')
+  const second = new FakeElement('second')
+  regions.mount('overlay', first)
+  regions.mount('overlay', second)
+  // Something outside the registry empties the host; both mounts are still registered.
+  host.removeChild(second)
+  host.removeChild(first)
+  assert.doesNotThrow(() => regions.mount('overlay', first))
+  assert.deepEqual(
+    host.children.map(child => child.name),
+    ['first']
+  )
 })

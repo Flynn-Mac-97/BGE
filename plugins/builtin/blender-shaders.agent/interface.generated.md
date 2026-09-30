@@ -1,4 +1,4 @@
-<!--00fee0c3-->
+<!--03173a6f-->
 parsed from source
   plugin Blender Shaders
   category visuals
@@ -8,4 +8,4 @@ parsed from source
   arguments blender.shaders:;blender.shaders.apply:
   systems frame
   listens frame:painted, hot:applied
-  source 288 lines
+  source 289 lines

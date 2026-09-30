@@ -19,6 +19,7 @@ category: core
   title and action buttons) `tree`; `thumb` `preview` `picture` for images.
   A widget the kit lacks goes into the kit, not into a plugin.
 - Give every action a command id; it works from a terminal too.
+- `expandable: true` on a panel adds Expand to its header: it is drawn over the whole editor and its render gets `context.isExpanded`.
 - Shortcut: `key: 'ctrl+z'` on the command; the shell owns keydown.
 - Expose verbs and state through `context`; tests use `test.context`.
 - Subscribe in `onLoad(context)`; the viewport exists after `shell:ready`.

@@ -1,7 +1,7 @@
 {
-  "comment": "Scope is the kernel closure: engine/** minus the peripheral tooling named in kernel-trellis.yaml. sloppinessIndex is not budgeted: its 20 remaining points are the audit's incomplete-graph floor, not kernel debt. Six deliberate dynamic imports (index.js x2, start-world-node.mjs x2, project-index.mjs, and plugin-interface.mjs reaching the plugin tree above engine/) cannot resolve statically, and the Trellis config has no key that declares them. unresolvedImports bounds that floor, so a seventh unresolved import fails the check. erodedCount, duplicationGroups and importCycleGroups are the real gate.",
+  "comment": "Scope is the kernel closure: engine/** minus the peripheral tooling named in kernel-trellis.yaml. sloppinessIndex is not budgeted: its 20 remaining points are the audit's incomplete-graph floor, not kernel debt. Seven deliberate dynamic imports (index.js x2, player.js importing the exported game's own files by URL, start-world-node.mjs x2, project-index.mjs, and plugin-interface.mjs reaching the plugin tree above engine/) cannot resolve statically, and the Trellis config has no key that declares them. unresolvedImports bounds that floor, so an eighth unresolved import fails the check. erodedCount, duplicationGroups and importCycleGroups are the real gate.",
   "erodedCount": 0,
   "duplicationGroups": 0,
   "importCycleGroups": 0,
-  "unresolvedImports": 6
+  "unresolvedImports": 7
 }

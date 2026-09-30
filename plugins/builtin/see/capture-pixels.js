@@ -87,11 +87,16 @@ export function measureLight(pixels, width, height) {
   }
 }
 
+/**
+ * Whether any pixel of an RGBA frame has alpha.
+ *
+ * Reads every pixel. The world canvas has a transparent background, so a small
+ * scene can cover under 1% of the frame, and a sample of a few hundred points
+ * misses it: an 800x600 frame of three platforms read back "empty" every time.
+ */
 export function hasPixels(pixels) {
-  let anything = false
-  const stride = Math.max(4, Math.floor(pixels.length / 4 / 400) * 4)
-  for (let at = 3; at < pixels.length; at += stride) {
-    if (pixels[at] > 0) { anything = true; break }
+  for (let at = 3; at < pixels.length; at += 4) {
+    if (pixels[at] > 0) return true
   }
-  return anything
+  return false
 }

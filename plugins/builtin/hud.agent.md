@@ -50,3 +50,7 @@ emptied on `level:loaded`.
 - `hud.read` — every line as it currently reads, filled from world state. This
   is how a headless run checks the HUD without a picture.
 - `hud.toggle` — show the HUD while editing, so a capture can include it.
+
+## Colours from the theme
+
+Text and bars that name no `color` use `hud.palette` (`ink`, `outline`). Game UI's theme file sets both from `--ui-ink` and `--ui-outline`, so one stylesheet colours the HUD too.

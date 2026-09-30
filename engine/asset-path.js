@@ -54,5 +54,13 @@ export const assetPath = reference => {
   return PROJECT_FOLDER.test(relative) ? relative : 'assets/' + relative
 }
 
+/**
+ * Where the open project is served. The dev server serves it at `/project/`.
+ * An exported game plays from any path (an itch.io page is not at a site's
+ * root), so its page sets `globalThis.__engineProjectBase` to the project
+ * folder beside it before the engine loads.
+ */
+const projectBase = () => globalThis.__engineProjectBase ?? `/${PROJECT_PREFIX}/`
+
 /** The same answer as a URL the browser can fetch. */
-export const assetURL = source => `/${PROJECT_PREFIX}/` + assetPath(source)
+export const assetURL = source => projectBase() + assetPath(source)

@@ -180,7 +180,8 @@ export default {
 
       // Repaint only when the picture changed. A screen that redraws every
       // frame is an easy way to make a 60fps game run at 40.
-      const key = `${JSON.stringify(list)}|${layer.canvas.clientWidth}x${layer.canvas.clientHeight}`
+      // The palette is in the key: a theme change repaints with the same items.
+      const key = `${JSON.stringify(list)}|${JSON.stringify(context.screen.palette)}|${layer.canvas.clientWidth}x${layer.canvas.clientHeight}`
       if (key === layer.last) return
       layer.last = key
       paint(layer, list, context.screen, scale)

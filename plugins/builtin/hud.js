@@ -44,6 +44,8 @@ export default {
       items: [],          // from the level
       extra: [],          // added by game code
       visible: true,
+      // What items use when they name no colour. Game UI sets it from the theme.
+      palette: { ink: '#ffffff', outline: 'rgba(0,0,0,0.75)' },
       add: item => { hud.extra.push(item); return item },
       clear: () => { hud.extra.length = 0 }
     }
@@ -76,6 +78,7 @@ export default {
       const key = [
         JSON.stringify(items),
         JSON.stringify(world.state),
+        JSON.stringify(hud.palette),
         layer.canvas.clientWidth,
         layer.canvas.clientHeight
       ].join('|')
@@ -85,7 +88,7 @@ export default {
       if (key === layer.last) return
       layer.last = key
 
-      paint(layer, items, world.state)
+      paint(layer, items, world.state, hud.palette)
     }
   }],
 
@@ -105,7 +108,7 @@ export default {
 }
 
 // ------------------------------------------------------------------ the layer
-function paint(layer, items, state) {
+function paint(layer, items, state, palette) {
   const { canvas, g } = layer
   const dpr = Math.min(devicePixelRatio || 1, 2)
   const w = canvas.clientWidth, h = canvas.clientHeight
@@ -119,8 +122,8 @@ function paint(layer, items, state) {
 
   for (const item of items) {
     const [ax, ay] = place(item, w, h)
-    if (item.bar != null) drawBar(g, item, ax, ay, state)
-    else drawText(g, item, ax, ay, state)
+    if (item.bar != null) drawBar(g, item, ax, ay, state, palette)
+    else drawText(g, item, ax, ay, state, palette)
   }
 }
 
@@ -134,7 +137,7 @@ function place(item, w, h) {
   ]
 }
 
-function drawText(g, item, x, y, state) {
+function drawText(g, item, x, y, state, palette) {
   const size = item.size || 16
   g.font = `${item.weight || 600} ${size}px ui-monospace, monospace`
   g.textBaseline = 'top'
@@ -145,14 +148,14 @@ function drawText(g, item, x, y, state) {
   // A dark outline, so the same HUD stays readable over a bright sky and a
   // dark cave without the author choosing a colour per level.
   g.lineWidth = Math.max(2, size / 6)
-  g.strokeStyle = item.outline || 'rgba(0,0,0,0.75)'
+  g.strokeStyle = item.outline || palette.outline
   g.lineJoin = 'round'
   g.strokeText(text, x, y)
-  g.fillStyle = item.color || '#ffffff'
+  g.fillStyle = item.color || palette.ink
   g.fillText(text, x, y)
 }
 
-function drawBar(g, item, x, y, state) {
+function drawBar(g, item, x, y, state, palette) {
   const [w, h] = item.size || [90, 8]
   const value = Number(fill(String(item.bar), state)) || 0
   const frac = Math.max(0, Math.min(1, value / (item.max ?? 1)))
@@ -160,7 +163,7 @@ function drawBar(g, item, x, y, state) {
 
   g.fillStyle = 'rgba(0,0,0,0.55)'
   g.fillRect(left - 1, y - 1, w + 2, h + 2)
-  g.fillStyle = item.color || '#ffffff'
+  g.fillStyle = item.color || palette.ink
   g.fillRect(left, y, w * frac, h)
 }
 

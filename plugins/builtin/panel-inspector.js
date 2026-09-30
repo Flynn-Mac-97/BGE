@@ -28,6 +28,7 @@ export default {
     title: 'Inspector',
     dock: 'right',
     order: 10,
+    minHeight: 240,
 
     render(ui, context) {
       const sel = context.selection

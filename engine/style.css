@@ -82,11 +82,11 @@ input:focus-visible {
 }
 .mid {
   display: grid;
-  grid-template-columns: var(--left-size, 190px) 5px minmax(0, 1fr) 5px var(--right-size, 236px);
+  grid-template-columns: var(--left-size, 190px) 5px minmax(0, 1fr) 5px var(--right-size, 300px);
   min-height: 0;
 }
 .mid.no-left {
-  grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--right-size, 236px);
+  grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--right-size, 300px);
 }
 .mid.no-right {
   grid-template-columns: var(--left-size, 190px) 5px minmax(0, 1fr) 0 0;
@@ -208,11 +208,17 @@ input:focus-visible {
 }
 
 /* ---------- docks ---------- */
+/* A dock scrolls when its open panels do not fit. Each open panel keeps a
+   floor (--panel-min), so a crowded dock is longer, never unreadable. */
 .dock {
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--surface);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
 }
 .dock.hidden {
   display: none;
@@ -306,28 +312,66 @@ input:focus-visible {
 .panel {
   display: flex;
   flex-direction: column;
-  min-height: 0;
   flex: 1 1 0;
+  min-height: var(--panel-min, 140px);
   border-bottom: 1px solid var(--rule);
+}
+.panel.folded {
+  flex: none;
+  min-height: 0;
 }
 .panel:last-child {
   border-bottom: 0;
 }
 .dock.bottom .panel {
+  min-height: 0;
   border-bottom: 0;
 }
 .panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  padding: 8px 10px 6px;
+  height: 28px;
+  padding: 0 10px;
   flex: none;
+  background: var(--surface);
 }
 .panel-head .t {
   font: 9.5px var(--mono);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-4);
+}
+.panel-fold {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: none;
+  border: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.panel-fold::before {
+  content: '\25B8';
+  display: inline-block;
+  width: 14px;
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+.panel-fold[aria-expanded='true']::before {
+  content: '\25BE';
+}
+.panel-fold:hover {
+  color: var(--ink);
 }
 .panel-head .by {
   font: 8.5px var(--mono);
@@ -357,6 +401,35 @@ input:focus-visible {
 }
 .panel-body.scroll {
   overflow: auto;
+}
+
+/* ---------- expanded panel ---------- */
+/* One `expandable` panel drawn over the docks and viewport, below the bar and
+   above the status line. The docks stay built underneath, so docking it again
+   costs one redraw. */
+.app {
+  position: relative;
+}
+/* Absolute, so it takes no grid cell: the bar is 36px and the status line 22px. */
+.expanded-host {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+}
+.expanded-host.hidden {
+  display: none;
+}
+.expanded-host > .panel {
+  flex: 1;
+  min-height: 0;
 }
 
 /* ---------- play focus ---------- */
@@ -767,6 +840,23 @@ input:focus-visible {
   background: var(--sel);
   border-left-color: var(--ink);
   color: var(--ink);
+}
+.u-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+}
+.u-columns > * {
+  min-height: 0;
+  overflow: auto;
+}
+.u-sandbox {
+  padding: 12px;
+  border: 1px solid var(--ink-4);
+  background: var(--sunk);
+  overflow: auto;
 }
 .u-textarea {
   width: 100%;

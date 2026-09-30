@@ -1,4 +1,4 @@
-<!--e59220d3-->
+<!--b58c254e-->
 parsed from source
   plugin Render
   category visuals
@@ -9,4 +9,4 @@ parsed from source
   arguments render.look:;render.set: args;render.reset:
   systems frame
   listens frame:painted, hot:applied, level:loaded, plugins:changed
-  source 355 lines
+  source 356 lines

@@ -198,7 +198,10 @@ let readabilityDefaults = null
  */
 export function applyReadability(context, { readability }) {
   const aids = context.renderer?.readability
-  if (!aids) return
+  // Readability fills these when it attaches, which can come after the first
+  // apply. Kept then, `undefined` would stand for good and a keyline would be
+  // NaN pixels wide. Every level load applies again, after Readability attaches.
+  if (aids?.keyline === undefined) return
   readabilityDefaults ??= { keyline: aids.keyline, shadow: aids.shadow, ring: aids.ring }
   Object.assign(aids, readability === 'off' ? { keyline: 0, shadow: false, ring: false } : readabilityDefaults)
 }

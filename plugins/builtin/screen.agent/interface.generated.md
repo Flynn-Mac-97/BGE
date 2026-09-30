@@ -1,4 +1,4 @@
-<!--d06795df-->
+<!--04c8f3d6-->
 parsed from source
   plugin Screen
   category game
@@ -8,4 +8,4 @@ parsed from source
   context screen
   systems frame
   listens level:loaded, play:stopped
-  source 364 lines
+  source 365 lines

@@ -40,7 +40,7 @@ export function makeLayout(root, frame, onResize) {
 
   const DEFAULT_LAYOUT = {
     left: 190,
-    right: 236,
+    right: 300,
     centre: Math.min(560, Math.max(240, Math.round(root.getBoundingClientRect().width * 0.46))),
     bottom: 220
   }

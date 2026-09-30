@@ -1,4 +1,4 @@
-<!--1449b20d-->
+<!--1ca132e0-->
 parsed from source
   plugin Blender Assets
   category editor
@@ -11,4 +11,4 @@ parsed from source
   arguments blender.check:;blender.list:;blender.import: args;blender.inspect: args;blender.settings: args
   systems frame
   listens frame:painted
-  source 357 lines
+  source 358 lines

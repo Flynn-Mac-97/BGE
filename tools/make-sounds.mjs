@@ -5,7 +5,8 @@
  * Same idea as the sprites: the sound is described, not committed as an opaque
  * blob. A few numbers you can read and change beat a binary you cannot.
  *
- *   node tools/make-sounds.mjs
+ *   node tools/make-sounds.mjs                 the demo project's sounds
+ *   node tools/make-sounds.mjs --ui <directory>  the short sounds a UI plays (click, hover, focus, open, close, notify, toggle, pickup, drop)
  *
  * WAV is written by hand — an uncompressed header and PCM samples — so the
  * project keeps zero build dependencies for something this small.
@@ -24,6 +25,19 @@ const SOUNDS = {
   coin:  { wave: 'square',   from: 880, to: 1320, secs: 0.14, decay: 5, gain: 0.22, steps: 2 },
   hurt:  { wave: 'saw',      from: 420, to: 90,  secs: 0.30, decay: 3, gain: 0.28 },
   land:  { wave: 'noise',    from: 200, to: 80,  secs: 0.09, decay: 12, gain: 0.18 }
+}
+
+// The sounds Game UI plays. A game points its `--ui-sound-*` tokens at them.
+const UI_SOUNDS = {
+  click:  { wave: 'square', from: 660, to: 440, secs: 0.05, decay: 5, gain: 0.16 },
+  hover:  { wave: 'sine',   from: 900, to: 1000, secs: 0.03, decay: 4, gain: 0.10 },
+  focus:  { wave: 'sine',   from: 700, to: 700, secs: 0.04, decay: 5, gain: 0.12 },
+  open:   { wave: 'sine',   from: 400, to: 800, secs: 0.12, decay: 3, gain: 0.18 },
+  close:  { wave: 'sine',   from: 800, to: 400, secs: 0.10, decay: 3, gain: 0.16 },
+  notify: { wave: 'square', from: 880, to: 1180, secs: 0.16, decay: 4, gain: 0.16, steps: 2 },
+  toggle: { wave: 'square', from: 520, to: 780, secs: 0.06, decay: 5, gain: 0.14 },
+  pickup: { wave: 'sine',   from: 500, to: 900, secs: 0.08, decay: 4, gain: 0.16 },
+  drop:   { wave: 'noise',  from: 200, to: 100, secs: 0.07, decay: 10, gain: 0.14 }
 }
 
 // ------------------------------------------------------------------ synthesis
@@ -85,11 +99,13 @@ function wav(float32) {
 }
 
 // ------------------------------------------------------------------ write
-export function main() {
-  fs.mkdirSync(OUT, { recursive: true })
-  for (const [name, def] of Object.entries(SOUNDS)) {
+export function main(argv = process.argv) {
+  const uiAt = argv.indexOf('--ui')
+  const [directory, sounds] = uiAt === -1 ? [OUT, SOUNDS] : [path.resolve(argv[uiAt + 1] ?? '.'), UI_SOUNDS]
+  fs.mkdirSync(directory, { recursive: true })
+  for (const [name, def] of Object.entries(sounds)) {
     const buf = wav(samples(def))
-    fs.writeFileSync(path.join(OUT, `${name}.wav`), buf)
+    fs.writeFileSync(path.join(directory, `${name}.wav`), buf)
     console.log(`${name}.wav`.padEnd(12), `${def.secs}s`.padEnd(7), def.wave.padEnd(7), `${buf.length}b`)
   }
 }

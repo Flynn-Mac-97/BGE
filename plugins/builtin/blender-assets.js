@@ -261,6 +261,7 @@ export default {
     id: 'blender-assets',
     title: 'Blender',
     dock: 'left',
+    collapsed: true,
     order: 40,
 
     actions: [{ label: 'Read', run: context => context.run('blender.list') }],

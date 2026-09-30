@@ -337,6 +337,7 @@ export default {
     id: 'render',
     title: 'Render',
     dock: 'right',
+    collapsed: true,
     order: 30,
 
     actions: [{ label: 'Reset session', run: context => context.run('render.reset') }],

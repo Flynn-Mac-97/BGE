@@ -410,6 +410,7 @@ export default {
     id: 'materials',
     title: 'Materials',
     dock: 'right',
+    collapsed: true,
     order: 40,
 
     render(ui, context) {

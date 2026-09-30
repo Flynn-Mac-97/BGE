@@ -260,6 +260,7 @@ export default {
     id: 'blender-shaders',
     title: 'Blender Shaders',
     dock: 'left',
+    collapsed: true,
     order: 41,
 
     actions: [{ label: 'Rebuild', run: context => context.run('blender.shaders.apply') }],

@@ -1,4 +1,4 @@
-<!--af9ff95c-->
+<!--1406bad3-->
 parsed from source
   plugin Shaders
   category visuals
@@ -7,4 +7,4 @@ parsed from source
   commands shaders.list
   arguments shaders.list:
   emits world:changed
-  source 167 lines
+  source 168 lines

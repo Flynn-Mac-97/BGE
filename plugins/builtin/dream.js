@@ -101,6 +101,7 @@ export default {
     id: 'dream',
     title: 'Dream · improve',
     dock: 'right',
+    collapsed: true,
     order: 40,
 
     actions: [
