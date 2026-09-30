@@ -6,7 +6,8 @@
  *
  * The build is `player.html` and `engine/player.js`, bundled by Vite with only
  * the runtime plugins (categories `engine`, `visuals` and `game`, less the two
- * that only matter while editing and any the game's `game.json` turns off), then the game's own runtime files copied
+ * that only matter while editing and any the game's `game.json` turns off; or
+ * only those in its `plugins.only`, with what they require), then the game's own runtime files copied
  * beside it under `project/`, with the index and file list the player reads in
  * place of a dev server. Editor and agent plugins are left out.
  *
@@ -51,6 +52,9 @@ export const isRuntimeFile = file =>
  * The builtin plugins an export bundles: each file whose plugin has a runtime
  * category and is not turned off by name in `game.json`'s `plugins.disabled`.
  * Answers `[{ file, name, category }]`, `file` from the checkout.
+ *
+ * A game that lists `plugins.only` in `game.json` gets just those plugins, plus
+ * every runtime plugin that provides a service one of them requires.
  */
 export async function runtimePlugins(checkout, game = {}) {
   const disabled = new Set(game.plugins?.disabled ?? [])
@@ -66,9 +70,32 @@ export async function runtimePlugins(checkout, game = {}) {
       disabled.has(definition.name)
     )
       continue
-    plugins.push({ file: `plugins/builtin/${name}`, name: definition.name, category: definition.category })
+    plugins.push({
+      file: `plugins/builtin/${name}`,
+      name: definition.name,
+      category: definition.category,
+      provides: definition.provides ?? [],
+      requires: definition.requires ?? []
+    })
   }
-  return plugins
+  return game.plugins?.only ? onlyWithRequirements(plugins, game.plugins.only) : plugins
+}
+
+/** The named plugins and, repeatedly, the plugins that provide what a kept one requires. */
+function onlyWithRequirements(plugins, only) {
+  const names = new Set(only)
+  const unknown = only.filter(name => !plugins.some(plugin => plugin.name === name))
+  if (unknown.length) throw new Error(`game.json plugins.only names no runtime plugin: ${unknown.join(', ')}`)
+  const kept = new Set(plugins.filter(plugin => names.has(plugin.name)))
+  const needed = [...kept].flatMap(plugin => plugin.requires)
+  while (needed.length) {
+    const key = needed.pop()
+    const provider = plugins.find(plugin => plugin.provides.includes(key))
+    if (!provider || kept.has(provider)) continue
+    kept.add(provider)
+    needed.push(...provider.requires)
+  }
+  return plugins.filter(plugin => kept.has(plugin))
 }
 
 /** The text `engine/player-plugins.js` is built with: each bundled plugin as a lazy import the player awaits in order. */

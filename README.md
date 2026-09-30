@@ -56,6 +56,22 @@ stay out. A game starts on a click or key press, because browsers only allow
 sound after the player acts. An export replaces an earlier export in the same
 folder and refuses any other folder that is not empty.
 
+To bundle only the plugins a game uses, list them in `game.json`:
+`"plugins": { "only": ["Render", "Game UI", "Health"] }`. Each plugin's required
+services are added for you. An unknown name fails the export.
+
+### Android
+
+```
+node bin/engine.mjs export --android --project ../bge-projects/my-game [--out my-game.apk]
+```
+
+writes `release/my-game.apk`, the same game in a full-screen WebView app, signed
+with a debug key. It needs a JDK and the Android SDK (`ANDROID_HOME`), no Gradle.
+`game.json` may set `"android": { "package": "com.you.game", "orientation": "landscape" }`.
+With no computer at hand, run the **Android APK** workflow in GitHub Actions
+(`.github/workflows/android-apk.yml`) and install the artifact it uploads.
+
 ## The shape of a project
 
 Depth 1 everywhere. One file per thing.

@@ -66,3 +66,13 @@ test('an export builds a game the player can boot, and replaces only an earlier 
     await fs.rm(scratch, { recursive: true, force: true })
   }
 })
+
+test('plugins.only bundles just the named plugins and what they require', async () => {
+  const only = await runtimePlugins(CHECKOUT, { plugins: { only: ['Render', 'Game UI'] } })
+  const names = only.map(plugin => plugin.name)
+  assert.deepEqual(names.filter(name => ['Render', 'Game UI'].includes(name)).sort(), ['Game UI', 'Render'])
+  assert.ok(names.length < (await runtimePlugins(CHECKOUT)).length, 'fewer plugins than the default')
+  const provided = new Set(only.flatMap(plugin => plugin.provides))
+  for (const key of only.flatMap(plugin => plugin.requires)) assert.ok(provided.has(key), `${key} has a provider`)
+  await assert.rejects(runtimePlugins(CHECKOUT, { plugins: { only: ['No Such Plugin'] } }), /names no runtime plugin/)
+})
