@@ -14,25 +14,24 @@ import { BASE_CSS } from './base-css.js'
 
 /** Token name → value. A token is `--ui-<name>` in CSS; Screen and the HUD read the colours. */
 export const DEFAULT_TOKENS = {
-  ink: '#ede8dc',
-  quiet: 'rgba(237, 232, 220, 0.66)',
-  surface: 'rgba(17, 19, 22, 0.94)',
-  edge: 'rgba(237, 232, 220, 0.16)',
-  accent: '#ff8a3d',
-  'on-accent': '#16130f',
-  track: 'rgba(237, 232, 220, 0.10)',
-  scrim: 'rgba(8, 9, 11, 0.74)',
-  outline: 'rgba(0, 0, 0, 0.8)',
-  good: '#6ccb8a',
-  danger: '#ff5a5f',
-  trail: 'rgba(237, 232, 220, 0.55)',
-  // DIN-style faces a player's system already has: Windows ships Bahnschrift, macOS DIN Alternate.
-  font: "Bahnschrift, 'DIN Alternate', 'Barlow', 'Roboto Condensed', 'Segoe UI', system-ui, sans-serif",
-  size: '15px',
-  radius: '2px',
+  ink: '#ffffff',
+  quiet: 'rgba(255, 255, 255, 0.7)',
+  surface: 'rgba(0, 0, 0, 0.8)',
+  edge: 'rgba(255, 255, 255, 0.25)',
+  accent: '#60a5fa',
+  'on-accent': '#000000',
+  track: 'rgba(255, 255, 255, 0.12)',
+  scrim: 'rgba(0, 0, 0, 0.6)',
+  outline: 'rgba(0, 0, 0, 0.75)',
+  good: '#4ade80',
+  danger: '#f87171',
+  trail: 'rgba(255, 255, 255, 0.5)',
+  font: 'system-ui, sans-serif',
+  size: '16px',
+  radius: '4px',
   space: '8px',
-  duration: '0.16s',
-  ease: 'cubic-bezier(0.2, 0.7, 0.1, 1)'
+  duration: '0.15s',
+  ease: 'ease-out'
 }
 
 /** Screen's palette key → the token that colours it. */
