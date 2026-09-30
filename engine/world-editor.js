@@ -68,6 +68,17 @@ export function makeEditor({ projectDirectory, projectName, projectUntitled, bus
       editor.tool = id
       bus.emit('tool:changed', id)
       bus.emit('plugins:changed')
+    },
+
+    /**
+     * Say the screen is up. A plugin that needs the DOM (keys, a canvas layer)
+     * attaches on `shell:ready`, so a boot with a screen calls this once, after
+     * the world has started and the screen is drawn.
+     *
+     * @returns {void}
+     */
+    screenReady() {
+      bus.emit('shell:ready', editor.context)
     }
   }
 

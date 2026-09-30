@@ -24,4 +24,5 @@ source:
     - chrome-path.mjs
     - project-servers.mjs
     - evolve.mjs
+    - export-game.mjs
     - transport.js

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>game</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #app { position: fixed; inset: 0; display: grid; place-items: center; }
+    /* The viewport keeps the game's shape (set from game.json) and fits the window. */
+    .viewport { position: relative; width: 100%; max-height: 100%; overflow: hidden; background: #000; }
+    @media (min-aspect-ratio: 1/1) { .viewport { width: auto; height: 100%; max-width: 100%; } }
+    .viewport canvas { display: block; width: 100%; height: 100%; }
+    .viewport-ui { position: absolute; inset: 0; pointer-events: none; }
+    .player-start { position: absolute; inset: 0; border: 0; background: rgba(0, 0, 0, 0.6); color: #fff; font: 18px system-ui, sans-serif; cursor: pointer; }
+    .player-start:focus-visible { outline: 2px solid #fff; outline-offset: -8px; }
+    .player-error { margin: 0; padding: 24px; color: #fff; font: 12px ui-monospace, monospace; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/engine/player.js"></script>
+</body>
+</html>

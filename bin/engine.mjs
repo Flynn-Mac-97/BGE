@@ -63,6 +63,9 @@ const HELP = `engine — read and drive the running editor
 
 state     snapshot [--entities --log --plugins --commands --timers]
           entity <id>          index          tree
+          export [--out DIR]   build the open project as a static web game with no
+                               editor, into release/<project>-web by default.
+                               Serve the folder from any static host
           check                exits 1 if anything is broken, nondeterministic,
                                or a plugin file that will not load, or if the
                                kernel fails format, lint, Trellis or Codemap
@@ -1120,6 +1123,21 @@ if (op === 'tree') {
   const { walk, KIND } = await readProject()
   const files = await walk(PROJECT)
   out(files.filter(f => !f.startsWith('.engine')).map(f => ({ path: f, kind: KIND(f) })))
+  process.exit(0)
+}
+
+// A static web build of the open project, with no editor: engine/export-game.mjs.
+if (op === 'export') {
+  const { isUntitled } = await import('../engine/project-path.mjs')
+  if (isUntitled(PROJECT)) die(1, 'export: the untitled project has no name to build. Save it with project.saveAs, or pass --project')
+  const { exportGame } = await import('../engine/export-game.mjs')
+  const name = path.basename(PROJECT)
+  const folder = typeof flags.out === 'string' ? path.resolve(flags.out) : path.join(CHECKOUT, 'release', `${name}-web`)
+  try {
+    out(await exportGame({ checkout: CHECKOUT, project: PROJECT, out: folder }))
+  } catch (error) {
+    die(1, `export: ${error.message}`, error.stack)
+  }
   process.exit(0)
 }
 

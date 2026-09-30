@@ -40,9 +40,13 @@
 
 The runtime is much thinner than the tooling. Missing: tilemaps and bulk
 placement, scene flow between levels, saving game state, parenting, gamepad and
-touch input, time scale, and any way to export a playable build.
+touch input, and time scale.
 
-Three things have come off this list. Check the code before putting one back:
+Several things have come off this list. Check the code before putting one back:
+
+- **Exporting a playable build.** `node bin/engine.mjs export --project <game>`
+  writes a static web build with no editor: `engine/export-game.mjs` bundles
+  `player.html` with the runtime plugins and copies the game's files beside it.
 
 - **3D model loading.** `mesh: { model: '<file>.glb' }` loads a GLB and
   `entity.pose` swings its named nodes. GLB crowds do not instance yet, which is

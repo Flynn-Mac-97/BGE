@@ -38,6 +38,24 @@ lane browser, a headless session — belongs to the supervisor. Start it with
 itself. Double-click `engine.cmd` at the checkout root to open the desktop.
 Use `node bin/engine.mjs supervisor --watch` for the terminal table.
 
+## Export a game
+
+```
+node bin/engine.mjs export --project ../bge-projects/my-game [--out DIR]
+```
+
+writes `release/my-game-web/`: a static web build that plays with no editor
+and no dev server. Upload the folder (zipped) to itch.io as an HTML game, or put
+it on any static host. It must be served over HTTP; opened as a `file://` page
+the browser refuses its modules, so try it locally with `npx serve release/my-game-web`.
+
+The build carries the engine, the game, visual and engine plugins (not the
+editor's or the agents'), and the game's `game.json`, `types/`, `behaviours/`,
+`levels/`, `assets/` and `plugins/`. Tests, agent files and `.blend` sources
+stay out. A game starts on a click or key press, because browsers only allow
+sound after the player acts. An export replaces an earlier export in the same
+folder and refuses any other folder that is not empty.
+
 ## The shape of a project
 
 Depth 1 everywhere. One file per thing.
