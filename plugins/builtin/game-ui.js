@@ -46,7 +46,7 @@ import { openMenu, openRadial } from './game-ui/popup.js'
 import { makeSounds, soundOfEvent } from './game-ui/sounds.js'
 import { bindMenuKeys, confirmEvent, moveFocus, scopeOf, settledFocus } from './game-ui/menu.js'
 import { htmlOf, makeAnchor, makePanel, makeUiEvent, refresh, startLeaving, textOf } from './game-ui/records.js'
-import { hudPaletteOf, screenPaletteOf, tokensOf } from './game-ui/theme.js'
+import { hudPaletteOf, screenPaletteOf, sheetText, tokensOf } from './game-ui/theme.js'
 import { makeTipState, tipHtml } from './game-ui/tooltip.js'
 import { makeTypewriter } from './game-ui/typewriter.js'
 import { resolveTarget } from './game-ui/world-layer.js'
@@ -273,11 +273,12 @@ export default {
         return true
       },
 
-      /** The theme: `use(css)` applies text, `load(name)` reads an asset, `tokens()` is what Screen and the HUD read. */
+      /** The theme: `use(css)` applies text, `load(name)` reads an asset, `tokens()` is what Screen and the HUD read, `sheet(css)` is the whole stylesheet a panel adopts for that theme text. */
       theme: {
         use: css => useTheme(css, 'code', ''),
         load: loadTheme,
         tokens: () => ({ ...state.theme.tokens }),
+        sheet: sheetText,
         name: () => state.theme.name,
         kind: () => state.theme.kind
       },

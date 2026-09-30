@@ -157,11 +157,12 @@ export function makeUI(state, redraw) {
     /**
      * Collapsible group. Closed until the reader opens it, so many folds cost
      * one summary line each. `o.meta` is a right-aligned count or note;
-     * `o.open` starts it open.
+     * `o.open` starts it open; `o.onToggle(isOpen)` hears it open or close.
      */
     fold(title, children, options = {}) {
       const element = makeElement('details', 'u-fold')
       if (options.open) element.open = true
+      if (options.onToggle) element.addEventListener('toggle', () => options.onToggle(element.open))
       const summary = makeElement('summary', 'u-fsum')
       append(summary, [makeElement('span', 'u-flabel', { text: title })])
       if (options.meta != null) append(summary, [makeElement('span', 'u-meta', { text: String(options.meta) })])
@@ -332,6 +333,28 @@ export function makeUI(state, redraw) {
       })
       element.value = String(options.value ?? '')
       bindable(options, element, 'input', target => target.value)
+      return element
+    },
+
+    /**
+     * Markup shown in a shadow root, so its stylesheet and the editor's cannot
+     * reach each other. `options.background` sets the colour behind it. `restyle(css)` swaps the sheet and `reshow(html)` swaps
+     * the markup, both without redrawing the panel.
+     */
+    sandbox(options = {}) {
+      const element = makeElement('div', 'u-sandbox')
+      if (options.background) element.style.background = options.background
+      const style = document.createElement('style')
+      style.textContent = options.css ?? ''
+      const body = document.createElement('div')
+      body.innerHTML = options.html ?? ''
+      element.attachShadow({ mode: 'open' }).append(style, body)
+      element.restyle = css => {
+        style.textContent = css
+      }
+      element.reshow = html => {
+        body.innerHTML = html
+      }
       return element
     },
 
