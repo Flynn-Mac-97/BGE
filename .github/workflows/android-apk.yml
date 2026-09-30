@@ -1,0 +1,39 @@
+name: Android APK
+
+# Builds a game into a debug APK you can download and install from a phone:
+# Actions > Android APK > Run workflow, then open the run's artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      game_repository:
+        description: 'GitHub repository holding the game (owner/name)'
+        required: true
+      game_folder:
+        description: 'Folder of the game inside that repository'
+        required: false
+        default: '.'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.game_repository }}
+          path: game-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci --ignore-scripts
+      - run: node bin/engine.mjs --project "$GITHUB_WORKSPACE/game-source/${{ inputs.game_folder }}" export --android --out "$GITHUB_WORKSPACE/game.apk"
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-apk
+          path: game.apk

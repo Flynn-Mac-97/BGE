@@ -65,7 +65,13 @@ state     snapshot [--entities --log --plugins --commands --timers]
           entity <id>          index          tree
           export [--out DIR]   build the open project as a static web game with no
                                editor, into release/<project>-web by default.
-                               Serve the folder from any static host
+                               Serve the folder from any static host.
+                               game.json "plugins":{"only":[names]} bundles just
+                               those plugins and what they require
+          export --android [--out FILE.apk]
+                               the same game as a signed debug APK for a phone,
+                               release/<project>.apk by default. Needs the
+                               Android SDK (ANDROID_HOME) and a JDK
           check                exits 1 if anything is broken, nondeterministic,
                                or a plugin file that will not load, or if the
                                kernel fails format, lint, Trellis or Codemap
@@ -276,7 +282,7 @@ closes one, meaning the engine now has a tool that reaches the same answer.
  * following argument and the failure would look like the flag doing nothing.
  */
 const VALUE_FLAGS = new Set(['port', 'timeout', 'kind', 'where', 'fix', 'cost', 'reads', 'level', 'root', 'project', 'client',
-                             'profile', 'debugPort', 'problem', 'saves', 'tool', 'repro', 'expected', 'actual'])
+                             'profile', 'debugPort', 'problem', 'saves', 'tool', 'repro', 'expected', 'actual', 'out'])
 
 const argv = process.argv.slice(2)
 const flags = process.env.ENGINE_CLIENT ? { client: process.env.ENGINE_CLIENT } : {}
@@ -1132,6 +1138,16 @@ if (op === 'export') {
   if (isUntitled(PROJECT)) die(1, 'export: the untitled project has no name to build. Save it with project.saveAs, or pass --project')
   const { exportGame } = await import('../engine/export-game.mjs')
   const name = path.basename(PROJECT)
+  if (flags.android) {
+    const { exportAndroid } = await import('../engine/export-android.mjs')
+    const apk = typeof flags.out === 'string' ? path.resolve(flags.out) : path.join(CHECKOUT, 'release', `${name}.apk`)
+    try {
+      out(await exportAndroid({ checkout: CHECKOUT, project: PROJECT, out: apk }))
+    } catch (error) {
+      die(1, `export --android: ${error.message}`, error.stack)
+    }
+    process.exit(0)
+  }
   const folder = typeof flags.out === 'string' ? path.resolve(flags.out) : path.join(CHECKOUT, 'release', `${name}-web`)
   try {
     out(await exportGame({ checkout: CHECKOUT, project: PROJECT, out: folder }))
