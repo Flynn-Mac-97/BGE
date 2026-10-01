@@ -168,6 +168,7 @@ export default {
       hide(id) {
         const record = recordOf(id)
         if (!record || record.phase === 'leaving') return false
+        record.mobile?.cancel()
         if (record.isInteractive) sounds.play('close')
         if (record.leave > 0 && record.element) startLeaving(record)
         else remove(id)
@@ -210,7 +211,7 @@ export default {
         const raised = type ?? control?.triggers[0]
         if (!control || !control.triggers.includes(raised)) return false
         // A scroll reports where it scrolled to, so the caller's value stands in for it.
-        const sendsOwnValue = raised !== 'scroll' && (raised !== TRIGGER[control.kind] || raised === 'click')
+        const sendsOwnValue = control.kind !== 'gesture' && raised !== 'scroll' && (raised !== TRIGGER[control.kind] || raised === 'click')
         state.queue.push(makeUiEvent(id, action, sendsOwnValue ? control.value : value, control.kind, { type: raised }))
         return true
       },

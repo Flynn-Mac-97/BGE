@@ -10,6 +10,7 @@
  */
 import { TRIGGER } from './controls.js'
 import { watchDrag } from './drag.js'
+import { watchMobile } from './mobile.js'
 
 /** Every DOM event a control can be triggered by. Each bubbles, so one listener per type on the root is enough. */
 const EVENT_TYPES = ['click', 'dblclick', 'contextmenu', 'pointerdown', 'pointerup', 'pointerover', 'pointerout', 'input', 'change']
@@ -60,7 +61,7 @@ export function watchRoot(root, { report, hover, tip }) {
 }
 
 /** Build a panel's element. `panel.hovered` is kept up to date on the record. */
-export function createPanelElement(id, panel, report, tip) {
+export function createPanelElement(id, panel, report, tip, input) {
   const element = document.createElement('div')
   element.dataset.gameUi = id
   // The overlay lets clicks through. An interactive panel takes them back once it has content (game-ui.js).
@@ -79,5 +80,5 @@ export function createPanelElement(id, panel, report, tip) {
     panel.hovered = name
   }
   watchRoot(root, { report, hover, tip })
-  return { element, root }
+  return { element, root, mobile: watchMobile(root, input, report) }
 }

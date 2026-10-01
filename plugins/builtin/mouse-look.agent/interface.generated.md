@@ -1,4 +1,4 @@
-<!--2350a0b3-->
+<!--02eaf3c6-->
 parsed from source
   plugin Mouse Look
   category engine
@@ -6,4 +6,4 @@ parsed from source
   commands mouse.sensitivity
   arguments mouse.sensitivity: value
   listens play:started, play:stopped, shell:ready
-  source 357 lines
+  source 358 lines

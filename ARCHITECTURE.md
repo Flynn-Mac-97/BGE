@@ -67,3 +67,5 @@ freshness checks.
 Plugin interfaces are generated files beside their guides. The server refreshes
 them on source edits; packet readers check freshness and include the stored text
 through the same file transport in the browser and headless worlds.
+
+Mobile game controls are Game UI components. They feed source-specific virtual codes into Keyboard Input's existing recorded input stream; tap/swipe callbacks use the UI's fixed-step queue. Installable web exports add a scoped, content-versioned offline cache. See `docs/mobile.md`.

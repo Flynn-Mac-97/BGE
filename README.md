@@ -824,3 +824,7 @@ Use `node bin/engine.mjs --headless run agent.commands '{"query":"profile"}'`
 to discover command arguments, and `run agent.contracts` for service owners,
 dependencies, lifecycle coverage and schedules. Reports are paginated.
 Contracts and migration limits are documented in `docs/kernel.md`.
+
+## Mobile demos
+
+Use Game UI's joystick, held action buttons and tap/swipe areas with Keyboard Input. Export an installable web app for Safari and Add to Home Screen; see [mobile setup and delivery](docs/mobile.md). APK export remains Android-only.

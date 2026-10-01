@@ -48,6 +48,7 @@ function controlFrom(tagText) {
 
 /** The DOM event that acts on each kind of control. A kind absent here is not acted on. */
 export const TRIGGER = {
+  gesture: 'tap',
   button: 'click',
   tab: 'click',
   slot: 'click',

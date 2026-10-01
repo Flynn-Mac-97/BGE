@@ -77,6 +77,13 @@ const field = (label, control) =>
   tag('label', { class: 'ui-field' }, tag('span', { class: 'ui-field-label' }, escapeHtml(label)) + control)
 
 const components = {
+  mobileControls: children => tag('div', { class: 'ui-mobile-controls' }, join(children)),
+  joystick: ({ label = 'Move', left = 'left', right = 'right', up = 'up', down = 'down', deadZone = 0.2, isDisabled = false } = {}) =>
+    tag('div', { class: 'ui-mobile ui-joystick', 'data-mobile': 'joystick', 'data-directions': JSON.stringify({ left, right, up, down }), 'data-dead-zone': Math.min(0.9, Math.max(0.05, Number(deadZone) || 0.2)), 'data-disabled': isDisabled, 'aria-label': label, role: 'group' }, tag('span', { class: 'ui-joystick-thumb' })),
+  actionButton: (label, { action, isDisabled = false } = {}) =>
+    tag('button', { type: 'button', class: 'ui-mobile ui-action-button', 'data-mobile': 'button', 'data-action': action, 'data-disabled': isDisabled, disabled: isDisabled, 'aria-label': label }, escapeHtml(label)),
+  gestureArea: (children, { action = 'gesture', label = 'Gesture area' } = {}) =>
+    tag('div', { class: 'ui-mobile ui-gesture-area', 'data-mobile': 'gesture', ...controlAttributes('gesture', { action, label, triggers: ['tap', 'swipe'] }), 'aria-label': label }, join(children)),
   stack: layout('ui-stack'),
   row: layout('ui-row'),
   grid: layout('ui-grid'),

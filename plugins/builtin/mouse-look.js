@@ -305,6 +305,7 @@ function attach(context, accumulated) {
   const viewport = context.shell?.viewport
   if (viewport) {
     viewport.addEventListener('pointerdown', event => {
+      if (event.composedPath?.().some(element => element.dataset?.gameUi)) return
       if (context.loop.running) event.stopPropagation()
     }, { capture: true })
   } else {

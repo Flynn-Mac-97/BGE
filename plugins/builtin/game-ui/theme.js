@@ -11,6 +11,7 @@
  * panel.
  */
 import { BASE_CSS } from './base-css.js'
+import { MOBILE_CSS } from './mobile.js'
 
 /** Token name → value. A token is `--ui-<name>` in CSS; Screen and the HUD read the colours. */
 export const DEFAULT_TOKENS = {
@@ -56,7 +57,7 @@ export function tokensOf(css) {
 /** The stylesheet text a panel adopts: the kit's rules, the token defaults, then the game's file. */
 export function sheetText(css) {
   const defaults = Object.entries(DEFAULT_TOKENS).map(([name, value]) => `--ui-${name}: ${value};`).join(' ')
-  return `${BASE_CSS}\n:host { ${defaults} }\n${css.replace(/:root/g, ':host')}`
+  return `${BASE_CSS}\n${MOBILE_CSS}\n:host { ${defaults} }\n${css.replace(/:root/g, ':host')}`
 }
 
 /** Screen's palette, from tokens. */
