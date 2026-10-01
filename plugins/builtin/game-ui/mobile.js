@@ -1,4 +1,7 @@
 /** Mobile controls own each pointer until release, cancellation, removal or page suspension. */
+import { makeTouchGestures } from './touch-gestures.js'
+import { drawTouchDebug } from './touch-debug.js'
+export { contactGesture } from './touch-gestures.js'
 
 /** A joystick's normalized position, with up positive, clamped to its circular radius. */
 export function joystickPosition(rect, x, y) {
@@ -9,25 +12,21 @@ export function joystickPosition(rect, x, y) {
   return { x: horizontal / length, y: vertical / length }
 }
 
-/** A short, stationary contact is a tap; a sufficiently long movement is a swipe. */
-export function contactGesture(start, end) {
-  const x = end.x - start.x
-  const y = end.y - start.y
-  const distance = Math.hypot(x, y)
-  const duration = end.time - start.time
-  if (distance <= 12 && duration <= 350) return { type: 'tap', x: end.x, y: end.y }
-  if (distance < 40 || duration > 700) return null
-  const horizontal = x < 0 ? 'left' : 'right'
-  const vertical = y < 0 ? 'up' : 'down'
-  return { type: 'swipe', direction: Math.abs(x) >= Math.abs(y) ? horizontal : vertical, x, y }
-}
-
 /** Attach mobile kit controls to a panel; return release and disposal hooks for its lifecycle. */
 export function watchMobile(root, input, report) {
   const contacts = new Map()
+  const areas = new Map()
   const controller = new AbortController()
   const options = { signal: controller.signal }
   const point = event => ({ x: event.clientX, y: event.clientY, time: event.timeStamp })
+
+  function area(control) {
+    if (!areas.has(control)) areas.set(control, makeTouchGestures({
+      report: value => report({ action: control.dataset.action, value, kind: 'gesture', type: value.type, x: value.x || 0, y: value.y || 0 }),
+      draw: snapshot => drawTouchDebug(control, snapshot)
+    }))
+    return areas.get(control)
+  }
 
   function release(contact) {
     for (const action of contact.held) input?.releaseAction(action, contact.source)
@@ -61,7 +60,8 @@ export function watchMobile(root, input, report) {
   function press(event) {
     const control = event.target.closest?.('[data-mobile]')
     if (!control || control.hasAttribute('data-disabled') || event.button > 0) return
-    if ([...contacts.values()].some(contact => contact.control === control)) return
+    if (control.dataset.mobile !== 'gesture' && [...contacts.values()].some(contact => contact.control === control)) return
+    if (control.dataset.mobile === 'gesture' && !area(control).down(event.pointerId, point(event))) return
     event.preventDefault()
     const source = `panel:${root.host.dataset.gameUi}:${[...root.querySelectorAll('[data-mobile]')].indexOf(control)}`
     const contact = { control, source, held: new Set(), start: point(event), last: event, kind: control.dataset.mobile }
@@ -78,6 +78,7 @@ export function watchMobile(root, input, report) {
     event.preventDefault()
     contact.last = event
     if (contact.kind === 'joystick') moveStick(contact, event)
+    if (contact.kind === 'gesture') area(contact.control).move(event.pointerId, point(event))
   }
 
   function end(event) {
@@ -86,13 +87,12 @@ export function watchMobile(root, input, report) {
     contacts.delete(event.pointerId)
     release(contact)
     if (contact.control.hasPointerCapture?.(event.pointerId)) contact.control.releasePointerCapture(event.pointerId)
-    if (event.type !== 'pointerup' || contact.kind !== 'gesture') return
-    const gesture = contactGesture(contact.start, point(event))
-    if (gesture) report({ action: contact.control.dataset.action, value: gesture, kind: 'gesture', type: gesture.type, x: event.clientX, y: event.clientY })
+    if (contact.kind === 'gesture') area(contact.control).up(event.pointerId, point(event), event.type === 'pointerup' ? 'release' : 'cancel')
   }
 
   function cancel() {
-    for (const [pointerId, contact] of [...contacts]) end({ pointerId, type: 'pointercancel' })
+    for (const [pointerId] of [...contacts]) end({ pointerId, type: 'pointercancel' })
+    for (const recognizer of areas.values()) recognizer.cancel()
   }
 
   function reconcile() {
@@ -105,12 +105,20 @@ export function watchMobile(root, input, report) {
     }
   }
 
+  const restore = () => {
+    reconcile()
+    for (const [control, recognizer] of areas) {
+      if (!root.contains(control)) { recognizer.cancel(); areas.delete(control); continue }
+      recognizer.paint()
+    }
+  }
+
   root.addEventListener('pointerdown', press, options)
   root.addEventListener('pointermove', move, options)
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) root.addEventListener(type, end, options)
   globalThis.window?.addEventListener?.('blur', cancel, options)
   globalThis.document?.addEventListener?.('visibilitychange', () => { if (document.hidden) cancel() }, options)
-  return { cancel, reconcile, dispose() { cancel(); controller.abort() } }
+  return { cancel, reconcile: restore, dispose() { cancel(); areas.clear(); controller.abort() } }
 }
 
 /** Mobile controls take only their own hit areas and leave the rest of the game reachable. */
@@ -122,5 +130,6 @@ export const MOBILE_CSS = `
 .ui-action-button { min-width:64px; min-height:64px; border-radius:50%; border:2px solid #ffffff90; background:#254565dd; color:white; font:600 16px system-ui }
 .ui-action-button[data-held] { background:#437b9e }
 .ui-mobile[data-disabled] { opacity:.4; pointer-events:none }
-.ui-gesture-area { min-width:44px; min-height:44px }
+.ui-gesture-area { position:relative; min-width:44px; min-height:44px }
+.ui-touch-debug { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:hidden }
 `

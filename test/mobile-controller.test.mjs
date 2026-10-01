@@ -73,12 +73,12 @@ test('a UI patch cannot erase held feedback or leave disabled controls pressed',
   mobile.dispose()
 })
 
-test('cancellation emits no gesture and disposal releases an active button', () => {
+test('cancellation emits no tap and disposal releases an active button', () => {
   const { input, mobile, control, fire, reports } = fixture()
   const gesture = control('gesture')
   fire('pointerdown', gesture, 1)
   fire('pointercancel', gesture, 1)
-  assert.deepEqual(reports, [])
+  assert.deepEqual(reports.map(report => report.type), ['cancel'])
   const button = control('button')
   fire('pointerdown', button, 2)
   mobile.dispose()

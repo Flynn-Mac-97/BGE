@@ -26,6 +26,6 @@ New builds have content-versioned caches. Close all windows of an older app befo
 
 ## Device checks
 
-On the real iPad, test a joystick plus a second-finger action, release outside a control, rotate the device, background and restore Safari, and hide the controls while holding them. Test tap/swipe, screen-edge safe areas, audio after the start tap, Home Screen launch and an offline relaunch. Browser automation checks behavior, but cannot certify Safari performance or system gestures.
+On the real iPad, test a joystick plus a second-finger action, release outside a control, rotate the device, background and restore Safari, and hide the controls while holding them. Test tap, double tap, hold, drag, swipe and two-finger pinch/rotate/pan. Enable `gestureArea` with `debug: true` to inspect persistent trails, direction, distance and contact markers. Test screen-edge safe areas, audio after the start tap, Home Screen launch and an offline relaunch. Browser automation checks behavior, but cannot certify Safari performance or system gestures.
 
 The exported player applies `device.pixelRatio` to the renderer (clamped by the renderer to 1–2). Set it to 1 for a lightweight mobile demo. A ratio of 2 draws four times as many pixels at the same CSS size. The UI keeps its CSS resolution and touch coordinates when this value changes.
