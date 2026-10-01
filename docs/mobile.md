@@ -45,3 +45,10 @@ CSS text and SVG debug paths retain device-resolution sharpness independently of
 `kit.spellBar(spells, { label: 'Spells', radius: 64 })` builds a persistent wheel for named input actions. Each spell has a label, action, remaining cooldown, total cooldown and optional disabled state. Read `input.pressed(action)` for one cast per press; enforce costs and cooldowns in simulation as well as disabling unavailable buttons. Use four spells at the default radius; increase radius for more entries to keep targets separate.
 
 Compose it with `kit.joystick` (custom direction action names for a second aim stick), `kit.bar` for health/energy, `kit.pips` for charges, and ordinary buttons for pause, heal and reset. Keep gameplay controls captured independently. The mobile-playground UI controls exercise shows only the kit components and touch feedback, using default plugin styling. It has no character, arena, combat simulation or effects. Its portrait layout stacks the central sticks above the right spell wheel; landscape places them side by side. Static example markup is cached until a UI setting changes; do not rebuild an entire panel for animated movement.
+
+
+## Renderer selection
+
+Exported players read `render.backend` from the packaged game before renderer creation. `webgpu` (also the absent-setting default) prefers WebGPU and lets Three.js fall back to WebGL 2 if initialization is unavailable. `webgl` explicitly selects WebGL 2. Saved editor/backend settings do not override a packaged player's selection, including after an APK update.
+
+The demo performance strip reports the actual initialized backend. `WebGL 2 (fallback)` means its WebGPU preference could not be used on that runtime. The strip measures engine frames and browser refresh callbacks; it does not claim hardware display frequency. WebGPU support must be checked in the phone's Android System WebView, independently of Chrome support.

@@ -106,13 +106,16 @@ if (!uniformBufferLimit.forcedBoneTexture) {
 /**
  * Whether the project asked for the WebGL backend.
  *
- * Off unless stored as 'true': WebGPU is the default, and three falls back to
+ * An explicit player preference wins over stored editor settings.
+ * Otherwise off unless stored as 'true': WebGPU is the default; three falls back to
  * WebGL by itself where the browser has no WebGPU. A shader written only in
  * GLSL needs WebGL; one also written in TSL draws on either. Written by
  * `glsl.forceWebGL` and by the Render plugin's `backend`, and read here because
  * the backend is chosen during init, before any plugin has loaded.
  */
-function wantsWebGL() {
+function wantsWebGL(preference) {
+  if (preference === 'webgl') return true
+  if (preference === 'webgpu') return false
   if (typeof localStorage === 'undefined') return false
   try {
     return localStorage.getItem('engine.forceWebGL') === 'true'
@@ -281,7 +284,7 @@ export async function makeRenderer(canvas, view, viewport, options = {}) {
           // Raw GLSL is inserted into the shader three generates, and the WebGPU
           // backend generates WGSL, so a project drawing GLSL-only shaders asks for
           // WebGL. Read here because the backend is chosen once, during init.
-          forceWebGL: wantsWebGL()
+          forceWebGL: wantsWebGL(options.backend)
         }))
   if (headless) {
     // The counters survive both passes in a drawing world; a headless one still

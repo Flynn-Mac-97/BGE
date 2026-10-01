@@ -135,6 +135,7 @@ async function play() {
     loadPlugins: findPlugins,
     importProjectFile,
     async attachScreen(worldContext) {
+      const game = JSON.parse(await worldContext.files.read('game.json'))
       const screen = mountScreen(root, worldContext.device)
       worldContext.ui = { mount: screen.regions.mount, unmount: screen.regions.unmount, regions: screen.regions.names }
       worldContext.shell = {
@@ -147,7 +148,8 @@ async function play() {
         focused: true
       }
       worldContext.renderer = await makeRenderer(screen.canvas, worldContext.view, worldContext.viewport, {
-        bus: worldContext.bus
+        bus: worldContext.bus,
+        backend: game.render?.backend === 'webgl' ? 'webgl' : 'webgpu'
       })
       worldContext.renderer.setPixelRatio(worldContext.device.pixelRatio)
       worldContext.renderer.resize()
