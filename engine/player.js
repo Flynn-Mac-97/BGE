@@ -148,6 +148,7 @@ async function play() {
       worldContext.renderer = await makeRenderer(screen.canvas, worldContext.view, worldContext.viewport, {
         bus: worldContext.bus
       })
+      worldContext.renderer.setPixelRatio(worldContext.device.pixelRatio)
       worldContext.renderer.resize()
     }
   })

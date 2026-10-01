@@ -21,3 +21,5 @@ context.gameUi.show('controls', {
 Pointer capture keeps a hold alive outside its original hit area. Pointer cancellation, lost capture, hidden pages, window blur, panel removal, disabled controls and level changes release held inputs. Hiding a panel releases immediately, including one with a leave animation.
 
 Style `.ui-mobile-controls`, `.ui-joystick`, `.ui-joystick-thumb`, `.ui-action-button` and `.ui-gesture-area` in the game's theme. Control targets are at least 44 CSS pixels; the default action button is 64. The layout respects safe-area insets. Touch-action suppression applies only to these controls. Pinch/rotate and analog sticks are not part of this version.
+
+An HTML refresh restores each active control's held appearance after patching the DOM. Keep pointer feedback immediate; do not animate the joystick thumb toward the finger. For earlier engagement in a game, lower the joystick's `deadZone` rather than changing the input clock.

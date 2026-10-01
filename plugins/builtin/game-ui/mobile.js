@@ -98,7 +98,10 @@ export function watchMobile(root, input, report) {
   function reconcile() {
     for (const [pointerId, contact] of [...contacts]) {
       if (!root.contains(contact.control) || contact.control.hasAttribute('data-disabled')) end({ pointerId, type: 'pointercancel' })
-      else if (contact.kind === 'joystick') moveStick(contact, contact.last)
+      else {
+        contact.control.setAttribute('data-held', '')
+        if (contact.kind === 'joystick') moveStick(contact, contact.last)
+      }
     }
   }
 
