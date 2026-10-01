@@ -77,6 +77,17 @@ const field = (label, control) =>
   tag('label', { class: 'ui-field' }, tag('span', { class: 'ui-field-label' }, escapeHtml(label)) + control)
 
 const components = {
+  /** A persistent touch spell wheel; each named action uses independent pointer ownership. */
+  spellBar: (spells, { label = 'Spells', radius = 64 } = {}) => {
+    const distance = Math.max(64, Number(radius) || 64)
+    const size = distance * 2 + 64
+    const slots = spells.map((spell, index) => {
+      const angle = index / Math.max(1, spells.length) * Math.PI * 2 - Math.PI / 2
+      const button = components.actionButton(spell.label, { action: spell.action, isDisabled: spell.isDisabled || spell.remaining > 0 })
+      return tag('div', { class: 'ui-spell-slot', style: `left:${size / 2 + Math.cos(angle) * distance}px;top:${size / 2 + Math.sin(angle) * distance}px` }, components.cooldown(button, { remaining: spell.remaining ?? 0, total: spell.total ?? 1 }))
+    }).join('')
+    return tag('div', { class: 'ui-spell-bar', role: 'group', 'aria-label': label, style: `width:${size}px;height:${size}px` }, tag('span', { class: 'ui-spell-centre' }, escapeHtml(label)) + slots)
+  },
   mobileControls: children => tag('div', { class: 'ui-mobile-controls' }, join(children)),
   joystick: ({ label = 'Move', left = 'left', right = 'right', up = 'up', down = 'down', deadZone = 0.2, isDisabled = false } = {}) =>
     tag('div', { class: 'ui-mobile ui-joystick', 'data-mobile': 'joystick', 'data-directions': JSON.stringify({ left, right, up, down }), 'data-dead-zone': Math.min(0.9, Math.max(0.05, Number(deadZone) || 0.2)), 'data-disabled': isDisabled, 'aria-label': label, role: 'group' }, tag('span', { class: 'ui-joystick-thumb' })),

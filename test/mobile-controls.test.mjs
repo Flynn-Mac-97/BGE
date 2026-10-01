@@ -76,3 +76,15 @@ test('full-screen fit is opt-in and keeps a declared reference size', () => {
   assert.equal(device.width, 390)
   assert.equal(device.height, 844)
 })
+
+test('spell bars preserve action ownership, accessible labels and cooldown disabling', () => {
+  const html = kit.spellBar([
+    { label: '<Flare>', action: 'flare', remaining: 0 },
+    { label: 'Ward', action: 'ward', remaining: 2, total: 3 }
+  ])
+  assert.match(html, /aria-label="&lt;Flare&gt;"/)
+  assert.match(html, /data-action="flare"/)
+  assert.match(html, /data-action="ward" data-disabled disabled/)
+  assert.match(html, /class="ui-cooldown" data-cooling/)
+  assert.equal((html.match(/data-mobile="button"/g) || []).length, 2)
+})

@@ -125,6 +125,10 @@ export function watchMobile(root, input, report) {
 /** Mobile controls take only their own hit areas and leave the rest of the game reachable. */
 export const MOBILE_CSS = `
 .ui-mobile { pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none }
+.ui-spell-bar { position:relative; pointer-events:none }
+.ui-spell-slot { position:absolute; transform:translate(-50%,-50%); width:56px; height:56px }
+.ui-spell-slot .ui-action-button { width:56px; height:56px; min-width:56px; min-height:56px; padding:0; font-size:12px }
+.ui-spell-centre { position:absolute; inset:0; display:grid; place-items:center; font:600 11px system-ui; color:#aac8d7 }
 .ui-mobile-controls { position:absolute; inset:0; pointer-events:none; padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); box-sizing:border-box; display:flex; align-items:flex-end; justify-content:space-between; gap:20px }
 .ui-joystick { width:140px; height:140px; border:2px solid #ffffff70; border-radius:50%; background:#18243b99; display:grid; place-items:center }
 .ui-joystick-thumb { width:54px; height:54px; border-radius:50%; background:#d8eaffaa; pointer-events:none }

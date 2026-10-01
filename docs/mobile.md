@@ -38,3 +38,10 @@ Set `device.fit` to `"screen"` to fill the exported player's available screen in
 Gesture areas accept `feedback: 'pinch' | 'rotate' | 'pan' | 'drag' | 'transform'`. Put a `[data-touch-object]` child in the area. The engine sets its transform directly on pointer events and restores it after UI patches, bypassing the fixed-step wait for visual feedback. Gameplay reports still enter the fixed-step queue. Feedback is relative to the current gesture; pinch preview is clamped to 0.1–8 times. Do not animate this child's transform. Use an outer wrapper for a base transform.
 
 CSS text and SVG debug paths retain device-resolution sharpness independently of the 3D render pixel ratio. Debug trails can be disabled for normal play. The OS, WebView and display determine presentation frequency; immediate feedback does not guarantee 90/120 Hz or remove main-thread stalls.
+
+
+## Mobile HUD starter
+
+`kit.spellBar(spells, { label: 'Spells', radius: 64 })` builds a persistent wheel for named input actions. Each spell has a label, action, remaining cooldown, total cooldown and optional disabled state. Read `input.pressed(action)` for one cast per press; enforce costs and cooldowns in simulation as well as disabling unavailable buttons. Use four spells at the default radius; increase radius for more entries to keep targets separate.
+
+Compose it with `kit.joystick` (custom direction action names for a second aim stick), `kit.bar` for health/energy, `kit.pips` for charges, and ordinary buttons for pause, heal and reset. Keep gameplay controls captured independently. The mobile-playground Mobile HUD exercise demonstrates simultaneous movement, aim and casts, fixed-time cooldowns, energy regeneration and healing charges. Its portrait layout stacks the central sticks above the right spell wheel; landscape places them side by side.
