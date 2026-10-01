@@ -1,0 +1,759 @@
+[
+  {
+    "seed": 7,
+    "strategy": "ignore",
+    "cleared": 3,
+    "room": 4,
+    "phase": "defeat",
+    "owned": 4,
+    "seconds": 0,
+    "rooms": [
+      {
+        "room": 1,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": [
+          "venom",
+          "stone",
+          "salve"
+        ]
+      },
+      {
+        "room": 2,
+        "outcome": "reward",
+        "health": 9,
+        "cycles": 4,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": [
+          "stone",
+          "echo",
+          "hungryTooth"
+        ]
+      },
+      {
+        "room": 3,
+        "outcome": "reward",
+        "health": 5,
+        "cycles": 5,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": [
+          "sprig",
+          "dagger",
+          "banner"
+        ]
+      },
+      {
+        "room": 4,
+        "outcome": "defeat",
+        "health": 0,
+        "cycles": 4,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": []
+      }
+    ]
+  },
+  {
+    "seed": 7,
+    "strategy": "build",
+    "cleared": 12,
+    "room": 13,
+    "phase": "battle",
+    "owned": 17,
+    "seconds": 12,
+    "rooms": [
+      {
+        "room": 1,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": [
+          "venom",
+          "stone",
+          "salve"
+        ]
+      },
+      {
+        "room": 2,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger",
+          "venom"
+        ],
+        "choices": [
+          "stone",
+          "echo",
+          "hungryTooth"
+        ]
+      },
+      {
+        "room": 3,
+        "outcome": "reward",
+        "health": 9,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom"
+        ],
+        "choices": [
+          "sprig",
+          "dagger",
+          "banner"
+        ]
+      },
+      {
+        "room": 4,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth"
+        ],
+        "choices": [
+          "sprig",
+          "echo",
+          "buckler"
+        ]
+      },
+      {
+        "room": 5,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth"
+        ],
+        "choices": [
+          "buckler",
+          "hungryTooth",
+          "bloodCup"
+        ]
+      },
+      {
+        "room": 6,
+        "outcome": "reward",
+        "health": 10,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth"
+        ],
+        "choices": [
+          "banner",
+          "salt",
+          "tooth"
+        ]
+      },
+      {
+        "room": 7,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "buckler",
+          "banner",
+          "salve"
+        ],
+        "choices": [
+          "salve",
+          "sword",
+          "banner"
+        ]
+      },
+      {
+        "room": 8,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "buckler",
+          "banner",
+          "salve"
+        ],
+        "choices": [
+          "banner",
+          "tooth",
+          "sword"
+        ]
+      },
+      {
+        "room": 9,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 5,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "buckler",
+          "banner",
+          "salve"
+        ],
+        "choices": [
+          "sprig",
+          "sword",
+          "salve"
+        ]
+      },
+      {
+        "room": 10,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 5,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "buckler",
+          "banner",
+          "salve"
+        ],
+        "choices": [
+          "bloodCup",
+          "banner",
+          "dagger"
+        ]
+      },
+      {
+        "room": 11,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 5,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "buckler",
+          "banner",
+          "salve"
+        ],
+        "choices": [
+          "hungryTooth",
+          "sprig",
+          "venom"
+        ]
+      },
+      {
+        "room": 12,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 6,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "buckler",
+          "banner",
+          "salve"
+        ],
+        "choices": [
+          "hungryTooth",
+          "tooth",
+          "stone"
+        ]
+      }
+    ]
+  },
+  {
+    "seed": 19,
+    "strategy": "build",
+    "cleared": 12,
+    "room": 13,
+    "phase": "battle",
+    "owned": 17,
+    "seconds": 20,
+    "rooms": [
+      {
+        "room": 1,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": [
+          "venom",
+          "stone",
+          "salve"
+        ]
+      },
+      {
+        "room": 2,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger",
+          "venom"
+        ],
+        "choices": [
+          "stone",
+          "dagger",
+          "echo"
+        ]
+      },
+      {
+        "room": 3,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger"
+        ],
+        "choices": [
+          "tooth",
+          "dagger",
+          "echo"
+        ]
+      },
+      {
+        "room": 4,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 2,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve"
+        ],
+        "choices": [
+          "bloodCup",
+          "buckler",
+          "banner"
+        ]
+      },
+      {
+        "room": 5,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve"
+        ],
+        "choices": [
+          "venom",
+          "sprig",
+          "tooth"
+        ]
+      },
+      {
+        "room": 6,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve"
+        ],
+        "choices": [
+          "tooth",
+          "bloodCup",
+          "hungryTooth"
+        ]
+      },
+      {
+        "room": 7,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve",
+          "tooth",
+          "dagger"
+        ],
+        "choices": [
+          "stone",
+          "sword",
+          "bloodCup"
+        ]
+      },
+      {
+        "room": 8,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve",
+          "tooth",
+          "dagger"
+        ],
+        "choices": [
+          "stone",
+          "bloodCup",
+          "buckler"
+        ]
+      },
+      {
+        "room": 9,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve",
+          "tooth",
+          "dagger"
+        ],
+        "choices": [
+          "venom",
+          "echo",
+          "banner"
+        ]
+      },
+      {
+        "room": 10,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve",
+          "tooth",
+          "dagger",
+          "banner"
+        ],
+        "choices": [
+          "echo",
+          "salve",
+          "sword"
+        ]
+      },
+      {
+        "room": 11,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve",
+          "tooth",
+          "dagger",
+          "banner"
+        ],
+        "choices": [
+          "echo",
+          "salt",
+          "dagger"
+        ]
+      },
+      {
+        "room": 12,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "dagger",
+          "tooth",
+          "salve",
+          "tooth",
+          "dagger",
+          "banner",
+          "salt"
+        ],
+        "choices": [
+          "tooth",
+          "sword",
+          "sprig"
+        ]
+      }
+    ]
+  },
+  {
+    "seed": 41,
+    "strategy": "build",
+    "cleared": 12,
+    "room": 13,
+    "phase": "battle",
+    "owned": 17,
+    "seconds": 18,
+    "rooms": [
+      {
+        "room": 1,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger"
+        ],
+        "choices": [
+          "venom",
+          "stone",
+          "salve"
+        ]
+      },
+      {
+        "room": 2,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 2,
+        "equipped": [
+          "dagger",
+          "venom"
+        ],
+        "choices": [
+          "stone",
+          "sprig",
+          "banner"
+        ]
+      },
+      {
+        "room": 3,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig"
+        ],
+        "choices": [
+          "venom",
+          "salt",
+          "tooth"
+        ]
+      },
+      {
+        "room": 4,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve"
+        ],
+        "choices": [
+          "sprig",
+          "tooth",
+          "salt"
+        ]
+      },
+      {
+        "room": 5,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve"
+        ],
+        "choices": [
+          "bloodCup",
+          "echo",
+          "tooth"
+        ]
+      },
+      {
+        "room": 6,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve"
+        ],
+        "choices": [
+          "bloodCup",
+          "sprig",
+          "echo"
+        ]
+      },
+      {
+        "room": 7,
+        "outcome": "reward",
+        "health": 11,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve",
+          "dagger"
+        ],
+        "choices": [
+          "bloodCup",
+          "echo",
+          "venom"
+        ]
+      },
+      {
+        "room": 8,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve",
+          "dagger"
+        ],
+        "choices": [
+          "banner",
+          "tooth",
+          "hungryTooth"
+        ]
+      },
+      {
+        "room": 9,
+        "outcome": "reward",
+        "health": 10,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve",
+          "dagger",
+          "banner"
+        ],
+        "choices": [
+          "dagger",
+          "bloodCup",
+          "buckler"
+        ]
+      },
+      {
+        "room": 10,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 3,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve",
+          "dagger",
+          "banner",
+          "dagger"
+        ],
+        "choices": [
+          "stone",
+          "tooth",
+          "hungryTooth"
+        ]
+      },
+      {
+        "room": 11,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve",
+          "dagger",
+          "banner",
+          "dagger",
+          "tooth"
+        ],
+        "choices": [
+          "salt",
+          "echo",
+          "bloodCup"
+        ]
+      },
+      {
+        "room": 12,
+        "outcome": "reward",
+        "health": 12,
+        "cycles": 4,
+        "equipped": [
+          "dagger",
+          "venom",
+          "sprig",
+          "tooth",
+          "salve",
+          "dagger",
+          "banner",
+          "dagger",
+          "tooth",
+          "salt"
+        ],
+        "choices": [
+          "hungryTooth",
+          "stone",
+          "bloodCup"
+        ]
+      }
+    ]
+  }
+]

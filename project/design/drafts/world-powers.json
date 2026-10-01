@@ -1,0 +1,691 @@
+{
+  "id": "draft-world-powers",
+  "title": "08 / WORLD POWERS — families, effects & looting (rough)",
+  "nodes": [
+    {
+      "id": "world",
+      "kind": "note",
+      "text": "WORLD’S POWERS\nFive provisional families\nSources → practices",
+      "at": [
+        680,
+        0
+      ],
+      "w": 300
+    },
+    {
+      "id": "growth",
+      "kind": "note",
+      "text": "EARTH & GROWTH\nEarth-elemental power\nOrganic life and spirits\nPhilosophy: growth",
+      "at": [
+        0,
+        220
+      ],
+      "w": 300
+    },
+    {
+      "id": "growth-practices",
+      "kind": "note",
+      "text": "NATURE PRACTICES\nNature weaving\nHerbal potions & poisons\nMending & healing\nAuras through relics / totems",
+      "at": [
+        0,
+        490
+      ],
+      "w": 300
+    },
+    {
+      "id": "combat",
+      "kind": "note",
+      "text": "MARTIAL / COMBAT\nSkill and strength\nTraining and weaponry\nBloody, brutal fighting",
+      "at": [
+        340,
+        220
+      ],
+      "w": 300
+    },
+    {
+      "id": "combat-practices",
+      "kind": "note",
+      "text": "MARTIAL PRACTICES\nBlades & hand-to-hand\nHammers & heavy force\nBows & ranged skill\nWarriors and archers",
+      "at": [
+        340,
+        490
+      ],
+      "w": 300
+    },
+    {
+      "id": "scholarship",
+      "kind": "note",
+      "text": "SCHOLARSHIP / SCIENCE\nKnowledge and experiment\nMathematics\nWealth & influence enable access",
+      "at": [
+        680,
+        220
+      ],
+      "w": 300
+    },
+    {
+      "id": "scholarship-practices",
+      "kind": "note",
+      "text": "SCHOLARLY PRACTICES\nChemistry & alchemy\nElectricity\nRatios, patterns & prediction\nResearch, equipment & expertise",
+      "at": [
+        680,
+        490
+      ],
+      "w": 300
+    },
+    {
+      "id": "hunger",
+      "kind": "note",
+      "text": "DARK / HUNGER\nHuman impulses\nOutside entities\nPower with appetite",
+      "at": [
+        1020,
+        220
+      ],
+      "w": 300
+    },
+    {
+      "id": "hunger-practices",
+      "kind": "note",
+      "text": "DARK PRACTICES\nVampirism & hunger\nCurses: slow, powerful payoff\nGreat enemy harm / self benefit\nManipulation remains possible",
+      "at": [
+        1020,
+        490
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging",
+      "kind": "note",
+      "text": "SCAVENGING / COLLECTION\nResourcefulness\nRecognise overlooked value\nLuck is optional",
+      "at": [
+        1360,
+        220
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging-practices",
+      "kind": "note",
+      "text": "SCAVENGER PRACTICES\nSalvage goods from junk\nAppraise rarity & collect\nManage packs and storage\nFull-height grid growth to right",
+      "at": [
+        1360,
+        490
+      ],
+      "w": 300
+    },
+    {
+      "id": "overlaps",
+      "kind": "note",
+      "text": "SHARED GROUND\nAlchemy bridges nature and scholarship. Items can combine families.\nStorage is available across all families; scavengers specialise in it.\nNames, access to power and exact rules remain open.",
+      "at": [
+        330,
+        1130
+      ],
+      "w": 1000
+    },
+    {
+      "id": "growth-grid-idea",
+      "kind": "note",
+      "text": "GRID IDEA · GROWTH\nTotem empowers touching herbs.\nHerb → mortar → potion.\nPotion coats a neighbouring blade or heals its wielder.",
+      "at": [
+        0,
+        820
+      ],
+      "w": 300
+    },
+    {
+      "id": "combat-grid-idea",
+      "kind": "note",
+      "text": "GRID IDEA · COMBAT\nWhetstone empowers a touching blade.\nBlade strikes → shield reacts.\nBow gains preparation from an adjacent quiver.",
+      "at": [
+        340,
+        820
+      ],
+      "w": 300
+    },
+    {
+      "id": "scholarship-grid-idea",
+      "kind": "note",
+      "text": "GRID IDEA · SCHOLARSHIP\nReagent → catalyst → mixture.\nCoil transfers charge to a linked tool.\nRatios or grid patterns could boost a recipe.",
+      "at": [
+        680,
+        820
+      ],
+      "w": 300
+    },
+    {
+      "id": "hunger-grid-idea",
+      "kind": "note",
+      "text": "GRID IDEA · HUNGER\nCurse gathers pressure in a vessel.\nA blade feeds it through draining.\nRelease stored power as enemy harm or a self boon.",
+      "at": [
+        1020,
+        820
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging-grid-idea",
+      "kind": "note",
+      "text": "GRID IDEA · SCAVENGING\nSorter reveals value in junk.\nPack adds full-height columns to the right.\nChains cross the new boundary.",
+      "at": [
+        1360,
+        820
+      ],
+      "w": 300
+    },
+    {
+      "id": "effect-title",
+      "kind": "text",
+      "text": "SHARED EFFECT TYPES · what an item changes\nFamilies give flavour; any item can combine these behaviours.",
+      "at": [
+        330,
+        1380
+      ],
+      "w": 1000
+    },
+    {
+      "id": "effect-act",
+      "kind": "note",
+      "text": "ACT\nDamage, heal, mend, guard.\nTargets a crew member, enemy or item.\nExample: potion restores health; kit repairs gear.",
+      "at": [
+        0,
+        1510
+      ],
+      "w": 300
+    },
+    {
+      "id": "effect-modify",
+      "kind": "note",
+      "text": "MODIFY\nEmpower, weaken, cleanse, apply a status.\nDuration / stacks need limits.\nExample: oil empowers one blade use; curse builds pressure.",
+      "at": [
+        340,
+        1510
+      ],
+      "w": 300
+    },
+    {
+      "id": "effect-supply",
+      "kind": "note",
+      "text": "PRODUCE / CONVERT\nCreate supply; turn ingredients into another resource.\nExample: herb + bottle → potion.\nInputs are spent; output needs room.",
+      "at": [
+        680,
+        1510
+      ],
+      "w": 300
+    },
+    {
+      "id": "effect-route",
+      "kind": "note",
+      "text": "TRANSFER / STORE\nSend charges or resources to another item; keep them for later.\nExample: coil → battery → tool.\nCapacity limits the stored amount.",
+      "at": [
+        1020,
+        1510
+      ],
+      "w": 300
+    },
+    {
+      "id": "effect-space",
+      "kind": "note",
+      "text": "SPACE / ACCESS\nExpand grid space, reveal properties or unlock access.\nPack adds right columns; lens appraises loot; a tool opens a container.",
+      "at": [
+        1360,
+        1510
+      ],
+      "w": 300
+    },
+    {
+      "id": "grid-targeting",
+      "kind": "note",
+      "text": "GRID CONNECTIONS · options\nTouching neighbour, facing direction, row or linked item.\nSockets hold modifiers; an aura reaches a defined area.\nEach item shows its targets. Exact ranges stay open.",
+      "at": [
+        0,
+        1840
+      ],
+      "w": 520
+    },
+    {
+      "id": "grid-triggering",
+      "kind": "note",
+      "text": "WHEN IT RUNS · separate from effect\nRound start, use, hit or reaction in combat.\nDiscover loot, inspect, collect, place or salvage outside combat.\nA passive aura applies while its condition holds. Each item names its trigger.",
+      "at": [
+        570,
+        1840
+      ],
+      "w": 520
+    },
+    {
+      "id": "grid-limits",
+      "kind": "note",
+      "text": "COSTS & LIMITS · proposals\nCharges, ingredients, storage capacity and per-event limits.\nPlayers choose valuable items before salvage.\nReceiving loot should not fire combat attacks.\nExact costs and automation remain open.",
+      "at": [
+        1140,
+        1840
+      ],
+      "w": 520
+    },
+    {
+      "id": "loot-title",
+      "kind": "text",
+      "text": "OUTSIDE COMBAT · LOOTING IDEAS\nDiscover → inspect → choose what to carry → place or salvage.\nFamilies offer different ways to use the same find.",
+      "at": [
+        330,
+        2160
+      ],
+      "w": 1000
+    },
+    {
+      "id": "growth-outside-loot",
+      "kind": "note",
+      "text": "GROWTH · ORGANIC FINDS\nFind herbs, seeds or organic remains.\nHerbal lens beside a find reveals its uses.\nMortar + herb → medicine or poison.\nPlayer chooses the recipe; ingredients are spent.",
+      "at": [
+        0,
+        2300
+      ],
+      "w": 300
+    },
+    {
+      "id": "combat-outside-loot",
+      "kind": "note",
+      "text": "COMBAT · RECOVER GEAR\nFind worn weapons, armour and trophies.\nTool beside a sealed cache could spend a charge to open it.\nRepair kit + damaged loot → usable gear.\nKeep the item or salvage its materials.",
+      "at": [
+        340,
+        2300
+      ],
+      "w": 300
+    },
+    {
+      "id": "scholarship-outside-loot",
+      "kind": "note",
+      "text": "SCHOLARSHIP · ANALYSE\nFind reagents, mechanisms or strange devices.\nLens beside an unknown item reveals a property.\nReagent + assay tool → identified material.\nCould trade knowledge for safer choices.",
+      "at": [
+        680,
+        2300
+      ],
+      "w": 300
+    },
+    {
+      "id": "hunger-outside-loot",
+      "kind": "note",
+      "text": "HUNGER · CURSED FINDS\nFind tainted relics or bound remnants.\nVessel could collect a remnant.\nSeal beside cursed loot reveals or contains its burden.\nKeep, cleanse or sacrifice it: costs remain open.",
+      "at": [
+        1020,
+        2300
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging-outside-loot",
+      "kind": "note",
+      "text": "SCAVENGING · RECOGNISE VALUE\nFind goods among junk and dungeon debris.\nSorter beside selected junk → useful parts.\nAppraisal reveals a rare component.\nPack creates space; player chooses what deserves it.",
+      "at": [
+        1360,
+        2300
+      ],
+      "w": 300
+    },
+    {
+      "id": "loot-flow",
+      "kind": "note",
+      "text": "LOOT → GRID · possible first interaction\nSelect a find → inspect → choose Keep, Place or Salvage.\nExample: find herb + empty bottle → place beside mortar → brew → store potion.\nFull grid: rearrange, use a pack, leave a find or choose something to salvage.\nFeedback: show affected cells, preview result / cost, animate transfer, update quantities.\nDiscovery rules, rarity, sockets on found items and charges remain open.",
+      "at": [
+        330,
+        2660
+      ],
+      "w": 1000
+    },
+    {
+      "id": "card-study-title",
+      "kind": "text",
+      "text": "VISUAL ITEM CARDS · early concept\nArt + icon stats + rules + a small grid example.",
+      "at": [
+        1900,
+        0
+      ],
+      "w": 1500
+    },
+    {
+      "id": "card-study-image",
+      "kind": "image",
+      "text": "assets/concepts/item-card-study.png",
+      "at": [
+        1900,
+        120
+      ],
+      "w": 1500,
+      "h": 1000
+    },
+    {
+      "id": "card-study-layout",
+      "kind": "note",
+      "text": "CARD ANATOMY\n1. Name and family / item type.\n2. Large item illustration.\n3. Icon + value: damage, healing, charges, capacity.\n4. Trigger + effect + cost.\n5. Grid footprint and source → target example.\nKeep icons paired with words.",
+      "at": [
+        1900,
+        1240
+      ],
+      "w": 700
+    },
+    {
+      "id": "card-study-status",
+      "kind": "note",
+      "text": "DRAFT VALUES · OPEN FOR DISCUSSION\nDagger: 2 DMG, 1×2; left whetstone gives +2 next strike.\nBrew proposal: 2 HEAL, 1 charge, 1×1; herb + bottle + mortar recipe.\nPack proposal: 1×2; adds one full-height right column.\nFamily is a setting tag; it does not lock who can use an item.\nThis image is a design reference, separate from implemented rules.",
+      "at": [
+        2700,
+        1240
+      ],
+      "w": 700
+    },
+    {
+      "id": "card-study-icons",
+      "kind": "note",
+      "text": "ICON VOCABULARY · rough\nSword = damage. Heart = heal. Arrow = empower.\nCircular arrow = trigger. Cells = grid footprint. Gem = loot.\nBottle = charges. Expanded grid = capacity.\nLater: shield = guard, skull = curse, linked circles = socket.\nA stat row shows only the values relevant to that item.",
+      "at": [
+        1900,
+        1570
+      ],
+      "w": 1500
+    },
+    {
+      "id": "family-study-title",
+      "kind": "text",
+      "text": "FAMILY STUDIES · separate icon + editable details\nEach emblem can be moved independently. Expand the cards as we develop each family.",
+      "at": [
+        1900,
+        1900
+      ],
+      "w": 1500
+    },
+    {
+      "id": "family-study-emblems",
+      "kind": "note",
+      "text": "EMBLEM LANGUAGE · editable design notes\nEarth & Growth: rooted tree, leaves and stone; growth / organic / spiritual.\nMartial / Combat: crossed blade, hammer and arrow; skill / strength / ranged fighting.\nScholarship / Science: compass, flask and lightning; maths / chemistry / electricity.\nDark / Hunger: fanged chalice and blood drop; vampirism / hunger / delayed curses.\nScavenging / Collection: pack, rough shard and gem; salvage / value / carrying.\nNames stay provisional. Icons identify setting families; item use can cross families. Luck stays optional.",
+      "at": [
+        1900,
+        2770
+      ],
+      "w": 1500
+    },
+    {
+      "id": "family-detail-growth",
+      "kind": "note",
+      "text": "EARTH & GROWTH\nSource: earth, organic life and spirits.\nPhilosophy: growth.\nNature weaving; herbs, potions and poisons; healing and mending; totems and auras.",
+      "at": [
+        1910,
+        2430
+      ],
+      "w": 270
+    },
+    {
+      "id": "family-detail-combat",
+      "kind": "note",
+      "text": "MARTIAL / COMBAT\nSource: skill, strength and training.\nTraditional, bloody and brutal fighting.\nBlades and hand-to-hand; hammers and force; bows and ranged skill.",
+      "at": [
+        2210,
+        2430
+      ],
+      "w": 270
+    },
+    {
+      "id": "family-detail-scholarship",
+      "kind": "note",
+      "text": "SCHOLARSHIP / SCIENCE\nSource: knowledge and experiment.\nAlchemy, chemistry, electricity and mathematics.\nWealth and influence open access to tools, research and learning.",
+      "at": [
+        2510,
+        2430
+      ],
+      "w": 270
+    },
+    {
+      "id": "family-detail-hunger",
+      "kind": "note",
+      "text": "DARK / HUNGER\nSource: human impulses and outside entities.\nVampirism, hunger and curses.\nSlow payoff: great enemy harm or a powerful self boon.\nManipulation remains possible.",
+      "at": [
+        2810,
+        2430
+      ],
+      "w": 270
+    },
+    {
+      "id": "family-detail-scavenging",
+      "kind": "note",
+      "text": "SCAVENGING / COLLECTION\nSource: resourcefulness and an eye for value.\nSalvage, appraisal, rarity and collection.\nPacks and storage support the crew.\nLuck is optional.",
+      "at": [
+        3110,
+        2430
+      ],
+      "w": 270
+    },
+    {
+      "id": "family-frame-growth",
+      "kind": "group",
+      "text": "Earth & Growth",
+      "at": [
+        1900,
+        2030
+      ],
+      "w": 290,
+      "h": 630
+    },
+    {
+      "id": "family-icon-growth",
+      "kind": "image",
+      "text": "assets/concepts/family-icons/growth.png",
+      "at": [
+        1910,
+        2090
+      ],
+      "w": 270,
+      "h": 270
+    },
+    {
+      "id": "family-frame-combat",
+      "kind": "group",
+      "text": "Martial / Combat",
+      "at": [
+        2200,
+        2030
+      ],
+      "w": 290,
+      "h": 630
+    },
+    {
+      "id": "family-icon-combat",
+      "kind": "image",
+      "text": "assets/concepts/family-icons/combat.png",
+      "at": [
+        2210,
+        2090
+      ],
+      "w": 270,
+      "h": 270
+    },
+    {
+      "id": "family-frame-scholarship",
+      "kind": "group",
+      "text": "Scholarship / Science",
+      "at": [
+        2500,
+        2030
+      ],
+      "w": 290,
+      "h": 630
+    },
+    {
+      "id": "family-icon-scholarship",
+      "kind": "image",
+      "text": "assets/concepts/family-icons/scholarship.png",
+      "at": [
+        2510,
+        2090
+      ],
+      "w": 270,
+      "h": 270
+    },
+    {
+      "id": "family-frame-hunger",
+      "kind": "group",
+      "text": "Dark / Hunger",
+      "at": [
+        2800,
+        2030
+      ],
+      "w": 290,
+      "h": 630
+    },
+    {
+      "id": "family-icon-hunger",
+      "kind": "image",
+      "text": "assets/concepts/family-icons/hunger.png",
+      "at": [
+        2810,
+        2090
+      ],
+      "w": 270,
+      "h": 270
+    },
+    {
+      "id": "family-frame-scavenging",
+      "kind": "group",
+      "text": "Scavenging / Collection",
+      "at": [
+        3100,
+        2030
+      ],
+      "w": 290,
+      "h": 630
+    },
+    {
+      "id": "family-icon-scavenging",
+      "kind": "image",
+      "text": "assets/concepts/family-icons/scavenging.png",
+      "at": [
+        3110,
+        2090
+      ],
+      "w": 270,
+      "h": 270
+    }
+  ],
+  "edges": [
+    {
+      "from": "world",
+      "to": "growth"
+    },
+    {
+      "from": "growth",
+      "to": "growth-practices"
+    },
+    {
+      "from": "world",
+      "to": "combat"
+    },
+    {
+      "from": "combat",
+      "to": "combat-practices"
+    },
+    {
+      "from": "world",
+      "to": "scholarship"
+    },
+    {
+      "from": "scholarship",
+      "to": "scholarship-practices"
+    },
+    {
+      "from": "world",
+      "to": "hunger"
+    },
+    {
+      "from": "hunger",
+      "to": "hunger-practices"
+    },
+    {
+      "from": "world",
+      "to": "scavenging"
+    },
+    {
+      "from": "scavenging",
+      "to": "scavenging-practices"
+    },
+    {
+      "from": "growth-practices",
+      "to": "growth-grid-idea",
+      "text": "possible grid use"
+    },
+    {
+      "from": "combat-practices",
+      "to": "combat-grid-idea",
+      "text": "possible grid use"
+    },
+    {
+      "from": "scholarship-practices",
+      "to": "scholarship-grid-idea",
+      "text": "possible grid use"
+    },
+    {
+      "from": "hunger-practices",
+      "to": "hunger-grid-idea",
+      "text": "possible grid use"
+    },
+    {
+      "from": "scavenging-practices",
+      "to": "scavenging-grid-idea",
+      "text": "possible grid use"
+    },
+    {
+      "from": "effect-title",
+      "to": "effect-act"
+    },
+    {
+      "from": "effect-title",
+      "to": "effect-modify"
+    },
+    {
+      "from": "effect-title",
+      "to": "effect-supply"
+    },
+    {
+      "from": "effect-title",
+      "to": "effect-route"
+    },
+    {
+      "from": "effect-title",
+      "to": "effect-space"
+    },
+    {
+      "from": "loot-title",
+      "to": "growth-outside-loot"
+    },
+    {
+      "from": "loot-title",
+      "to": "combat-outside-loot"
+    },
+    {
+      "from": "loot-title",
+      "to": "scholarship-outside-loot"
+    },
+    {
+      "from": "loot-title",
+      "to": "hunger-outside-loot"
+    },
+    {
+      "from": "loot-title",
+      "to": "scavenging-outside-loot"
+    },
+    {
+      "from": "loot-title",
+      "to": "loot-flow",
+      "text": "choice & feedback"
+    },
+    {
+      "from": "card-study-title",
+      "to": "card-study-image"
+    },
+    {
+      "from": "card-study-image",
+      "to": "card-study-layout"
+    },
+    {
+      "from": "card-study-image",
+      "to": "card-study-status"
+    }
+  ]
+}

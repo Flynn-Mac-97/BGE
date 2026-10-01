@@ -1,0 +1,673 @@
+{
+  "title": "02 / COAT → STRIKE → REACT — one readable chain",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "02 / COAT → STRIKE → REACT — one readable chain",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    },
+    {
+      "id": "coat-frame",
+      "kind": "group",
+      "text": "1 / PREPARE — CELL 1",
+      "at": [
+        0,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "coat-stage",
+      "kind": "text",
+      "text": "Enemy 14 HP  |  Recruit 0 guard",
+      "at": [
+        16,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "coat-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        202,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        34,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        118,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        202,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        34,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        118,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        202,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "coat-caption",
+      "kind": "note",
+      "text": "Vial lifts and pours onto the dagger.\nA green charge stays on its slot.\nTarget: the blade immediately right.",
+      "at": [
+        16,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "coat-vial-foot",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "coat-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        37,
+        211
+      ],
+      "w": 74,
+      "colour": "#244636"
+    },
+    {
+      "id": "coat-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "coat-dagger",
+      "kind": "text",
+      "text": "Dagger\n1 × 2",
+      "at": [
+        121,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "coat-tooth-foot",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        202,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "coat-tooth",
+      "kind": "text",
+      "text": "Tooth",
+      "at": [
+        205,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "hit-frame",
+      "kind": "group",
+      "text": "2 / ACT — CELL 2",
+      "at": [
+        360,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "hit-stage",
+      "kind": "text",
+      "text": "Enemy 12 HP  |  Poison +2",
+      "at": [
+        376,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "hit-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        394,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        478,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        562,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        394,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        478,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        562,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        394,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        478,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        562,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "hit-caption",
+      "kind": "note",
+      "text": "Dagger lunges toward the enemy.\nShow −2 health, then +2 poison.\nConsume the vial’s prepared charge.",
+      "at": [
+        376,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "hit-vial-foot",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        394,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "hit-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        397,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "hit-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        478,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "hit-dagger",
+      "kind": "text",
+      "text": "Dagger\n1 × 2",
+      "at": [
+        481,
+        211
+      ],
+      "w": 74,
+      "colour": "#244636"
+    },
+    {
+      "id": "hit-tooth-foot",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        562,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "hit-tooth",
+      "kind": "text",
+      "text": "Tooth",
+      "at": [
+        565,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "react-frame",
+      "kind": "group",
+      "text": "3 / REACT — IMMEDIATELY",
+      "at": [
+        720,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "react-stage",
+      "kind": "text",
+      "text": "Enemy 12 HP  |  Recruit +2 guard",
+      "at": [
+        736,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "react-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        754,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        838,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        922,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        754,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        838,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        922,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        754,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        838,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        922,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "react-caption",
+      "kind": "note",
+      "text": "Tooth pops; a token flies to the recruit.\nIt heard an adjacent poisoned strike.\nReact once this round, then dim.",
+      "at": [
+        736,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "react-vial-foot",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        754,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "react-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        757,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "react-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        838,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "react-dagger",
+      "kind": "text",
+      "text": "Dagger\n1 × 2",
+      "at": [
+        841,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "react-tooth-foot",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        922,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "react-tooth",
+      "kind": "text",
+      "text": "Tooth",
+      "at": [
+        925,
+        211
+      ],
+      "w": 74,
+      "colour": "#4b4028"
+    },
+    {
+      "id": "footer",
+      "kind": "text",
+      "text": "SCAN: left → right, then next row. Dagger acts only at cell 2; cell 5 is its footprint. Tooth listens from round start. Poison ticks after item actions.",
+      "at": [
+        0,
+        590
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    }
+  ],
+  "edges": [
+    [
+      "coat-caption",
+      "hit-caption",
+      "next anchor"
+    ],
+    [
+      "hit-caption",
+      "react-caption",
+      "poisoned hit"
+    ]
+  ],
+  "id": "draft-02-coat-strike-react-one-readable-chain"
+}

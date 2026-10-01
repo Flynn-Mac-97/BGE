@@ -41,8 +41,8 @@ file, and nothing is saved anywhere else.
 - `plugins/` — everything is a plugin; each carries a short guide beside it.
   Keep a plugin under 400 lines: `--headless run plugin.sizes` names the ones
   that are over, and any missing a guide
-- `project/` — the open game, wherever its directory is; `project/agents/` has
-  the game's own rules. No game is in this repository
+- `project/` — the bundled Black Bell prototype, included at the user's request.
+  Other game directories can be opened with `--project <path>`.
 - `agent-runs/` — anything an agent makes: one folder per round, and the
   friction log. All of it is a working artifact and all of it can be deleted.
   Write your leftovers there, never at the root

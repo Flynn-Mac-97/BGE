@@ -1,0 +1,535 @@
+{
+  "title": "01 / PLACE ITEMS — footprints before commitment",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "01 / PLACE ITEMS — footprints before commitment",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    },
+    {
+      "id": "select-frame",
+      "kind": "group",
+      "text": "A / SELECT",
+      "at": [
+        0,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "select-stage",
+      "kind": "text",
+      "text": "RESERVE: tap Dagger (1 × 2)",
+      "at": [
+        16,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "select-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        202,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        34,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        118,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        202,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        34,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        118,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        202,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "select-caption",
+      "kind": "note",
+      "text": "The selected item stays raised.\nTap a cell to preview its whole footprint.",
+      "at": [
+        16,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "ghost-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "ghost",
+      "kind": "text",
+      "text": "Dagger\n1 × 2",
+      "at": [
+        121,
+        211
+      ],
+      "w": 74,
+      "colour": "#263f56"
+    },
+    {
+      "id": "fit-frame",
+      "kind": "group",
+      "text": "B / VALID PREVIEW",
+      "at": [
+        360,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "fit-stage",
+      "kind": "text",
+      "text": "Touch cell 2 → both cells fit",
+      "at": [
+        376,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "fit-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        394,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        478,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        562,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        394,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        478,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        562,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        394,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        478,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        562,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "fit-caption",
+      "kind": "note",
+      "text": "Cells 2 + 5 belong to ONE item.\nRelease to place; a small snap confirms it.",
+      "at": [
+        376,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "fit-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        478,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "fit-dagger",
+      "kind": "text",
+      "text": "Dagger\n1 × 2",
+      "at": [
+        481,
+        211
+      ],
+      "w": 74,
+      "colour": "#244636"
+    },
+    {
+      "id": "reject-frame",
+      "kind": "group",
+      "text": "C / INVALID PREVIEW",
+      "at": [
+        720,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "reject-stage",
+      "kind": "text",
+      "text": "Buckler (2 × 2) over occupied cells",
+      "at": [
+        736,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "reject-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        754,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        838,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        922,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        754,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        838,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        922,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        754,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        838,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        922,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "reject-caption",
+      "kind": "note",
+      "text": "Red footprint + “Occupied”.\nRelease leaves the layout unchanged.\nOff-grid placement uses the same response.",
+      "at": [
+        736,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "bad-buckler-foot",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        754,
+        187
+      ],
+      "w": 164,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "bad-buckler",
+      "kind": "text",
+      "text": "Buckler preview\nOVERLAPS DAGGER",
+      "at": [
+        757,
+        211
+      ],
+      "w": 158,
+      "colour": "#532e35"
+    },
+    {
+      "id": "footer",
+      "kind": "text",
+      "text": "TOUCH PROPOSAL: tap to select, tap to place; drag also previews. Keep the footprint above the finger. No effect fires while arranging.",
+      "at": [
+        0,
+        590
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    }
+  ],
+  "edges": [
+    [
+      "select-caption",
+      "fit-caption",
+      "fits"
+    ],
+    [
+      "fit-caption",
+      "reject-caption",
+      "try another item"
+    ]
+  ],
+  "id": "draft-01-place-items-footprints-before-commitment"
+}

@@ -1,0 +1,423 @@
+{
+  "id": "draft-04-item-tooltip-read-the-base-effect-and-what-changed",
+  "title": "04 / ITEM TOOLTIP — read the base effect and what changed",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "04 / ITEM TOOLTIP — read the base effect and what changed",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    },
+    {
+      "id": "inspect-frame",
+      "kind": "group",
+      "text": "TAP AN ITEM / PIN ITS TOOLTIP",
+      "at": [
+        0,
+        75
+      ],
+      "w": 320,
+      "h": 485,
+      "colour": "#181820"
+    },
+    {
+      "id": "inspect-stage",
+      "kind": "text",
+      "text": "Dagger selected — cells 2 + 5",
+      "at": [
+        16,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "inspect-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        202,
+        187
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        34,
+        263
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        118,
+        263
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        202,
+        263
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        34,
+        339
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        118,
+        339
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        202,
+        339
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#20202a"
+    },
+    {
+      "id": "inspect-caption",
+      "kind": "note",
+      "text": "Select an item to inspect it.\nKeep the selected footprint visible.\nTap outside or × to close.",
+      "at": [
+        16,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "inspect-vial-foot",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#30303c"
+    },
+    {
+      "id": "inspect-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        37,
+        211
+      ],
+      "w": 74,
+      "colour": "#244636"
+    },
+    {
+      "id": "inspect-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "h": 148,
+      "colour": "#30303c"
+    },
+    {
+      "id": "inspect-dagger",
+      "kind": "text",
+      "text": "Dagger\nselected",
+      "at": [
+        121,
+        211
+      ],
+      "w": 74,
+      "colour": "#263f56"
+    },
+    {
+      "id": "inspect-tooth-foot",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        202,
+        187
+      ],
+      "w": 80,
+      "h": 72,
+      "colour": "#30303c"
+    },
+    {
+      "id": "inspect-tooth",
+      "kind": "text",
+      "text": "Tooth",
+      "at": [
+        205,
+        211
+      ],
+      "w": 74,
+      "colour": "#4b4028"
+    },
+    {
+      "id": "plain-frame",
+      "kind": "group",
+      "text": "A / BEFORE PREPARATION",
+      "at": [
+        360,
+        75
+      ],
+      "w": 320,
+      "h": 485,
+      "colour": "#181820"
+    },
+    {
+      "id": "plain-name",
+      "kind": "text",
+      "text": "RUSTY DAGGER                 ×\nBlade · 1 × 2 cells",
+      "at": [
+        376,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "plain-base",
+      "kind": "note",
+      "text": "BASE EFFECT\nDeal 2 damage to the enemy.",
+      "at": [
+        376,
+        178
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "plain-time",
+      "kind": "note",
+      "text": "ACT · CELL 2\nOnce per round, when the scan reaches this item’s first cell.",
+      "at": [
+        376,
+        258
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "charged-frame",
+      "kind": "group",
+      "text": "B / AFTER THE VIAL POURS",
+      "at": [
+        720,
+        75
+      ],
+      "w": 320,
+      "h": 485,
+      "colour": "#181820"
+    },
+    {
+      "id": "charged-name",
+      "kind": "text",
+      "text": "RUSTY DAGGER                 ×\nBlade · 1 × 2 cells",
+      "at": [
+        736,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "charged-base",
+      "kind": "note",
+      "text": "BASE EFFECT\nDeal 2 damage to the enemy.",
+      "at": [
+        736,
+        178
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "charged-time",
+      "kind": "note",
+      "text": "ACT · CELL 2\nOnce per round, when the scan reaches this item’s first cell.",
+      "at": [
+        736,
+        258
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "plain-bonus",
+      "kind": "note",
+      "text": "BONUSES NOW\nNone.\nVenom vial at cell 1 will coat this blade before it acts.",
+      "at": [
+        376,
+        353
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "plain-next",
+      "kind": "note",
+      "text": "NEXT ATTACK PREVIEW\n2 damage + 2 poison if the vial prepares successfully.",
+      "at": [
+        376,
+        457
+      ],
+      "w": 288,
+      "colour": "#263f56"
+    },
+    {
+      "id": "charged-bonus",
+      "kind": "note",
+      "text": "PREPARED · VENOM ×1\nNext attack also applies 2 poison.\nFrom: Venom vial at cell 1.\nConsumed on hit; expires this round.",
+      "at": [
+        736,
+        353
+      ],
+      "w": 288,
+      "colour": "#244636"
+    },
+    {
+      "id": "charged-chain",
+      "kind": "note",
+      "text": "REACTION LINK\nTooth at cell 3 → +2 guard after this blade poisons the enemy.",
+      "at": [
+        736,
+        457
+      ],
+      "w": 288,
+      "colour": "#4b4028"
+    },
+    {
+      "id": "footer",
+      "kind": "text",
+      "text": "TOUCH: tap opens a pinned card; no hover needed. On a phone use a bottom sheet above the controls. Tap a source row to highlight that item. Proposed feedback; current combat values.",
+      "at": [
+        0,
+        590
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    },
+    {
+      "id": "approved-concept-frame",
+      "kind": "group",
+      "text": "APPROVED VISUAL DIRECTION · REFERENCE",
+      "at": [
+        1090,
+        0
+      ],
+      "w": 550,
+      "h": 945,
+      "colour": "#181820"
+    },
+    {
+      "id": "approved-concept",
+      "kind": "image",
+      "text": "concepts/tooltip-gothic.png",
+      "at": [
+        1110,
+        50
+      ],
+      "w": 510,
+      "h": 765
+    },
+    {
+      "id": "approved-concept-note",
+      "kind": "note",
+      "text": "Approved worn gothic tooltip: blackened metal, aged silver, painted items and bone text. Use this visual direction when art begins. This image is a Draft reference; the prototype uses placeholder geometry.",
+      "at": [
+        1110,
+        845
+      ],
+      "w": 510
+    },
+    {
+      "id": "implemented-interaction",
+      "kind": "note",
+      "text": "PROTOTYPE MECHANISM\nTap an equipped footprint to pin its compact inspector. Details expands while keeping the grid visible and holds the turn until closed. Move explicitly enables placement. Applied bonuses and predicted next-strike effects are separate. Tap bonus/source rows to highlight the linked pair. Vial pours; venom marker stays until the strike; tooth reacts once and sends guard to the recruit.",
+      "at": [
+        0,
+        675
+      ],
+      "w": 1040
+    }
+  ],
+  "edges": [
+    {
+      "from": "plain-bonus",
+      "to": "charged-bonus",
+      "text": "vial acts"
+    }
+  ]
+}

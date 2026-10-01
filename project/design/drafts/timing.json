@@ -1,0 +1,599 @@
+{
+  "title": "03 / TIMING — same blade, different potion position",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "03 / TIMING — same blade, different potion position",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    },
+    {
+      "id": "early-frame",
+      "kind": "group",
+      "text": "A / BEFORE THE ATTACK",
+      "at": [
+        0,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "early-stage",
+      "kind": "text",
+      "text": "Order: Vial 1 → Dagger 2",
+      "at": [
+        16,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "early-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        202,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        34,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        118,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        202,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        34,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        118,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        202,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "early-caption",
+      "kind": "note",
+      "text": "Vial at 1 prepares before the attack.\nDagger consumes venom: 2 damage + 2 poison.\nAn adjacent tooth can react.",
+      "at": [
+        16,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "early-vial-foot",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        34,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "early-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        37,
+        211
+      ],
+      "w": 74,
+      "colour": "#244636"
+    },
+    {
+      "id": "early-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        118,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "early-dagger",
+      "kind": "text",
+      "text": "Dagger\n1 × 2",
+      "at": [
+        121,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "late-frame",
+      "kind": "group",
+      "text": "B / AFTER THE ATTACK",
+      "at": [
+        360,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "late-stage",
+      "kind": "text",
+      "text": "Order: Dagger 2 → Vial 4",
+      "at": [
+        376,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "late-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        394,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        478,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        562,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        394,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        478,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        562,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        394,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        478,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        562,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "late-caption",
+      "kind": "note",
+      "text": "Dagger deals 2 damage with no poison.\nVial then coats the blade through cell 5.\nShow “Already acted”; no second attack.",
+      "at": [
+        376,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "late-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        478,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "late-dagger",
+      "kind": "text",
+      "text": "Dagger\nspent",
+      "at": [
+        481,
+        211
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "late-vial-foot",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        394,
+        263
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "late-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        397,
+        287
+      ],
+      "w": 74,
+      "colour": "#4b4028"
+    },
+    {
+      "id": "expired-frame",
+      "kind": "group",
+      "text": "C / END OF ROUND",
+      "at": [
+        720,
+        75
+      ],
+      "w": 320,
+      "colour": "#181820",
+      "h": 485
+    },
+    {
+      "id": "expired-stage",
+      "kind": "text",
+      "text": "Unused charge fades out",
+      "at": [
+        736,
+        108
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "expired-cell-1",
+      "kind": "group",
+      "text": "1",
+      "at": [
+        754,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-2",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        838,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-3",
+      "kind": "group",
+      "text": "3",
+      "at": [
+        922,
+        187
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-4",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        754,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-5",
+      "kind": "group",
+      "text": "5",
+      "at": [
+        838,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-6",
+      "kind": "group",
+      "text": "6",
+      "at": [
+        922,
+        263
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-7",
+      "kind": "group",
+      "text": "7",
+      "at": [
+        754,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-8",
+      "kind": "group",
+      "text": "8",
+      "at": [
+        838,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-cell-9",
+      "kind": "group",
+      "text": "9",
+      "at": [
+        922,
+        339
+      ],
+      "w": 80,
+      "colour": "#20202a",
+      "h": 72
+    },
+    {
+      "id": "expired-caption",
+      "kind": "note",
+      "text": "Prepared venom expires this round.\nShow “Unused” beside the dagger.\nMove the vial before ringing again.",
+      "at": [
+        736,
+        441
+      ],
+      "w": 288,
+      "colour": "#262633"
+    },
+    {
+      "id": "expired-dagger-foot",
+      "kind": "group",
+      "text": "2",
+      "at": [
+        838,
+        187
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 148
+    },
+    {
+      "id": "expired-dagger",
+      "kind": "text",
+      "text": "Dagger\nunused",
+      "at": [
+        841,
+        211
+      ],
+      "w": 74,
+      "colour": "#532e35"
+    },
+    {
+      "id": "expired-vial-foot",
+      "kind": "group",
+      "text": "4",
+      "at": [
+        754,
+        263
+      ],
+      "w": 80,
+      "colour": "#30303c",
+      "h": 72
+    },
+    {
+      "id": "expired-vial",
+      "kind": "text",
+      "text": "Venom",
+      "at": [
+        757,
+        287
+      ],
+      "w": 74,
+      "colour": "#363644"
+    },
+    {
+      "id": "footer",
+      "kind": "text",
+      "text": "TIME TYPES: PREPARE changes a later action · ACT runs once at the item’s first cell · REACT listens for its trigger, once per round. Frames show current rules; visual feedback is proposed.",
+      "at": [
+        0,
+        590
+      ],
+      "w": 1040,
+      "colour": "#262633"
+    }
+  ],
+  "edges": [
+    [
+      "late-caption",
+      "expired-caption",
+      "round ends"
+    ]
+  ],
+  "id": "draft-03-timing-same-blade-different-potion-position"
+}

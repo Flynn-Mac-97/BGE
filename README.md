@@ -828,3 +828,17 @@ Contracts and migration limits are documented in `docs/kernel.md`.
 ## Mobile demos
 
 Use Game UI's joystick, held action buttons and tap/swipe areas with Keyboard Input. Export an installable web app for Safari and Add to Home Screen; see [mobile setup and delivery](docs/mobile.md). APK export remains Android-only.
+
+## Bundled Black Bell prototype
+
+The bare black-and-white inventory-grid battler is included under [`project/`](project/README.md). It includes the modular rules plugin, item catalog, endless room and loot loop, tests, concept references and portable Draft boards. Its initial import is Black Bell source commit `035c351`; future edits belong here.
+
+From the checkout root:
+
+```sh
+node bin/engine.mjs supervisor.open dev-server '{"project":"project"}'
+node bin/engine.mjs --project project --headless run tests.run
+node --test project/tests/*.test.mjs
+```
+
+Game files are ordinary tracked files, with no nested Git repository. Runtime caches stay ignored. Draft sources are tracked in `project/design/drafts/`; see the game README for restoring them in a fresh checkout. Android build instructions are in that README.
