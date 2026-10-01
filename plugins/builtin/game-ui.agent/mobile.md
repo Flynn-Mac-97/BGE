@@ -31,4 +31,4 @@ Pointer capture keeps a hold alive outside its original hit area. Pointer cancel
 
 Style `.ui-mobile-controls`, `.ui-joystick`, `.ui-joystick-thumb`, `.ui-action-button` and `.ui-gesture-area` in the game's theme. Control targets are at least 44 CSS pixels; the default action button is 64. The layout respects safe-area insets. Touch-action suppression applies only to these controls. The stick still uses digital directions.
 
-An HTML refresh restores each active control's held appearance after patching the DOM. Keep pointer feedback immediate; do not animate the joystick thumb toward the finger. For earlier engagement in a game, lower the joystick's `deadZone` rather than changing the input clock.
+HTML refreshes preserve held feedback. `feedback: "pinch"`, `"rotate"`, `"pan"`, `"drag"` or `"transform"` drives a `[data-touch-object]` child immediately from pointer events. Gameplay handlers remain fixed-step. See `docs/mobile.md` for full-screen fit and feedback limits.

@@ -29,3 +29,12 @@ New builds have content-versioned caches. Close all windows of an older app befo
 On the real iPad, test a joystick plus a second-finger action, release outside a control, rotate the device, background and restore Safari, and hide the controls while holding them. Test tap, double tap, hold, drag, swipe and two-finger pinch/rotate/pan. Enable `gestureArea` with `debug: true` to inspect persistent trails, direction, distance and contact markers. Test screen-edge safe areas, audio after the start tap, Home Screen launch and an offline relaunch. Browser automation checks behavior, but cannot certify Safari performance or system gestures.
 
 The exported player applies `device.pixelRatio` to the renderer (clamped by the renderer to 1–2). Set it to 1 for a lightweight mobile demo. A ratio of 2 draws four times as many pixels at the same CSS size. The UI keeps its CSS resolution and touch coordinates when this value changes.
+
+
+## Responsive phone screens
+
+Set `device.fit` to `"screen"` to fill the exported player's available screen in either orientation. The default `"contain"` keeps the declared aspect ratio. Width and height remain the reference size for editor/headless checks. The renderer resizes with the window; game UI can use grid, flexible dimensions and safe-area insets. Set `android.orientation` to `"unspecified"` to allow device rotation.
+
+Gesture areas accept `feedback: 'pinch' | 'rotate' | 'pan' | 'drag' | 'transform'`. Put a `[data-touch-object]` child in the area. The engine sets its transform directly on pointer events and restores it after UI patches, bypassing the fixed-step wait for visual feedback. Gameplay reports still enter the fixed-step queue. Feedback is relative to the current gesture; pinch preview is clamped to 0.1–8 times. Do not animate this child's transform. Use an outer wrapper for a base transform.
+
+CSS text and SVG debug paths retain device-resolution sharpness independently of the 3D render pixel ratio. Debug trails can be disabled for normal play. The OS, WebView and display determine presentation frequency; immediate feedback does not guarantee 90/120 Hz or remove main-thread stalls.

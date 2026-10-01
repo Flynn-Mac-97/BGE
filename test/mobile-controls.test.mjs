@@ -1,5 +1,6 @@
 /** Mobile action ownership, gesture thresholds and the UI's headless event path. */
 import test from 'node:test'
+import { readDevice } from '../engine/device-profile.js'
 import assert from 'node:assert/strict'
 import inputPlugin from '../plugins/builtin/input.js'
 import { makeInputRecord } from '../engine/loop-input.js'
@@ -64,4 +65,14 @@ test('mobile kit escapes labels and declares gesture event types for headless us
   assert.match(kit.actionButton('<Jump>', { action: 'jump' }), /&lt;Jump&gt;/)
   assert.ok(controlsOf(kit.gestureArea('Swipe', { action: 'aim' }))[0].triggers.includes('swipe'))
   assert.match(kit.joystick(), /data-dead-zone="0.2"/)
+})
+
+
+test('full-screen fit is opt-in and keeps a declared reference size', () => {
+  assert.equal(readDevice({}).fit, 'contain')
+  assert.equal(readDevice({ device: { fit: 'invalid' } }).fit, 'contain')
+  const device = readDevice({ device: { fit: 'screen', width: 390, height: 844 } })
+  assert.equal(device.fit, 'screen')
+  assert.equal(device.width, 390)
+  assert.equal(device.height, 844)
 })

@@ -42,6 +42,7 @@ export function readDevice(game) {
   return {
     width,
     height,
+    fit: declared.fit === 'screen' ? 'screen' : 'contain',
     pixelRatio: positive(declared.pixelRatio) ?? DEFAULT_DEVICE.pixelRatio,
     orientation: declared.orientation || (height > width ? 'portrait' : 'landscape')
   }

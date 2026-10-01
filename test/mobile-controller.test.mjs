@@ -39,7 +39,7 @@ function fixture() {
     return element
   }
   const fire = (type, target, pointerId, x = 120, y = 70, timeStamp = 100) => listeners.get(type)?.({ type, target, pointerId, clientX: x, clientY: y, button: 0, timeStamp, preventDefault() {} })
-  return { input: context.input, mobile, control, fire, reports }
+  return { input: context.input, mobile, control, fire, reports, remove: element => controls.splice(controls.indexOf(element), 1) }
 }
 
 test('touch presses are immediate and one finger releasing leaves the other held', () => {
@@ -83,4 +83,36 @@ test('cancellation emits no tap and disposal releases an active button', () => {
   fire('pointerdown', button, 2)
   mobile.dispose()
   assert.equal(input.held('fire'), false)
+})
+
+test('pinch feedback changes before a simulation step and survives a UI patch', () => {
+  const { mobile, control, fire, reports } = fixture()
+  const gesture = control('gesture')
+  const target = { style: {} }
+  gesture.dataset.touchFeedback = 'pinch'
+  gesture.querySelector = selector => selector === '[data-touch-object]' ? target : null
+  fire('pointerdown', gesture, 1, 20, 70, 0)
+  fire('pointerdown', gesture, 2, 60, 70, 10)
+  fire('pointermove', gesture, 2, 100, 70, 20)
+  assert.equal(target.style.transform, 'translate3d(0px,0px,0) rotate(0deg) scale(2)')
+  assert.ok(reports.some(report => report.type === 'transform'))
+  target.style.transform = ''
+  mobile.reconcile()
+  assert.equal(target.style.transform, 'translate3d(0px,0px,0) rotate(0deg) scale(2)')
+  mobile.dispose()
+})
+
+
+test('replacing an exercise releases held controls and cancels its gesture', () => {
+  const { input, mobile, control, fire, reports, remove } = fixture()
+  const button = control('button')
+  const gesture = control('gesture')
+  fire('pointerdown', button, 1)
+  fire('pointerdown', gesture, 2)
+  remove(button)
+  remove(gesture)
+  mobile.reconcile()
+  assert.equal(input.held('fire'), false)
+  assert.equal(reports.at(-1).type, 'cancel')
+  mobile.dispose()
 })

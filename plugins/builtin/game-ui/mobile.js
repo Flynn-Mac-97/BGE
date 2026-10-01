@@ -1,5 +1,6 @@
 /** Mobile controls own each pointer until release, cancellation, removal or page suspension. */
 import { makeTouchGestures } from './touch-gestures.js'
+import { drawTouchFeedback } from './touch-feedback.js'
 import { drawTouchDebug } from './touch-debug.js'
 export { contactGesture } from './touch-gestures.js'
 
@@ -23,7 +24,7 @@ export function watchMobile(root, input, report) {
   function area(control) {
     if (!areas.has(control)) areas.set(control, makeTouchGestures({
       report: value => report({ action: control.dataset.action, value, kind: 'gesture', type: value.type, x: value.x || 0, y: value.y || 0 }),
-      draw: snapshot => drawTouchDebug(control, snapshot)
+      draw: snapshot => { drawTouchFeedback(control, snapshot); drawTouchDebug(control, snapshot) }
     }))
     return areas.get(control)
   }

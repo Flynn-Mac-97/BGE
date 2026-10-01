@@ -82,8 +82,8 @@ const components = {
     tag('div', { class: 'ui-mobile ui-joystick', 'data-mobile': 'joystick', 'data-directions': JSON.stringify({ left, right, up, down }), 'data-dead-zone': Math.min(0.9, Math.max(0.05, Number(deadZone) || 0.2)), 'data-disabled': isDisabled, 'aria-label': label, role: 'group' }, tag('span', { class: 'ui-joystick-thumb' })),
   actionButton: (label, { action, isDisabled = false } = {}) =>
     tag('button', { type: 'button', class: 'ui-mobile ui-action-button', 'data-mobile': 'button', 'data-action': action, 'data-disabled': isDisabled, disabled: isDisabled, 'aria-label': label }, escapeHtml(label)),
-  gestureArea: (children, { action = 'gesture', label = 'Gesture area', debug = false } = {}) =>
-    tag('div', { class: 'ui-mobile ui-gesture-area', 'data-mobile': 'gesture', ...controlAttributes('gesture', { action, label, triggers: ['tap', 'doubletap', 'longpress', 'dragstart', 'drag', 'dragend', 'swipe', 'transformstart', 'transform', 'transformend', 'cancel'] }), 'aria-label': label }, join(children) + (debug ? '<svg class="ui-touch-debug" data-touch-debug aria-hidden="true"></svg>' : '')),
+  gestureArea: (children, { action = 'gesture', label = 'Gesture area', debug = false, feedback = 'none' } = {}) =>
+    tag('div', { class: 'ui-mobile ui-gesture-area', 'data-mobile': 'gesture', 'data-touch-feedback': feedback, ...controlAttributes('gesture', { action, label, triggers: ['tap', 'doubletap', 'longpress', 'dragstart', 'drag', 'dragend', 'swipe', 'transformstart', 'transform', 'transformend', 'cancel'] }), 'aria-label': label }, join(children) + (debug ? '<svg class="ui-touch-debug" data-touch-debug aria-hidden="true"></svg>' : '')),
   stack: layout('ui-stack'),
   row: layout('ui-row'),
   grid: layout('ui-grid'),

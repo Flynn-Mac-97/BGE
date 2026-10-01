@@ -100,7 +100,8 @@ function mountScreen(root, device) {
   root.innerHTML =
     '<div class="viewport" id="viewport"><canvas id="gl"></canvas><div class="viewport-ui" id="viewport-ui"></div></div>'
   const viewport = root.querySelector('#viewport')
-  viewport.style.aspectRatio = `${device.width} / ${device.height}`
+  viewport.dataset.fit = device.fit
+  viewport.style.aspectRatio = device.fit === 'screen' ? 'auto' : `${device.width} / ${device.height}`
   const overlay = root.querySelector('#viewport-ui')
   return { root, viewport, overlay, canvas: root.querySelector('#gl'), regions: makeRegions({ overlay }) }
 }

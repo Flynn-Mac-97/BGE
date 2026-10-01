@@ -77,6 +77,7 @@ export function makeTouchGestures({ report, draw = () => {}, schedule = setTimeo
       const type = contact.dragging ? 'drag' : 'dragstart'
       contact.dragging = true
       emit({ type, x: point.x - contact.start.x, y: point.y - contact.start.y })
+      return
     }
     paint()
   }
