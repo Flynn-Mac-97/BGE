@@ -1,7 +1,7 @@
 /** A landscape game field keeps the battle above inventory, with loot shown as a game overlay. */
 import { rules, itemDefinition } from './rules.js'
 import { tooltip } from './tooltip.js'
-import { equipmentFeedback, stageFeedback } from './feedback.js'
+import { equipmentFeedback, stageFeedback, damageFeedback } from './feedback.js'
 import { escape } from './inspection.js'
 
 function rewardOverlay(kit, journey) {
@@ -17,6 +17,7 @@ export function view(kit, state) {
   const journey = state.journey
   const battle = journey.battle
   const locked = state.queue.length > 0
+  const hits = damageFeedback(state.step)
   const columns = battle.grid.columns
   const cells = Array.from({ length: columns * battle.grid.rows }, (_, cell) => {
     const position = [cell % columns, Math.floor(cell / columns)]
@@ -25,7 +26,7 @@ export function view(kit, state) {
   })
   const shapes = Object.values(battle.items).filter(item => item.position).map(item => {
     const definition = itemDefinition(battle, item.id)
-    return `<div class="equipment-shape ${item.id === state.selected ? 'selected' : ''} ${state.link && [state.link, state.selected].includes(item.id) ? 'linked' : ''} ${item.id === state.step?.source?.id ? 'source item-attack' : ''} ${item.id === state.step?.target?.id ? 'target' : ''}" data-item="${item.id}" style="grid-column:${item.position[0] + 1}/span ${definition.footprint[0]};grid-row:${item.position[1] + 1}/span ${definition.footprint[1]}"><b>${escape(definition.mark)}</b><small>${escape(definition.name)}</small>${equipmentFeedback(item)}</div>`
+    return `<div class="equipment-shape ${item.id === state.selected ? 'selected' : ''} ${state.link && [state.link, state.selected].includes(item.id) ? 'linked' : ''} ${item.id === state.step?.source?.id ? 'source item-attack' : ''} ${item.id === state.step?.target?.id ? 'target' : ''}" data-item="${item.id}" data-key="item:${item.id}:${item.id === state.step?.source?.id ? state.serial : 0}" style="grid-column:${item.position[0] + 1}/span ${definition.footprint[0]};grid-row:${item.position[1] + 1}/span ${definition.footprint[1]}"><b>${escape(definition.mark)}</b><small>${escape(definition.name)}</small>${equipmentFeedback(item)}</div>`
   })
   const reserve = Object.values(battle.items).filter(item => !item.position).map(item => {
     const definition = itemDefinition(battle, item.id)
@@ -34,10 +35,11 @@ export function view(kit, state) {
   const actor = (id, mark) => {
     const actor = battle.actors[id]
     const poison = actor.statuses.poison?.stacks ?? 0
-    return `<div class="fighter ${id}"><div class="actor-status"><small>${escape(actor.name.toUpperCase())} · ${actor.health}/${actor.maxHealth}</small>${kit.bar(actor.health, { max: actor.maxHealth, trail: false })}<small>Guard ${actor.guard} · Poison ${poison}${id === 'enemy' ? ` · Attack ${actor.stats.damage}` : ` · Hunger ${actor.resources.hunger}`}</small></div><div class="actor-token">${mark}</div></div>`
+    const hit = hits.find(hit => hit.id === id)
+    return `<div class="fighter ${id} ${hit ? 'damage-victim' : ''}" data-key="actor:${id}:${hit ? state.serial : 0}"><div class="actor-status"><small>${escape(actor.name.toUpperCase())} · ${actor.health}/${actor.maxHealth}</small>${kit.bar(actor.health, { max: actor.maxHealth, trail: false })}<small>Guard ${actor.guard} · Poison ${poison}${id === 'enemy' ? ` · Attack ${actor.stats.damage}` : ` · Hunger ${actor.resources.hunger}`}</small></div><div class="actor-token">${hit ? hit.amount ? `−${hit.amount}` : '0' : mark}</div></div>`
   }
   const phase = journey.phase === 'defeat' ? 'DEFEAT' : locked ? state.paused || state.expanded ? 'HELD' : 'RESOLVING' : 'ARRANGE'
-  const stage = kit.target(`${actor('recruit', 'R')}${actor('enemy', battle.actors.enemy.mark)}${stageFeedback(state)}<div class="event-caption" role="status"><strong>${phase}</strong><span>${escape(state.message || journey.message)}</span></div>`, { action: 'deselect', as: 'section', attributes: { class: 'stage' } })
+  const stage = kit.target(`${actor('recruit', 'R')}${actor('enemy', battle.actors.enemy.mark)}${stageFeedback(state)}<div class="event-caption ${hits.length ? 'impact-caption' : ''}" role="status"><strong>${phase}</strong><span>${escape(state.message || journey.message)}</span></div>`, { action: 'deselect', as: 'section', attributes: { class: `stage ${hits.length ? 'has-damage' : ''}` } })
   const primary = locked ? { text: state.paused ? 'RESUME' : 'PAUSE', action: 'pause' } : journey.phase === 'defeat' ? { text: 'RETRY ROOM', action: 'retry' } : { text: 'FIGHT', action: 'fight' }
   const menu = `<div class="menu-shade"><section class="pause-sheet"><h2>Paused</h2>${kit.button('Continue', { action: 'menu' })}${kit.button('New run', { action: 'reset' })}<p>Fight → choose a find → equip → descend. Auto continues cycles within a room. Each room pauses for loot. Full Details holds combat.</p><p>Left-to-right, top-to-bottom scan. Edge neighbours link; diagonal cells do not. Unused preparation expires at cycle end.</p>${kit.button('History', { action: 'history' })}</section></div>`
   const history = `<div class="menu-shade"><section class="pause-sheet">${kit.button('Close history', { action: 'history' })}<ol>${state.log.map(line => `<li>${escape(line)}</li>`).join('') || '<li>No actions yet.</li>'}</ol></section></div>`

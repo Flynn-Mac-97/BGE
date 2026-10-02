@@ -13,6 +13,7 @@ Uses Black Bell Grid and Game UI. `context.blackBell.read()` returns an isolated
 - `bell/inspection.js` derives links and active stats from rule selectors. No item-specific inspection paths.
 - `bell/view.js`, `bell/tooltip.js`, `bell/feedback.js`, `assets/ui/theme.css` show the bare black-and-white game.
 - Auto continues cycles only inside a room; a win pauses for a reward. Turn mode allows rearranging each cycle. Details/Menu/History hold presentation.
+- Damage presentation holds for 1.1 seconds (1.8 in Slow), highlights its victim and groups actual HP loss by target. Poison is named as the cause; blocked hits report zero HP loss. Other trace steps retain their short timing.
 - `tools/playthrough.mjs` earns loot through deterministic simulated playthroughs; no fabricated wins.
 - `node --test tests/*.test.mjs` and engine headless `run tests.run` run all regressions.
 

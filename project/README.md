@@ -6,7 +6,7 @@ A bare black-and-white landscape auto-battler. Start with a nameless recruit and
 
 Tap a reserve item, then its top-left grid cell to equip it. Tap any occupied cell to inspect. Move explicitly starts a move; Stow returns an item to reserve. Invalid moves preserve the layout. Details holds combat and shows active bonuses, rule timing, remaining combat uses and selectable grid links.
 
-Fight starts automatic cycles within the current room. Turn off Auto to stop after each cycle and rearrange. Pause, Step and Slow control presentation. Menu and History also hold the turn. Winning always pauses for a reward; a choice never starts the next fight automatically.
+Fight starts automatic cycles within the current room. Turn off Auto to stop after each cycle and rearrange. Damage pauses for 1.1 seconds (1.8 in Slow). The attacking item stays highlighted; the victim shows a large damage number, and a source → target readout shows HP before and after. Poison and blocked damage are identified separately. Pause, Step and Slow control presentation. Menu and History also hold the turn. Winning always pauses for a reward; a choice never starts the next fight automatically.
 
 The first find offers Venom Vial, Whetstone or Herbal Salve. Place venom at cell 1, to the left of the starting dagger at cell 2. The vial prepares the dagger before its strike. Moving that vial to cell 4 prepares too late: the unused coating expires. Other finds include shields, healing, auras, Hunger generation/spending, cleansing and an extra-attack chime. Copies are independent instances.
 

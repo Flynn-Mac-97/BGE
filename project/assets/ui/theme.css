@@ -141,3 +141,19 @@ header>div { display:flex; gap:6px; }
 @media (orientation:portrait) { .reserve>.ui-button { position:static; max-width:none; } }
 
 @media (orientation:landscape) and (max-height:450px) { .bell-controls { gap:0; min-height:0; } }
+/* Hold the source and victim together while one grouped readout explains the health change. */
+.damage-victim .actor-token { background:#fff; color:#000; font-weight:700; border:2px solid #fff; }
+.damage-victim .actor-status .ui-bar-track { outline:1px solid #fff; outline-offset:2px; }
+.damage-readout { position:absolute; bottom:0; left:0; right:0; display:flex; justify-content:center; flex-wrap:wrap; gap:4px; pointer-events:none; }
+.damage-line { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:1px 10px; max-width:100%; padding:4px 10px; background:#000; border:1px solid #fff; }
+.damage-line>span { font:12px monospace; overflow-wrap:anywhere; }
+.damage-line>strong { grid-column:2; grid-row:1/3; align-self:center; font:700 22px monospace; white-space:nowrap; }
+.damage-line>small { font:11px monospace; }
+.has-damage .impact-caption { display:none; }
+@media (orientation:landscape) and (max-height:450px) {
+ .damage-line { padding:2px 8px; gap:0 8px; }
+ .damage-line>span,.damage-line>small { font-size:11px; }
+ .damage-line>strong { font-size:20px; }
+ .inspecting:not(.expanded-inspection) .has-damage .fighter { visibility:hidden; }
+}
+@media (orientation:landscape) and (max-height:380px) { .damage-victim .actor-token { display:grid; } }

@@ -3,7 +3,7 @@ import { rules, itemDefinition } from './bell/rules.js'
 import { createJourney, finishBattle, claim, salvage, searchCache, retryRoom } from './bell/loop.js'
 import { view } from './bell/view.js'
 import { itemLinks } from './bell/inspection.js'
-import { describeStep } from './bell/feedback.js'
+import { describeStep, stepDuration } from './bell/feedback.js'
 const sessions = new WeakMap()
 
 export default {
@@ -24,7 +24,7 @@ export default {
       state.message = describeStep(step)
       state.log.push(state.message)
       if (state.log.length > 100) state.log.shift()
-      state.serial++; state.left = state.slow ? 0.8 : 0.22
+      state.serial++; state.left = stepDuration(step, state.slow ? 'slow' : 'normal')
       if (!state.queue.length) {
         if (finishBattle(state.journey, () => context.random())) { state.paused = false; closeInspection(); state.message = '' }
         else if (state.auto) queueCycle()
