@@ -147,3 +147,21 @@ test('the battle box narrates hits, poison and statuses, and skips stack bookkee
   assert.ok(lines.some(line => /^Rusty Dagger hits .+ for \d+!/.test(line)), lines.join('\n'))
   assert.ok(lines.every(line => !line.includes('→')), lines.join('\n'))
 })
+
+test('a won floor shows the faint line before the reward screen covers the stage', async () => {
+  const { fixture } = await import('../tools/ui-fixture.mjs')
+  const game = fixture({ hub: true })
+  game.panel.on.goDown('rook')
+  game.panel.on.fight()
+  let sawFaint = false
+  for (let tick = 0; tick < 400 && game.read().journey.phase === 'battle'; tick++) {
+    game.tick(1, 0.05)
+    if (game.read().step?.kind === 'combatEnd') {
+      sawFaint = true
+      assert.equal(game.read().journey.phase, 'battle')
+      assert.match(game.panel.html(), /fainted!/)
+    }
+  }
+  assert.ok(sawFaint)
+  assert.equal(game.read().journey.phase, 'levelUp')
+})

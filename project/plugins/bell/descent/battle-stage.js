@@ -41,6 +41,7 @@ function stepMoments(step) {
 
 /** The battle box sentence for one resolved step, or '' for bookkeeping steps. */
 export function battleLine(step) {
+  if (step?.kind === 'combatEnd') return step.winner === 'crew' ? `${step.state.actors.enemy.name} fainted!` : `${step.state.actors.recruit.name} fell!`
   if (step?.kind !== 'ability') return ''
   const battle = step.state
   const source = step.statusId ? rules.catalog.statuses[step.statusId].name : nameOf(battle, step.source)
@@ -80,18 +81,13 @@ function pops(moment, serial) {
   return marks.length ? `<div class="pops" data-key="pops:${serial}">${marks.join('')}</div>` : ''
 }
 
-/** Effect classes for a fighter's portrait this step. */
+/** Movement classes for a fighter's portrait this step: lunge, hit, tick, faint. */
 function motionClasses(id, moments, actor) {
   const moment = moments[id]
-  return [
-    moments.attacker === id ? 'lunge' : '',
-    moment.hit ? 'hit' : '',
-    moment.isTick ? 'tick' : '',
-    moment.healed ? 'healed' : '',
-    moment.guarded ? 'guarded' : '',
-    actor.health <= 0 ? 'faint' : ''
-  ].filter(Boolean).join(' ')
+  return [moments.attacker === id ? 'lunge' : '', moment.hit ? 'hit' : '', moment.isTick ? 'tick' : '', actor.health <= 0 ? 'faint' : ''].filter(Boolean).join(' ')
 }
+/** Glow classes, on their own layer so a heal or guard never cancels a lunge or hit. */
+const glowClasses = moment => [moment.healed ? 'healed' : '', moment.guarded ? 'guarded' : ''].filter(Boolean).join(' ')
 
 function statusPills(actor) {
   const pills = Object.entries(actor.statuses).map(([id, status]) => `<span class="pill">${escape(rules.catalog.statuses[id].short ?? rules.catalog.statuses[id].name.slice(0, 3).toUpperCase())} ${status.stacks}</span>`)
@@ -101,7 +97,10 @@ function statusPills(actor) {
 
 function portrait(kit, side, image, label, actor, moments, state, floor, rank) {
   const classes = motionClasses(side, moments, actor)
-  return `<div class="battle-frame ${side}-frame rank-${rank}" data-key="${side}-frame:${floor}"><div class="frame-motion ${classes}" data-key="${side}-motion:${classes ? state.serial : 'rest'}">${art(kit, image, label)}</div>${pops(moments[side], state.serial)}<div class="platform"></div></div>`
+  const glow = glowClasses(moments[side])
+  // A fallen fighter keeps one key from the killing blow on, so the faint plays once and is not restarted by the steps after it.
+  const motionKey = actor.health <= 0 ? `faint:${floor}` : classes ? state.serial : 'rest'
+  return `<div class="battle-frame ${side}-frame rank-${rank}" data-key="${side}-frame:${floor}"><div class="frame-motion ${classes}" data-key="${side}-motion:${motionKey}">${art(kit, image, label)}</div><div class="frame-glow ${glow}" data-key="${side}-glow:${glow ? state.serial : 'rest'}"></div>${pops(moments[side], state.serial)}<div class="platform"></div></div>`
 }
 
 function gearStrip(kit, journey) {
@@ -116,10 +115,13 @@ export function battleStage(kit, state) {
   const moments = stepMoments(state.step)
   const isQuake = ['recruit', 'enemy'].some(id => moments[id].hit >= battle.actors[id].maxHealth * QUAKE_SHARE)
   const line = battleLine(state.step)
+  // Quiet steps (cycle start, planning) keep the last line on screen instead of flashing back to the floor text.
+  const held = !line && battle.started && state.battleLine ? state.battleLine : null
   const idle = state.message || (battle.started ? journey.message : `${run.story.at(-1) ?? ''} What will ${crew.name} do?`)
   const need = embersNeeded(run.level + run.pendingLevels)
   const foePlate = `<div class="battle-plate foe-plate"><div class="plate-name"><strong>${escape(foe.name.toUpperCase())}</strong><small>${crest[run.enemy.kind] || `FLOOR ${run.floor}`}</small></div><div class="pills">${statusPills(foe)}</div>${hpBar(foe, moments.enemy, state.serial)}</div>`
   const heroPlate = `<div class="battle-plate hero-plate"><div class="plate-name"><strong>${escape(crew.name.toUpperCase())}</strong><small>LV ${run.level}</small></div><div class="pills">${statusPills(hero)}</div>${hpBar(hero, moments.recruit, state.serial)}<div class="hp-numbers">${Math.max(0, hero.health)} / ${hero.maxHealth}</div><div class="xp-line"><b>EMB</b><div class="xp-bar"><i style="width:${percent(run.embers, need)}%"></i></div></div><div class="gear-strip">${gearStrip(kit, journey)}</div></div>`
-  const box = `<div class="battle-box" data-key="box:${line ? state.serial : 'idle:' + run.floor + ':' + journey.phase}"><p class="${line ? 'typing' : ''}">${escape(line || idle)}</p><span class="box-cursor">▼</span></div>`
+  const boxKey = line ? state.serial : held ? held.serial : `idle:${run.floor}:${journey.phase}`
+  const box = `<div class="battle-box" data-key="box:${boxKey}"><p class="${line || held ? 'typing' : ''}">${escape(line || held?.text || idle)}</p><span class="box-cursor">▼</span></div>`
   return `<div class="battle-field ${isQuake ? 'quake' : ''}" data-key="field:${isQuake ? state.serial : 'calm'}">${foePlate}${portrait(kit, 'enemy', run.enemy.portrait, foe.name, foe, moments, state, run.floor, run.enemy.kind)}${portrait(kit, 'recruit', crew.portrait, crew.name, hero, moments, state, run.floor, 'hero')}${heroPlate}</div>${box}`
 }

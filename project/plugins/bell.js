@@ -12,6 +12,7 @@ import { describeStep, stepDuration } from './bell/feedback.js'
 import { profileStore, settleRun, buyUpgrade, unlockedCrew } from './bell/descent/profile-save.js'
 import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun } from './bell/descent/run.js'
 import { hubView } from './bell/descent/view.js'
+import { battleLine } from './bell/descent/battle-stage.js'
 import { descentCrew } from './bell/descent/pool.js'
 const sessions = new WeakMap()
 /** The hub's first line: a welcome, or the last result. */
@@ -50,22 +51,27 @@ export default {
     }
     const closeInspection = () => { state.selected = null; state.moving = false; state.expanded = false; state.link = null }
     const editable = () => state.screen === 'expedition' && !state.queue.length && state.journey.phase === 'battle' && state.journey.battle.phase === 'planning'
-    const clearPresentation = () => { state.queue = []; state.step = null; state.log = []; state.paused = false; state.menu = false; state.history = false; state.message = ''; state.left = 0; closeInspection() }
-    const queueCycle = () => { state.queue = rules.resolveCycle(state.journey.battle, { afterCycle: ['enemy'] }).trace }
+    const clearPresentation = () => { state.queue = []; state.step = null; state.battleLine = null; state.log = []; state.paused = false; state.menu = false; state.history = false; state.message = ''; state.left = 0; closeInspection() }
+    // The closing marker settles the cycle only after the last step has had its full time on screen,
+    // so a killing blow and its faint are seen before any reward screen covers them.
+    const queueCycle = () => { state.queue = [...rules.resolveCycle(state.journey.battle, { afterCycle: ['enemy'] }).trace, { kind: 'settle' }] }
+    const settle = () => {
+      if ((state.journey.descent ? finishFloor : finishBattle)(state.journey, () => context.random())) { state.paused = false; closeInspection(); state.message = ''; state.step = null; state.battleLine = null }
+      else if (state.auto) queueCycle()
+      else state.paused = false
+    }
     const advance = () => {
       const step = state.queue.shift()
       if (!step) return
+      if (step.kind === 'settle') { settle(); redraw(); return }
       state.journey.battle = step.state
       state.step = step
+      const line = battleLine(step)
+      if (line) state.battleLine = { text: line, serial: state.serial + 1 }
       state.message = describeStep(step)
       state.log.push(state.message)
       if (state.log.length > 100) state.log.shift()
       state.serial++; state.left = stepDuration(step, state.slow ? 'slow' : 'normal')
-      if (!state.queue.length) {
-        if ((state.journey.descent ? finishFloor : finishBattle)(state.journey, () => context.random())) { state.paused = false; closeInspection(); state.message = '' }
-        else if (state.auto) queueCycle()
-        else state.paused = false
-      }
       redraw()
     }
     const actions = {
@@ -143,7 +149,7 @@ export default {
       cache() { if (!state.journey.sandbox && editable() && searchCache(state.journey, () => context.random())) { closeInspection(); state.message = ''; redraw() } },
       descend() { if (!state.queue.length && descend(state.journey)) { clearPresentation(); redraw() } },
       claim(type) { if (!state.queue.length && claim(state.journey, type)) { clearPresentation(); redraw() } },
-      fight() { if (editable()) { closeInspection(); state.log = []; state.paused = false; queueCycle(); advance() } },
+      fight() { if (editable()) { closeInspection(); state.log = []; state.battleLine = null; state.paused = false; queueCycle(); advance() } },
       pause() { if (state.queue.length) { state.paused = !state.paused; redraw() } },
       step() { if (state.paused && !state.expanded && !state.menu && !state.history) advance() },
       auto(value) { state.auto = !!value; redraw() },

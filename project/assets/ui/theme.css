@@ -366,8 +366,12 @@ header>div { display:flex; gap:6px; }
 .lunge { animation:lunge-up .45s ease-in-out; }.enemy-frame .lunge { animation-name:lunge-down; }
 .hit { animation:hit-blink .7s steps(1) .2s, hit-shake .35s .2s; }
 .tick { animation:wobble .6s ease-in-out; }
-.healed { animation:heal-glow .9s ease-out; }
-.guarded { animation:guard-flash .6s steps(2); }
+.frame-glow { position:absolute; inset:0; pointer-events:none; z-index:2; }
+.frame-glow.healed { animation:heal-glow .9s ease-out; }
+.frame-glow.guarded { animation:guard-flash .6s steps(2); }
+.frame-glow.healed.guarded { animation:heal-glow .9s ease-out, guard-flash .6s steps(2); }
+.hit.tick { animation:wobble .6s ease-in-out, hit-blink .7s steps(1) .2s; }
+.hit.faint,.lunge.faint { animation:hit-blink .5s steps(1), faint 1s ease-in .5s forwards; }
 .faint { animation:faint 1s ease-in .3s forwards; }
 .quake { animation:quake .45s; }
 .battle-box { position:absolute; left:0; right:0; bottom:0; height:var(--box); box-sizing:border-box; border:4px double #fff; border-radius:6px; background:#000; padding:6px 28px 6px 12px; display:flex; align-items:center; overflow:hidden; }
@@ -460,4 +464,17 @@ header>div { display:flex; gap:6px; }
   .evolution-morph { width:90px; height:90px; margin:4px auto; }
   .descent-card>.ink-art { width:36px; height:36px; }
   .loot-sheet h2 { font-size:13px; }
+}
+/* Level-up cards: as many columns as fit (four with Deep Pockets), compact on short and narrow screens. */
+.loot-sheet .loot-choices:has(.descent-card) { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+@media (orientation:landscape) and (max-height:500px) {
+  .descent-card { padding:6px; gap:3px; }
+  .descent-card>p { font-size:10px; line-height:1.25; }
+  .descent-card>.ui-button { min-height:34px; }
+  .loot-sheet { padding:8px; }
+}
+@media (orientation:portrait) {
+  .loot-card.descent-card { grid-template-columns:44px minmax(0,1fr); column-gap:10px; align-items:center; }
+  .descent-card>.ink-art { width:44px; height:44px; grid-row:span 2; }
+  .descent-card>strong,.descent-card>small { grid-column:2; }
 }
