@@ -38,6 +38,9 @@ export function prepareFight(state, catalog) {
   return prepared
 }
 
+// The enemy selector picks the first living hostile, so its match cannot be cached.
+const hasLiveSelector = trigger => trigger.source?.kind === 'enemy' || trigger.target?.kind === 'enemy'
+
 /** Cache static trigger matches; live enemy selectors and owner survival remain dynamic. */
 function candidates(runtime, event, matches) {
   const { state, catalog, prepared } = runtime
@@ -49,7 +52,7 @@ function candidates(runtime, event, matches) {
   const cache = prepared.listeners[event.kind] ??= new Map()
   let result = cache.get(identity)
   if (!result) {
-    result = entries.filter(entry => entry.ability.trigger.source?.kind === 'enemy' || matches({ state, catalog, source: entry.source, event }, entry.ability.trigger))
+    result = entries.filter(entry => hasLiveSelector(entry.ability.trigger) || matches({ state, catalog, source: entry.source, event }, entry.ability.trigger))
     cache.set(identity, result)
   }
   return result
@@ -76,7 +79,7 @@ export function compiledListeners(runtime, event, path, matches) {
   }
   for (const entry of candidates(runtime, event, matches)) {
     if (!isAlive(state, entry.source) || (entry.grantor && !activeGrant(state, entry.grantor))) continue
-    if (entry.ability.trigger.source?.kind === 'enemy' && !matches({ state, catalog, source: entry.source, event }, entry.ability.trigger)) continue
+    if (hasLiveSelector(entry.ability.trigger) && !matches({ state, catalog, source: entry.source, event }, entry.ability.trigger)) continue
     result.push({ kind: 'ability', source: entry.source, ability: entry.ability, statusId: null, status: null, ...(entry.grantor ? { grantor: entry.grantor } : {}), path, event })
   }
   return result

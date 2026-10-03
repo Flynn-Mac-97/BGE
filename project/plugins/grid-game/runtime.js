@@ -8,10 +8,15 @@ import { expire, activeStatus } from './values.js'
 import { applyEffect } from './effects.js'
 import { assertState, winner } from './state.js'
 
+const watches = (frame, selector, field) => targets(frame, selector).some(subject => sameReference(subject, frame.event[field]))
+
 function matches(frame, trigger) {
   if (trigger.event !== frame.event.kind) return false
   if (trigger.status && trigger.status !== frame.event.status) return false
-  if (trigger.source) return targets(frame, trigger.source).some(subject => sameReference(subject, frame.event.source))
+  // A target selector filters who the event happened to; alone, it replaces the default source check.
+  if (trigger.target && !watches(frame, trigger.target, 'target')) return false
+  if (trigger.source) return watches(frame, trigger.source, 'source')
+  if (trigger.target) return true
   const defaults = { ownTurn: 'source', itemActivated: 'source', damageDealt: 'source', damageTaken: 'target', statusApplied: 'source' }
   const field = defaults[trigger.event]
   return !field || sameReference(frame.source, frame.event[field])

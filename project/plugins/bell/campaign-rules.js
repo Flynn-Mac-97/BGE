@@ -1,4 +1,5 @@
 /** Campaign pacing and loot are editable data; combat abilities reuse the grid vocabulary. */
+import { labItems } from './catalog/lab.js'
 export const campaignRooms = [
   { name: 'Cellar Rat', mark: 'r', health: 4, damage: 1 },
   { name: 'Grave Robber', mark: 'x', health: 5, damage: 1 },
@@ -22,7 +23,7 @@ export function campaignEnemy(room) {
 export const lootPartners = { dagger: ['stone', 'venom', 'stormTotem', 'rootTotem', 'banner'], hungryTooth: ['bloodCup'], bloodCup: ['hungryTooth'], curseIdol: ['reapingSeal'], reapingSeal: ['curseIdol'], salvagePack: ['patchKit'], patchKit: ['salvagePack'], venom: ['tooth'], stormTotem: ['hammer'], rootTotem: ['hammer'] }
 export function campaignChoices(journey, catalog, random) {
   const owned = new Set(Object.values(journey.battle.items).map(item => item.type))
-  const all = Object.keys(catalog.items)
+  const all = Object.keys(catalog.items).filter(type => !labItems[type])
   const partners = [...new Set([...owned].flatMap(type => lootPartners[type] ?? []))].filter(type => !owned.has(type))
   const fresh = all.filter(type => !owned.has(type))
   const choices = []

@@ -41,6 +41,7 @@ export function validateAbility(ability, path, catalog) {
   if (!ability || typeof ability.id !== 'string' || !ability.id) fail(path, 'ability id required')
   if (!triggerNames.includes(ability.trigger?.event)) fail(path, 'unknown trigger event')
   if (ability.trigger.source) validateTarget(ability.trigger.source, path + '.trigger.source')
+  if (ability.trigger.target) validateTarget(ability.trigger.target, path + '.trigger.target')
   if (ability.trigger.status && !catalog.statuses[ability.trigger.status]) fail(path, 'unknown trigger status')
   validateTarget(ability.target, path + '.target')
   if (!Array.isArray(ability.effects) || !ability.effects.length) fail(path, 'effects required')

@@ -5,6 +5,7 @@ export const familyKits = {
   combat: { name: 'Combat', hint: 'Whetstone prepares the hammer to its right. The hammer strips guard before damage.', placed: [['stone', [0, 0]], ['hammer', [1, 0]], ['banner', [2, 0]], ['sword', [3, 0]]] },
   scholarship: { name: 'Scholarship & Alchemy', hint: 'Storm Totem empowers touching weapons. Venom prepares the dagger to its right.', placed: [['venom', [0, 0]], ['dagger', [1, 0]], ['stormTotem', [2, 1]], ['hammer', [3, 1]], ['echo', [3, 0]]] },
   hunger: { name: 'Hunger & Curses', hint: 'Curse Idol feeds Reaping Seal over two cycles. Hungry Tooth feeds Blood Cup.', placed: [['curseIdol', [0, 0]], ['reapingSeal', [1, 0]], ['dagger', [2, 0]], ['hungryTooth', [3, 0]], ['bloodCup', [4, 0]], ['banner', [1, 1]]] },
+  thorn: { name: 'Thorn Warden', hint: 'A druid who wants to be hit. Staff saps attackers; Totem poisons them. Idol feeds potency to what it touches.', placed: [['sapwoodStaff', [0, 0]], ['blightMortar', [1, 0]], ['sporeIdol', [2, 0]], ['thornsapVial', [1, 1]], ['thornTotem', [2, 1]], ['sprig', [1, 2]], ['salve', [3, 1]]] },
   scavenging: { name: 'Scavenging & Fortune', hint: 'The dagger inside Salvager Pack generates Salvage. Patch Kit spends 2 for guard.', placed: [['salvagePack', [5, 0]], ['dagger', [5, 0]], ['patchKit', [4, 0]], ['hammer', [1, 0]]] }
 }
 function practiceBattle(items) {
@@ -12,7 +13,7 @@ function practiceBattle(items) {
     recruit: { name: 'Practice Recruit', team: 'crew', maxHealth: 30, health: 20, resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 } },
     enemy: { name: 'Armoured Dummy', mark: 'T', team: 'dungeon', maxHealth: 60, stats: { damage: 2 }, abilities: [
       { id: 'dummyGuard', trigger: { event: 'cycleStart' }, target: { kind: 'self' }, effects: [{ type: 'guard', amount: 2 }] },
-      { id: 'dummyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: 2 }] }
+      { id: 'dummyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }
     ] }
   }, items })
 }

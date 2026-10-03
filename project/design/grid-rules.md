@@ -4,7 +4,7 @@ The game uses plain JSON-compatible records. A compiled catalog holds item defin
 
 ## Authoring
 
-Edit `plugins/bell/catalog/items.js` to add or tune an item. Edit `catalog/abilities.js` for a reusable ability. `plugins/bell/catalog.js` assembles those records and statuses. No resolver or UI branch is needed for a new combination of existing blocks.
+Edit `plugins/bell/catalog/items.js` to add or tune an item. Edit `catalog/abilities.js` for a reusable ability. `plugins/bell/catalog.js` assembles those records and statuses. No resolver or UI branch is needed for a new combination of existing blocks. Design mocks go in `catalog/lab.js`: they are playable in Family Lab and never appear as dungeon or campaign loot.
 
 Example item:
 
@@ -65,7 +65,7 @@ Hunger in the demo belongs to the recruit and caps at nine. Multiple Hungry Teet
 6. The demo enemy takes its turn, unless already dead.
 7. Unused cycle preparation and guard expire. If a team won, combat-duration effects expire; otherwise the next planning cycle opens.
 
-For each event, status listeners precede ordinary abilities. Own-turn, activation, damage-dealt and status-applied triggers default to the source item/actor; damage-taken defaults to the target. An explicit trigger `source` selector watches other sources. Lifecycle events broadcast to eligible living listeners.
+For each event, status listeners precede ordinary abilities. Own-turn, activation, damage-dealt and status-applied triggers default to the source item/actor; damage-taken defaults to the target. An explicit trigger `source` selector watches other sources. A trigger `target` selector filters by who the event happened to; `{ event: 'damageTaken', target: { kind: 'owner' } }` fires when the item's owner is hit, and not when poison ticks on the enemy. Lifecycle events broadcast to eligible living listeners.
 
 `nextAction` is consumed after the next successful own-turn ability, so all effects in that ability share the preparation. `expires:'cycle'` is an optional fallback. `whileAdjacent` contributions suspend when either item leaves the edge. Use declarative `auras` for continuous placement bonuses. Same-source, same-ability stat modifiers replace their previous value; distinct sources add. Status stacking can add, replace or take the maximum, with an optional cap.
 
