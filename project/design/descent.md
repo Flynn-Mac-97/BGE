@@ -51,8 +51,7 @@ any change to the numbers.
 | `plugins/bell/descent/run.js` | The run: floors, Embers, cards, chests, evolution, death. Plain records in and out. |
 | `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
 | `plugins/bell/descent/view.js` | The hub, the run header, cards, chest and summary screens. |
-| `plugins/bell/descent/gear-models.js` | Which grid items show on the side-on hero, in hand or on the back, and the back slots. |
-| `plugins/bell/descent/scene.js` | What the side-on scene reads from the game: gear, attacker, floor. The types in `types/` act it out. |
+| `plugins/bell/descent/battle-stage.js` | The battle stage: framed portraits, nameplates with HP and Embers, the battle text box, and the per-step effects. Styles are in `assets/ui/theme.css`. |
 
 To add an item to the run, add it to the catalog, then to `pool.js`. To add an
 evolution, add one recipe and one item record in `evolutions.js`. No logic

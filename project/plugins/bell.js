@@ -13,7 +13,6 @@ import { profileStore, settleRun, buyUpgrade, unlockedCrew } from './bell/descen
 import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun } from './bell/descent/run.js'
 import { hubView } from './bell/descent/view.js'
 import { descentCrew } from './bell/descent/pool.js'
-import { sceneFacts } from './bell/descent/scene.js'
 const sessions = new WeakMap()
 /** The hub's first line: a welcome, or the last result. */
 const hubWelcome = profile => profile.runs ? `The Last Lantern. ${profile.runs} run${profile.runs === 1 ? '' : 's'} so far; the deepest reached floor ${profile.bestFloor}. The stair waits.` : 'The Last Lantern, at the top of a stair that has no bottom. Choose who goes down. Whatever they find, the Bells they bring back stay with you.'
@@ -159,7 +158,7 @@ export default {
       }
     }
     context.bellCrafter = crafter
-    context.blackBell = { scene: () => sceneFacts(state), read: () => structuredClone(state), action: (name, value) => { if (!actions[name]) throw new Error('Unknown Black Bell action ' + name); actions[name](value); return context.blackBell.read() } }
+    context.blackBell = { read: () => structuredClone(state), action: (name, value) => { if (!actions[name]) throw new Error('Unknown Black Bell action ' + name); actions[name](value); return context.blackBell.read() } }
     sessions.set(context, { state, advance })
     context.bus.on('play:started', () => { redraw(); context.gameUi.show('black-bell', { html: () => html, on: actions }) })
   },

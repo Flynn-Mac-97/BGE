@@ -120,7 +120,7 @@ test('the Lantern hub starts a run, a card is taken through the panel, and givin
   game.panel.on.fight()
   for (let tick = 0; tick < 200 && game.read().journey.phase === 'battle'; tick++) game.tick(1, 2)
   assert.equal(game.read().journey.phase, 'levelUp')
-  assert.match(game.panel.html(), /LEVEL 2 · CHOOSE ONE/)
+  assert.match(game.panel.html(), /ROOK GREW TO LEVEL 2! · CHOOSE ONE/)
   game.panel.on.card(0)
   assert.equal(game.read().journey.descent.level, 2)
   game.panel.on.menu(); game.panel.on.abandon()
@@ -131,4 +131,19 @@ test('the Lantern hub starts a run, a card is taken through the panel, and givin
   assert.equal(profile.bells, 1)
   assert.equal(profile.journey, null)
   assert.equal(JSON.parse(storage.get('black-bell-descent-v1')).bells, 1)
+})
+
+test('the battle box narrates hits, poison and statuses, and skips stack bookkeeping', async () => {
+  const { battleLine } = await import('../plugins/bell/descent/battle-stage.js')
+  const random = seededRandom(2)
+  const journey = createRun(createProfile(), 'pip', random)
+  const lines = []
+  for (let cycle = 0; cycle < 3 && journey.phase === 'battle'; cycle++) {
+    const result = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] })
+    lines.push(...result.trace.map(battleLine).filter(Boolean))
+    journey.battle = result.state
+    finishFloor(journey, random)
+  }
+  assert.ok(lines.some(line => /^Rusty Dagger hits .+ for \d+!/.test(line)), lines.join('\n'))
+  assert.ok(lines.every(line => !line.includes('→')), lines.join('\n'))
 })

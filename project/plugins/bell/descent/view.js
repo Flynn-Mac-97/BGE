@@ -38,9 +38,6 @@ export function runHeader(kit, journey) {
   return `<span>THE DESCENT · ${escape(regionOf(run.floor).name.toUpperCase())} · FLOOR ${run.floor}${kind} · LV ${run.level} · ${run.bells} BELLS</span><div class="ember-meter"><small>EMBERS ${run.embers}/${need}</small>${kit.bar(run.embers, { max: need, trail: false })}</div>`
 }
 
-/** The last lines of the run's story, newest last, for the stage caption. */
-export const storyLines = journey => journey.descent.story.slice(-3).map((line, index, lines) => `<span class="${index === lines.length - 1 ? 'story-now' : 'story-past'}">${escape(line)}</span>`).join('')
-
 /** Small marks on a grid item: its level, and a star when it can evolve at the next chest. */
 export function levelBadge(journey, id, readyIds) {
   const item = journey.descent.items[id]
@@ -77,12 +74,12 @@ const overlays = {
       return `<section class="loot-card descent-card">${art(kit, face.image, face.title)}<strong>${escape(face.title)}</strong><small>${escape(face.sub)}</small><p>${escape(face.text)}</p>${face.hint ? `<p class="card-hint">${escape(face.hint)}</p>` : ''}${kit.button('Take', { action: 'card', value: index })}</section>`
     }).join('')
     const more = run.pendingLevels > 1 ? ` ${run.pendingLevels - 1} more after this.` : ''
-    return `<div class="menu-shade"><section class="loot-sheet"><h2>LEVEL ${run.level + 1} · CHOOSE ONE</h2><p>${escape(journey.message)}${more}</p><div class="loot-choices">${cards}</div>${kit.button(`Reroll · ${run.rerolls} left`, { action: 'reroll', isDisabled: run.rerolls < 1 })}</section></div>`
+    return `<div class="menu-shade"><section class="loot-sheet"><h2>${escape(descentCrew[run.crew].name.toUpperCase())} GREW TO LEVEL ${run.level + 1}! · CHOOSE ONE</h2><p>${escape(journey.message)}${more}</p><div class="loot-choices">${cards}</div>${kit.button(`Reroll · ${run.rerolls} left`, { action: 'reroll', isDisabled: run.rerolls < 1 })}</section></div>`
   },
   chest: (kit, journey) => {
     const chest = journey.descent.chest
     const body = chest.kind === 'evolution'
-      ? `<div class="evolution-reveal">${art(kit, chest.from, itemName(chest.from))}<strong>→</strong>${art(kit, chest.into, itemName(chest.into))}</div><h3>${escape(itemName(chest.from))} becomes ${escape(itemName(chest.into)).toUpperCase()}</h3><p>${escape(rules.catalog.items[chest.into].description)}</p>`
+      ? `<p class="evolve-start">What? ${escape(itemName(chest.from))} is evolving!</p><div class="evolution-morph"><span class="morph-from">${art(kit, chest.from, itemName(chest.from))}</span><span class="morph-into">${art(kit, chest.into, itemName(chest.into))}</span></div><h3 class="evolve-done">${escape(itemName(chest.from))} became ${escape(itemName(chest.into)).toUpperCase()}!</h3><p class="evolve-done">${escape(rules.catalog.items[chest.into].description)}</p>`
       : `<ul>${chest.ups.map(up => `<li>${escape(itemName(up.type))} · level ${up.from} → ${up.to}</li>`).join('')}</ul>`
     return `<div class="menu-shade"><section class="loot-sheet"><h2>${chest.kind === 'evolution' ? 'THE CHEST OPENS · EVOLUTION' : 'THE CHEST OPENS'}</h2><p>${escape(journey.message)}</p>${body}${kit.button('Take it', { action: 'chest' })}</section></div>`
   },
