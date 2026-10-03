@@ -69,7 +69,7 @@ function drawPanels(context, state, sheet) {
 function writePanel(context, state, id, panel, { sheet, scope }) {
   if (!panel.element) {
     const report = details => state.queue.push(makeUiEvent(id, details.action, details.value, details.kind, details))
-    Object.assign(panel, createPanelElement(id, panel, report, tipHooks(state.tip)))
+    Object.assign(panel, createPanelElement(id, panel, report, tipHooks(state.tip), context.input))
     panel.element.dataset.phase = panel.phase
     panel.drawnFrame = state.frame
     panel.sheet = new CSSStyleSheet()
@@ -84,6 +84,7 @@ function writePanel(context, state, id, panel, { sheet, scope }) {
   if (html === panel.written) return
   panel.written = html
   patchInto(panel.root, html)
+  panel.mobile.reconcile()
   // An interactive panel with nothing on it would still take every click.
   panel.element.style.pointerEvents = panel.isInteractive && html.trim() ? 'auto' : 'none'
 }

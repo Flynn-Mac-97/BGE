@@ -1,0 +1,335 @@
+{
+  "source": "GPT Image generated atlas",
+  "columns": 6,
+  "rows": 6,
+  "size": [
+    1254,
+    1254
+  ],
+  "assets": {
+    "rook": {
+      "path": "ink/rook.png",
+      "rect": [
+        0,
+        0,
+        209,
+        209
+      ]
+    },
+    "nettle": {
+      "path": "ink/nettle.png",
+      "rect": [
+        209,
+        0,
+        418,
+        209
+      ]
+    },
+    "pip": {
+      "path": "ink/pip.png",
+      "rect": [
+        418,
+        0,
+        627,
+        209
+      ]
+    },
+    "toll": {
+      "path": "ink/toll.png",
+      "rect": [
+        627,
+        0,
+        836,
+        209
+      ]
+    },
+    "moss": {
+      "path": "ink/moss.png",
+      "rect": [
+        836,
+        0,
+        1045,
+        209
+      ]
+    },
+    "innkeeper": {
+      "path": "ink/innkeeper.png",
+      "rect": [
+        1045,
+        0,
+        1254,
+        209
+      ]
+    },
+    "cellarRat": {
+      "path": "ink/cellarRat.png",
+      "rect": [
+        0,
+        209,
+        209,
+        418
+      ]
+    },
+    "graveRobber": {
+      "path": "ink/graveRobber.png",
+      "rect": [
+        209,
+        209,
+        418,
+        418
+      ]
+    },
+    "venomLeech": {
+      "path": "ink/venomLeech.png",
+      "rect": [
+        418,
+        209,
+        627,
+        418
+      ]
+    },
+    "cellarBrute": {
+      "path": "ink/cellarBrute.png",
+      "rect": [
+        627,
+        209,
+        836,
+        418
+      ]
+    },
+    "rustedSentry": {
+      "path": "ink/rustedSentry.png",
+      "rect": [
+        836,
+        209,
+        1045,
+        418
+      ]
+    },
+    "venomKeeper": {
+      "path": "ink/venomKeeper.png",
+      "rect": [
+        1045,
+        209,
+        1254,
+        418
+      ]
+    },
+    "graveEnforcer": {
+      "path": "ink/graveEnforcer.png",
+      "rect": [
+        0,
+        418,
+        209,
+        627
+      ]
+    },
+    "cellarWarden": {
+      "path": "ink/cellarWarden.png",
+      "rect": [
+        209,
+        418,
+        418,
+        627
+      ]
+    },
+    "dagger": {
+      "path": "ink/dagger.png",
+      "rect": [
+        418,
+        418,
+        627,
+        627
+      ]
+    },
+    "sword": {
+      "path": "ink/sword.png",
+      "rect": [
+        627,
+        418,
+        836,
+        627
+      ]
+    },
+    "hammer": {
+      "path": "ink/hammer.png",
+      "rect": [
+        836,
+        418,
+        1045,
+        627
+      ]
+    },
+    "buckler": {
+      "path": "ink/buckler.png",
+      "rect": [
+        1045,
+        418,
+        1254,
+        627
+      ]
+    },
+    "venom": {
+      "path": "ink/venom.png",
+      "rect": [
+        0,
+        627,
+        209,
+        836
+      ]
+    },
+    "salve": {
+      "path": "ink/salve.png",
+      "rect": [
+        209,
+        627,
+        418,
+        836
+      ]
+    },
+    "stone": {
+      "path": "ink/stone.png",
+      "rect": [
+        418,
+        627,
+        627,
+        836
+      ]
+    },
+    "tooth": {
+      "path": "ink/tooth.png",
+      "rect": [
+        627,
+        627,
+        836,
+        836
+      ]
+    },
+    "hungryTooth": {
+      "path": "ink/hungryTooth.png",
+      "rect": [
+        836,
+        627,
+        1045,
+        836
+      ]
+    },
+    "bloodCup": {
+      "path": "ink/bloodCup.png",
+      "rect": [
+        1045,
+        627,
+        1254,
+        836
+      ]
+    },
+    "salt": {
+      "path": "ink/salt.png",
+      "rect": [
+        0,
+        836,
+        209,
+        1045
+      ]
+    },
+    "banner": {
+      "path": "ink/banner.png",
+      "rect": [
+        209,
+        836,
+        418,
+        1045
+      ]
+    },
+    "echo": {
+      "path": "ink/echo.png",
+      "rect": [
+        418,
+        836,
+        627,
+        1045
+      ]
+    },
+    "sprig": {
+      "path": "ink/sprig.png",
+      "rect": [
+        627,
+        836,
+        836,
+        1045
+      ]
+    },
+    "pouch": {
+      "path": "ink/pouch.png",
+      "rect": [
+        836,
+        836,
+        1045,
+        1045
+      ]
+    },
+    "pack": {
+      "path": "ink/pack.png",
+      "rect": [
+        1045,
+        836,
+        1254,
+        1045
+      ]
+    },
+    "rootTotem": {
+      "path": "ink/rootTotem.png",
+      "rect": [
+        0,
+        1045,
+        209,
+        1254
+      ]
+    },
+    "stormTotem": {
+      "path": "ink/stormTotem.png",
+      "rect": [
+        209,
+        1045,
+        418,
+        1254
+      ]
+    },
+    "curseIdol": {
+      "path": "ink/curseIdol.png",
+      "rect": [
+        418,
+        1045,
+        627,
+        1254
+      ]
+    },
+    "reapingSeal": {
+      "path": "ink/reapingSeal.png",
+      "rect": [
+        627,
+        1045,
+        836,
+        1254
+      ]
+    },
+    "salvagePack": {
+      "path": "ink/salvagePack.png",
+      "rect": [
+        836,
+        1045,
+        1045,
+        1254
+      ]
+    },
+    "patchKit": {
+      "path": "ink/patchKit.png",
+      "rect": [
+        1045,
+        1045,
+        1254,
+        1254
+      ]
+    }
+  }
+}

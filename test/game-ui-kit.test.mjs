@@ -844,3 +844,14 @@ test('a virtual list reports its scroll position, cannot be focused, and lists o
   const after = context.gameUi.controls('list').filter(control => control.action === 'pick').map(control => control.value)
   assert.deepEqual([after[0], after.at(-1)], ['196', '213'], 'the window moved to rows 196 to 213')
 })
+
+test('multiline concept notes are escaped and read as a text control', () => {
+  const context = loaded()
+  const text = 'first line\n<script>second</script>'
+  context.context.gameUi.show('notes', { html: kit.textArea('Raw notes', { action: 'notes', value: text }) })
+  const html = kit.textArea('Raw notes', { action: 'notes', value: text, rows: 5 })
+  assert.match(html, /<textarea/)
+  assert.match(html, /rows="5"/)
+  assert.ok(html.includes('first line\n&lt;script&gt;second&lt;/script&gt;'))
+  assert.ok(!html.includes('<script>'))
+})

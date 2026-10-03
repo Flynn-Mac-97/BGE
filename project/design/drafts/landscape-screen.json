@@ -1,0 +1,95 @@
+{
+  "id": "draft-landscape-game-screen",
+  "title": "05 / LANDSCAPE GAME SCREEN — planning and play",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "NATIVE LANDSCAPE · THE BLACK BELL · SCREEN CONCEPT",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1280
+    },
+    {
+      "id": "planning",
+      "kind": "image",
+      "text": "concepts/landscape-planning.png",
+      "at": [
+        0,
+        70
+      ],
+      "w": 960,
+      "h": 540
+    },
+    {
+      "id": "planning-note",
+      "kind": "note",
+      "text": "PLANNING\nWide side-view dungeon above the equipment tray. Reserve on the left; exact 3×3 equipment grid; one continuous 1×2 dagger footprint; pinned selected-item inspector beside the grid. Ring button on the right for thumb access. Inspector labels upcoming preparation as a preview.",
+      "at": [
+        990,
+        70
+      ],
+      "w": 290
+    },
+    {
+      "id": "combat",
+      "kind": "image",
+      "text": "concepts/landscape-combat.png",
+      "at": [
+        0,
+        740
+      ],
+      "w": 960,
+      "h": 540
+    },
+    {
+      "id": "combat-note",
+      "kind": "note",
+      "text": "PLAY / TURN RESOLUTION\nSame layout. Dagger hits for 2 damage and applies 2 Poison; adjacent tooth grants 2 Guard once. Venom charge is consumed, tooth shows Used, movement/stow are locked, and Ring becomes Pause Turn. Effects remain small 2D tokens and numeric feedback.",
+      "at": [
+        990,
+        740
+      ],
+      "w": 290
+    },
+    {
+      "id": "layout-rule",
+      "kind": "note",
+      "text": "LAYOUT DIRECTION\nGame-first native landscape screen. Maintain clear touch targets and safe areas on both sides. No joystick: this prototype auto-resolves its grid. The concept proposes an inspector beside the grid while the dungeon remains visible; full Details can hold presentation. All scenes use the same core layout to avoid screen jumps.",
+      "at": [
+        990,
+        350
+      ],
+      "w": 290
+    },
+    {
+      "id": "implementation",
+      "kind": "note",
+      "text": "IMPLEMENTATION STATUS\nPrototype defaults to 844×390, fit: screen, orientation: landscape. Android orientation is landscape for subsequent exports. Existing placeholder gameplay and inspection mechanism remain playable. These two painted images are design references in Draft, not implemented game art. No new APK in this concept pass.",
+      "at": [
+        990,
+        1040
+      ],
+      "w": 290
+    },
+    {
+      "id": "caption",
+      "kind": "text",
+      "text": "Approved tooltip style applied to a complete screen. Compare the two states before committing to production assets.",
+      "at": [
+        0,
+        640
+      ],
+      "w": 960
+    }
+  ],
+  "edges": [
+    [
+      "planning",
+      "combat",
+      "ring the bell"
+    ]
+  ]
+}

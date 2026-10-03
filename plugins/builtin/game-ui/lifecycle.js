@@ -15,6 +15,7 @@ export function dropGoneAnchors(context, state) {
 export function removeNow(context, state, id) {
   const record = state.panels.get(id) ?? state.anchors.get(id)
   if (!record) return false
+  record.mobile?.dispose()
   if (record.kind === 'panel' && record.element) context.ui?.unmount(record.element)
   if (record.kind === 'anchor') removeAnchorElement(record)
   state.panels.delete(id)

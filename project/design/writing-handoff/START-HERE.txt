@@ -1,0 +1,195 @@
+BLACK BELL — WRITING HANDOFF
+Snapshot: 2026-10-01. Working title and family names remain provisional.
+
+HOW TO USE THIS PACKAGE
+
+For a GPT writing session, upload ALL-DRAFT-DETAILS.txt first. It includes this
+brief, the full text of all eight saved Draft boards, their connections, the
+prototype README and an image inventory. The ZIP also contains editable JSON
+boards, original concept PNGs, five separate transparent family icons and
+review screenshots. All board text is retained, including older proposals.
+
+Latest setting overview: design/drafts/world-powers.json.
+More detailed family ideas: design/drafts/power-families.json.
+Item interaction ideas: design/drafts/item-interactions.json.
+Latest visual format: separate emblem icons with editable text cards.
+Current visual capture: screenshots/black-bell-separate-family-icons-draft.png.
+
+GAME DIRECTION
+
+A medieval dark-fantasy dungeon game, inspired by the retro feel of Wizardry.
+The player starts with a weak, poorly equipped crew and builds power through
+items, upgrades and combinations. The intended game is 2D, side-view and native
+landscape for mobile. Combat is an auto battler organised into rounds, with
+interesting grid decisions between resolutions. The user wants a real game
+layout and snappy touch interactions.
+
+The equipment grid is central. Items occupy different-sized footprints.
+Their placement, activation order, targets and combinations matter. Feedback
+should show cause and effect: a potion flies over and pours onto a blade before
+it attacks, then another item reacts. Item behaviours should be modular and
+data-oriented. Appearance, family tags and character archetypes should not
+prevent compatible interactions. Archetypes can emerge from items and crew
+development rather than requiring fixed exclusive classes.
+
+This remains a mechanics prototype. The playable demo uses black-and-white
+placeholders; concept images are design references. The user prefers short
+ideas, visual Draft iterations and discussion before locking a large design.
+
+FIVE ESTABLISHED FAMILY DIRECTIONS
+
+1. EARTH & GROWTH
+Earth-elemental power, nature weaving and organic materials. Growth is the
+philosophy. Druids, herbalists, healers and poison-makers fit here. Practices
+include herbs/potions/poisons, mending/healing and spiritual or aura effects
+through relics and totems. What spirits are, how people gain access and the
+limits of growth are open. Emblem: rooted tree, broad leaves and a root stone.
+
+2. MARTIAL / COMBAT
+Traditional fighting through skill, strength, training and weaponry. Blades,
+hammers, bows, close combat and ranged combat belong here, including warriors
+and archers. The tone includes bloody, brutal violence. Weapon differences and
+the broader philosophy remain open. Emblem: crossed blade, hammer and arrow.
+
+3. SCHOLARSHIP / SCIENCE
+Knowledge, mathematics, experimentation and scholarly practice. Chemistry,
+alchemy and electricity are foundations to explore. Wealth and influence can
+enable access to reagents, tools, research and expertise; their exact role in
+combat, supply or campaign play is open. Alchemy can overlap with Earth &
+Growth. Technology level and the relationship between science and magic are
+open. Emblem: compass enclosing a flask with a lightning mark.
+
+4. DARK / HUNGER
+A mixture of dark human impulses and outside entities. Vampirism, appetite and
+curses are central directions. Slow buildup can produce great harm to an enemy
+or a powerful benefit to self. Manipulation and temptation remain possible.
+What feeds a curse, when it pays off, its costs, expiry and entity nature are
+open. Do not assume that curses automatically grow every round. Emblem: fanged
+chalice with a blood drop.
+
+5. SCAVENGING / COLLECTION
+Resourcefulness and recognising value others overlook. Find useful goods in
+junk; appraise rarity; collect, salvage and manage what the crew carries.
+Scavenger, collector, packkeeper or quartermaster roles fit. Luck is optional.
+This direction grew from a Fate/Fortune suggestion, but the user chose the
+practical collection/storage emphasis. Discovery, rarity, collection rewards
+and repair/crafting scope are open. Emblem: pack, rough shard and gem.
+
+These are setting families, not five mutually exclusive character classes or
+a final cosmology. No universal magical fuel, gods, guilds, history, morality
+system or sixth family has been established. Suggested alternatives such as
+Faith/Oaths or Dreams/Memory were not adopted.
+
+ITEMS, GRID CONNECTIONS AND EFFECTS
+
+Core interaction directions: Action, Preparation, Reaction and Storage.
+Further ideas: Supply, Relay, Conversion, Amplification, Pattern and Timing.
+Describe behaviours as trigger -> target -> effect -> limit. Separate what an
+effect does from when it runs and how it chooses a target.
+
+The user specifically confirmed storage extends the same connected grid to the
+RIGHT by adding FULL-HEIGHT columns. Chains can cross into those columns. It
+does not mean a disconnected mini-bag. Storage is modular across all families.
+Exact expansion amounts, costs, stacking and removing occupied space are open.
+
+Item sockets and empowerment are requested concepts. Socket types, quantities,
+compatibility, costs and removal rules are not locked.
+
+Shared effect ideas on the board:
+- Act: damage, heal, mend, guard.
+- Modify: empower, weaken, cleanse, apply a status.
+- Produce/convert: create supply or spend ingredients to make another resource.
+- Transfer/store: route charges or resources and keep them for later.
+- Space/access: expand grid space, reveal properties or unlock access.
+
+Possible targeting: touching neighbours, facing direction, rows, linked items,
+sockets and bounded auras. Each item should show its targets. These are options
+to explore, not universal rules that every item must use.
+
+OUTSIDE COMBAT: LOOTING
+
+The user corrected the word "looping" to "looting". Current notes are about
+discovering, inspecting, carrying and using finds. No automatic workshop ticks
+or offline production system was accepted.
+
+Possible flow: discover -> inspect -> choose Keep/Place/Salvage. Preview affected
+cells, results and costs. Preserve player choice before destroying a valuable
+find. A full grid creates choices: rearrange, add storage, leave a find or
+salvage something. Collection should not accidentally trigger combat attacks.
+
+Family examples are proposals:
+- Growth: identify organic finds; herbs + bottle + mortar could make medicine
+  or poison, spending ingredients.
+- Combat: open a cache with a tool; repair damaged loot; keep or salvage gear.
+- Scholarship: inspect unknown materials or devices with a lens/assay tool.
+- Hunger: capture remnants or inspect/contain a cursed relic; keep, cleanse or
+  sacrifice it. Costs and risks remain open.
+- Scavenging: sort selected junk into parts, recognise rare components and use
+  pack space to carry useful goods.
+
+CURRENT PLAYABLE MECHANICS — DISTINCT FROM DESIGN PROPOSALS
+
+One recruit, one enemy at a time, a 3x3 grid, six items and three fixed fights.
+The recruit starts with only the dagger equipped; all six items are available
+to test. Each item activates once at its starting cell in left-to-right,
+top-to-bottom order. Preparation targets the blade immediately to the right.
+The tooth listens from round start and can react once per round to an
+edge-adjacent blade's poisoned hit. Late preparation does not make the blade
+attack twice. Presentation controls do not change combat outcomes.
+
+- Rusty dagger: 1x2, 2 damage; consumes prepared venom and sharpening.
+- Venom vial: 1x1, prepares +2 poison for the blade immediately right; refills
+  each round in this prototype.
+- Whetstone: 1x1, prepares +2 next-strike damage for the blade immediately
+  right; expires this round.
+- Scavenger tooth: 1x1, poisoned blade hit -> +2 guard, once per round.
+- Buckler: 2x2, +3 guard for this round.
+- Salve: 1x1, restores 2 health up to 12; refills each round in this prototype.
+
+Poison deals its stack amount before the enemy and loses one stack. Enemy
+attack is 4. Unused preparation and guard expire each round. Fights have enemy
+health 14, 18 and 22. The next fight restores recruit health to 12 and keeps the
+equipment layout. Retry also keeps the layout. Restart returns to a bare
+dagger. There is no implemented loot/reward system, grid expansion, sockets,
+crew progression, persistent save or procedural dungeon yet.
+
+The user disliked "ring the bell" as the interaction theme. The main button is
+Play round. Older Draft text and log messages still use bell language; this
+does not establish a mandatory bell ritual or final title.
+
+VISUAL REFERENCES AND STATUS
+
+Current family art: five separately sliced transparent icons, original pixels
+preserved, with family descriptions in editable Draft cards. PNGs and slicing
+manifest are in assets/concepts/family-icons/. No text is baked into these
+icons. Use these for continuing family studies.
+
+The earlier power-family-cards.png has descriptions baked into the artwork;
+that presentation was superseded by the icon-only format. Keep it as an older
+study, not the current layout specification. power-family-emblems.png is the
+approved source strip from which the individual icons were sliced.
+
+item-card-study.png is a supplementary item-card proposal. Its Herbal Brew and
+pack values are illustrative. They do not replace the actual Salve rules or
+implement storage. tooltip-gothic.png was an approved visual reference for
+inspection. landscape-planning.png and landscape-combat.png are archived
+painted screen studies; later playable work returned to monochrome mechanics.
+
+Wizardry is the intended inspiration. Earlier spelling confusion around its
+sword-hilt logo does not establish an unrelated artist as the source.
+
+NEXT WRITING DIRECTIONS TO DISCUSS
+
+Work out how each family gains power, its materials/foci, beliefs and costs.
+Explore overlaps and rivalries without locking item use to a family. Define
+what a find reveals before or after appraisal, what makes a relic cursed, and
+how rare goods support combinations. Decide how sockets and storage extend
+choices. Keep new lore and rules clearly labelled as proposals until adopted.
+
+SUGGESTED PROMPT FOR THE WRITING SESSION
+
+"Read this Black Bell handoff and the full Draft details. Help me develop the
+world's five power families, their philosophies, materials, relics and loot.
+Preserve the established direction and identify open questions. Work with me
+through short ideas and small iterations; label new lore as proposals. Keep
+descriptions separate from icon art and keep item behaviours modular."

@@ -24,6 +24,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
 import { KIND, buildIndex, walk } from './project-index.mjs'
+import { writeWebApp } from './export-web-app.mjs'
 
 /** The plugin categories a game runs with. `editor` and `agents` are the editor's. */
 export const RUNTIME_CATEGORIES = new Set(['engine', 'visuals', 'game'])
@@ -177,6 +178,7 @@ export async function exportGame({ checkout, project, out }) {
     JSON.stringify(projectFiles.map(file => ({ path: file, kind: KIND(file) })))
   )
   await fs.writeFile(path.join(out, MARK), `${game.title ?? path.basename(project)}\n`)
+  await writeWebApp(out, game)
 
   return {
     out: path.resolve(out),

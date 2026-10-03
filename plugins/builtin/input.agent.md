@@ -34,3 +34,6 @@ category: gameplay
   a name in a panel does not move the player.
 - Every held key is released on window `blur`. A key held while the tab loses
   focus would otherwise stay down for good.
+
+- `holdAction(action, source)` / `releaseAction(action, source)` drive one named control through the recorded input path. Independent sources and physical keys do not release each other. Keep source names stable. Bindings are local to one world.
+- Touches on Game UI controls do not press mouse actions. See `game-ui.agent/mobile.md` for the touch kit.

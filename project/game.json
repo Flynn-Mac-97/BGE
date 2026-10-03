@@ -1,0 +1,27 @@
+{
+  "title": "Black Bell \u2014 The Last Lantern",
+  "startLevel": "main",
+  "device": {
+    "width": 844,
+    "height": 390,
+    "pixelRatio": 1,
+    "fit": "screen",
+    "orientation": "landscape"
+  },
+  "render": {
+    "backend": "webgpu"
+  },
+  "android": {
+    "package": "com.engine.blackbellprototype",
+    "orientation": "landscape"
+  },
+  "plugins": {
+    "only": [
+      "Game UI",
+      "Render",
+      "Keyboard Input",
+      "Screen",
+      "Heads Up Display"
+    ]
+  }
+}

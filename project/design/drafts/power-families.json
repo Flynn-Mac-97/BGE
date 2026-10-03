@@ -1,0 +1,658 @@
+{
+  "id": "draft-power-families",
+  "title": "07 / POWER FAMILIES — Nature, Martial, Scholarship, Dark & Scavenging (rough)",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "07 / POWER FAMILIES — Earth & Growth · rough ideas",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1040
+    },
+    {
+      "id": "earth-growth",
+      "kind": "note",
+      "text": "EARTH & GROWTH\nEarth-elemental basis. Power expressed through nature, organic materials and spiritual effects.",
+      "at": [
+        350,
+        90
+      ],
+      "w": 340
+    },
+    {
+      "id": "philosophy",
+      "kind": "note",
+      "text": "PHILOSOPHY\nGrowth. The deeper meaning is still open.",
+      "at": [
+        0,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "materials",
+      "kind": "note",
+      "text": "MATERIALS\nPlants, herbs and other organic materials. Relics and totems can act as spiritual foci.",
+      "at": [
+        760,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "weaving",
+      "kind": "note",
+      "text": "NATURE WEAVING\nDruidic practice: working with nature and organic materials.",
+      "at": [
+        0,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "herbalism",
+      "kind": "note",
+      "text": "HERBAL ALCHEMY\nHerbalists, potions and poisons. A material route into this family’s power.",
+      "at": [
+        370,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "spiritual",
+      "kind": "note",
+      "text": "SPIRITUAL FOCI\nRelics and totems carry or channel auras and spiritual effects.",
+      "at": [
+        740,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "effect-directions",
+      "kind": "note",
+      "text": "EFFECT DIRECTIONS\nGrowth · mending · healing · poisons · auras · spiritual effects.\nShared ideas for the whole family; not exclusive to one practice.",
+      "at": [
+        270,
+        560
+      ],
+      "w": 500
+    },
+    {
+      "id": "open",
+      "kind": "note",
+      "text": "LEAVE OPEN\nMeaning of growth · nature of the spirits · how foci work · who can access the power.\nSetting ideas only; no rules or numbers locked in.",
+      "at": [
+        0,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "modular",
+      "kind": "note",
+      "text": "ITEM CONNECTION\nOrganic ingredients, potions, relics and totems give us different item forms for this family.\nTheir interaction behaviours remain modular.",
+      "at": [
+        540,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "martial-title",
+      "kind": "text",
+      "text": "MARTIAL / COMBAT · rough ideas",
+      "at": [
+        1200,
+        0
+      ],
+      "w": 1040
+    },
+    {
+      "id": "martial-combat",
+      "kind": "note",
+      "text": "MARTIAL / COMBAT\nTraditional fighting through weaponry, skill and strength. Close combat and ranged combat.",
+      "at": [
+        1550,
+        90
+      ],
+      "w": 340
+    },
+    {
+      "id": "martial-power",
+      "kind": "note",
+      "text": "POWER\nSkill and strength. Learned fighting ability and physical force.",
+      "at": [
+        1200,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "martial-tone",
+      "kind": "note",
+      "text": "TONE\nBloody, brutal violence. Physical combat is a force in this world.",
+      "at": [
+        1960,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "martial-close",
+      "kind": "note",
+      "text": "BLADES & HAND-TO-HAND\nBlades and other close-combat methods. Traditional warriors and close-range fighters.",
+      "at": [
+        1200,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "martial-force",
+      "kind": "note",
+      "text": "HAMMERS & OTHER WEAPONS\nHammers and other fighting implements. Skill and strength both remain relevant.",
+      "at": [
+        1570,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "martial-ranged",
+      "kind": "note",
+      "text": "BOWS & RANGED COMBAT\nArchers and other ranged fighters. Fighting through weapon handling and trained skill.",
+      "at": [
+        1940,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "martial-expression",
+      "kind": "note",
+      "text": "SHARED FAMILY\nWarriors · archers · hand-to-hand fighters.\nDifferent weapons and methods within traditional physical combat.",
+      "at": [
+        1470,
+        560
+      ],
+      "w": 500
+    },
+    {
+      "id": "martial-open",
+      "kind": "note",
+      "text": "LEAVE OPEN\nCombat philosophy · how skill and strength differ · how injury affects fighting.\nRough setting ideas; no rules or stats locked in.",
+      "at": [
+        1200,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "martial-items",
+      "kind": "note",
+      "text": "ITEM CONNECTION\nBows, blades, hammers and other weapons express this family.\nItem interaction behaviours stay modular; hybrid combinations remain open.",
+      "at": [
+        1740,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "science-title",
+      "kind": "text",
+      "text": "SCHOLARSHIP / SCIENCE · rough ideas",
+      "at": [
+        2400,
+        0
+      ],
+      "w": 1040
+    },
+    {
+      "id": "science-family",
+      "kind": "note",
+      "text": "SCHOLARSHIP / SCIENCE\nPower through knowledge, mathematics and scholarly practice. Chemistry, alchemy and electricity are possible foundations.",
+      "at": [
+        2750,
+        90
+      ],
+      "w": 340
+    },
+    {
+      "id": "science-source",
+      "kind": "note",
+      "text": "APPROACH\nObservation, calculation and experiment. Learn how materials and forces behave, then put that knowledge to use.",
+      "at": [
+        2400,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "science-means",
+      "kind": "note",
+      "text": "WEALTH & INFLUENCE\nPossible uses: obtain rare reagents, fund research, secure equipment or enlist expertise and support.",
+      "at": [
+        3160,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "science-chemistry",
+      "kind": "note",
+      "text": "CHEMISTRY & ALCHEMY\nMixtures, reactions and catalysts. Possible uses: remedies, acids, smoke and volatile preparations.",
+      "at": [
+        2400,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "science-electricity",
+      "kind": "note",
+      "text": "ELECTRICITY\nStore charge, conduct it through linked items, then discharge. Possible uses: energise a device or empower an attack.",
+      "at": [
+        2770,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "science-mathematics",
+      "kind": "note",
+      "text": "MATHS & SCHOLARSHIP\nRatios, patterns and prediction. Possible uses: refine mixtures, improve precision or optimise an item chain.",
+      "at": [
+        3140,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "science-uses",
+      "kind": "note",
+      "text": "COMBINATION IDEAS\nConductive preparation → electrical discharge.\nCatalyst → stronger mixture.\nCalculated preparation → precise attack.\nPossible uses to explore, not settled rules.",
+      "at": [
+        2670,
+        560
+      ],
+      "w": 500
+    },
+    {
+      "id": "science-open",
+      "kind": "note",
+      "text": "LEAVE OPEN\nTechnology level · relation to magic · whether wealth and influence affect battles, supplies or the wider run.\nSetting ideas; no costs or stats locked in.",
+      "at": [
+        2400,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "science-items",
+      "kind": "note",
+      "text": "ITEM CONNECTION\nReagents, formulae, instruments and conductive materials.\nAlchemy can overlap Earth & Growth; preparations can support martial weapons.",
+      "at": [
+        2940,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "dark-title",
+      "kind": "text",
+      "text": "DARK / HUNGER · rough ideas",
+      "at": [
+        3600,
+        0
+      ],
+      "w": 1040
+    },
+    {
+      "id": "dark-family",
+      "kind": "note",
+      "text": "DARK / HUNGER\nHuman emotions and impulses mixed with outside supernatural entities. Vampirism, hunger and slow-burning curses.",
+      "at": [
+        3950,
+        90
+      ],
+      "w": 340
+    },
+    {
+      "id": "dark-source",
+      "kind": "note",
+      "text": "MIXED SOURCE\nPower from within people and from entities that engage with or exploit those feelings. The relationship is still open.",
+      "at": [
+        3600,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "dark-hunger",
+      "kind": "note",
+      "text": "HUNGER\nTaking, needing, feeding. Decide later what sustains the power and what feeding costs.",
+      "at": [
+        4360,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "dark-vampirism",
+      "kind": "note",
+      "text": "VAMPIRISM\nDrain vitality and sustain the user. Feeding could also empower a linked item. Exact benefits and limits remain open.",
+      "at": [
+        3600,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "dark-curses",
+      "kind": "note",
+      "text": "CURSES\nSlow buildup across rounds, with a delayed and potentially powerful payoff. Possible outcomes: great harm to an enemy or a strong benefit to the user.",
+      "at": [
+        3970,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "dark-manipulation",
+      "kind": "note",
+      "text": "MANIPULATION / TEMPTATION\nExplore fear, desire and control. Possible uses: lure, bind or misdirect. Still an idea to discuss.",
+      "at": [
+        4340,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "dark-playstyle",
+      "kind": "note",
+      "text": "DELAYED PAYOFF\nBuild curse pressure → reach a large payoff.\nEnemy harm or self benefit. Vampirism could sustain the user while waiting.",
+      "at": [
+        3870,
+        560
+      ],
+      "w": 500
+    },
+    {
+      "id": "dark-open",
+      "kind": "note",
+      "text": "LEAVE OPEN\nWhat builds the curse: time, other items, or both. How it pays off, expires and is sustained.\nEntity nature and feeding costs also remain open.",
+      "at": [
+        3600,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "dark-items",
+      "kind": "note",
+      "text": "ITEM CONNECTION\nRelics, vessels and prepared poisons are possible carriers.\nVampiric or curse behaviours can combine with other item behaviours.",
+      "at": [
+        4140,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "scavenging-title",
+      "kind": "text",
+      "text": "SCAVENGING / COLLECTION · rough ideas",
+      "at": [
+        4800,
+        0
+      ],
+      "w": 1040
+    },
+    {
+      "id": "scavenging-family",
+      "kind": "note",
+      "text": "SCAVENGING / COLLECTION\nA crew member who finds useful goods in junk, recognises unusual value and manages what the party carries.",
+      "at": [
+        5150,
+        90
+      ],
+      "w": 340
+    },
+    {
+      "id": "scavenging-source",
+      "kind": "note",
+      "text": "RESOURCEFULNESS\nAn eye for usable parts, careful collection and practical organisation. Find value in what others discard.",
+      "at": [
+        4800,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "scavenging-fortune",
+      "kind": "note",
+      "text": "FORTUNE (OPTIONAL)\nChance, omens or fortunate discoveries can add flavour. Skill in recognising value is central to this archetype.",
+      "at": [
+        5560,
+        90
+      ],
+      "w": 280
+    },
+    {
+      "id": "scavenging-salvage",
+      "kind": "note",
+      "text": "SCAVENGE & SALVAGE\nFind goods among junk and dungeon debris. Recovered parts could become reagents, supplies or useful equipment.",
+      "at": [
+        4800,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging-storage",
+      "kind": "note",
+      "text": "PACKS & STORAGE\nPouches and packs add full-height columns to the right of the shared grid. A specialist manages capacity and useful arrangements.",
+      "at": [
+        5170,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging-appraisal",
+      "kind": "note",
+      "text": "APPRAISAL & COLLECTION\nRecognise rarity, hidden properties and useful combinations. Collection could reward noticing overlooked items.",
+      "at": [
+        5540,
+        310
+      ],
+      "w": 300
+    },
+    {
+      "id": "scavenging-loop",
+      "kind": "note",
+      "text": "POSSIBLE LOOP\nFind overlooked goods → recognise value → make room in the pack → build a useful item chain.\nSupply and collection support the whole crew.",
+      "at": [
+        5070,
+        560
+      ],
+      "w": 500
+    },
+    {
+      "id": "scavenging-open",
+      "kind": "note",
+      "text": "LEAVE OPEN\nHow finds are discovered; how rarity is recognised; collection rewards; whether salvage repairs, crafts or simply recovers items.",
+      "at": [
+        4800,
+        790
+      ],
+      "w": 500
+    },
+    {
+      "id": "scavenging-items",
+      "kind": "note",
+      "text": "ITEM CONNECTION\nPacks, pouches, gathered components and unusual finds.\nStorage remains a modular behaviour usable across all families.",
+      "at": [
+        5340,
+        790
+      ],
+      "w": 500
+    }
+  ],
+  "edges": [
+    {
+      "from": "earth-growth",
+      "to": "weaving",
+      "text": "practice"
+    },
+    {
+      "from": "earth-growth",
+      "to": "herbalism",
+      "text": "practice"
+    },
+    {
+      "from": "earth-growth",
+      "to": "spiritual",
+      "text": "practice"
+    },
+    {
+      "from": "weaving",
+      "to": "effect-directions",
+      "text": "expressions"
+    },
+    {
+      "from": "herbalism",
+      "to": "effect-directions",
+      "text": "expressions"
+    },
+    {
+      "from": "spiritual",
+      "to": "effect-directions",
+      "text": "expressions"
+    },
+    {
+      "from": "martial-combat",
+      "to": "martial-close",
+      "text": "method"
+    },
+    {
+      "from": "martial-combat",
+      "to": "martial-force",
+      "text": "method"
+    },
+    {
+      "from": "martial-combat",
+      "to": "martial-ranged",
+      "text": "method"
+    },
+    {
+      "from": "martial-close",
+      "to": "martial-expression",
+      "text": "combatants"
+    },
+    {
+      "from": "martial-force",
+      "to": "martial-expression",
+      "text": "combatants"
+    },
+    {
+      "from": "martial-ranged",
+      "to": "martial-expression",
+      "text": "combatants"
+    },
+    {
+      "from": "science-family",
+      "to": "science-chemistry",
+      "text": "practice"
+    },
+    {
+      "from": "science-family",
+      "to": "science-electricity",
+      "text": "practice"
+    },
+    {
+      "from": "science-family",
+      "to": "science-mathematics",
+      "text": "practice"
+    },
+    {
+      "from": "science-chemistry",
+      "to": "science-uses",
+      "text": "possible use"
+    },
+    {
+      "from": "science-electricity",
+      "to": "science-uses",
+      "text": "possible use"
+    },
+    {
+      "from": "science-mathematics",
+      "to": "science-uses",
+      "text": "possible use"
+    },
+    {
+      "from": "dark-family",
+      "to": "dark-vampirism",
+      "text": "direction"
+    },
+    {
+      "from": "dark-family",
+      "to": "dark-curses",
+      "text": "direction"
+    },
+    {
+      "from": "dark-family",
+      "to": "dark-manipulation",
+      "text": "idea"
+    },
+    {
+      "from": "dark-vampirism",
+      "to": "dark-playstyle",
+      "text": "sustain"
+    },
+    {
+      "from": "dark-curses",
+      "to": "dark-playstyle",
+      "text": "pressure"
+    },
+    {
+      "from": "dark-manipulation",
+      "to": "dark-playstyle",
+      "text": "possible support"
+    },
+    {
+      "from": "scavenging-family",
+      "to": "scavenging-salvage",
+      "text": "practice"
+    },
+    {
+      "from": "scavenging-family",
+      "to": "scavenging-storage",
+      "text": "practice"
+    },
+    {
+      "from": "scavenging-family",
+      "to": "scavenging-appraisal",
+      "text": "practice"
+    },
+    {
+      "from": "scavenging-salvage",
+      "to": "scavenging-loop",
+      "text": "find"
+    },
+    {
+      "from": "scavenging-storage",
+      "to": "scavenging-loop",
+      "text": "carry"
+    },
+    {
+      "from": "scavenging-appraisal",
+      "to": "scavenging-loop",
+      "text": "recognise"
+    }
+  ]
+}

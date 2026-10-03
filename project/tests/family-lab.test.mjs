@@ -1,0 +1,57 @@
+/** Every family has a playable kit, visible effect feedback and a reversible practice session. */
+import { defineSuite } from '../tools/node-suite.mjs'
+import assert from 'node:assert/strict'
+import { familyKits, createFamilyJourney, resetPractice } from '../plugins/bell/family-lab.js'
+import { rules } from '../plugins/bell/rules.js'
+import { finishBattle } from '../plugins/bell/loop.js'
+import { describeStep } from '../plugins/bell/feedback.js'
+import { fixture } from '../tools/ui-fixture.mjs'
+const { test, suite } = defineSuite('Family item laboratory')
+export default suite
+for (const family of Object.keys(familyKits)) test(family + ' kit plays full cycles and defeats its practice dummy', () => {
+  const journey = createFamilyJourney(family), events = []
+  assert.equal(Object.keys(journey.battle.items).length, Object.keys(rules.catalog.items).length)
+  let cycles = 0
+  while (!rules.winner(journey.battle) && cycles++ < 30) {
+    const result = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] })
+    for (const step of result.trace) { assert.equal(typeof describeStep(step), 'string'); events.push(step) }
+    journey.battle = result.state
+  }
+  assert.equal(rules.winner(journey.battle), 'crew')
+  const expected = { growth: 'rootMend', combat: 'breakArmour', scholarship: 'shockTick', hunger: 'reapCurse', scavenging: 'patchGuard' }[family]
+  assert.ok(events.some(step => step.kind === 'ability' && step.ability.id.includes(expected) && step.effects.some(effect => effect.amount > 0)), expected)
+  assert.ok(finishBattle(journey, () => 0))
+  assert.equal(journey.phase, 'practiceComplete')
+  assert.equal(journey.scrap, 0)
+  const positions = Object.values(journey.battle.items).map(item => item.position)
+  resetPractice(journey)
+  assert.deepEqual(Object.values(journey.battle.items).map(item => item.position), positions)
+  assert.equal(journey.battle.actors.enemy.health, 60)
+  assert.equal(journey.battle.actors.recruit.resources.salvage, 0)
+})
+test('touch flow enters, mixes, resets and returns to the untouched dungeon', () => {
+  const game = fixture(), before = game.read().journey
+  game.panel.on.family('scholarship')
+  assert.equal(game.read().auto, false)
+  assert.match(game.panel.html(), /LAB · Scholarship/)
+  game.panel.on.select('lab-stormTotem'); game.panel.on.details()
+  assert.match(game.panel.html(), /Grants shockHit/)
+  game.panel.on.deselect(); game.panel.on.select('lab-rootTotem'); game.panel.on.cell(10)
+  assert.deepEqual(game.read().journey.battle.items['lab-rootTotem'].position, [0, 2])
+  game.panel.on.fight(); game.tick(10)
+  game.panel.on.practiceReset()
+  assert.equal(game.read().queue.length, 0)
+  assert.deepEqual(game.read().journey.battle.items['lab-rootTotem'].position, [0, 2])
+  game.panel.on.select('lab-rootTotem'); game.panel.on.salvage()
+  assert.ok(game.read().journey.battle.items['lab-rootTotem'])
+  game.panel.on.leaveLab()
+  assert.deepEqual(game.read().journey, before)
+  assert.equal(game.read().auto, true)
+})
+test('entering practice cannot discard a pending dungeon combat', () => {
+  const game = fixture()
+  game.panel.on.fight()
+  const before = game.read()
+  game.panel.on.family('growth')
+  assert.deepEqual(game.read(), before)
+})

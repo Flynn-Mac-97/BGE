@@ -125,3 +125,7 @@ is on disk, so anything that *writes* still needs its own worktree or its own
 lane. Headless cannot draw; for a frame, use a browser.
 
 The engine hosts no AI. Any CLI can drive it.
+
+The standalone player's start gesture starts an idle loop only. Reload recovery
+may already have restored a playing loop; the gesture must not toggle it off.
+Game plugins remain responsible for durable progression outside world snapshots.

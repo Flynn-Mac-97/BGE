@@ -63,12 +63,17 @@ function watchPointer(viewport, keys, pointer) {
   viewport.addEventListener('pointerleave', () => { pointer.isOver = false })
   // In the capture phase: Mouse Look stops a click there while playing, so the
   // editor under it does not see a shot, and a bubbling listener would miss it.
-  viewport.addEventListener('pointerdown', event => { place(event); keys.press(mouseButtonName(event.button)) }, { capture: true })
+  viewport.addEventListener('pointerdown', event => {
+    if (event.composedPath?.().some(element => element.dataset?.gameUi)) return
+    place(event)
+    if (event.pointerType !== 'touch') keys.press(mouseButtonName(event.button))
+  }, { capture: true })
   addEventListener('pointerup', event => keys.release(mouseButtonName(event.button)))
+  addEventListener('pointercancel', event => keys.release(mouseButtonName(event.button)))
 }
 
 /** Whether any action is bound to this physical key. */
-const isBound = code => Object.values(ACTIONS).some(codes => codes.includes(code))
+const isBound = (actions, code) => Object.values(actions).some(codes => codes.includes(code))
 
 /** The one argument `input.press` and `input.release` take. */
 const ACTION_ARGUMENT = {
@@ -91,6 +96,10 @@ export default {
   category: 'engine',
   onLoad(context) {
     const keys = context.loop.input
+    const actions = Object.fromEntries(Object.entries(ACTIONS).map(([action, codes]) => [action, [...codes]]))
+    const sources = new Map()
+    const virtualCodes = action => [...sources.values()].filter(source => source.action === action).map(source => source.code)
+    const actionCodes = action => [...(actions[action] || []), ...virtualCodes(action)]
 
     const editing = element => ['INPUT', 'TEXTAREA'].includes(element?.tagName)
 
@@ -100,7 +109,7 @@ export default {
         // While a run plays, a key the game has bound is the game's alone: Tab
         // must not also move focus onto an editor button, where the next Space
         // would press it.
-        if (context.loop.running && isBound(event.code)) event.preventDefault()
+        if (context.loop.running && isBound(actions, event.code)) event.preventDefault()
         keys.press(event.code)
       })
       addEventListener('keyup', event => keys.release(event.code))
@@ -108,9 +117,12 @@ export default {
       // let go of here. It is recorded like any other release, because it really
       // is part of what the run was played with.
       addEventListener('blur', () => keys.releaseAll())
+      globalThis.document?.addEventListener('visibilitychange', () => {
+        if (document.hidden) keys.releaseAll()
+      })
     }
 
-    const held = action => (ACTIONS[action] || []).some(code => keys.isDown(code))
+    const held = action => actionCodes(action).some(code => keys.isDown(code))
 
     // Where the pointer is over the game view. A place, not an event, so it is
     // not recorded for replay; a run that needs it replayed binds a button.
@@ -128,15 +140,25 @@ export default {
        */
       press: code => keys.press(code),
       release: code => keys.release(code),
-      pressed: action => (ACTIONS[action] || []).some(code => keys.pressed(code)),
+      pressed: action => actionCodes(action).some(code => keys.pressed(code)),
       axis: which => which === 'y'
         ? (held('up') ? 1 : 0) - (held('down') ? 1 : 0)
         : (held('right') ? 1 : 0) - (held('left') ? 1 : 0),
-      bind: (action, codes) => { ACTIONS[action] = [].concat(codes) },
-      actions: () => Object.keys(ACTIONS),
+      bind: (action, codes) => { actions[action] = [].concat(codes) },
+      actions: () => [...new Set([...Object.keys(actions), ...[...sources.values()].map(source => source.action)])],
       // Which physical keys an action means. A test presses a real key rather
       // than faking the action, so rebinding is covered by the same test.
-      codes: action => [...(ACTIONS[action] || [])],
+      codes: action => [...(actions[action] || [])],
+      /** Hold an action from one named control without releasing another control or a keyboard key. */
+      holdAction(action, source) {
+        const code = `Virtual:${JSON.stringify([action, source])}`
+        sources.set(code, { action, source, code })
+        keys.press(code)
+      },
+      /** Release just this control's contribution. Its recorded code stays known for replay. */
+      releaseAction(action, source) {
+        keys.release(`Virtual:${JSON.stringify([action, source])}`)
+      },
       /** The pointer over the game view, in viewport pixels: `{ x, y, isOver }`. */
       pointer: () => ({ ...pointer }),
       /** Put the pointer somewhere by hand, as a test does. */

@@ -27,6 +27,7 @@
 | `table(columns, rows, { action, selected, sortKey, sortDirection })` | columns `{ key, label, align, isSortable }`, rows `{ value, ...cells }`; a row raises `action`, a sortable header raises `sort` with its key, and you sort |
 | `avatar({ image, name, size, status })` | a round picture or initials; `status`: `online away busy` |
 | `keybind(label, code, { isListening })` | a label and a keycap; the keycap raises `rebind`. Then call `gameUi.captureKey` |
+| `spellBar(spells, { label, radius })` | persistent mobile wheel; spells `{ label, action, remaining, total, isDisabled }`. Holds named input actions; cooldowns disable casting. Four spells at the default radius give 56px targets. Use `input.pressed(action)` for single casts. |
 | `radial(items, { x, y, radius })` | items `{ label, value, glyph, isDisabled }` on a circle clockwise from the top. Use `gameUi.radial` |
 | `log(lines, { height, max })` | a chat or combat log that stays at its newest line with no script; lines are text or `{ who, text, tone }`, and only the last `max` (200) are drawn |
 | `virtualList(items, { rowHeight, height, top, overscan, pick })` | any number of rows, only those in view drawn. Keep `top` from the `scroll` action |
@@ -76,3 +77,7 @@ kit.slot({ glyph: '⚔', tipKey: 'item', tipValue: 'sword' })
 - **Any list, table or log:** rows out of view skip layout and paint (`content-visibility: auto`), so a few hundred rows cost little.
 - **Thousands of rows:** use `virtualList`. Keep the scroll position in your state: the `scroll` action's value is `scrollTop` in pixels, and you pass it back as `top`. Rows are a fixed height, so the scroll bar is exact, and about 14 rows are in the page whatever the length. `pick: 'action'` makes rows clickable; `gameUi.controls(id)` lists only the rows drawn.
 - **A log:** `log(lines)` needs no script. Append to your array; the newest line stays at the bottom, and a person who scrolls up is not pulled back down until they return.
+
+`textArea(label, { action, value, placeholder, rows, isDisabled, isReadOnly })`
+is a multiline text control. It reports `input` like `textInput`; live focus and
+text selection survive normal panel updates. Read-only text remains selectable.

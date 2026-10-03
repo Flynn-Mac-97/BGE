@@ -100,7 +100,8 @@ function mountScreen(root, device) {
   root.innerHTML =
     '<div class="viewport" id="viewport"><canvas id="gl"></canvas><div class="viewport-ui" id="viewport-ui"></div></div>'
   const viewport = root.querySelector('#viewport')
-  viewport.style.aspectRatio = `${device.width} / ${device.height}`
+  viewport.dataset.fit = device.fit
+  viewport.style.aspectRatio = device.fit === 'screen' ? 'auto' : `${device.width} / ${device.height}`
   const overlay = root.querySelector('#viewport-ui')
   return { root, viewport, overlay, canvas: root.querySelector('#gl'), regions: makeRegions({ overlay }) }
 }
@@ -129,11 +130,12 @@ function waitForStart(root, title) {
 
 async function play() {
   const root = document.getElementById('app')
-  const { context, engine, editor } = await startWorld({
+  const { context, engine, editor, loop } = await startWorld({
     openFiles: bus => makeFiles(bus, overStaticFiles()),
     loadPlugins: findPlugins,
     importProjectFile,
     async attachScreen(worldContext) {
+      const game = JSON.parse(await worldContext.files.read('game.json'))
       const screen = mountScreen(root, worldContext.device)
       worldContext.ui = { mount: screen.regions.mount, unmount: screen.regions.unmount, regions: screen.regions.names }
       worldContext.shell = {
@@ -146,8 +148,10 @@ async function play() {
         focused: true
       }
       worldContext.renderer = await makeRenderer(screen.canvas, worldContext.view, worldContext.viewport, {
-        bus: worldContext.bus
+        bus: worldContext.bus,
+        backend: game.render?.backend === 'webgl' ? 'webgl' : 'webgpu'
       })
+      worldContext.renderer.setPixelRatio(worldContext.device.pixelRatio)
       worldContext.renderer.resize()
     }
   })
@@ -166,7 +170,8 @@ async function play() {
   paint()
   await waitForStart(root, editor.projectName || 'Game')
   isWaiting = false
-  editor.togglePlay()
+  // Reload recovery may already have started play; toggling would stop it.
+  if (!loop.running) editor.togglePlay()
 }
 
 play().catch(error => {

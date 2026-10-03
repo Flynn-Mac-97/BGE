@@ -1,0 +1,298 @@
+{
+  "id": "draft-item-interactions",
+  "title": "06 / ITEM INTERACTIONS — quick idea sheet",
+  "nodes": [
+    {
+      "id": "title",
+      "kind": "text",
+      "text": "06 / ITEM INTERACTIONS — quick idea sheet",
+      "at": [
+        0,
+        0
+      ],
+      "w": 1120
+    },
+    {
+      "id": "principle",
+      "kind": "note",
+      "text": "BEHAVIOUR, NOT STYLE\nAny item can combine behaviours. Appearance and character archetype do not decide its mechanics.",
+      "at": [
+        0,
+        70
+      ],
+      "w": 540
+    },
+    {
+      "id": "recipe",
+      "kind": "note",
+      "text": "MODULAR ITEM RECIPE\nFootprint + behaviours.\nEach behaviour: trigger → target → effect → limit.",
+      "at": [
+        580,
+        70
+      ],
+      "w": 540
+    },
+    {
+      "id": "core-title",
+      "kind": "text",
+      "text": "CORE BEHAVIOURS",
+      "at": [
+        0,
+        230
+      ],
+      "w": 1120
+    },
+    {
+      "id": "action",
+      "kind": "note",
+      "text": "ACTION\nExecutes an effect.\nExamples: damage, heal, guard.",
+      "at": [
+        0,
+        290
+      ],
+      "w": 260
+    },
+    {
+      "id": "prepare",
+      "kind": "note",
+      "text": "PREPARATION\nChanges another item’s next action.\nExamples: poison coating, extra damage.",
+      "at": [
+        290,
+        290
+      ],
+      "w": 260
+    },
+    {
+      "id": "reaction",
+      "kind": "note",
+      "text": "REACTION\nResponds to a named event.\nExample: nearby poisoned hit → guard.",
+      "at": [
+        580,
+        290
+      ],
+      "w": 260
+    },
+    {
+      "id": "storage",
+      "kind": "note",
+      "text": "STORAGE\nAdds full-height columns to the RIGHT of the shared grid.\nMore room; longer chains.",
+      "at": [
+        870,
+        290
+      ],
+      "w": 260
+    },
+    {
+      "id": "explore-title",
+      "kind": "text",
+      "text": "MORE INTERACTION IDEAS — not locked in",
+      "at": [
+        0,
+        480
+      ],
+      "w": 1120
+    },
+    {
+      "id": "supply",
+      "kind": "note",
+      "text": "SUPPLY\nProduces charges or energy that other items spend.",
+      "at": [
+        0,
+        540
+      ],
+      "w": 260
+    },
+    {
+      "id": "relay",
+      "kind": "note",
+      "text": "RELAY\nPasses an effect onward so a chain can reach farther.",
+      "at": [
+        290,
+        540
+      ],
+      "w": 260
+    },
+    {
+      "id": "convert",
+      "kind": "note",
+      "text": "CONVERSION\nTurns one effect into another.\nExample: healing → guard.",
+      "at": [
+        580,
+        540
+      ],
+      "w": 260
+    },
+    {
+      "id": "amplify",
+      "kind": "note",
+      "text": "AMPLIFICATION\nBoosts an eligible linked item’s effect.",
+      "at": [
+        870,
+        540
+      ],
+      "w": 260
+    },
+    {
+      "id": "pattern",
+      "kind": "note",
+      "text": "PATTERN\nRewards an arrangement.\nExamples: adjacency, same row, matching marks.",
+      "at": [
+        0,
+        700
+      ],
+      "w": 260
+    },
+    {
+      "id": "timing",
+      "kind": "note",
+      "text": "TIMING\nChanges when an effect runs.\nExamples: delayed charge, repeat next round.",
+      "at": [
+        290,
+        700
+      ],
+      "w": 260
+    },
+    {
+      "id": "targeting",
+      "kind": "note",
+      "text": "TARGETING OPTIONS\nSelf · owner · enemy · neighbour · row.\nEligibility uses mechanical capabilities.",
+      "at": [
+        580,
+        700
+      ],
+      "w": 260
+    },
+    {
+      "id": "combine",
+      "kind": "note",
+      "text": "COMBINE FREELY\nAn attack item can also store charges.\nA storage item can also prepare a neighbour.",
+      "at": [
+        870,
+        700
+      ],
+      "w": 260
+    },
+    {
+      "id": "storage-title",
+      "kind": "text",
+      "text": "STORAGE — one connected grid",
+      "at": [
+        0,
+        910
+      ],
+      "w": 1120
+    },
+    {
+      "id": "base-grid",
+      "kind": "note",
+      "text": "BASE\n3 × 3 cells",
+      "at": [
+        0,
+        970
+      ],
+      "w": 260
+    },
+    {
+      "id": "expanded-grid",
+      "kind": "note",
+      "text": "ADD STORAGE\n3 × 3 → 4 × 3\nExample: one extra full-height column on the right.",
+      "at": [
+        290,
+        970
+      ],
+      "w": 260
+    },
+    {
+      "id": "chain-grid",
+      "kind": "note",
+      "text": "CHAIN ACROSS\nExisting interactions also reach items in the extra columns.",
+      "at": [
+        580,
+        970
+      ],
+      "w": 260
+    },
+    {
+      "id": "storage-open",
+      "kind": "note",
+      "text": "DECIDE LATER\nFootprint cost · columns granted · stacking · removal when occupied.",
+      "at": [
+        870,
+        970
+      ],
+      "w": 260
+    },
+    {
+      "id": "example-title",
+      "kind": "text",
+      "text": "FIRST EXAMPLE TO BUILD OUT",
+      "at": [
+        0,
+        1190
+      ],
+      "w": 1120
+    },
+    {
+      "id": "example-prepare",
+      "kind": "note",
+      "text": "PREPARE\nGive the next attack poison.",
+      "at": [
+        0,
+        1250
+      ],
+      "w": 260
+    },
+    {
+      "id": "example-act",
+      "kind": "note",
+      "text": "ACT\nAttack and apply that poison.",
+      "at": [
+        290,
+        1250
+      ],
+      "w": 260
+    },
+    {
+      "id": "example-react",
+      "kind": "note",
+      "text": "REACT\nNotice the poisoned hit and grant guard.",
+      "at": [
+        580,
+        1250
+      ],
+      "w": 260
+    },
+    {
+      "id": "scope",
+      "kind": "note",
+      "text": "DRAFT ONLY\nCollect ideas first. No new code, art or APK. Core interactions already exist; the new types are proposals.",
+      "at": [
+        870,
+        1250
+      ],
+      "w": 260
+    }
+  ],
+  "edges": [
+    {
+      "from": "base-grid",
+      "to": "expanded-grid",
+      "text": "storage"
+    },
+    {
+      "from": "expanded-grid",
+      "to": "chain-grid",
+      "text": "same grid"
+    },
+    {
+      "from": "example-prepare",
+      "to": "example-act",
+      "text": "prepared effect"
+    },
+    {
+      "from": "example-act",
+      "to": "example-react",
+      "text": "poisoned hit"
+    }
+  ]
+}
