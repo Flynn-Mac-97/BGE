@@ -12,7 +12,7 @@
     "backend": "webgpu"
   },
   "android": {
-    "package": "com.engine.blackbellprototype",
+    "package": "com.engine.blackbelldescent",
     "orientation": "landscape"
   },
   "plugins": {
