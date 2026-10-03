@@ -1,12 +1,14 @@
 /** Short grid labels say what each item does and what feeds what, read live from the same blocks combat resolves. */
 import { rules, itemDefinition, itemReference } from './rules.js'
 import { footprint } from '../grid-game/grid.js'
+import { auraAmount } from '../grid-game/values.js'
 
 const statShort = { damage: 'DMG', potency: 'POT', guard: 'GD', heal: 'HP', poisonOnHit: 'PSN' }
 const resourceShort = { hunger: 'HUN', salvage: 'SLV' }
 const triggerShort = { combatStart: 'FIGHT', cycleStart: 'START', cycleEnd: 'END', damageTaken: 'HIT', damageDealt: 'ON DMG', itemActivated: 'ON USE', statusApplied: 'ON' }
 const arrows = { right: '▶', left: '◀', down: '▼', up: '▲' }
-const shortStat = stat => statShort[stat] ?? stat.slice(0, 3).toUpperCase()
+/** A stat's short grid name, such as DMG or POT. */
+export const shortStat = stat => statShort[stat] ?? stat.slice(0, 3).toUpperCase()
 const shortStatus = id => rules.catalog.statuses[id].short ?? rules.catalog.statuses[id].name.toUpperCase()
 const signed = amount => amount < 0 ? `−${-amount}` : `+${amount}`
 
@@ -25,7 +27,7 @@ function liveAmount(battle, id, expression) {
 export function statusText(id, amount) {
   const modifiers = rules.catalog.statuses[id].modifiers ?? []
   if (!modifiers.length) return `${amount} ${shortStatus(id)}`
-  return modifiers.map(modifier => `${signed(typeof modifier.amount === 'number' ? modifier.amount : amount)} ${shortStat(modifier.stat)}`).join(' ')
+  return modifiers.map(modifier => `${signed(typeof modifier.amount === 'number' ? modifier.amount : amount * (modifier.amount.scale ?? 1))} ${shortStat(modifier.stat)}`).join(' ')
 }
 const effectText = {
   damage: (effect, amount) => `${amount} DMG`, heal: (effect, amount) => `+${amount} HP`, guard: (effect, amount) => `+${amount} GD`,
@@ -57,7 +59,7 @@ function abilityLabel(battle, id, ability) {
 export function itemGlance(battle, id) {
   const definition = itemDefinition(battle, id)
   const lines = definition.abilities.map(ability => abilityLabel(battle, id, ability)).filter(Boolean)
-  for (const aura of definition.auras) lines.push({ trigger: 'AURA', text: `${signed(aura.amount)} ${shortStat(aura.stat)}`, isBoosted: false })
+  for (const aura of definition.auras) lines.push({ trigger: 'AURA', text: `${signed(auraAmount(aura, battle.items[id]))} ${shortStat(aura.stat)}`, isBoosted: false })
   for (const grant of definition.grants) for (const ability of grant.abilities) {
     const label = abilityLabel(battle, id, ability)
     if (label) lines.push({ trigger: 'GIVES', text: `${label.trigger ? label.trigger + ' ' : ''}${label.text}`, isBoosted: false })
@@ -74,7 +76,7 @@ export function firedGlance(step) {
 export function linkLabel(battle, link) {
   const definition = itemDefinition(battle, link.source)
   const kinds = {
-    aura: () => definition.auras.map(aura => `${signed(aura.amount)} ${shortStat(aura.stat)}`).join(' '),
+    aura: () => definition.auras.map(aura => `${signed(auraAmount(aura, battle.items[link.source]))} ${shortStat(aura.stat)}`).join(' '),
     grant: () => '✦',
     reaction: () => '◉',
     target: () => definition.abilities.map(ability => ability.target.kind === 'directionalNeighbour' ? abilityLabel(battle, link.source, ability)?.text.replace(/ [▶◀▼▲]$/, '') : null).filter(Boolean).join(' ') || '•',

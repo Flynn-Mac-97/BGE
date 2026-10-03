@@ -1,0 +1,15 @@
+{
+  "actions": {
+    "block": {
+      "path": [
+        {"at":0,"guard":{},"ease":"back-out"},
+        {"at":0.18,"guard":{"distance":0.45,"height":0.25,"side":0}},
+        {"at":0.34,"guard":{"distance":0.45,"height":0.25,"side":0},"ease":"quad-out"},
+        {"at":0.4,"guard":{"distance":0.36,"height":0.22,"side":0.02},"ease":"sine-in-out"},
+        {"at":0.55,"guard":{"distance":0.45,"height":0.25,"side":0}},
+        {"at":0.7,"guard":{"distance":0.45,"height":0.25,"side":0},"ease":"sine-in-out"},
+        {"at":0.95,"guard":{}}
+      ]
+    }
+  }
+}

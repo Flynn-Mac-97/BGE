@@ -1,6 +1,7 @@
 /** Planning hints describe geometry and normal scan order, not guaranteed combat outcomes. */
 import { rules, itemDefinition, itemReference } from './rules.js'
 import { placedItems } from '../grid-game/grid.js'
+import { auraAmount } from '../grid-game/values.js'
 const eventLabels = { combatStart: 'combat start', ownTurn: 'its turn', cycleStart: 'cycle start', cycleEnd: 'cycle end', itemActivated: 'item activation', damageDealt: 'damage dealt', damageTaken: 'damage taken', statusApplied: 'a status being applied' }
 
 /** Passive listeners and auras have no scheduled turn; they are active from cycle start. */
@@ -47,7 +48,8 @@ export function connectionLinks(battle) {
     }
     for (const grant of definition.grants) for (const target of eligibleItems(battle, item.id, grant.target)) append(item.id, target.id, 'grant', `Grants ${grant.abilities.map(ability => ability.id).join(', ')} while connected. Each recipient has independent limits.`)
     for (const aura of definition.auras) {
-      for (const target of eligibleItems(battle, item.id, aura.target)) append(item.id, target.id, 'aura', `While adjacent: ${aura.amount >= 0 ? '+' : ''}${aura.amount} ${aura.stat}. Scan order does not matter.`)
+      const amount = auraAmount(aura, item)
+      for (const target of eligibleItems(battle, item.id, aura.target)) append(item.id, target.id, 'aura', `While adjacent: ${amount >= 0 ? '+' : ''}${amount} ${aura.stat}. Scan order does not matter.`)
     }
   }
   return { order, links, missing }

@@ -1,9 +1,13 @@
 ---
 category: gameplay
-description: Black Bell's monochrome tavern, persistent crew, expeditions and grid battles.
-triggers: black bell, equipment demo, fight loop, loot, endless battler
+description: Black Bell's endless Descent run, the Lantern hub and Bell Tower, the older tavern campaign, and grid battles.
+triggers: black bell, descent, endless run, level up, evolution, bell tower, equipment demo, fight loop, loot, endless battler
 ---
 # Black Bell Prototype
+
+The start screen is the Lantern hub of **The Descent**, the endless run. Read `design/descent.md` first: the loop, the numbers in `bell/descent/tuning.js`, and which file holds which data. `bell/descent/run.js` is the run (plain records; phases battle, chest, levelUp, dead). `bell/descent/profile-save.js` saves the profile under `black-bell-descent-v1`. `bell/descent/view.js` draws the hub, run header, cards, chest and summary. Actions: `crew`, `goDown`, `continueRun`, `buy`, `card`, `reroll`, `chest`, `abandon`, `lantern`, `oldCompany`, `openLab`. `node tools/descent-sim.mjs [runs] [crew] [tower JSON]` plays seeded bot runs; run it after changing numbers.
+
+The side-on scene behind a run's stage: `types/hero.js`, `types/foe.js`, `types/pillar.js`, `types/stair.js` and `levels/main.json`, fed by `context.blackBell.scene()` (`bell/descent/scene.js`). The hero is the Kimodo mannequin from the animation demo with its takes and `animation/hero.states.json`; grid gear maps to hand and back models in `bell/descent/gear-models.js`.
 
 Uses Black Bell Grid and Game UI. `context.blackBell.read()` returns an isolated snapshot. `context.blackBell.action(name,value)` drives the same actions as touch controls. Commands: `bell.read`, `bell.action {action,value}`.
 

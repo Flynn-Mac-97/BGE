@@ -1,0 +1,59 @@
+# The Descent: endless run
+
+The main mode of Black Bell. One crew member goes down an endless stair until
+they die. Their gear grows stronger on the way down. The Bells they earn buy
+permanent upgrades at the Bell Tower, so the next run goes deeper.
+
+## The hook in one line
+
+Every floor gives Embers. A full Ember bar lets you choose one of three
+upgrades. Five levels plus the right neighbour on the grid turns an item into
+its evolved form. Enemies grow every floor, without end.
+
+## The loop, by time scale
+
+| Scale | What happens | Why it pulls |
+| --- | --- | --- |
+| Seconds | A floor is one auto-battle. Items fire in grid order; numbers pop on the grid. | Your build visibly does things. |
+| About a minute | The Ember bar fills. Choose 1 of 3 cards: level up an owned item, or, rarely, a new item. | Constant small choices; every card shows before → after numbers. |
+| About five minutes | Every 5th floor is an elite, and every 10th a boss. Both drop a chest. A chest evolves an eligible item, or gives free level-ups. | A goal you can see coming and plan the grid for. |
+| A run | Depth is the score. New crew unlock at depth 10, 15 and 25. | "One more floor." |
+| Between runs | Bells buy Bell Tower ranks: more health, more Embers, rerolls, a fourth card, higher starting levels, a wider back. | Each death still moves you forward. |
+
+## Rules
+
+- **Items level without limit.** Every number an item has is a stat. At level L each stat is `base × (1 + growth × (L − 1))`, rounded. `growth` is in `plugins/bell/descent/tuning.js`.
+- **No duplicate drops.** A card for an item you own is a level-up. New items are rare: their weight falls with every item you own, and there is a hard cap.
+- **Evolution.** An item at its recipe's level, touching its partner item on the grid, evolves at the next chest. It keeps its level, gains a new name, a new ability and the evolved border. Recipes are in `descent/evolutions.js`.
+- **Health carries over.** The recruit recovers a share of health after each floor, and each level-up raises max health a little.
+- **Rerolls.** A run starts with a few rerolls; each redraws the current cards.
+- **Death.** The run ends at once. Bells: 1 per floor cleared, more for elites and bosses.
+- **Stall.** A fight with no winner after the cycle cap is a defeat. Builds must kill.
+
+## Scaling
+
+Enemy health and damage grow by a fixed factor every floor (exponential). Item
+levels grow linearly, and evolutions and synergies multiply them, so a good
+build stays ahead for a long time and then is overrun. Elites and bosses
+multiply health. All factors are in `tuning.js`. `node tools/descent-sim.mjs`
+plays seeded runs with a simple bot and prints the depths reached; use it after
+any change to the numbers.
+
+## Data, by file
+
+| File | Holds |
+| --- | --- |
+| `plugins/bell/descent/tuning.js` | Every number: growth, scaling, Ember curve, card weights, chest cadence, Bells. |
+| `plugins/bell/descent/pool.js` | Which items can drop, and the starting crew and their kits. |
+| `plugins/bell/descent/enemies.js` | Enemy bands by depth, with their lines of narration. |
+| `plugins/bell/descent/evolutions.js` | Recipes and the evolved items. |
+| `plugins/bell/descent/tower.js` | Bell Tower upgrades, their ranks and costs. |
+| `plugins/bell/descent/run.js` | The run: floors, Embers, cards, chests, evolution, death. Plain records in and out. |
+| `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
+| `plugins/bell/descent/view.js` | The hub, the run header, cards, chest and summary screens. |
+| `plugins/bell/descent/gear-models.js` | Which grid items show on the side-on hero, in hand or on the back, and the back slots. |
+| `plugins/bell/descent/scene.js` | What the side-on scene reads from the game: gear, attacker, floor. The types in `types/` act it out. |
+
+To add an item to the run, add it to the catalog, then to `pool.js`. To add an
+evolution, add one recipe and one item record in `evolutions.js`. No logic
+changes are needed for either.

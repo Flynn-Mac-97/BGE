@@ -21,7 +21,10 @@
       "Render",
       "Keyboard Input",
       "Screen",
-      "Heads Up Display"
+      "Heads Up Display",
+      "Rig Animation",
+      "Animation States",
+      "Game Camera"
     ]
   }
 }

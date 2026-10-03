@@ -100,8 +100,8 @@ export function compileCatalog(input) {
     if (status.maxStacks !== undefined && (!Number.isFinite(status.maxStacks) || status.maxStacks <= 0)) fail(id, 'invalid stack cap')
     for (const modifier of status.modifiers ?? []) {
       if (typeof modifier.stat !== 'string') fail(id, 'status stat required')
-      validateAmount(modifier.amount, id)
-      if (typeof modifier.amount !== 'number' && !modifier.amount.stacks) fail(id, 'status modifier supports constants or stacks')
+      const isStacks = dictionary(modifier.amount) && modifier.amount.stacks === true && Object.keys(modifier.amount).every(key => ['stacks', 'scale'].includes(key)) && (modifier.amount.scale === undefined || Number.isFinite(modifier.amount.scale))
+      if (!Number.isFinite(modifier.amount) && !isStacks) fail(id, 'status modifier supports a constant or {stacks:true, scale?}')
     }
     status.abilities = abilitiesOf(status.abilities, catalog, id)
   }
@@ -115,7 +115,7 @@ export function compileCatalog(input) {
     for (const [resource, amount] of Object.entries(item.resources ?? {})) if (amount > (item.resourceCaps?.[resource] ?? Infinity)) fail(id, 'resource exceeds its cap')
     for (const aura of item.auras ?? []) {
       validateTarget(aura.target, id + '.aura')
-      if (typeof aura.stat !== 'string' || !Number.isFinite(aura.amount)) fail(id, 'aura needs stat and constant amount')
+      if (typeof aura.stat !== 'string' || !(Number.isFinite(aura.amount) || (dictionary(aura.amount) && Object.keys(aura.amount).length === 1 && typeof aura.amount.stat === 'string'))) fail(id, 'aura needs stat and a constant or {stat} amount')
     }
     const grants = (item.grants ?? []).map(grant => {
       if (typeof grant.id !== 'string' || !grant.id) fail(id, 'grant id required')

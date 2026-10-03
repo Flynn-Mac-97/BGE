@@ -9,7 +9,14 @@ import { createFamilyJourney, resetPractice, familyKits } from './bell/family-la
 import { view } from './bell/view.js'
 import { itemLinks } from './bell/inspection.js'
 import { describeStep, stepDuration } from './bell/feedback.js'
+import { profileStore, settleRun, buyUpgrade, unlockedCrew } from './bell/descent/profile-save.js'
+import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun } from './bell/descent/run.js'
+import { hubView } from './bell/descent/view.js'
+import { descentCrew } from './bell/descent/pool.js'
+import { sceneFacts } from './bell/descent/scene.js'
 const sessions = new WeakMap()
+/** The hub's first line: a welcome, or the last result. */
+const hubWelcome = profile => profile.runs ? `The Last Lantern. ${profile.runs} run${profile.runs === 1 ? '' : 's'} so far; the deepest reached floor ${profile.bestFloor}. The stair waits.` : 'The Last Lantern, at the top of a stair that has no bottom. Choose who goes down. Whatever they find, the Bells they bring back stay with you.'
 
 export default {
   name: 'Black Bell Prototype', category: 'game', needs: ['Game UI', 'Black Bell Grid'],
@@ -17,7 +24,8 @@ export default {
     let storage = context.companyStorage
     if (!storage) try { storage = globalThis.window?.localStorage } catch {}
     const saves = companyStore(storage), company = saves.load()
-    const state = { company, screen: company.active ? 'expedition' : 'tavern', tavernSelected: Object.keys(company.roster)[0] ?? 'rook', saveWarning: saves.warning(), journey: company.active ?? createJourney(), selected: null, moving: false, expanded: false, link: null, queue: [], step: null, log: [], paused: false, menu: false, history: false, slow: false, auto: true, left: 0, serial: 0, message: '' }
+    const profiles = profileStore(storage), profile = profiles.load()
+    const state = { profile, crewSelected: 'rook', hubNotice: hubWelcome(profile), company, screen: 'hub', tavernSelected: Object.keys(company.roster)[0] ?? 'rook', saveWarning: saves.warning(), journey: company.active ?? createJourney(), selected: null, moving: false, expanded: false, link: null, queue: [], step: null, log: [], paused: false, menu: false, history: false, slow: false, auto: true, left: 0, serial: 0, message: '' }
     let html = ''
     let savedJourney = null
     let savedAuto = true
@@ -26,9 +34,20 @@ export default {
     const crafter = createCrafter(context.gameUi.kit, storage, () => redraw(), () => { state.screen = craftReturn; redraw() })
     const redraw = () => {
       if (state.company.active && !state.journey.sandbox && state.screen === 'expedition') state.company.active = state.journey
-      if (!state.queue.length) saves.save(state.company)
-      state.saveWarning = saves.warning()
-      html = state.screen === 'crafter' ? crafter.view() : state.screen === 'tavern' ? tavernView(context.gameUi.kit, state) : view(context.gameUi.kit, state)
+      if (state.journey.descent && state.screen === 'expedition') {
+        state.profile.journey = state.journey
+        const banked = settleRun(state.profile, state.journey)
+        if (banked) state.hubNotice = `${descentCrew[state.journey.descent.crew].name} reached floor ${state.journey.descent.floor} and brought back ${banked} Bells.`
+      }
+      if (!state.queue.length) { saves.save(state.company); profiles.save(state.profile) }
+      state.saveWarning = profiles.warning() || saves.warning()
+      html = screens[state.screen]()
+    }
+    const screens = {
+      crafter: () => crafter.view(),
+      tavern: () => tavernView(context.gameUi.kit, state),
+      hub: () => hubView(context.gameUi.kit, state),
+      expedition: () => view(context.gameUi.kit, state)
     }
     const closeInspection = () => { state.selected = null; state.moving = false; state.expanded = false; state.link = null }
     const editable = () => state.screen === 'expedition' && !state.queue.length && state.journey.phase === 'battle' && state.journey.battle.phase === 'planning'
@@ -44,7 +63,7 @@ export default {
       if (state.log.length > 100) state.log.shift()
       state.serial++; state.left = stepDuration(step, state.slow ? 'slow' : 'normal')
       if (!state.queue.length) {
-        if (finishBattle(state.journey, () => context.random())) { state.paused = false; closeInspection(); state.message = '' }
+        if ((state.journey.descent ? finishFloor : finishBattle)(state.journey, () => context.random())) { state.paused = false; closeInspection(); state.message = '' }
         else if (state.auto) queueCycle()
         else state.paused = false
       }
@@ -61,6 +80,25 @@ export default {
       rest(id) { if (rest(state.company, id)) redraw() },
       learn(trait) { if (learn(state.company, state.tavernSelected, trait)) redraw() },
       refine(id) { if (refine(state.company, state.tavernSelected, id)) redraw() },
+      hub() { if (!state.queue.length) { state.screen = 'hub'; clearPresentation(); redraw() } },
+      oldCompany() { if (state.company.active) state.journey = state.company.active; state.screen = state.company.active ? 'expedition' : 'tavern'; redraw() },
+      openLab() { actions.family('thorn') },
+      crew(id) { if (descentCrew[id]) { state.crewSelected = id; redraw() } },
+      goDown(id) {
+        if (state.profile.journey || !unlockedCrew(state.profile).includes(id)) return
+        state.journey = createRun(state.profile, id, () => context.random()); state.screen = 'expedition'; clearPresentation(); redraw()
+      },
+      continueRun() { if (state.profile.journey) { state.journey = state.profile.journey; state.screen = 'expedition'; clearPresentation(); redraw() } },
+      buy(id) { if (buyUpgrade(state.profile, id)) { state.hubNotice = `The ${id === 'deepPockets' ? 'tower' : 'bell'} rings. ${state.profile.bells} Bells left.`; redraw() } },
+      card(index) { if (!state.queue.length && chooseCard(state.journey, Number(index), () => context.random())) { closeInspection(); redraw() } },
+      reroll() { if (rerollCards(state.journey, () => context.random())) redraw() },
+      chest() { if (collectChest(state.journey, () => context.random())) redraw() },
+      abandon() {
+        const journey = state.journey.descent ? state.journey : state.profile.journey
+        if (!journey || state.queue.length || !abandonRun(journey)) return
+        state.journey = journey; state.screen = 'expedition'; state.menu = false; redraw()
+      },
+      lantern() { if (state.journey.phase === 'dead') { state.profile.journey = null; state.journey = createJourney(); state.screen = 'hub'; clearPresentation(); redraw() } },
       family(value) {
         if (!familyKits[value] || (!state.journey.sandbox && state.queue.length)) return
         if (!state.journey.sandbox) { savedJourney = state.journey; savedAuto = state.auto; savedScreen = state.screen }
@@ -121,7 +159,7 @@ export default {
       }
     }
     context.bellCrafter = crafter
-    context.blackBell = { read: () => structuredClone(state), action: (name, value) => { if (!actions[name]) throw new Error('Unknown Black Bell action ' + name); actions[name](value); return context.blackBell.read() } }
+    context.blackBell = { scene: () => sceneFacts(state), read: () => structuredClone(state), action: (name, value) => { if (!actions[name]) throw new Error('Unknown Black Bell action ' + name); actions[name](value); return context.blackBell.read() } }
     sessions.set(context, { state, advance })
     context.bus.on('play:started', () => { redraw(); context.gameUi.show('black-bell', { html: () => html, on: actions }) })
   },

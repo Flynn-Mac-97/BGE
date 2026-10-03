@@ -1,5 +1,7 @@
 # Black Bell — grid gameplay prototype
 
+**Start here: The Descent.** The game opens at the Last Lantern. Pick a crew member and go down an endless stair. Each floor is one auto-battle. Embers fill a bar; a full bar is a level and a choice of three cards: level up an item you own (the card shows the numbers before and after), or rarely a new item. Every fifth floor is an elite and every tenth a boss; both drop a chest. An item at level 5 touching its partner evolves at the next chest. When the run ends, its Bells buy permanent Bell Tower ranks. A side-on Kimodo mannequin acts the fight out behind the stage, with its gear on its back. Design and numbers: [design/descent.md](design/descent.md). The older tavern campaign is still reachable from the Lantern (`oldCompany`) and from Family Lab.
+
 A bare black-and-white landscape auto-battler. Start with a nameless recruit and one rusty dagger. Defeat rooms, gather salvage and earn one item choice every fourth room. Fifteen item definitions combine eight shared effect types. No concept art appears during play.
 
 ## Play

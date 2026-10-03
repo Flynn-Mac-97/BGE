@@ -2,7 +2,7 @@
 import { relationshipGraph, grantedEntries, activeGrant } from './relationships.js'
 import { placedItems } from './grid.js'
 import { entityOf, definitionOf, reference, targets, keyOf, isAlive } from './targets.js'
-import { activeStatus } from './values.js'
+import { activeStatus, auraAmount } from './values.js'
 import { preparedStates } from './prepared.js'
 
 export function prepareFight(state, catalog) {
@@ -32,7 +32,7 @@ export function prepareFight(state, catalog) {
     for (const target of targets({ state, catalog, source }, aura.target)) {
       const key = keyOf(target) + ':' + aura.stat
       if (!auras.has(key)) auras.set(key, [])
-      auras.get(key).push({ owner: item.owner, amount: aura.amount })
+      auras.get(key).push({ owner: item.owner, amount: auraAmount(aura, item) })
     }
   }
   return prepared

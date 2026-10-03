@@ -32,7 +32,7 @@ Example ability:
 }
 ```
 
-A shared ability uses its catalog key as its ID. Inline abilities need an explicit ID. Item definitions support `resources`, `resourceCaps` and `auras` as well as the fields above. Auras are constant stat contributions with a selector; they recompute from the actual layout.
+A shared ability uses its catalog key as its ID. Inline abilities need an explicit ID. Item definitions support `resources`, `resourceCaps` and `auras` as well as the fields above. Auras are stat contributions with a selector; they recompute from the actual layout. An aura amount is a constant or `{stat}`, read from the source item's own stats without auras or modifiers, so a levelled item's aura grows and two auras never feed each other.
 
 ## Vocabulary
 
@@ -67,7 +67,7 @@ Hunger in the demo belongs to the recruit and caps at nine. Multiple Hungry Teet
 
 For each event, status listeners precede ordinary abilities. Own-turn, activation, damage-dealt and status-applied triggers default to the source item/actor; damage-taken defaults to the target. An explicit trigger `source` selector watches other sources. A trigger `target` selector filters by who the event happened to; `{ event: 'damageTaken', target: { kind: 'owner' } }` fires when the item's owner is hit, and not when poison ticks on the enemy. Lifecycle events broadcast to eligible living listeners.
 
-`nextAction` is consumed after the next successful own-turn ability, so all effects in that ability share the preparation. `expires:'cycle'` is an optional fallback. `whileAdjacent` contributions suspend when either item leaves the edge. Use declarative `auras` for continuous placement bonuses. Same-source, same-ability stat modifiers replace their previous value; distinct sources add. Status stacking can add, replace or take the maximum, with an optional cap.
+`nextAction` is consumed after the next successful own-turn ability, so all effects in that ability share the preparation. `expires:'cycle'` is an optional fallback. `whileAdjacent` contributions suspend when either item leaves the edge. Use declarative `auras` for continuous placement bonuses. Same-source, same-ability stat modifiers replace their previous value; distinct sources add. Status stacking can add, replace or take the maximum, with an optional cap. A status modifier amount is a constant or `{stacks:true, scale}`; Sapped uses `scale: -1` to lower damage by its stacks.
 
 Poison and Regeneration are status records containing the same ability/effect blocks as equipment. Poison deals stack damage at cycle end, bypasses guard and removes one stack. Regeneration heals stack health at cycle start and removes one stack. Venom coating modifies the weapon's `poisonOnHit` stat until used or expired.
 

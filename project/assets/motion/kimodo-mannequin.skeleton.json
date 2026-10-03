@@ -1,0 +1,455 @@
+{
+  "model": "models/kimodo-mannequin.glb",
+  "nodes": {
+    "Hips": {
+      "parent": null,
+      "position": [
+        0,
+        0.9927614636634001,
+        0
+      ],
+      "rotation": [
+        0.004,
+        0.0001,
+        -0.0195,
+        0.9998
+      ],
+      "scale": 1
+    },
+    "Spine": {
+      "parent": "Hips",
+      "position": [
+        -0.000137,
+        0.050038,
+        -0.000537
+      ],
+      "rotation": [
+        -0.0187,
+        -0.0027,
+        0.0178,
+        0.9997
+      ],
+      "scale": 1
+    },
+    "Spine1": {
+      "parent": "Spine",
+      "position": [
+        0,
+        0.071253,
+        -0.000298
+      ],
+      "rotation": [
+        -0.0493,
+        -0.0061,
+        -0.0016,
+        0.9988
+      ],
+      "scale": 1
+    },
+    "Spine2": {
+      "parent": "Spine1",
+      "position": [
+        0,
+        0.075501,
+        -0.00816
+      ],
+      "rotation": [
+        0.0922,
+        -0.0255,
+        0.0092,
+        0.9954
+      ],
+      "scale": 1
+    },
+    "Neck": {
+      "parent": "Spine2",
+      "position": [
+        -0.001817,
+        0.263113,
+        -0.005533
+      ],
+      "rotation": [
+        0.1058,
+        0.0151,
+        0.022,
+        0.994
+      ],
+      "scale": 1
+    },
+    "Neck1": {
+      "parent": "Neck",
+      "position": [
+        0,
+        0.077094,
+        0.023026
+      ],
+      "rotation": [
+        -0.0322,
+        0.0011,
+        -0.0073,
+        0.9995
+      ],
+      "scale": 1
+    },
+    "Head": {
+      "parent": "Neck1",
+      "position": [
+        0,
+        0.061289,
+        0.019537
+      ],
+      "rotation": [
+        -0.0995,
+        0.0151,
+        -0.0438,
+        0.994
+      ],
+      "scale": 1
+    },
+    "Jaw": {
+      "parent": "Head",
+      "position": [
+        0.000026,
+        0.004756,
+        0.030949
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftEye": {
+      "parent": "Head",
+      "position": [
+        0.032064,
+        0.053802,
+        0.075869
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightEye": {
+      "parent": "Head",
+      "position": [
+        -0.032224,
+        0.053619,
+        0.075582
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftShoulder": {
+      "parent": "Spine2",
+      "position": [
+        0.016217,
+        0.232372,
+        0.051134
+      ],
+      "rotation": [
+        0.1203,
+        -0.0723,
+        -0.1745,
+        0.9746
+      ],
+      "scale": 1
+    },
+    "LeftArm": {
+      "parent": "LeftShoulder",
+      "position": [
+        0.149198,
+        0,
+        -0.055023
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftForeArm": {
+      "parent": "LeftArm",
+      "position": [
+        0.287393,
+        0,
+        -0.000026
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftHand": {
+      "parent": "LeftForeArm",
+      "position": [
+        0.27094,
+        0,
+        0.000026
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftHandThumbEnd": {
+      "parent": "LeftHand",
+      "position": [
+        0.122686,
+        -0.032202,
+        0.048331
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftHandMiddleEnd": {
+      "parent": "LeftHand",
+      "position": [
+        0.19012,
+        -0.003129,
+        -0.00034
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightShoulder": {
+      "parent": "Spine2",
+      "position": [
+        -0.013801,
+        0.231803,
+        0.052142
+      ],
+      "rotation": [
+        0.0993,
+        0.0943,
+        0.1444,
+        0.98
+      ],
+      "scale": 1
+    },
+    "RightArm": {
+      "parent": "RightShoulder",
+      "position": [
+        -0.150372,
+        0,
+        -0.055456
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightForeArm": {
+      "parent": "RightArm",
+      "position": [
+        -0.287366,
+        0,
+        -0.000026
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightHand": {
+      "parent": "RightForeArm",
+      "position": [
+        -0.271336,
+        0,
+        0.000026
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightHandThumbEnd": {
+      "parent": "RightHand",
+      "position": [
+        -0.122642,
+        -0.032115,
+        0.04804
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightHandMiddleEnd": {
+      "parent": "RightHand",
+      "position": [
+        -0.190006,
+        -0.003066,
+        -0.000316
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftUpLeg": {
+      "parent": "Hips",
+      "position": [
+        0.100432,
+        -0.084345,
+        0.025957
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftLeg": {
+      "parent": "LeftUpLeg",
+      "position": [
+        0,
+        -0.432218,
+        -0.008029
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftFoot": {
+      "parent": "LeftLeg",
+      "position": [
+        0,
+        -0.421551,
+        -0.034815
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "LeftToeBase": {
+      "parent": "LeftFoot",
+      "position": [
+        0,
+        -0.050595,
+        0.132315
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightUpLeg": {
+      "parent": "Hips",
+      "position": [
+        -0.100473,
+        -0.082953,
+        0.026203
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightLeg": {
+      "parent": "RightUpLeg",
+      "position": [
+        0,
+        -0.433622,
+        -0.008056
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightFoot": {
+      "parent": "RightLeg",
+      "position": [
+        0,
+        -0.421174,
+        -0.034784
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "RightToeBase": {
+      "parent": "RightFoot",
+      "position": [
+        0,
+        -0.050796,
+        0.132842
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    }
+  }
+}

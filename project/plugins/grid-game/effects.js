@@ -86,8 +86,11 @@ export const effectHandlers = {
 
 /** Amounts are evaluated once per effect/target against the current source state. */
 export function applyEffect(frame, effect, target) {
-  const amount = effect.type === 'triggerItem' ? 0 : amountOf(frame, effect.amount)
-  if (!Number.isFinite(amount) || (amount < 0 && !['modifyStat', 'resource', 'modifyCharges'].includes(effect.type))) throw new RangeError('Invalid resolved effect amount')
+  const resolved = effect.type === 'triggerItem' ? 0 : amountOf(frame, effect.amount)
+  const isSigned = ['modifyStat', 'resource', 'modifyCharges'].includes(effect.type)
+  // A stat lowered below zero by a status, such as Sapped damage, does nothing; a negative constant is still a catalog error.
+  const amount = !isSigned && typeof effect.amount === 'object' && resolved < 0 ? 0 : resolved
+  if (!Number.isFinite(amount) || (amount < 0 && !isSigned)) throw new RangeError('Invalid resolved effect amount')
   const outcome = effectHandlers[effect.type](frame, effect, target, amount)
   frame.previousAmount = outcome.amount
   return outcome

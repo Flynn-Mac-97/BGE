@@ -1,0 +1,36 @@
+{
+  "model": "models/items/bow.glb",
+  "hand": "left",
+  "grip": {
+    "mount": {
+      "on": "hand",
+      "position": [
+        0.0734,
+        -0.0283,
+        -0.0144
+      ],
+      "turn": [
+        -0.1086,
+        0.4748,
+        0.4453,
+        -0.7513
+      ]
+    }
+  },
+  "guard": {
+    "distance": 0.3,
+    "height": 0,
+    "side": 0.2,
+    "pitch": 0,
+    "yaw": 0,
+    "roll": 0
+  },
+  "motion": {
+    "stiffness": 0,
+    "damping": 0,
+    "sway": 0,
+    "swaySpeed": 0
+  },
+  "weight": 0,
+  "set": "bow"
+}
