@@ -67,3 +67,13 @@ test('Thorn Warden reacts only to hits on its owner, and Sapped lowers the next 
   assert.equal(fired.filter(step => step.ability.id === 'thornLash').length, hits.length)
   assert.deepEqual(hits.map(step => step.effects[0].amount), [2, 1, 1])
 })
+test('the grid shows live item effects and labelled edge links without selecting anything', () => {
+  const game = fixture()
+  game.panel.on.family('thorn')
+  const html = game.panel.html()
+  // The Spore Idol raises the Totem from 2 to 3 potency, so its label is live and marked boosted.
+  assert.match(html, /glance-line boosted"><span class="glance-trigger">HIT<\/span> 3 PSN/)
+  assert.match(html, /glance-trigger">HIT<\/span> −1 DMG/)
+  assert.match(html, /edge-badge edge-right link-target">\+2 POT ▶/)
+  assert.match(html, /edge-badge edge-down link-aura">\+1 POT ▼/)
+})

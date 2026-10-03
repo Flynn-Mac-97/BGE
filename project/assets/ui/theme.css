@@ -286,3 +286,19 @@ header>div { display:flex; gap:6px; }
 .craft-art-tile[aria-pressed="true"]::after { content:'✓'; position:absolute; top:2px; right:3px; background:#000; color:#fff; font:700 16px monospace; }
 .craft-art-tile:focus-visible { outline:2px dashed #fff; outline-offset:2px; }
 .craft-art-tile>span { max-width:100%; overflow-wrap:anywhere; }
+/* At-a-glance labels: what each item does, and badges on the edges where one item feeds another. */
+.equipment-shape:has(.glance)>small { visibility:hidden; }
+.equipment-shape .glance { position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex; flex-direction:column; gap:1px; }
+.glance-line { background:#fff; color:#000; font:600 8px/1.1 monospace; text-align:center; padding:1px 1px; overflow-wrap:anywhere; }
+.glance-trigger { font-weight:800; text-decoration:underline; }
+.glance-line.boosted { background:#000; color:#fff; outline:1px solid #fff; outline-offset:-1px; }
+.equipment-shape .charge-markers { bottom:auto; top:2px; left:auto; right:2px; }
+.equipment-shape .fired { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4; background:#fff; color:#000; font:800 11px monospace; padding:1px 4px; border:2px solid #000; white-space:nowrap; }
+.edge-anchor { position:relative; z-index:3; pointer-events:none; }
+.edge-badge { position:absolute; background:#000; color:#fff; border:1px solid #fff; font:700 8px/1.1 monospace; padding:1px 3px; white-space:nowrap; text-align:center; }
+.edge-badge.link-late { background:#fff; color:#000; }
+.edge-right { right:0; top:50%; transform:translate(calc(50% + 2px), -50%); }
+.edge-left { left:0; top:50%; transform:translate(calc(-50% - 2px), -50%); }
+.edge-down { bottom:0; left:50%; transform:translate(-50%, calc(50% + 2px)); }
+.edge-up { top:0; left:50%; transform:translate(-50%, calc(-50% - 2px)); }
+.equipment-shape.source { z-index:4; }

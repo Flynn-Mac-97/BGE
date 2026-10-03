@@ -1,6 +1,7 @@
 /** Rule trace facts drive text and small monochrome feedback, without item-name branches. */
 import { rules, itemDefinition } from './rules.js'
 import { escape } from './inspection.js'
+import { statusText } from './glance.js'
 const nameOf = (battle, subject) => subject.kind === 'item' ? itemDefinition(battle, subject.id).name : battle.actors[subject.id].name ?? subject.id
 const effectText = {
   damage: effect => `${effect.amount} damage${effect.blocked ? ` (${effect.blocked} blocked)` : ''}`,
@@ -21,7 +22,7 @@ export function describeStep(step) {
   return messages[step.kind] ?? step.kind
 }
 export function equipmentFeedback(item) {
-  const charges = Object.entries(item.statuses).map(([id, status]) => `<span class="charge">${escape(rules.catalog.statuses[id].name)} ${status.stacks}</span>`)
+  const charges = Object.entries(item.statuses).map(([id, status]) => `<span class="charge">${escape(statusText(id, status.stacks))}</span>`)
   for (const modifier of item.modifiers) charges.push(`<span class="charge">+${modifier.amount} ${escape(modifier.stat)}</span>`)
   return `<span class="charge-markers">${charges.join('')}</span>`
 }
