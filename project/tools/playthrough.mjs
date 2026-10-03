@@ -1,7 +1,7 @@
 /** Repeatable playthroughs earn every reward; a bounded placement search stands in for a player. */
 import { performance } from 'node:perf_hooks'
 import { rules } from '../plugins/bell/rules.js'
-import { createJourney, finishBattle, claim, searchCache } from '../plugins/bell/loop.js'
+import { createJourney, finishBattle, claim, searchCache, descend } from '../plugins/bell/loop.js'
 function seeded(seed) { return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296 } }
 function score(battle) {
   let preview = structuredClone(battle)
@@ -31,6 +31,7 @@ function arrange(battle) {
   return { battle: best, score: bestScore }
 }
 function choose(journey, strategy) {
+  if (journey.rewardKind === 'salvage') { descend(journey); return }
   if (strategy === 'ignore') { claim(journey, journey.choices[0]); return }
   const candidates = journey.choices.map(type => {
     const candidate = structuredClone(journey)

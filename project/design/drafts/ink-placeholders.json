@@ -1,0 +1,784 @@
+{
+  "id": "draft-09-ink-placeholders-scribe-bench",
+  "revision": "1486ed51-ed22-4797-adbd-c187aaa91d2a",
+  "title": "09 / INK PLACEHOLDERS & SCRIBE BENCH",
+  "nodes": [
+    {
+      "id": "overview",
+      "kind": "note",
+      "text": "09 / FIRST INK ART + SCRIBE BENCH\n36 separate monochrome sprites. Placeholder portraits and items, not final art. In game: Scribe\u2019s Bench \u2192 concept / rules / test / AI-JSON. Raw notes travel with the versioned concept record.",
+      "at": [
+        0,
+        -190
+      ],
+      "w": 900
+    },
+    {
+      "id": "image-rook",
+      "kind": "image",
+      "text": "ink/rook.png",
+      "at": [
+        0,
+        0
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-rook",
+      "kind": "text",
+      "text": "rook",
+      "at": [
+        0,
+        143
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-nettle",
+      "kind": "image",
+      "text": "ink/nettle.png",
+      "at": [
+        180,
+        0
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-nettle",
+      "kind": "text",
+      "text": "nettle",
+      "at": [
+        180,
+        143
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-pip",
+      "kind": "image",
+      "text": "ink/pip.png",
+      "at": [
+        360,
+        0
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-pip",
+      "kind": "text",
+      "text": "pip",
+      "at": [
+        360,
+        143
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-toll",
+      "kind": "image",
+      "text": "ink/toll.png",
+      "at": [
+        540,
+        0
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-toll",
+      "kind": "text",
+      "text": "toll",
+      "at": [
+        540,
+        143
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-moss",
+      "kind": "image",
+      "text": "ink/moss.png",
+      "at": [
+        720,
+        0
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-moss",
+      "kind": "text",
+      "text": "moss",
+      "at": [
+        720,
+        143
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-innkeeper",
+      "kind": "image",
+      "text": "ink/innkeeper.png",
+      "at": [
+        900,
+        0
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-innkeeper",
+      "kind": "text",
+      "text": "innkeeper",
+      "at": [
+        900,
+        143
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-cellarrat",
+      "kind": "image",
+      "text": "ink/cellarRat.png",
+      "at": [
+        0,
+        190
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-cellarrat",
+      "kind": "text",
+      "text": "cellarRat",
+      "at": [
+        0,
+        333
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-graverobber",
+      "kind": "image",
+      "text": "ink/graveRobber.png",
+      "at": [
+        180,
+        190
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-graverobber",
+      "kind": "text",
+      "text": "graveRobber",
+      "at": [
+        180,
+        333
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-venomleech",
+      "kind": "image",
+      "text": "ink/venomLeech.png",
+      "at": [
+        360,
+        190
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-venomleech",
+      "kind": "text",
+      "text": "venomLeech",
+      "at": [
+        360,
+        333
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-cellarbrute",
+      "kind": "image",
+      "text": "ink/cellarBrute.png",
+      "at": [
+        540,
+        190
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-cellarbrute",
+      "kind": "text",
+      "text": "cellarBrute",
+      "at": [
+        540,
+        333
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-rustedsentry",
+      "kind": "image",
+      "text": "ink/rustedSentry.png",
+      "at": [
+        720,
+        190
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-rustedsentry",
+      "kind": "text",
+      "text": "rustedSentry",
+      "at": [
+        720,
+        333
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-venomkeeper",
+      "kind": "image",
+      "text": "ink/venomKeeper.png",
+      "at": [
+        900,
+        190
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-venomkeeper",
+      "kind": "text",
+      "text": "venomKeeper",
+      "at": [
+        900,
+        333
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-graveenforcer",
+      "kind": "image",
+      "text": "ink/graveEnforcer.png",
+      "at": [
+        0,
+        380
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-graveenforcer",
+      "kind": "text",
+      "text": "graveEnforcer",
+      "at": [
+        0,
+        523
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-cellarwarden",
+      "kind": "image",
+      "text": "ink/cellarWarden.png",
+      "at": [
+        180,
+        380
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-cellarwarden",
+      "kind": "text",
+      "text": "cellarWarden",
+      "at": [
+        180,
+        523
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-dagger",
+      "kind": "image",
+      "text": "ink/dagger.png",
+      "at": [
+        360,
+        380
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-dagger",
+      "kind": "text",
+      "text": "dagger",
+      "at": [
+        360,
+        523
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-sword",
+      "kind": "image",
+      "text": "ink/sword.png",
+      "at": [
+        540,
+        380
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-sword",
+      "kind": "text",
+      "text": "sword",
+      "at": [
+        540,
+        523
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-hammer",
+      "kind": "image",
+      "text": "ink/hammer.png",
+      "at": [
+        720,
+        380
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-hammer",
+      "kind": "text",
+      "text": "hammer",
+      "at": [
+        720,
+        523
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-buckler",
+      "kind": "image",
+      "text": "ink/buckler.png",
+      "at": [
+        900,
+        380
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-buckler",
+      "kind": "text",
+      "text": "buckler",
+      "at": [
+        900,
+        523
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-venom",
+      "kind": "image",
+      "text": "ink/venom.png",
+      "at": [
+        0,
+        570
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-venom",
+      "kind": "text",
+      "text": "venom",
+      "at": [
+        0,
+        713
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-salve",
+      "kind": "image",
+      "text": "ink/salve.png",
+      "at": [
+        180,
+        570
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-salve",
+      "kind": "text",
+      "text": "salve",
+      "at": [
+        180,
+        713
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-stone",
+      "kind": "image",
+      "text": "ink/stone.png",
+      "at": [
+        360,
+        570
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-stone",
+      "kind": "text",
+      "text": "stone",
+      "at": [
+        360,
+        713
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-tooth",
+      "kind": "image",
+      "text": "ink/tooth.png",
+      "at": [
+        540,
+        570
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-tooth",
+      "kind": "text",
+      "text": "tooth",
+      "at": [
+        540,
+        713
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-hungrytooth",
+      "kind": "image",
+      "text": "ink/hungryTooth.png",
+      "at": [
+        720,
+        570
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-hungrytooth",
+      "kind": "text",
+      "text": "hungryTooth",
+      "at": [
+        720,
+        713
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-bloodcup",
+      "kind": "image",
+      "text": "ink/bloodCup.png",
+      "at": [
+        900,
+        570
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-bloodcup",
+      "kind": "text",
+      "text": "bloodCup",
+      "at": [
+        900,
+        713
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-salt",
+      "kind": "image",
+      "text": "ink/salt.png",
+      "at": [
+        0,
+        760
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-salt",
+      "kind": "text",
+      "text": "salt",
+      "at": [
+        0,
+        903
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-banner",
+      "kind": "image",
+      "text": "ink/banner.png",
+      "at": [
+        180,
+        760
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-banner",
+      "kind": "text",
+      "text": "banner",
+      "at": [
+        180,
+        903
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-echo",
+      "kind": "image",
+      "text": "ink/echo.png",
+      "at": [
+        360,
+        760
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-echo",
+      "kind": "text",
+      "text": "echo",
+      "at": [
+        360,
+        903
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-sprig",
+      "kind": "image",
+      "text": "ink/sprig.png",
+      "at": [
+        540,
+        760
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-sprig",
+      "kind": "text",
+      "text": "sprig",
+      "at": [
+        540,
+        903
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-pouch",
+      "kind": "image",
+      "text": "ink/pouch.png",
+      "at": [
+        720,
+        760
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-pouch",
+      "kind": "text",
+      "text": "pouch",
+      "at": [
+        720,
+        903
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-pack",
+      "kind": "image",
+      "text": "ink/pack.png",
+      "at": [
+        900,
+        760
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-pack",
+      "kind": "text",
+      "text": "pack",
+      "at": [
+        900,
+        903
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-roottotem",
+      "kind": "image",
+      "text": "ink/rootTotem.png",
+      "at": [
+        0,
+        950
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-roottotem",
+      "kind": "text",
+      "text": "rootTotem",
+      "at": [
+        0,
+        1093
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-stormtotem",
+      "kind": "image",
+      "text": "ink/stormTotem.png",
+      "at": [
+        180,
+        950
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-stormtotem",
+      "kind": "text",
+      "text": "stormTotem",
+      "at": [
+        180,
+        1093
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-curseidol",
+      "kind": "image",
+      "text": "ink/curseIdol.png",
+      "at": [
+        360,
+        950
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-curseidol",
+      "kind": "text",
+      "text": "curseIdol",
+      "at": [
+        360,
+        1093
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-reapingseal",
+      "kind": "image",
+      "text": "ink/reapingSeal.png",
+      "at": [
+        540,
+        950
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-reapingseal",
+      "kind": "text",
+      "text": "reapingSeal",
+      "at": [
+        540,
+        1093
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-salvagepack",
+      "kind": "image",
+      "text": "ink/salvagePack.png",
+      "at": [
+        720,
+        950
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-salvagepack",
+      "kind": "text",
+      "text": "salvagePack",
+      "at": [
+        720,
+        1093
+      ],
+      "w": 160
+    },
+    {
+      "id": "image-patchkit",
+      "kind": "image",
+      "text": "ink/patchKit.png",
+      "at": [
+        900,
+        950
+      ],
+      "w": 140,
+      "h": 140
+    },
+    {
+      "id": "label-patchkit",
+      "kind": "text",
+      "text": "patchKit",
+      "at": [
+        900,
+        1093
+      ],
+      "w": 160
+    },
+    {
+      "id": "workflow",
+      "kind": "note",
+      "text": "AI workflow: notes \u2192 copy brief \u2192 ChatGPT \u2192 paste JSON \u2192 validate \u2192 isolated simulation \u2192 Save concept. No LLM service connected. Library is device-local; export individual concepts as JSON backups. Saved concepts do not enter campaign loot automatically.",
+      "at": [
+        0,
+        1160
+      ],
+      "w": 900
+    }
+  ],
+  "edges": []
+}

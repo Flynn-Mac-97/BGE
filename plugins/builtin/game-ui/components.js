@@ -140,6 +140,11 @@ const components = {
     tag('label', { class: 'ui-field', ...controlAttributes('text', { action, value, label, isDisabled }) },
       tag('span', { class: 'ui-field-label' }, escapeHtml(label)) + tag('input', { class: 'ui-input', type: 'text', value, placeholder })),
 
+  /** Multiline notes use the same input event and focus preservation as a text field. */
+  textArea: (label, { action, value = '', placeholder, rows = 4, isDisabled, isReadOnly = false } = {}) =>
+    tag('label', { class: 'ui-field', ...controlAttributes('text', { action, value, label, isDisabled }) },
+      tag('span', { class: 'ui-field-label' }, escapeHtml(label)) + tag('textarea', { class: 'ui-input', rows, placeholder, readonly: isReadOnly, disabled: isDisabled }, escapeHtml(value))),
+
   tabs: (items, { action, value } = {}) =>
     tag('div', { class: 'ui-tabs', role: 'tablist' }, items.map(optionOf).map(item =>
       tag('button', { class: 'ui-tab', type: 'button', role: 'tab', 'aria-selected': String(item.value === value), 'data-selected': item.value === value, ...controlAttributes('tab', { action, value: item.value, label: item.label }) }, escapeHtml(item.label))).join('')),

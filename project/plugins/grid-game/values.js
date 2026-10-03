@@ -1,10 +1,13 @@
 /** Stats are derived from base values, temporary modifiers, statuses and placed auras. */
+import { preparedStates } from './prepared.js'
 import { entityOf, targets, reference, sameReference } from './targets.js'
 import { adjacent, placedItems } from './grid.js'
 
 /** Expressions deliberately have no arbitrary scripts or recursive stat references. */
 export function amountOf(frame, expression, subject = frame.source) {
   if (typeof expression === 'number') return expression
+  if (expression.previous) return (frame.previousAmount ?? 0) * (expression.scale ?? 1)
+  if (expression.eventAmount) return (frame.event?.amount ?? 0) * (expression.scale ?? 1)
   if (expression.stacks) return frame.status?.stacks ?? 0
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)
   if (expression.resource) return entityOf(frame.state, subject).resources[expression.resource] ?? 0
@@ -31,11 +34,21 @@ export function statOf(state, catalog, subject, stat) {
     }
     value += modifier.amount
   }
-  for (const [id, status] of Object.entries(entity.statuses)) {
+  for (const id in entity.statuses) {
+    const status = entity.statuses[id]
     if (!activeStatus(state, catalog, subject, status)) continue
     for (const modifier of catalog.statuses[id].modifiers ?? []) {
       if (modifier.stat === stat) value += typeof modifier.amount === 'number' ? modifier.amount : status.stacks
     }
+  }
+  const prepared = preparedStates.get(state)
+  if (prepared) {
+    for (const aura of prepared.auras.get(`${subject.kind}:${subject.id}:${stat}`) ?? []) if (state.actors[aura.owner].health > 0) value += aura.amount
+    for (const entry of prepared.dynamicAuras) {
+      if (entry.aura.stat !== stat || state.actors[entry.owner].health <= 0) continue
+      if (targets({ state, catalog, source: entry.source }, entry.aura.target).some(target => sameReference(target, subject))) value += entry.aura.amount
+    }
+    return value
   }
   for (const source of placedItems(state)) {
     for (const aura of catalog.items[source.type].auras ?? []) {
@@ -48,15 +61,16 @@ export function statOf(state, catalog, subject, stat) {
 }
 
 /** Consumption and expiry use the same duration vocabulary for statuses and stat modifiers. */
-export function expire(entity, duration) {
+export function expire(entity, duration, state) {
   const removed = []
-  entity.modifiers = entity.modifiers.filter(modifier => {
+  if (entity.modifiers.length) entity.modifiers = entity.modifiers.filter(modifier => {
     const expires = modifier.duration === duration || modifier.expires === duration
     if (expires) removed.push({ kind: 'modifier', stat: modifier.stat })
     return !expires
   })
-  for (const [id, status] of Object.entries(entity.statuses)) {
-    if (status.duration === duration || status.expires === duration) { delete entity.statuses[id]; removed.push({ kind: 'status', id }) }
+  for (const id in entity.statuses) {
+    const status = entity.statuses[id]
+    if (status.duration === duration || status.expires === duration) { delete entity.statuses[id]; removed.push({ kind: 'status', id }); const prepared = preparedStates.get(state); if (prepared) prepared.statusListeners = null }
   }
   return removed
 }

@@ -77,3 +77,7 @@ kit.slot({ glyph: '⚔', tipKey: 'item', tipValue: 'sword' })
 - **Any list, table or log:** rows out of view skip layout and paint (`content-visibility: auto`), so a few hundred rows cost little.
 - **Thousands of rows:** use `virtualList`. Keep the scroll position in your state: the `scroll` action's value is `scrollTop` in pixels, and you pass it back as `top`. Rows are a fixed height, so the scroll bar is exact, and about 14 rows are in the page whatever the length. `pick: 'action'` makes rows clickable; `gameUi.controls(id)` lists only the rows drawn.
 - **A log:** `log(lines)` needs no script. Append to your array; the newest line stays at the bottom, and a person who scrolls up is not pulled back down until they return.
+
+`textArea(label, { action, value, placeholder, rows, isDisabled, isReadOnly })`
+is a multiline text control. It reports `input` like `textInput`; live focus and
+text selection survive normal panel updates. Read-only text remains selectable.

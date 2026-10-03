@@ -1,7 +1,7 @@
 /** Fail at authoring boundaries instead of silently dropping a misspelled effect. */
 import { selectorNames, conditionNames } from './targets.js'
 
-export const effectNames = ['damage', 'heal', 'guard', 'applyStatus', 'removeStatus', 'modifyStat', 'resource', 'triggerItem']
+export const effectNames = ['damage', 'heal', 'guard', 'applyStatus', 'removeStatus', 'modifyStat', 'resource', 'triggerItem', 'removeGuard', 'consumeStatus', 'transferResource', 'modifyCharges']
 export const triggerNames = ['combatStart', 'cycleStart', 'cycleEnd', 'ownTurn', 'itemActivated', 'damageDealt', 'damageTaken', 'statusApplied']
 export const durationNames = ['instant', 'nextAction', 'cycle', 'combat', 'whileAdjacent']
 const positive = value => Number.isInteger(value) && value > 0
@@ -11,10 +11,16 @@ const dictionary = value => value && typeof value === 'object' && !Array.isArray
 function validateTarget(selector, path) {
   if (!selector || !selectorNames.includes(selector.kind)) fail(path, 'unknown target kind')
   if (selector.kind === 'directionalNeighbour' && !['right', 'left', 'up', 'down'].includes(selector.direction)) fail(path, 'direction must be right, left, up or down')
+  if (selector.kind === 'area') {
+    if (!['rays', 'row', 'column', 'radius'].includes(selector.shape)) fail(path, 'unknown area shape')
+    if (selector.range !== undefined && (!positive(selector.range) || selector.range > 12)) fail(path, 'range must be 1–12')
+    if (selector.directions && (!Array.isArray(selector.directions) || !selector.directions.length || selector.directions.some(direction => !['up', 'down', 'left', 'right'].includes(direction)))) fail(path, 'invalid directions')
+  }
   if (selector.tags && (!Array.isArray(selector.tags) || selector.tags.some(tag => typeof tag !== 'string'))) fail(path, 'tags must be strings')
 }
 function validateAmount(amount, path) {
   if (typeof amount === 'number' && Number.isFinite(amount)) return
+  if (dictionary(amount) && (amount.previous === true || amount.eventAmount === true) && Object.keys(amount).every(key => ['previous', 'eventAmount', 'scale'].includes(key)) && !(amount.previous && amount.eventAmount) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
   if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
   fail(path, 'expected finite number or {stat}, {resource}, {stacks:true}')
 }
@@ -25,6 +31,8 @@ function validateCondition(condition, path, catalog) {
   if (condition.kind === 'hasTag' && typeof condition.tag !== 'string') fail(path, 'tag required')
   if (condition.kind === 'resourceAtLeast' && (typeof condition.resource !== 'string' || !Number.isFinite(condition.amount) || condition.amount < 0)) fail(path, 'resource and nonnegative amount required')
   if (condition.kind === 'healthBelow' && !(Number.isFinite(condition.amount) || (Number.isFinite(condition.ratio) && condition.ratio >= 0 && condition.ratio <= 1))) fail(path, 'health amount or ratio required')
+  if (['cycleAtLeast', 'cycleEvery'].includes(condition.kind) && !positive(condition.amount)) fail(path, 'positive cycle count required')
+  if (condition.kind === 'eventAmountAtLeast' && (!Number.isFinite(condition.amount) || condition.amount < 0)) fail(path, 'nonnegative event amount required')
   if (condition.kind === 'cellEmpty' && !['right', 'left', 'up', 'down'].includes(condition.direction)) fail(path, 'direction required')
 }
 
@@ -41,9 +49,11 @@ export function validateAbility(ability, path, catalog) {
     if (!effectNames.includes(effect.type)) fail(path, `unknown effect ${effect.type}`)
     if (effect.target) validateTarget(effect.target, path + '.effect.target')
     if (effect.type !== 'triggerItem') validateAmount(effect.amount, path + '.' + effect.type)
-    if (['applyStatus', 'removeStatus'].includes(effect.type) && !catalog.statuses[effect.status]) fail(path, 'unknown effect status')
+    if (['applyStatus', 'removeStatus', 'consumeStatus'].includes(effect.type) && !catalog.statuses[effect.status]) fail(path, 'unknown effect status')
     if (effect.type === 'modifyStat' && typeof effect.stat !== 'string') fail(path, 'stat name required')
-    if (effect.type === 'resource' && typeof effect.resource !== 'string') fail(path, 'resource name required')
+    if (['resource', 'transferResource'].includes(effect.type) && typeof effect.resource !== 'string') fail(path, 'resource name required')
+    if (effect.type === 'transferResource') validateTarget(effect.from, path + '.from')
+    if (effect.type === 'modifyCharges' && typeof effect.ability !== 'string') fail(path, 'charged ability id required')
     if (effect.duration && !durationNames.includes(effect.duration)) fail(path, 'unknown duration')
     if (effect.duration && effect.duration !== 'instant' && !['applyStatus', 'modifyStat'].includes(effect.type)) fail(path, 'duration belongs on a status or stat modifier')
     if (effect.type === 'applyStatus' && effect.duration === 'instant') fail(path, 'status needs an ongoing duration')
@@ -60,7 +70,8 @@ export function validateAbility(ability, path, catalog) {
   if (ability.limit?.refill && ability.limit.refill !== 'cycle') fail(path, 'charge refill must be cycle')
 }
 
-function abilitiesOf(entries, catalog, path) {
+/** Expand shared ability references for items, statuses and actors. */
+export function abilitiesOf(entries, catalog, path) {
   const abilities = (entries ?? []).map(entry => {
     if (typeof entry !== 'string') return structuredClone(entry)
     if (!catalog.abilities[entry]) fail(path, 'unknown ability block ' + entry)
@@ -95,6 +106,7 @@ export function compileCatalog(input) {
   }
   for (const [id, item] of Object.entries(input.items)) {
     if (!Array.isArray(item.footprint) || item.footprint.length !== 2 || !item.footprint.every(positive)) fail(id, 'footprint must be [positive width, positive height]')
+    if (item.storage && (!positive(item.storage.columns) || item.storage.columns > 9)) fail(id, 'storage columns must be an integer from 1 to 9')
     if (item.footprint.some(size => size > 12)) fail(id, 'footprint exceeds grid limit')
     if (typeof item.name !== 'string' || (!Array.isArray(item.tags ?? []) || (item.tags ?? []).some(tag => typeof tag !== 'string'))) fail(id, 'name and tags required')
     for (const value of Object.values({ ...item.stats, ...item.resources })) if (!Number.isFinite(value)) fail(id, 'stats/resources must be finite')
@@ -104,7 +116,14 @@ export function compileCatalog(input) {
       validateTarget(aura.target, id + '.aura')
       if (typeof aura.stat !== 'string' || !Number.isFinite(aura.amount)) fail(id, 'aura needs stat and constant amount')
     }
-    catalog.items[id] = { tags: [], stats: {}, resources: {}, resourceCaps: {}, auras: [], ...structuredClone(item), abilities: abilitiesOf(item.abilities, catalog, id) }
+    const grants = (item.grants ?? []).map(grant => {
+      if (typeof grant.id !== 'string' || !grant.id) fail(id, 'grant id required')
+      validateTarget(grant.target, id + '.grant')
+      if (!['area', 'containerItems', 'adjacentItems', 'directionalNeighbour', 'allItems'].includes(grant.target.kind)) fail(id, 'grants require fixed item recipients')
+      return { ...structuredClone(grant), abilities: abilitiesOf(grant.abilities, catalog, id + '.grant') }
+    })
+    if (new Set(grants.map(grant => grant.id)).size !== grants.length) fail(id, 'duplicate grant id')
+    catalog.items[id] = { tags: [], stats: {}, resources: {}, resourceCaps: {}, auras: [], ...structuredClone(item), abilities: abilitiesOf(item.abilities, catalog, id), grants }
   }
   return freeze(catalog)
 }

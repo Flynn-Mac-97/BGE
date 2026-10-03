@@ -1,5 +1,9 @@
 /** Each entry is an independent data block. Tags describe compatibility, not class locks. */
 export const items = {
+  pouch: { name: 'Patched Pouch', mark: 'p', footprint: [1, 1], tags: ['storage', 'scavenging'], storage: { columns: 1 }, abilities: [],
+    description: 'Attach to the right edge: a full-height 1-column pouch. Put items inside. Empty it before detaching.' },
+  pack: { name: 'Worn Pack', mark: 'P', footprint: [1, 2], tags: ['storage', 'scavenging'], storage: { columns: 2 }, abilities: [],
+    description: 'Attach to the right edge: a full-height 2-column pack. Put items inside; chain another pack to its right.' },
   dagger: { name: 'Rusty Dagger', mark: 'D', footprint: [1, 2], tags: ['weapon', 'blade', 'combat'], stats: { damage: 2 }, abilities: ['strike'],
     description: 'Deal 2 damage. Uses any prepared coating on its next strike.' },
   sword: { name: 'Iron Sword', mark: 'I', footprint: [1, 3], tags: ['weapon', 'blade', 'combat'], stats: { damage: 5 }, abilities: ['strike'],

@@ -105,8 +105,8 @@ header>div { display:flex; gap:6px; }
 }
 @media (prefers-reduced-motion:reduce) { .transfer,.struck .actor-token,.combat-flight,.item-attack b,.item-react b { animation:none; }.transfer,.combat-flight { display:none; } }
 /* The equipment grid grows to the right; reserve overflow scrolls inside its own area. */
-.board { grid-template-columns:repeat(var(--columns),minmax(44px,1fr)); }
-.dock { grid-template-columns:minmax(130px,1fr) calc(var(--columns) * 58px) minmax(100px,1fr); }
+.board { grid-template-columns:repeat(var(--board-columns),minmax(44px,1fr)); }
+.dock { grid-template-columns:minmax(130px,1fr) calc(var(--visible-columns) * 58px) minmax(100px,1fr); }
 .reserve-items { overflow:auto; min-height:0; flex:1; align-content:start; overscroll-behavior:contain; }
 .reserve-items p { font-size:11px; grid-column:1/-1; }
 .reserve>.ui-button { font-size:10px; padding:4px; flex:none; }
@@ -125,8 +125,8 @@ header>div { display:flex; gap:6px; }
  .bell-game { grid-template-rows:44px minmax(50px,1fr) 178px 26px; }
  .bell-game.inspecting { grid-template-rows:44px minmax(36px,1fr) 178px 78px; }
  .bell-game.expanded-inspection { grid-template-rows:44px minmax(50px,1fr) 178px 0px; }
- .dock { grid-template-columns:minmax(112px,1fr) calc(var(--columns) * 48px) minmax(100px,1fr); gap:10px; }
- .expanded-inspection .loadout { width:calc(var(--columns) * 48px); }
+ .dock { grid-template-columns:minmax(112px,1fr) calc(var(--visible-columns) * 48px) minmax(100px,1fr); gap:10px; }
+ .expanded-inspection .loadout { width:calc(var(--visible-columns) * 48px); }
  .event-caption span { max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
  .tooltip-summary { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
@@ -157,3 +157,132 @@ header>div { display:flex; gap:6px; }
  .inspecting:not(.expanded-inspection) .has-damage .fighter { visibility:hidden; }
 }
 @media (orientation:landscape) and (max-height:380px) { .damage-victim .actor-token { display:grid; } }
+/* Planning connections are monochrome outlines; ! marks late preparation, not a guaranteed miss. */
+.equipment-shape.preview-linked { outline:2px solid #fff; outline-offset:-3px; }
+.equipment-shape.preview-late { outline-style:dashed; }
+.scan-marker,.connection-marker { position:absolute; top:1px; font:9px monospace; background:#000; color:#fff; padding:1px 2px; }
+.scan-marker { left:1px; }.connection-marker { right:1px; }
+.preview-late .connection-marker { background:#fff; color:#000; font-weight:bold; }
+.connection-warning { border-left:2px solid #fff; padding-left:6px; }
+
+/* Extra storage scrolls horizontally so touch cells never shrink below 44 pixels. */
+.loadout { min-width:0; }
+.board-scroll { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.board { height:100%; min-width:calc(var(--board-columns) * 48px - 4px); box-sizing:border-box; }
+
+.full .tooltip-summary { white-space:normal; overflow-wrap:anywhere; min-width:0; width:100%; }
+
+/* Container outlines preserve cell input; the tap socket stays outside the scrolling grid. */
+.pack-region { position:relative; border:2px solid #fff; outline:1px dashed #fff; outline-offset:-5px; pointer-events:none; z-index:2; }
+.pack-region small { position:absolute; bottom:1px; right:1px; background:#000; padding:1px 2px; font-size:8px; }
+.pack-socket { border:2px dashed #fff; white-space:pre-line; font-size:10px; padding:2px; }
+
+.loadout-body { display:flex; gap:4px; flex:1; min-height:0; min-width:0; }
+.loadout-body .board-scroll { min-width:0; }
+.pack-socket { flex:0 0 44px; min-width:44px; align-self:stretch; }
+/* The tavern is a text-first landscape scene, using the same unstyled buttons and borders. */
+.tavern-game { position:absolute; inset:0; box-sizing:border-box; padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left)); display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:8px; color:#fff; background:#000; font:12px monospace; pointer-events:auto; }
+.tavern-game header { display:flex; justify-content:space-between; gap:12px; }
+.tavern-story { border-block:1px solid #fff; padding:6px 0; max-height:100px; overflow:auto; }
+.tavern-story p { margin:0 0 5px; }
+.tavern-body { min-height:0; display:grid; grid-template-columns:minmax(170px,1fr) minmax(0,2fr); gap:14px; }
+.tavern-body aside,.tavern-body article { overflow:auto; min-height:0; }
+.tavern-body h2 { font-size:14px; }.tavern-body h3 { font-size:12px; margin-top:16px; }
+.tavern-body .ui-button { width:100%; white-space:pre-line; margin-bottom:6px; min-height:44px; }
+.tavern-body li { margin-bottom:8px; }
+
+/* Damage direction and recipient remain readable without colour or motion. */
+.actor-role { display:block; font:700 10px monospace; margin-bottom:2px; }
+.damage-attacker .actor-role { text-decoration:underline; text-underline-offset:3px; }
+.damage-victim .actor-token { width:48px; height:40px; font-size:24px; }
+.damage-victim .actor-status { border-left:3px solid #fff; padding-left:5px; }
+.damage-readout { gap:6px; padding:0 4px; }
+.damage-line { min-width:230px; max-width:46%; grid-template-columns:minmax(0,1fr) auto; padding:5px 10px; }
+.damage-line.incoming { margin-right:auto; border:3px solid #fff; }
+.damage-line.outgoing { margin-left:auto; border:2px solid #fff; }
+.hit-direction { grid-column:1; font:700 13px monospace; letter-spacing:.4px; }
+.damage-line>span { grid-column:1; font-size:11px; }
+.damage-line>strong { grid-column:2; grid-row:1/4; font-size:32px; }
+.damage-line>small { grid-column:1; }
+@media (orientation:landscape) and (max-height:420px) {
+ .damage-line { padding:3px 6px; min-width:210px; gap:1px 6px; }
+ .hit-direction { font-size:11px; }
+ .damage-line>strong { font-size:26px; }
+ .damage-victim .actor-token { width:42px; height:34px; font-size:21px; }
+ .fighter { top:0; }
+}
+
+.has-damage .actor-status>small:last-child { display:none; }
+.damage-victim .blocked-token { font-size:11px; }
+@media (orientation:landscape) and (max-height:420px) {
+ .damage-line { min-width:0; width:48%; max-width:48%; box-sizing:border-box; }
+ .damage-line>span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; line-height:1.1; }
+ .damage-line>small,.hit-direction { font-size:10px; line-height:1.1; }
+ .damage-line>strong { font-size:24px; }
+}
+/* First art pass: isolated ink sprites; game rules and readable text stay separate. */
+.ink-art { display:block; object-fit:contain; image-rendering:auto; border:0; background:#000; width:48px; height:48px; flex:none; }
+.equipment-shape>.ink-art { flex:1; min-height:0; max-height:75%; width:100%; height:40px; }
+.equipment-shape>small { position:relative; z-index:1; font-size:9px; line-height:1.05; }
+.equipment-shape .charge-markers { z-index:2; }
+.loot-card>.ink-art { width:64px; height:64px; margin:0 auto; }
+.reserve-art { display:flex; align-items:center; min-width:0; border:1px solid #fff; }
+.reserve-art>.ink-art { width:30px; height:38px; }
+.reserve-art .item-choice { border:0; flex:1; min-width:0; padding:2px; }
+.tooltip-header>.ink-art { width:42px; height:42px; }
+.actor-portrait { position:relative; width:54px; height:54px; flex:none; }
+.actor-portrait>.ink-art { width:100%; height:100%; }
+.actor-portrait .actor-token { position:absolute; bottom:0; left:0; width:100%; height:26px; font-size:22px; }
+.actor-token:empty { display:none; }
+.damage-attacker .actor-portrait { outline:1px solid #fff; }
+.tavern-portrait { float:right; margin:0 0 8px 12px; }
+.tavern-portrait>.ink-art { width:100px; height:100px; }
+@media (orientation:landscape) and (max-height:420px) {
+ .actor-portrait { width:34px; height:34px; }
+ .actor-portrait .actor-token { width:34px; height:24px; font-size:20px; }
+ .actor-portrait .blocked-token { font-size:9px; }
+ .loot-card>.ink-art { width:42px; height:42px; }
+ .tavern-portrait>.ink-art { width:72px; height:72px; }
+}
+/* The bench scrolls inside two landscape columns, including with the phone keyboard open. */
+.crafter-game { position:absolute; inset:0; display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:6px; padding:8px 12px; background:#000; color:#fff; font:12px monospace; pointer-events:auto; overflow:hidden; }
+.crafter-game header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.crafter-game header>div { display:flex; gap:6px; }
+.craft-status { margin:0; min-height:15px; max-height:42px; overflow:auto; }
+.craft-body { display:grid; grid-template-columns:minmax(155px,28%) minmax(0,1fr); gap:12px; min-height:0; }
+.craft-body>aside,.craft-body>article { min-height:0; overflow:auto; padding:3px; }
+.craft-body>aside { border-right:1px solid #fff; padding-right:8px; }
+.craft-body h3 { font-size:11px; margin:6px 0; }
+.craft-new { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.craft-page { padding-top:8px; display:flex; flex-direction:column; gap:8px; }
+.craft-page p { margin:0; line-height:1.4; }
+.crafter-game .ui-field { display:flex; flex-direction:column; gap:4px; width:100%; min-width:0; }
+.crafter-game .ui-input,.crafter-game .ui-select { width:100%; box-sizing:border-box; padding:8px; border:1px solid #fff; border-radius:0; background:#000; color:#fff; font:16px monospace; min-height:44px; }
+.crafter-game textarea { resize:vertical; user-select:text; touch-action:auto; }
+.craft-identity { display:flex; align-items:center; gap:12px; }
+.craft-identity>.ink-art { width:84px; height:84px; }
+.craft-identity>div { flex:1; min-width:0; }
+.craft-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.craft-row { display:flex; flex-wrap:wrap; gap:6px; }
+.craft-row>.ui-field { flex:1; }
+.craft-saved { display:flex; align-items:center; gap:4px; margin:4px 0; }
+.craft-saved>.ink-art { width:32px; height:32px; }
+.craft-saved>.ui-button { flex:1; min-width:0; overflow-wrap:anywhere; }
+.craft-rule { display:flex; gap:8px; align-items:center; border:1px solid #fff; padding:4px; }
+.craft-rule>code { flex:1; overflow-wrap:anywhere; }
+.craft-log { padding-left:22px; line-height:1.5; }
+.craft-page pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.crafter-game .ui-tabs { position:sticky; top:-3px; background:#000; z-index:1; display:flex; }
+.crafter-game .ui-tab { flex:1; min-height:44px; }
+/* The art browser uses the full landscape width; only the open tab draws its thumbnails. */
+.craft-body.art-open { grid-template-columns:minmax(0,1fr); }
+.craft-body.art-open>aside { display:none; }
+.craft-art-controls { display:grid; grid-template-columns:minmax(100px,1fr) minmax(120px,1fr) minmax(140px,2fr); gap:8px; }
+.craft-art-summary { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.craft-art-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(86px,1fr)); gap:8px; padding:3px; }
+.craft-art-tile { appearance:none; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:start; gap:5px; min-height:98px; padding:5px 2px; border:1px solid #555; border-radius:0; background:#000; color:#fff; font:11px monospace; cursor:pointer; touch-action:pan-y; }
+.craft-art-tile>.ink-art { width:64px; height:64px; }
+.craft-art-tile[aria-pressed="true"] { border-color:#fff; outline:2px solid #fff; }
+.craft-art-tile[aria-pressed="true"]::after { content:'✓'; position:absolute; top:2px; right:3px; background:#000; color:#fff; font:700 16px monospace; }
+.craft-art-tile:focus-visible { outline:2px dashed #fff; outline-offset:2px; }
+.craft-art-tile>span { max-width:100%; overflow-wrap:anywhere; }

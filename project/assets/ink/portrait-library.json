@@ -1,0 +1,1489 @@
+{
+  "source": "GPT Image / exec-d08b6b1b-3a94-4e8b-ba96-6eb85d13cc6e.png",
+  "masterSize": [
+    1254,
+    1254
+  ],
+  "columns": 8,
+  "rows": 8,
+  "spriteSize": [
+    64,
+    64
+  ],
+  "background": "black",
+  "scale": "contain; no nine-slice",
+  "assets": {
+    "scarredSwordsman": {
+      "id": "scarredSwordsman",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Scarred Swordsman",
+      "cell": [
+        0,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/scarredSwordsman.png",
+      "sourceRect": [
+        0,
+        0,
+        157,
+        157
+      ]
+    },
+    "spearGuard": {
+      "id": "spearGuard",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Spear Guard",
+      "cell": [
+        1,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/spearGuard.png",
+      "sourceRect": [
+        157,
+        0,
+        314,
+        157
+      ]
+    },
+    "womanKnight": {
+      "id": "womanKnight",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Woman Knight",
+      "cell": [
+        2,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/womanKnight.png",
+      "sourceRect": [
+        314,
+        0,
+        470,
+        157
+      ]
+    },
+    "beardedAxeman": {
+      "id": "beardedAxeman",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Bearded Axeman",
+      "cell": [
+        3,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/beardedAxeman.png",
+      "sourceRect": [
+        470,
+        0,
+        627,
+        157
+      ]
+    },
+    "hoodedArcher": {
+      "id": "hoodedArcher",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Hooded Archer",
+      "cell": [
+        4,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/hoodedArcher.png",
+      "sourceRect": [
+        627,
+        0,
+        784,
+        157
+      ]
+    },
+    "womanRanger": {
+      "id": "womanRanger",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Woman Ranger",
+      "cell": [
+        5,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/womanRanger.png",
+      "sourceRect": [
+        784,
+        0,
+        940,
+        157
+      ]
+    },
+    "youngSquire": {
+      "id": "youngSquire",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Young Squire",
+      "cell": [
+        6,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/youngSquire.png",
+      "sourceRect": [
+        940,
+        0,
+        1097,
+        157
+      ]
+    },
+    "oldVeteran": {
+      "id": "oldVeteran",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Old Veteran",
+      "cell": [
+        7,
+        0
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/oldVeteran.png",
+      "sourceRect": [
+        1097,
+        0,
+        1254,
+        157
+      ]
+    },
+    "staffWizard": {
+      "id": "staffWizard",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Staff Wizard",
+      "cell": [
+        0,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/staffWizard.png",
+      "sourceRect": [
+        0,
+        157,
+        157,
+        314
+      ]
+    },
+    "womanMage": {
+      "id": "womanMage",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Woman Mage",
+      "cell": [
+        1,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/womanMage.png",
+      "sourceRect": [
+        157,
+        157,
+        314,
+        314
+      ]
+    },
+    "herbWitch": {
+      "id": "herbWitch",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Herb Witch",
+      "cell": [
+        2,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/herbWitch.png",
+      "sourceRect": [
+        314,
+        157,
+        470,
+        314
+      ]
+    },
+    "antlerDruid": {
+      "id": "antlerDruid",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Antler Druid",
+      "cell": [
+        3,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/antlerDruid.png",
+      "sourceRect": [
+        470,
+        157,
+        627,
+        314
+      ]
+    },
+    "wanderingMonk": {
+      "id": "wanderingMonk",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Wandering Monk",
+      "cell": [
+        4,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/wanderingMonk.png",
+      "sourceRect": [
+        627,
+        157,
+        784,
+        314
+      ]
+    },
+    "armouredCleric": {
+      "id": "armouredCleric",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Armoured Cleric",
+      "cell": [
+        5,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/armouredCleric.png",
+      "sourceRect": [
+        784,
+        157,
+        940,
+        314
+      ]
+    },
+    "maskedRogue": {
+      "id": "maskedRogue",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Masked Rogue",
+      "cell": [
+        6,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/maskedRogue.png",
+      "sourceRect": [
+        940,
+        157,
+        1097,
+        314
+      ]
+    },
+    "duelist": {
+      "id": "duelist",
+      "kind": "portrait",
+      "category": "Adventurers",
+      "label": "Duelist",
+      "cell": [
+        7,
+        1
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/duelist.png",
+      "sourceRect": [
+        1097,
+        157,
+        1254,
+        314
+      ]
+    },
+    "baldSmith": {
+      "id": "baldSmith",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Bald Smith",
+      "cell": [
+        0,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/baldSmith.png",
+      "sourceRect": [
+        0,
+        314,
+        157,
+        470
+      ]
+    },
+    "womanSmith": {
+      "id": "womanSmith",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Woman Smith",
+      "cell": [
+        1,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/womanSmith.png",
+      "sourceRect": [
+        157,
+        314,
+        314,
+        470
+      ]
+    },
+    "apronCook": {
+      "id": "apronCook",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Apron Cook",
+      "cell": [
+        2,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/apronCook.png",
+      "sourceRect": [
+        314,
+        314,
+        470,
+        470
+      ]
+    },
+    "sternInnkeeper": {
+      "id": "sternInnkeeper",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Stern Innkeeper",
+      "cell": [
+        3,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/sternInnkeeper.png",
+      "sourceRect": [
+        470,
+        314,
+        627,
+        470
+      ]
+    },
+    "oldFarmer": {
+      "id": "oldFarmer",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Old Farmer",
+      "cell": [
+        4,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/oldFarmer.png",
+      "sourceRect": [
+        627,
+        314,
+        784,
+        470
+      ]
+    },
+    "youngFarmer": {
+      "id": "youngFarmer",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Young Farmer",
+      "cell": [
+        5,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/youngFarmer.png",
+      "sourceRect": [
+        784,
+        314,
+        940,
+        470
+      ]
+    },
+    "hoodedShepherd": {
+      "id": "hoodedShepherd",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Hooded Shepherd",
+      "cell": [
+        6,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/hoodedShepherd.png",
+      "sourceRect": [
+        940,
+        314,
+        1097,
+        470
+      ]
+    },
+    "sailor": {
+      "id": "sailor",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Sailor",
+      "cell": [
+        7,
+        2
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/sailor.png",
+      "sourceRect": [
+        1097,
+        314,
+        1254,
+        470
+      ]
+    },
+    "coinMerchant": {
+      "id": "coinMerchant",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Coin Merchant",
+      "cell": [
+        0,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/coinMerchant.png",
+      "sourceRect": [
+        0,
+        470,
+        157,
+        627
+      ]
+    },
+    "womanTrader": {
+      "id": "womanTrader",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Woman Trader",
+      "cell": [
+        1,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/womanTrader.png",
+      "sourceRect": [
+        157,
+        470,
+        314,
+        627
+      ]
+    },
+    "spectacledScribe": {
+      "id": "spectacledScribe",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Spectacled Scribe",
+      "cell": [
+        2,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/spectacledScribe.png",
+      "sourceRect": [
+        314,
+        470,
+        470,
+        627
+      ]
+    },
+    "tiredScholar": {
+      "id": "tiredScholar",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Tired Scholar",
+      "cell": [
+        3,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/tiredScholar.png",
+      "sourceRect": [
+        470,
+        470,
+        627,
+        627
+      ]
+    },
+    "plagueDoctor": {
+      "id": "plagueDoctor",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Plague Doctor",
+      "cell": [
+        4,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/plagueDoctor.png",
+      "sourceRect": [
+        627,
+        470,
+        784,
+        627
+      ]
+    },
+    "bandagedHealer": {
+      "id": "bandagedHealer",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Bandaged Healer",
+      "cell": [
+        5,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/bandagedHealer.png",
+      "sourceRect": [
+        784,
+        470,
+        940,
+        627
+      ]
+    },
+    "lanternKeeper": {
+      "id": "lanternKeeper",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Lantern Keeper",
+      "cell": [
+        6,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/lanternKeeper.png",
+      "sourceRect": [
+        940,
+        470,
+        1097,
+        627
+      ]
+    },
+    "travellingBard": {
+      "id": "travellingBard",
+      "kind": "portrait",
+      "category": "Townsfolk",
+      "label": "Travelling Bard",
+      "cell": [
+        7,
+        3
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/travellingBard.png",
+      "sourceRect": [
+        1097,
+        470,
+        1254,
+        627
+      ]
+    },
+    "raggedBeggar": {
+      "id": "raggedBeggar",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Ragged Beggar",
+      "cell": [
+        0,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/raggedBeggar.png",
+      "sourceRect": [
+        0,
+        627,
+        157,
+        784
+      ]
+    },
+    "oneEyedThief": {
+      "id": "oneEyedThief",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "One Eyed Thief",
+      "cell": [
+        1,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/oneEyedThief.png",
+      "sourceRect": [
+        157,
+        627,
+        314,
+        784
+      ]
+    },
+    "raggedScavenger": {
+      "id": "raggedScavenger",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Ragged Scavenger",
+      "cell": [
+        2,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/raggedScavenger.png",
+      "sourceRect": [
+        314,
+        627,
+        470,
+        784
+      ]
+    },
+    "packPorter": {
+      "id": "packPorter",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Pack Porter",
+      "cell": [
+        3,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/packPorter.png",
+      "sourceRect": [
+        470,
+        627,
+        627,
+        784
+      ]
+    },
+    "grinningGambler": {
+      "id": "grinningGambler",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Grinning Gambler",
+      "cell": [
+        4,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/grinningGambler.png",
+      "sourceRect": [
+        627,
+        627,
+        784,
+        784
+      ]
+    },
+    "veiledStranger": {
+      "id": "veiledStranger",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Veiled Stranger",
+      "cell": [
+        5,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/veiledStranger.png",
+      "sourceRect": [
+        784,
+        627,
+        940,
+        784
+      ]
+    },
+    "prisoner": {
+      "id": "prisoner",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Prisoner",
+      "cell": [
+        6,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/prisoner.png",
+      "sourceRect": [
+        940,
+        627,
+        1097,
+        784
+      ]
+    },
+    "graveDigger": {
+      "id": "graveDigger",
+      "kind": "portrait",
+      "category": "Outcasts",
+      "label": "Grave Digger",
+      "cell": [
+        7,
+        4
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/graveDigger.png",
+      "sourceRect": [
+        1097,
+        627,
+        1254,
+        784
+      ]
+    },
+    "vampireNoble": {
+      "id": "vampireNoble",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Vampire Noble",
+      "cell": [
+        0,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/vampireNoble.png",
+      "sourceRect": [
+        0,
+        784,
+        157,
+        940
+      ]
+    },
+    "womanVampire": {
+      "id": "womanVampire",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Woman Vampire",
+      "cell": [
+        1,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/womanVampire.png",
+      "sourceRect": [
+        157,
+        784,
+        314,
+        940
+      ]
+    },
+    "bonePriest": {
+      "id": "bonePriest",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Bone Priest",
+      "cell": [
+        2,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/bonePriest.png",
+      "sourceRect": [
+        314,
+        784,
+        470,
+        940
+      ]
+    },
+    "blindOracle": {
+      "id": "blindOracle",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Blind Oracle",
+      "cell": [
+        3,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/blindOracle.png",
+      "sourceRect": [
+        470,
+        784,
+        627,
+        940
+      ]
+    },
+    "ashCultist": {
+      "id": "ashCultist",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Ash Cultist",
+      "cell": [
+        4,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ashCultist.png",
+      "sourceRect": [
+        627,
+        784,
+        784,
+        940
+      ]
+    },
+    "hornedWarlock": {
+      "id": "hornedWarlock",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Horned Warlock",
+      "cell": [
+        5,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/hornedWarlock.png",
+      "sourceRect": [
+        784,
+        784,
+        940,
+        940
+      ]
+    },
+    "mushroomHermit": {
+      "id": "mushroomHermit",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Mushroom Hermit",
+      "cell": [
+        6,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/mushroomHermit.png",
+      "sourceRect": [
+        940,
+        784,
+        1097,
+        940
+      ]
+    },
+    "maskedAlchemist": {
+      "id": "maskedAlchemist",
+      "kind": "portrait",
+      "category": "Occultists",
+      "label": "Masked Alchemist",
+      "cell": [
+        7,
+        5
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/maskedAlchemist.png",
+      "sourceRect": [
+        1097,
+        784,
+        1254,
+        940
+      ]
+    },
+    "goblinSneak": {
+      "id": "goblinSneak",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Goblin Sneak",
+      "cell": [
+        0,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/goblinSneak.png",
+      "sourceRect": [
+        0,
+        940,
+        157,
+        1097
+      ]
+    },
+    "goblinBrute": {
+      "id": "goblinBrute",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Goblin Brute",
+      "cell": [
+        1,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/goblinBrute.png",
+      "sourceRect": [
+        157,
+        940,
+        314,
+        1097
+      ]
+    },
+    "orcRaider": {
+      "id": "orcRaider",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Orc Raider",
+      "cell": [
+        2,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/orcRaider.png",
+      "sourceRect": [
+        314,
+        940,
+        470,
+        1097
+      ]
+    },
+    "ogre": {
+      "id": "ogre",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Ogre",
+      "cell": [
+        3,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ogre.png",
+      "sourceRect": [
+        470,
+        940,
+        627,
+        1097
+      ]
+    },
+    "troll": {
+      "id": "troll",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Troll",
+      "cell": [
+        4,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/troll.png",
+      "sourceRect": [
+        627,
+        940,
+        784,
+        1097
+      ]
+    },
+    "skeletalSoldier": {
+      "id": "skeletalSoldier",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Skeletal Soldier",
+      "cell": [
+        5,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/skeletalSoldier.png",
+      "sourceRect": [
+        784,
+        940,
+        940,
+        1097
+      ]
+    },
+    "zombie": {
+      "id": "zombie",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Zombie",
+      "cell": [
+        6,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/zombie.png",
+      "sourceRect": [
+        940,
+        940,
+        1097,
+        1097
+      ]
+    },
+    "wraith": {
+      "id": "wraith",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Wraith",
+      "cell": [
+        7,
+        6
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/wraith.png",
+      "sourceRect": [
+        1097,
+        940,
+        1254,
+        1097
+      ]
+    },
+    "wolf": {
+      "id": "wolf",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Wolf",
+      "cell": [
+        0,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/wolf.png",
+      "sourceRect": [
+        0,
+        1097,
+        157,
+        1254
+      ]
+    },
+    "raven": {
+      "id": "raven",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Raven",
+      "cell": [
+        1,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/raven.png",
+      "sourceRect": [
+        157,
+        1097,
+        314,
+        1254
+      ]
+    },
+    "giantBat": {
+      "id": "giantBat",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Giant Bat",
+      "cell": [
+        2,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/giantBat.png",
+      "sourceRect": [
+        314,
+        1097,
+        470,
+        1254
+      ]
+    },
+    "giantSpider": {
+      "id": "giantSpider",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Giant Spider",
+      "cell": [
+        3,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/giantSpider.png",
+      "sourceRect": [
+        470,
+        1097,
+        627,
+        1254
+      ]
+    },
+    "boar": {
+      "id": "boar",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Boar",
+      "cell": [
+        4,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/boar.png",
+      "sourceRect": [
+        627,
+        1097,
+        784,
+        1254
+      ]
+    },
+    "packYak": {
+      "id": "packYak",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Pack Yak",
+      "cell": [
+        5,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/packYak.png",
+      "sourceRect": [
+        784,
+        1097,
+        940,
+        1254
+      ]
+    },
+    "serpent": {
+      "id": "serpent",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Serpent",
+      "cell": [
+        6,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/serpent.png",
+      "sourceRect": [
+        940,
+        1097,
+        1097,
+        1254
+      ]
+    },
+    "ratFolk": {
+      "id": "ratFolk",
+      "kind": "portrait",
+      "category": "Creatures",
+      "label": "Rat Folk",
+      "cell": [
+        7,
+        7
+      ],
+      "purpose": "Reusable NPC, character or enemy portrait",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ratFolk.png",
+      "sourceRect": [
+        1097,
+        1097,
+        1254,
+        1254
+      ]
+    }
+  }
+}

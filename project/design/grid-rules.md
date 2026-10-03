@@ -82,3 +82,12 @@ The prototype only changes topology between cycles. It does not yet implement so
 ## Verification
 
 `node --test tests/*.test.mjs` checks rules, UI locks and progression. Engine headless `run tests.run` executes the same cases. `node tools/playthrough.mjs` earns items through real fights and tests reward/placement decisions over twelve rooms with fixed seeds. It is a balance probe, not evidence of subjective enjoyment or device frame rate.
+
+
+## Storage and acquisition
+
+Item definitions may include `storage: { columns: 1 }` (integer 1–9). A storage instance uses `position: [leftColumn, 0]` to identify an attached full-height container region. It occupies no equipment cells: `cells` returns an empty array for storage. Reserve storage adds nothing. `baseColumns` records the base width; total width is capped at twelve.
+
+Attach with `place(state,id,[state.grid.columns,0])`. Pack regions must form a contiguous chain starting at the base right edge. Ordinary items can occupy the resulting cells; adjacency and directional effects work across joins. Stowing with `place(...,null)` succeeds only for an empty outermost pack. Placement and resizing validate the full arrangement atomically. Base resizing with attached packs is refused if it would break their fixed attachment coordinates. Room transitions preserve attachment IDs and coordinates. The UI provides a tap-only right-edge socket outside the scrolling grid, plus an Attach right action; attached entries select the pack for Detach or Salvage.
+
+Acquisition is separate from combat effects: ordinary rooms yield one scrap and three recovery on `descend`; every fourth room yields one item choice on `claim`. Both actions are single-use. Caches cost twelve scrap and never advance rooms. The first item choice is room four; room eight offers pouch/pack/sword. Intervals and enemy numbers are provisional; detailed scaling design is deferred.

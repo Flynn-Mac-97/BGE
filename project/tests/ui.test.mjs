@@ -4,15 +4,16 @@ import assert from 'node:assert/strict'
 import { fixture } from '../tools/ui-fixture.mjs'
 const { test, suite } = defineSuite('Playable prototype controls')
 export default suite
-function winFirst(game) { game.panel.on.fight(); game.tick(100); game.panel.on.claim('venom') }
+function winFirst(game) { for (let room = 1; room <= 4; room++) { game.panel.on.fight(); game.tick(200); if (room < 4) game.panel.on.descend() } game.panel.on.claim('venom') }
 
 test('auto battle earns a reward, then waits for a choice before entering the next room', () => {
   const game = fixture()
-  game.panel.on.fight(); game.tick(100)
+  for (let room = 1; room <= 3; room++) { game.panel.on.fight(); game.tick(200); game.panel.on.descend() }
+  game.panel.on.fight(); game.tick(200)
   assert.match(game.panel.html(), /VICTORY · CHOOSE YOUR FIND/)
-  assert.equal(game.read().journey.room, 1)
+  assert.equal(game.read().journey.room, 4)
   game.panel.on.claim('venom')
-  assert.match(game.panel.html(), /ROOM 2/)
+  assert.match(game.panel.html(), /ROOM 5/)
   assert.equal(game.read().queue.length, 0)
   assert.equal(game.read().journey.battle.items['item-2'].type, 'venom')
 })
@@ -45,7 +46,7 @@ test('equipment and salvage cannot mutate a queued battle even when called direc
   game.panel.on.fight(); game.panel.on.select('item-2')
   game.panel.on.move(); game.panel.on.cell(0); game.panel.on.remove(); game.panel.on.salvage()
   assert.equal(game.read().journey.battle.items['item-2'].position, null)
-  assert.equal(game.read().journey.scrap, 1)
+  assert.equal(game.read().journey.scrap, 4)
 })
 test('turn mode stops between cycles; reset drops all queued outcomes', () => {
   const game = fixture()
@@ -85,4 +86,39 @@ test('stepping over a cycle boundary keeps Auto paused for the next cycle', () =
   assert.equal(game.panel.html(), held)
   game.panel.on.step()
   assert.equal(game.read().paused, true)
+})
+
+for (const type of ['pouch', 'pack']) test(`earned ${type} attaches by selecting then tapping its slot`, () => {
+  const game = fixture(); winFirst(game)
+  game.panel.on.select('item-2'); game.panel.on.cell(0)
+  for (let room = 5; room <= 8; room++) {
+    game.panel.on.fight(); game.tick(200)
+    if (room < 8) game.panel.on.descend()
+  }
+  game.panel.on.claim(type)
+  game.panel.on.returnTavern(); game.panel.on.embark('rook')
+  const columns = type === 'pouch' ? 4 : 5
+  assert.doesNotMatch(game.panel.html(), /data-drag|data-drop/)
+  assert.doesNotMatch(game.panel.html(), /pack-socket/)
+  game.panel.on.select('item-1'); game.panel.on.snap('')
+  assert.equal(game.read().journey.battle.grid.columns, 3)
+  game.panel.on.select('item-3')
+  assert.match(game.panel.html(), /pack-socket/)
+  game.panel.on.cell(0)
+  assert.equal(game.read().journey.battle.grid.columns, 3)
+  game.panel.on.snap('')
+  assert.equal(game.read().journey.battle.grid.columns, columns)
+  assert.deepEqual(game.read().journey.battle.items['item-3'].position, [3, 0])
+  assert.match(game.panel.html(), /pack-region/)
+  game.panel.on.select('item-1'); game.panel.on.move(); game.panel.on.cell(3)
+  assert.deepEqual(game.read().journey.battle.items['item-1'].position, [3, 0])
+  game.panel.on.select('item-3'); game.panel.on.remove()
+  assert.equal(game.read().journey.battle.grid.columns, columns)
+  game.panel.on.select('item-1'); game.panel.on.move(); game.panel.on.cell(1)
+  game.panel.on.select('item-3'); game.panel.on.remove()
+  assert.equal(game.read().journey.battle.grid.columns, 3)
+  game.panel.on.select('item-3'); game.panel.on.snap()
+  assert.equal(game.read().journey.battle.grid.columns, columns)
+  game.panel.on.fight(); game.panel.on.select('item-3'); game.panel.on.remove()
+  assert.equal(game.read().journey.battle.grid.columns, columns)
 })

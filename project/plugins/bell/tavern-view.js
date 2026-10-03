@@ -1,0 +1,19 @@
+/** Narrative choices explain the persistent roster while using the existing monochrome controls. */
+import { art } from './art.js'
+import { adventurers, traits } from './campaign.js'
+import { rules } from './rules.js'
+import { escape } from './inspection.js'
+export function tavernView(kit, state) {
+  const company = state.company, id = state.tavernSelected, definition = adventurers[id], member = company.roster[id]
+  const unlocked = company.bestDepth >= definition.requirement
+  const button = (label, action, value, disabled = false) => kit.button(label, { action, value, isDisabled: disabled })
+  const roster = Object.entries(adventurers).map(([id, definition]) => button(`${definition.name}\n${company.roster[id] ? 'YOUR COMPANY' : company.bestDepth >= definition.requirement ? 'FOR HIRE · ' + definition.cost + ' coin' : 'RUMOUR · return after floor ' + definition.requirement}`, 'patron', id)).join('')
+  const gear = member?.kit.map(item => {
+    const definition = rules.catalog.items[item.type]
+    const eligible = ['damage', 'heal', 'guard'].some(stat => definition.stats[stat] > 0)
+    return `<li>${escape(definition.name)}${item.refinement ? ` · +1 ${item.refinement.stat}` : ''}${eligible && !item.refinement ? button('Refine · 3 coin', 'refine', item.id, company.coins < 3 || !!company.active) : ''}</li>`
+  }).join('') ?? ''
+  const progression = member ? `<p>Experience ${member.experience} · Expeditions ${member.expeditions} · ${member.injuries ? 'INJURED' : 'Ready'}</p><p>${member.trait ? escape(traits[member.trait].name + ': ' + traits[member.trait].text) : member.experience >= 4 ? 'They have learned enough to choose a lasting trait.' : 'Return with 4 experience to choose a lasting trait.'}</p>${!member.trait && member.experience >= 4 ? Object.entries(traits).map(([id, trait]) => button(trait.name + ' · ' + trait.text, 'learn', id, !!company.active)).join('') : ''}<h3>PERSONAL KIT</h3><ul>${gear}</ul>` : ''
+  const action = member ? member.injuries ? button('Rest by the hearth · free', 'rest', id, !!company.active) : button('Enter the cellars', 'embark', id, !!company.active) : button(unlocked ? `Hire permanently · ${definition.cost} coin` : `Return safely after floor ${definition.requirement} to meet them`, 'hire', id, !unlocked || company.coins < definition.cost || !!company.active)
+  return `<main class="tavern-game"><header><strong>THE LAST LANTERN · TAVERN-01</strong><span>${company.coins} coin · deepest safe return ${company.bestDepth}</span>${button('Scribe’s Bench', 'openCrafter')}</header><section class="tavern-story" role="status"><p>${escape(company.notice)}</p>${state.saveWarning ? `<p>${escape(state.saveWarning)}</p>` : '<small>Progress saves on this device. Completed decisions survive closing the app.</small>'}</section><section class="tavern-body"><aside><h2>UNLIKELY COMPANY</h2>${roster}</aside><article><div class="tavern-portrait">${art(kit, id, definition.name)}</div><h2>${escape(definition.name)}</h2><p>${escape(definition.story)}</p>${progression}${action}<h3>THE EXPEDITION</h3><p>Send one companion into eight rooms beneath the tavern. Arrange their kit before combat. The equipment acts automatically; you can pause and inspect every step.</p><p>Return between fights to keep finds, coin and experience. If you fall, departure gear is recovered, but unbanked finds are lost. Injuries heal with a free night’s rest.</p><p>Clear floor 4 and return to attract Toll. Defeat the floor 8 warden and return to attract Moss. Hire them permanently when you can afford it.</p><p>Finds remain scarce: one every four rooms. Return expeditions can reveal new equipment and partners for your current kit.</p>${company.active ? button('Resume your expedition', 'resumeExpedition') : ''}${button("Scribe’s Bench · craft concepts", 'openCrafter')}${button('Practice in Family Lab', 'family', 'growth')}</article></section></main>`
+}

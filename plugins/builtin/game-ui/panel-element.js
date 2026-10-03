@@ -32,7 +32,7 @@ function routeControlEvent(event, report) {
   if (!triggers.includes(event.type)) return
   // Moving between two parts of one control is not entering or leaving it.
   if ((event.type === 'pointerover' || event.type === 'pointerout') && control.contains(event.relatedTarget)) return
-  const field = control.querySelector('input, select') ?? control
+  const field = control.querySelector('input, select, textarea') ?? control
   const isOwnEvent = TRIGGER[kind] === event.type
   // A scroll reports where the scrolled element is.
   const value = event.type === 'scroll' ? event.target.scrollTop : isOwnEvent && FIELD_VALUES[kind] ? FIELD_VALUES[kind](field) : control.dataset.value ?? ''

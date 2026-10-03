@@ -9,6 +9,10 @@ const effectText = {
   removeStatus: effect => `remove ${effect.amount} ${rules.catalog.statuses[effect.status].name}`,
   modifyStat: effect => `${effect.amount >= 0 ? '+' : ''}${effect.amount} ${effect.stat}`,
   resource: effect => `${effect.amount >= 0 ? '+' : ''}${effect.amount} ${effect.resource}`,
+  removeGuard: effect => `remove ${effect.amount} guard`,
+  consumeStatus: effect => `consume ${effect.amount} ${rules.catalog.statuses[effect.status].name}`,
+  transferResource: effect => `transfer ${effect.amount} ${effect.resource}`,
+  modifyCharges: effect => `${effect.amount >= 0 ? '+' : ''}${effect.amount} charges`,
   triggerItem: () => 'extra action'
 }
 export function describeStep(step) {
@@ -35,20 +39,20 @@ export function damageFeedback(step) {
   return [...victims.values()].map(hit => {
     const actor = step.state.actors[hit.id]
     const healed = step.effects.filter(effect => effect.type === 'heal' && effect.target.kind === 'actor' && effect.target.id === hit.id).reduce((total, effect) => total + effect.amount, 0)
-    return { ...hit, healed, name: actor.name ?? hit.id, before: actor.health + hit.amount - healed, after: actor.health,
+    return { ...hit, healed, side: actor.team === 'crew' ? 'incoming' : 'outgoing', label: actor.team === 'crew' ? hit.amount ? 'YOU TAKE DAMAGE' : 'YOU BLOCK' : hit.amount ? 'YOU DEAL DAMAGE' : 'ENEMY BLOCKS', name: actor.name ?? hit.id, before: actor.health + hit.amount - healed, after: actor.health,
       source: step.statusId ? rules.catalog.statuses[step.statusId].name : nameOf(step.state, step.source) }
   })
 }
 
 /** Damage gets a readable hold; ordinary bookkeeping keeps its existing short timing. */
 export function stepDuration(step, speed) {
-  if (damageFeedback(step).length) return speed === 'slow' ? 1.8 : 1.1
+  if (damageFeedback(step).length) return speed === 'slow' ? 2.2 : 1.5
   return speed === 'slow' ? 0.8 : 0.22
 }
 
 export function stageFeedback(state) {
   const hits = damageFeedback(state.step)
-  if (hits.length) return `<div class="damage-readout" role="status" data-key="impact:${state.serial}">${hits.map(hit => `<div class="damage-line"><span>${escape(hit.source)} → ${escape(hit.name)}</span><strong>${hit.amount ? `−${hit.amount} HP` : 'BLOCKED'}</strong><small>HP ${hit.before} → ${hit.after}${hit.blocked ? ` · ${hit.blocked} blocked` : ''}${hit.healed ? ` · +${hit.healed} healed` : ''}</small></div>`).join('')}</div>`
+  if (hits.length) return `<div class="damage-readout" role="status" data-key="impact:${state.serial}">${hits.map(hit => `<div class="damage-line ${hit.side}"><b class="hit-direction">${hit.label}</b><span>${escape(hit.source)} → ${escape(hit.name)}</span><strong>${hit.amount ? `−${hit.amount} HP` : 'BLOCKED'}</strong><small>HP ${hit.before} → ${hit.after}${hit.blocked ? ` · ${hit.blocked} blocked` : ''}${hit.healed ? ` · +${hit.healed} healed` : ''}</small></div>`).join('')}</div>`
   if (state.step?.kind !== 'ability') return ''
   return state.step.effects.filter(effect => effect.target.kind === 'actor' && (effect.amount || effect.blocked)).map(effect => `<span class="combat-result ${effect.target.id === 'enemy' ? 'attack' : 'react'}" data-key="${effect.type}:${state.serial}">${escape(effectText[effect.type](effect))}</span>`).join('')
 }

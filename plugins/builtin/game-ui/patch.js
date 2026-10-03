@@ -8,7 +8,7 @@
  * Browser only.
  */
 
-const FORM_TAGS = new Set(['INPUT', 'SELECT'])
+const FORM_TAGS = new Set(['INPUT', 'SELECT', 'TEXTAREA'])
 
 /**
  * Make `container`'s children equal to the nodes of `html`. `root` is the
@@ -52,5 +52,5 @@ function patchAttributes(existing, node) {
 /** The live `value` and `checked` do not follow their attributes once a person has edited them. */
 function patchFormState(existing, node) {
   existing.checked = node.hasAttribute('checked')
-  existing.value = existing.tagName === 'SELECT' ? node.value : node.getAttribute('value') ?? ''
+  existing.value = existing.tagName === 'INPUT' ? node.getAttribute('value') ?? '' : node.value
 }

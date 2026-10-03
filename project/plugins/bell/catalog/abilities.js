@@ -1,5 +1,6 @@
 /** Shared ability blocks contain rules only; item art and family never choose behaviour. */
 export const abilities = {
+  endureHunger: { trigger: { event: 'damageTaken' }, target: { kind: 'self' }, effects: [{ type: 'resource', resource: 'hunger', amount: 1 }], limit: { perCycle: 1 } },
   strike: { trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [
     { type: 'damage', amount: { stat: 'damage' } },
     { type: 'applyStatus', status: 'poison', amount: { stat: 'poisonOnHit' } }

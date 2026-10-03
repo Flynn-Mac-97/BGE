@@ -1,0 +1,1489 @@
+{
+  "source": "GPT Image / exec-eaaacc68-7e99-4263-ac6d-5dde0830c934.png",
+  "masterSize": [
+    1254,
+    1254
+  ],
+  "columns": 8,
+  "rows": 8,
+  "spriteSize": [
+    64,
+    64
+  ],
+  "background": "black",
+  "scale": "contain; no nine-slice",
+  "assets": {
+    "shortSword": {
+      "id": "shortSword",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Short Sword",
+      "cell": [
+        0,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/shortSword.png",
+      "sourceRect": [
+        0,
+        0,
+        157,
+        157
+      ]
+    },
+    "curvedSword": {
+      "id": "curvedSword",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Curved Sword",
+      "cell": [
+        1,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/curvedSword.png",
+      "sourceRect": [
+        157,
+        0,
+        314,
+        157
+      ]
+    },
+    "greatSword": {
+      "id": "greatSword",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Great Sword",
+      "cell": [
+        2,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/greatSword.png",
+      "sourceRect": [
+        314,
+        0,
+        470,
+        157
+      ]
+    },
+    "handAxe": {
+      "id": "handAxe",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Hand Axe",
+      "cell": [
+        3,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/handAxe.png",
+      "sourceRect": [
+        470,
+        0,
+        627,
+        157
+      ]
+    },
+    "battleAxe": {
+      "id": "battleAxe",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Battle Axe",
+      "cell": [
+        4,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/battleAxe.png",
+      "sourceRect": [
+        627,
+        0,
+        784,
+        157
+      ]
+    },
+    "warPick": {
+      "id": "warPick",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "War Pick",
+      "cell": [
+        5,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/warPick.png",
+      "sourceRect": [
+        784,
+        0,
+        940,
+        157
+      ]
+    },
+    "woodenClub": {
+      "id": "woodenClub",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Wooden Club",
+      "cell": [
+        6,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/woodenClub.png",
+      "sourceRect": [
+        940,
+        0,
+        1097,
+        157
+      ]
+    },
+    "spikedMace": {
+      "id": "spikedMace",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Spiked Mace",
+      "cell": [
+        7,
+        0
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/spikedMace.png",
+      "sourceRect": [
+        1097,
+        0,
+        1254,
+        157
+      ]
+    },
+    "spear": {
+      "id": "spear",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Spear",
+      "cell": [
+        0,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/spear.png",
+      "sourceRect": [
+        0,
+        157,
+        157,
+        314
+      ]
+    },
+    "halberd": {
+      "id": "halberd",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Halberd",
+      "cell": [
+        1,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/halberd.png",
+      "sourceRect": [
+        157,
+        157,
+        314,
+        314
+      ]
+    },
+    "huntingBow": {
+      "id": "huntingBow",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Hunting Bow",
+      "cell": [
+        2,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/huntingBow.png",
+      "sourceRect": [
+        314,
+        157,
+        470,
+        314
+      ]
+    },
+    "crossbow": {
+      "id": "crossbow",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Crossbow",
+      "cell": [
+        3,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/crossbow.png",
+      "sourceRect": [
+        470,
+        157,
+        627,
+        314
+      ]
+    },
+    "quiver": {
+      "id": "quiver",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Quiver",
+      "cell": [
+        4,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/quiver.png",
+      "sourceRect": [
+        627,
+        157,
+        784,
+        314
+      ]
+    },
+    "throwingKnife": {
+      "id": "throwingKnife",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Throwing Knife",
+      "cell": [
+        5,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/throwingKnife.png",
+      "sourceRect": [
+        784,
+        157,
+        940,
+        314
+      ]
+    },
+    "sling": {
+      "id": "sling",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Sling",
+      "cell": [
+        6,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/sling.png",
+      "sourceRect": [
+        940,
+        157,
+        1097,
+        314
+      ]
+    },
+    "flail": {
+      "id": "flail",
+      "kind": "item",
+      "category": "Weapons",
+      "label": "Flail",
+      "cell": [
+        7,
+        1
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/flail.png",
+      "sourceRect": [
+        1097,
+        157,
+        1254,
+        314
+      ]
+    },
+    "kiteShield": {
+      "id": "kiteShield",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Kite Shield",
+      "cell": [
+        0,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/kiteShield.png",
+      "sourceRect": [
+        0,
+        314,
+        157,
+        470
+      ]
+    },
+    "towerShield": {
+      "id": "towerShield",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Tower Shield",
+      "cell": [
+        1,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/towerShield.png",
+      "sourceRect": [
+        157,
+        314,
+        314,
+        470
+      ]
+    },
+    "ironHelm": {
+      "id": "ironHelm",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Iron Helm",
+      "cell": [
+        2,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ironHelm.png",
+      "sourceRect": [
+        314,
+        314,
+        470,
+        470
+      ]
+    },
+    "leatherCap": {
+      "id": "leatherCap",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Leather Cap",
+      "cell": [
+        3,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/leatherCap.png",
+      "sourceRect": [
+        470,
+        314,
+        627,
+        470
+      ]
+    },
+    "chainShirt": {
+      "id": "chainShirt",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Chain Shirt",
+      "cell": [
+        4,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/chainShirt.png",
+      "sourceRect": [
+        627,
+        314,
+        784,
+        470
+      ]
+    },
+    "plateGlove": {
+      "id": "plateGlove",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Plate Glove",
+      "cell": [
+        5,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/plateGlove.png",
+      "sourceRect": [
+        784,
+        314,
+        940,
+        470
+      ]
+    },
+    "ironBoots": {
+      "id": "ironBoots",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Iron Boots",
+      "cell": [
+        6,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ironBoots.png",
+      "sourceRect": [
+        940,
+        314,
+        1097,
+        470
+      ]
+    },
+    "travelCloak": {
+      "id": "travelCloak",
+      "kind": "item",
+      "category": "Armour",
+      "label": "Travel Cloak",
+      "cell": [
+        7,
+        2
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/travelCloak.png",
+      "sourceRect": [
+        1097,
+        314,
+        1254,
+        470
+      ]
+    },
+    "oakLeaf": {
+      "id": "oakLeaf",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Oak Leaf",
+      "cell": [
+        0,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/oakLeaf.png",
+      "sourceRect": [
+        0,
+        470,
+        157,
+        627
+      ]
+    },
+    "thornVine": {
+      "id": "thornVine",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Thorn Vine",
+      "cell": [
+        1,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/thornVine.png",
+      "sourceRect": [
+        157,
+        470,
+        314,
+        627
+      ]
+    },
+    "mushroom": {
+      "id": "mushroom",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Mushroom",
+      "cell": [
+        2,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/mushroom.png",
+      "sourceRect": [
+        314,
+        470,
+        470,
+        627
+      ]
+    },
+    "rootBundle": {
+      "id": "rootBundle",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Root Bundle",
+      "cell": [
+        3,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/rootBundle.png",
+      "sourceRect": [
+        470,
+        470,
+        627,
+        627
+      ]
+    },
+    "seedPod": {
+      "id": "seedPod",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Seed Pod",
+      "cell": [
+        4,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/seedPod.png",
+      "sourceRect": [
+        627,
+        470,
+        784,
+        627
+      ]
+    },
+    "antlerCharm": {
+      "id": "antlerCharm",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Antler Charm",
+      "cell": [
+        5,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/antlerCharm.png",
+      "sourceRect": [
+        784,
+        470,
+        940,
+        627
+      ]
+    },
+    "honeycomb": {
+      "id": "honeycomb",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Honeycomb",
+      "cell": [
+        6,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/honeycomb.png",
+      "sourceRect": [
+        940,
+        470,
+        1097,
+        627
+      ]
+    },
+    "feather": {
+      "id": "feather",
+      "kind": "item",
+      "category": "Nature",
+      "label": "Feather",
+      "cell": [
+        7,
+        3
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/feather.png",
+      "sourceRect": [
+        1097,
+        470,
+        1254,
+        627
+      ]
+    },
+    "roundPotion": {
+      "id": "roundPotion",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Round Potion",
+      "cell": [
+        0,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/roundPotion.png",
+      "sourceRect": [
+        0,
+        627,
+        157,
+        784
+      ]
+    },
+    "tallPotion": {
+      "id": "tallPotion",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Tall Potion",
+      "cell": [
+        1,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/tallPotion.png",
+      "sourceRect": [
+        157,
+        627,
+        314,
+        784
+      ]
+    },
+    "doubleFlask": {
+      "id": "doubleFlask",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Double Flask",
+      "cell": [
+        2,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/doubleFlask.png",
+      "sourceRect": [
+        314,
+        627,
+        470,
+        784
+      ]
+    },
+    "mortarPestle": {
+      "id": "mortarPestle",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Mortar Pestle",
+      "cell": [
+        3,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/mortarPestle.png",
+      "sourceRect": [
+        470,
+        627,
+        627,
+        784
+      ]
+    },
+    "powderBomb": {
+      "id": "powderBomb",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Powder Bomb",
+      "cell": [
+        4,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/powderBomb.png",
+      "sourceRect": [
+        627,
+        627,
+        784,
+        784
+      ]
+    },
+    "coilBattery": {
+      "id": "coilBattery",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Coil Battery",
+      "cell": [
+        5,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/coilBattery.png",
+      "sourceRect": [
+        784,
+        627,
+        940,
+        784
+      ]
+    },
+    "crystalShard": {
+      "id": "crystalShard",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Crystal Shard",
+      "cell": [
+        6,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/crystalShard.png",
+      "sourceRect": [
+        940,
+        627,
+        1097,
+        784
+      ]
+    },
+    "hourglass": {
+      "id": "hourglass",
+      "kind": "item",
+      "category": "Alchemy",
+      "label": "Hourglass",
+      "cell": [
+        7,
+        4
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/hourglass.png",
+      "sourceRect": [
+        1097,
+        627,
+        1254,
+        784
+      ]
+    },
+    "waxCandle": {
+      "id": "waxCandle",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Wax Candle",
+      "cell": [
+        0,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/waxCandle.png",
+      "sourceRect": [
+        0,
+        784,
+        157,
+        940
+      ]
+    },
+    "ritualSkull": {
+      "id": "ritualSkull",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Ritual Skull",
+      "cell": [
+        1,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ritualSkull.png",
+      "sourceRect": [
+        157,
+        784,
+        314,
+        940
+      ]
+    },
+    "boundBook": {
+      "id": "boundBook",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Bound Book",
+      "cell": [
+        2,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/boundBook.png",
+      "sourceRect": [
+        314,
+        784,
+        470,
+        940
+      ]
+    },
+    "boneWand": {
+      "id": "boneWand",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Bone Wand",
+      "cell": [
+        3,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/boneWand.png",
+      "sourceRect": [
+        470,
+        784,
+        627,
+        940
+      ]
+    },
+    "moonAmulet": {
+      "id": "moonAmulet",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Moon Amulet",
+      "cell": [
+        4,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/moonAmulet.png",
+      "sourceRect": [
+        627,
+        784,
+        784,
+        940
+      ]
+    },
+    "signetRing": {
+      "id": "signetRing",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Signet Ring",
+      "cell": [
+        5,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/signetRing.png",
+      "sourceRect": [
+        784,
+        784,
+        940,
+        940
+      ]
+    },
+    "runeTablet": {
+      "id": "runeTablet",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Rune Tablet",
+      "cell": [
+        6,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/runeTablet.png",
+      "sourceRect": [
+        940,
+        784,
+        1097,
+        940
+      ]
+    },
+    "scryingEye": {
+      "id": "scryingEye",
+      "kind": "item",
+      "category": "Relics",
+      "label": "Scrying Eye",
+      "cell": [
+        7,
+        5
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/scryingEye.png",
+      "sourceRect": [
+        1097,
+        784,
+        1254,
+        940
+      ]
+    },
+    "breadLoaf": {
+      "id": "breadLoaf",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Bread Loaf",
+      "cell": [
+        0,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/breadLoaf.png",
+      "sourceRect": [
+        0,
+        940,
+        157,
+        1097
+      ]
+    },
+    "cheeseWedge": {
+      "id": "cheeseWedge",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Cheese Wedge",
+      "cell": [
+        1,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/cheeseWedge.png",
+      "sourceRect": [
+        157,
+        940,
+        314,
+        1097
+      ]
+    },
+    "meatJoint": {
+      "id": "meatJoint",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Meat Joint",
+      "cell": [
+        2,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/meatJoint.png",
+      "sourceRect": [
+        314,
+        940,
+        470,
+        1097
+      ]
+    },
+    "waterSkin": {
+      "id": "waterSkin",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Water Skin",
+      "cell": [
+        3,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/waterSkin.png",
+      "sourceRect": [
+        470,
+        940,
+        627,
+        1097
+      ]
+    },
+    "coinPurse": {
+      "id": "coinPurse",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Coin Purse",
+      "cell": [
+        4,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/coinPurse.png",
+      "sourceRect": [
+        627,
+        940,
+        784,
+        1097
+      ]
+    },
+    "woodenChest": {
+      "id": "woodenChest",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Wooden Chest",
+      "cell": [
+        5,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/woodenChest.png",
+      "sourceRect": [
+        784,
+        940,
+        940,
+        1097
+      ]
+    },
+    "travelSatchel": {
+      "id": "travelSatchel",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Travel Satchel",
+      "cell": [
+        6,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/travelSatchel.png",
+      "sourceRect": [
+        940,
+        940,
+        1097,
+        1097
+      ]
+    },
+    "bedroll": {
+      "id": "bedroll",
+      "kind": "item",
+      "category": "Supplies",
+      "label": "Bedroll",
+      "cell": [
+        7,
+        6
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/bedroll.png",
+      "sourceRect": [
+        1097,
+        940,
+        1254,
+        1097
+      ]
+    },
+    "ropeCoil": {
+      "id": "ropeCoil",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Rope Coil",
+      "cell": [
+        0,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ropeCoil.png",
+      "sourceRect": [
+        0,
+        1097,
+        157,
+        1254
+      ]
+    },
+    "ironKey": {
+      "id": "ironKey",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Iron Key",
+      "cell": [
+        1,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/ironKey.png",
+      "sourceRect": [
+        157,
+        1097,
+        314,
+        1254
+      ]
+    },
+    "lockpicks": {
+      "id": "lockpicks",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Lockpicks",
+      "cell": [
+        2,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/lockpicks.png",
+      "sourceRect": [
+        314,
+        1097,
+        470,
+        1254
+      ]
+    },
+    "oilLantern": {
+      "id": "oilLantern",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Oil Lantern",
+      "cell": [
+        3,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/oilLantern.png",
+      "sourceRect": [
+        470,
+        1097,
+        627,
+        1254
+      ]
+    },
+    "handShovel": {
+      "id": "handShovel",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Hand Shovel",
+      "cell": [
+        4,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/handShovel.png",
+      "sourceRect": [
+        627,
+        1097,
+        784,
+        1254
+      ]
+    },
+    "pickaxe": {
+      "id": "pickaxe",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Pickaxe",
+      "cell": [
+        5,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/pickaxe.png",
+      "sourceRect": [
+        784,
+        1097,
+        940,
+        1254
+      ]
+    },
+    "sewingKit": {
+      "id": "sewingKit",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Sewing Kit",
+      "cell": [
+        6,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/sewingKit.png",
+      "sourceRect": [
+        940,
+        1097,
+        1097,
+        1254
+      ]
+    },
+    "scrollRoll": {
+      "id": "scrollRoll",
+      "kind": "item",
+      "category": "Tools",
+      "label": "Scroll Roll",
+      "cell": [
+        7,
+        7
+      ],
+      "purpose": "Reusable item concept icon",
+      "classification": "unique",
+      "scale": "uniform contain; no nine-slice",
+      "states": [
+        "normal"
+      ],
+      "path": "ink/scrollRoll.png",
+      "sourceRect": [
+        1097,
+        1097,
+        1254,
+        1254
+      ]
+    }
+  }
+}

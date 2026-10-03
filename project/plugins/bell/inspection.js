@@ -7,7 +7,7 @@ export function itemLinks(battle, selected) {
   for (const item of Object.values(battle.items)) {
     if (!item.position) continue
     const definition = itemDefinition(battle, item.id)
-    const selectors = [...definition.abilities.flatMap(ability => [ability.target, ability.trigger.source].filter(Boolean)), ...definition.auras.map(aura => aura.target)]
+    const selectors = [...definition.abilities.flatMap(ability => [ability.target, ability.trigger.source].filter(Boolean)), ...definition.auras.map(aura => aura.target), ...definition.grants.map(grant => grant.target)]
     for (const selector of selectors) {
       for (const target of rules.targets(battle, itemReference(item.id), selector)) {
         if (target.kind !== 'item' || item.id === target.id || ![item.id, target.id].includes(selected)) continue
@@ -29,8 +29,9 @@ export function inspectItem(battle, id) {
     const remaining = ability.limit?.perCombat === undefined ? null : Math.max(0, ability.limit.perCombat - (uses?.combatCount ?? 0))
     return `${ability.id} · ${ability.trigger.event}${remaining === null ? '' : ` · ${remaining} use(s) left this combat`}`
   })
+  for (const grant of definition.grants) for (const ability of grant.abilities) abilities.push(`Grants ${ability.id} · ${ability.trigger.event} · per linked item`)
   return { item, definition, links: item.position ? itemLinks(battle, id) : [], bonuses: [...statuses, ...modifiers], abilities,
     damage: definition.tags.includes('weapon') ? rules.stat(battle, itemReference(id), 'damage') : null,
     poison: rules.stat(battle, itemReference(id), 'poisonOnHit'),
-    status: item.position ? battle.acted.includes(id) ? 'Already acted' : 'Equipped' : 'In reserve' }
+    status: definition.storage ? item.position ? 'Attached' : 'In reserve' : item.position ? battle.acted.includes(id) ? 'Already acted' : 'Equipped' : 'In reserve' }
 }

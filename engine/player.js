@@ -130,7 +130,7 @@ function waitForStart(root, title) {
 
 async function play() {
   const root = document.getElementById('app')
-  const { context, engine, editor } = await startWorld({
+  const { context, engine, editor, loop } = await startWorld({
     openFiles: bus => makeFiles(bus, overStaticFiles()),
     loadPlugins: findPlugins,
     importProjectFile,
@@ -170,7 +170,8 @@ async function play() {
   paint()
   await waitForStart(root, editor.projectName || 'Game')
   isWaiting = false
-  editor.togglePlay()
+  // Reload recovery may already have started play; toggling would stop it.
+  if (!loop.running) editor.togglePlay()
 }
 
 play().catch(error => {

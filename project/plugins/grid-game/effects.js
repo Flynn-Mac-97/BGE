@@ -1,5 +1,7 @@
 /** Eight effect handlers form the shared vocabulary for items, spells and statuses. */
+import { extendedEffects } from './extended-effects.js'
 import { entityOf, sameReference } from './targets.js'
+import { preparedStates } from './prepared.js'
 import { amountOf } from './values.js'
 
 const requireActor = target => { if (target.kind !== 'actor') throw new TypeError('Health and guard effects require an actor target') }
@@ -7,6 +9,7 @@ const stackRules = { add: (before, amount) => before + amount, replace: (before,
 const result = (effect, target, amount, extra = {}) => ({ type: effect.type, target, amount, ...extra })
 
 export const effectHandlers = {
+  ...extendedEffects,
   damage(frame, effect, target, amount) {
     requireActor(target)
     const entity = entityOf(frame.state, target)
@@ -38,6 +41,8 @@ export const effectHandlers = {
     if (!amount) return result(effect, target, 0, { status: effect.status })
     const definition = frame.catalog.statuses[effect.status]
     const before = entity.statuses[effect.status]?.stacks ?? 0
+    const prepared = preparedStates.get(frame.state)
+    if (!before && prepared) prepared.statusListeners = null
     const stacks = Math.min(definition.maxStacks ?? Number.MAX_SAFE_INTEGER, stackRules[definition.stacking ?? 'add'](before, amount))
     entity.statuses[effect.status] = { stacks, duration: effect.duration ?? definition.duration ?? 'combat', expires: effect.expires ?? definition.expires ?? null, source: frame.source }
     frame.events.push({ kind: 'statusApplied', source: frame.source, target, status: effect.status, amount: stacks - before })
@@ -47,7 +52,11 @@ export const effectHandlers = {
     const entity = entityOf(frame.state, target)
     const before = entity.statuses[effect.status]?.stacks ?? 0
     const removed = Math.min(before, amount)
-    if (removed === before) delete entity.statuses[effect.status]
+    if (removed === before) {
+      delete entity.statuses[effect.status]
+      const prepared = preparedStates.get(frame.state)
+      if (before && prepared) prepared.statusListeners = null
+    }
     else entity.statuses[effect.status].stacks -= removed
     return result(effect, target, removed, { status: effect.status })
   },
@@ -78,6 +87,8 @@ export const effectHandlers = {
 /** Amounts are evaluated once per effect/target against the current source state. */
 export function applyEffect(frame, effect, target) {
   const amount = effect.type === 'triggerItem' ? 0 : amountOf(frame, effect.amount)
-  if (!Number.isFinite(amount) || (amount < 0 && !['modifyStat', 'resource'].includes(effect.type))) throw new RangeError('Invalid resolved effect amount')
-  return effectHandlers[effect.type](frame, effect, target, amount)
+  if (!Number.isFinite(amount) || (amount < 0 && !['modifyStat', 'resource', 'modifyCharges'].includes(effect.type))) throw new RangeError('Invalid resolved effect amount')
+  const outcome = effectHandlers[effect.type](frame, effect, target, amount)
+  frame.previousAmount = outcome.amount
+  return outcome
 }
