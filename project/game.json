@@ -13,7 +13,7 @@
   },
   "android": {
     "package": "com.engine.blackbelldescent",
-    "orientation": "landscape"
+    "orientation": "unspecified"
   },
   "plugins": {
     "only": [

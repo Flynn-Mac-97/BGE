@@ -35,7 +35,7 @@ export function runHeader(kit, journey) {
   const run = journey.descent
   const need = embersNeeded(run.level + run.pendingLevels)
   const kind = { normal: '', elite: ' · ELITE', boss: ' · BOSS' }[run.enemy.kind]
-  return `<span>THE DESCENT · ${escape(regionOf(run.floor).name.toUpperCase())} · FLOOR ${run.floor}${kind} · LV ${run.level} · ${run.bells} BELLS</span><div class="ember-meter"><small>EMBERS ${run.embers}/${need}</small>${kit.bar(run.embers, { max: need, trail: false })}</div>`
+  return `<span><span class="run-region">THE DESCENT · ${escape(regionOf(run.floor).name.toUpperCase())} · </span>FLOOR ${run.floor}${kind} · LV ${run.level} · ${run.bells} BELLS</span><div class="ember-meter"><small>EMBERS ${run.embers}/${need}</small>${kit.bar(run.embers, { max: need, trail: false })}</div>`
 }
 
 /** Small marks on a grid item: its level, and a star when it can evolve at the next chest. */

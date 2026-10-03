@@ -116,7 +116,7 @@ test('the Lantern hub starts a run, a card is taken through the panel, and givin
   for (const [, action] of game.panel.html().matchAll(/data-action="([^"]+)"/g)) assert.equal(typeof game.panel.on[action], 'function', action)
   game.panel.on.goDown('rook')
   assert.equal(game.read().screen, 'expedition')
-  assert.match(game.panel.html(), /THE DESCENT · THE CELLARS · FLOOR 1/)
+  assert.match(game.panel.html(), /THE DESCENT · THE CELLARS · <\/span>FLOOR 1/)
   game.panel.on.fight()
   for (let tick = 0; tick < 200 && game.read().journey.phase === 'battle'; tick++) game.tick(1, 2)
   assert.equal(game.read().journey.phase, 'levelUp')
