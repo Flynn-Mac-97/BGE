@@ -29,6 +29,7 @@ test('a tapped draught heals once at the next cycle start and spends its only ch
   journey.battle.actors.recruit.health = 5
   assert.ok(readyItem(journey, 'item-9'))
   assert.equal(readyItem(journey, 'item-9'), false)
+  assert.match(journey.descent.log.at(-1), /^Tapped Mending Draught in cycle 2 at HP 5\//)
   const trace = cycle(journey)
   assert.equal(fired(trace), 1)
   assert.ok(journey.battle.actors.recruit.health > 5)

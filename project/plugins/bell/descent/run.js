@@ -104,6 +104,8 @@ export function readyItem(journey, id) {
   if (journey.phase !== 'battle' || !item || !journey.battle.items[id]?.position || !chargesLeft(item) || item.readied) return false
   item.used = (item.used ?? 0) + 1
   item.readied = true
+  const hero = journey.battle.actors.recruit
+  note(journey.descent, `Tapped ${rules.catalog.items[item.type].name} in cycle ${journey.battle.cycle} at HP ${Math.max(0, hero.health)}/${hero.maxHealth}.`)
   return true
 }
 

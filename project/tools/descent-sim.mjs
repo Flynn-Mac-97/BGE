@@ -70,7 +70,7 @@ function playRun(seed) {
     if (journey.phase === 'battle') {
       placeReserve(journey)
       const kind = journey.descent.enemy.kind, hero = journey.battle.actors.recruit
-      if (!journey.battle.started) fights.push({ kind, start: hero.health, max: hero.maxHealth })
+      if (!journey.battle.started) fights.push({ kind, floor: journey.descent.floor, start: hero.health, max: hero.maxHealth })
       tapConsumables(journey)
       journey.battle = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] }).state
       const fight = fights.at(-1)
@@ -96,4 +96,8 @@ for (const kind of ['normal', 'elite', 'boss']) {
   const fights = results.flatMap(result => result.fights).filter(fight => fight.kind === kind)
   const deaths = results.filter(result => result.deathKind === kind).length
   console.log(`${kind}: ${fights.length} fights · ${average(fights.map(fight => fight.cycles)).toFixed(1)} cycles · ${Math.round(100 * average(fights.map(fight => (fight.start - fight.end) / fight.max)))}% HP lost · ${deaths} deaths`)
+}
+for (const from of [1, 11, 21, 31]) {
+  const fights = results.flatMap(result => result.fights).filter(fight => fight.kind === 'normal' && fight.floor >= from && fight.floor < from + 10)
+  if (fights.length) console.log(`normal floors ${from}-${from + 9}: ${fights.length} fights · ${Math.round(100 * average(fights.map(fight => (fight.start - fight.end) / fight.max)))}% HP lost · start at ${Math.round(100 * average(fights.map(fight => fight.start / fight.max)))}% HP`)
 }
