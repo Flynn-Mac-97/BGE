@@ -386,8 +386,8 @@ header>div { display:flex; gap:6px; }
   .hp-numbers { font-size:11px; }.gear-chip { width:20px; height:20px; }
   .battle-box p { font-size:12px; }
 }
-/* A short stage (landscape phones): one row, hero plate and enemy plate in the middle. */
-@container (max-height:250px) {
+/* A short stage (landscape phones, or any stage with item details open below it): one row, hero plate and enemy plate in the middle. */
+@container (max-height:290px) {
   .battle-field,.battle-box { --box:40px; }
   .battle-field { grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto; grid-template-rows:minmax(0,1fr); grid-template-areas:"hero heroplate foeplate foe"; gap:8px; }
   .battle-frame { width:min(24cqw, calc(100cqh - var(--box) - 22px), 160px); }
@@ -554,3 +554,16 @@ header>div { display:flex; gap:6px; }
 .play-log { grid-template-rows:auto auto minmax(0,1fr); }
 .play-log-body { min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:8px; }
 .play-log-body textarea { width:100%; height:100%; min-height:62vh; box-sizing:border-box; resize:none; background:#000; color:#fff; border:1px solid #fff; font:11px/1.4 monospace; padding:8px; user-select:text; -webkit-user-select:text; }
+/* Consumables: charges under the level badge, a dashed border, and a pulse while readied. */
+.equipment-shape:has(.charge-badge) { border-style:dashed; }
+.equipment-shape .charge-badge { position:absolute; top:16px; right:2px; z-index:3; background:#000; color:#fff; border:1px solid #fff; font:800 9px monospace; padding:0 3px; }
+.equipment-shape .charge-badge.spent { opacity:.5; }
+.equipment-shape .charge-badge.readied { background:#fff; color:#000; animation:readied-pulse .8s ease-in-out infinite alternate; }
+@keyframes readied-pulse { to { box-shadow:0 0 8px #fff; } }
+@media (prefers-reduced-motion:reduce) { .equipment-shape .charge-badge.readied { animation:none; } }
+/* The tome sheet: one row per tome, with its price on the right. */
+.tome-list { list-style:none; padding:0; margin:0 0 10px; display:grid; gap:6px; }
+.tome-row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; gap:8px; align-items:center; border:1px solid #fff; padding:4px 6px; }
+.tome-row>.ink-art { width:40px; height:40px; }
+.tome-row .ui-button { min-height:36px; white-space:nowrap; }
+.tome-sheet h2 { font-size:13px; }

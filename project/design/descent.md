@@ -51,6 +51,8 @@ any change to the numbers.
 | `plugins/bell/descent/run.js` | The run: floors, Embers, cards, chests, evolution, death. Plain records in and out. |
 | `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
 | `plugins/bell/descent/view.js` | The hub, the run header, cards, chest and summary screens. |
+| `plugins/bell/descent/consumables.js` | Consumable items, their tap abilities, charges and grid labels. |
+| `plugins/bell/descent/tomes.js` | Tomes: prices and what each one adds. Numbers are in `tuning.js`. |
 | `plugins/bell/descent/forge.js` | Forge parts (WHEN, DO, TO, POWER), their costs, and how a record becomes an item and an ability. |
 | `plugins/bell/descent/forge-view.js` | The Forge screen. |
 | `plugins/bell/duel/duel-rules.js` | Duel Pit rule cards and their options. |
@@ -80,3 +82,21 @@ phone, then Player 2 drafts. The builds fight on two separate grids; the board
 shows P1's grid on the left and P2's on the right. After each fight the
 players rate it Dull, OK or Great. The profile keeps the last 60 ratings, and
 the rules screen lists the rule options with the best average fun.
+
+## Consumables
+
+Mending Draught, Bramble Ward, Rot Bloom, Whet Oil and Smoke Flask drop as
+new-item cards. Each sits on the grid like any item and has charges (Bramble
+Ward 2, the rest 1). Tap one during a floor, then Use: it is readied, and it
+acts at the start of the next cycle. A tap the floor never used gives its
+charge back. Every chest refills all charges. Levels raise their numbers, not
+their charges. They never stand on the Duel Pit shelf. The sim bot taps them
+on elites and bosses, and taps the healers below half health.
+
+## Tomes
+
+Before a floor's fight starts, the Tomes button spends run Bells. A Tome of
+Vigor adds max health for the run; a Tome of Might adds 1 to every nonzero
+number on one item. Each tome's price grows each time it is bought (Might
+counts per item). Bells spent on tomes do not come home, so a tome trades
+Bell Tower progress for depth in this run.

@@ -1,6 +1,9 @@
 /** What the Descent can offer, and who can go down. Item types are catalog keys. */
 export const descentPool = ['dagger', 'sword', 'hammer', 'buckler', 'salve', 'sprig', 'venom', 'stone', 'banner', 'hungryTooth', 'bloodCup', 'sapwoodStaff', 'thornTotem', 'blightMortar', 'sporeIdol', 'thornsapVial']
 
+/** Consumables that can drop in the Descent; they are never on the Duel Pit shelf. */
+export const consumablePool = ['mendingDraught', 'brambleWard', 'rotBloom', 'whetOil', 'smokeFlask']
+
 /** Starting crew. `unlock` is the best depth that brings them to the Lantern; `kit` places items at [column, row]. */
 export const descentCrew = {
   rook: { name: 'Rook', title: 'the Deserter', portrait: 'rook', unlock: 0, line: 'A soldier without a regiment. He knows which end of a blade to hold.', kit: [['dagger', [1, 0]], ['stone', [0, 0]]] },

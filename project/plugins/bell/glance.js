@@ -1,5 +1,6 @@
 /** Short grid labels say what each item does and what feeds what, read live from the same blocks combat resolves. */
 import { rules, itemDefinition, itemReference } from './rules.js'
+import { consumableGlance } from './descent/consumables.js'
 import { footprint } from '../grid-game/grid.js'
 import { auraAmount } from '../grid-game/values.js'
 
@@ -58,6 +59,8 @@ function abilityLabel(battle, id, ability) {
 /** Every line an item shows on the grid: its own abilities, then what it gives its neighbours. */
 export function itemGlance(battle, id) {
   const definition = itemDefinition(battle, id)
+  const consumable = consumableGlance[battle.items[id].type]
+  if (consumable) return [{ trigger: 'TAP', text: consumable(battle.items[id].stats), isBoosted: false }]
   const lines = definition.abilities.map(ability => abilityLabel(battle, id, ability)).filter(Boolean)
   for (const aura of definition.auras) lines.push({ trigger: 'AURA', text: `${signed(auraAmount(aura, battle.items[id]))} ${shortStat(aura.stat)}`, isBoosted: false })
   for (const grant of definition.grants) for (const ability of grant.abilities) {

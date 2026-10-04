@@ -4,8 +4,9 @@ import { abilities } from './catalog/abilities.js'
 import { items } from './catalog/items.js'
 import { labItems, labAbilities } from './catalog/lab.js'
 import { evolvedItems, evolvedAbilities } from './descent/evolutions.js'
+import { consumableItems, consumableAbilities } from './descent/consumables.js'
 export const catalog = {
-  items: { ...items, ...familyItems, ...labItems, ...evolvedItems }, abilities: { ...abilities, ...familyAbilities, ...labAbilities, ...evolvedAbilities },
+  items: { ...items, ...familyItems, ...labItems, ...evolvedItems, ...consumableItems }, abilities: { ...abilities, ...familyAbilities, ...labAbilities, ...evolvedAbilities, ...consumableAbilities },
   statuses: {
     shock: { short: 'SHOCK', name: 'Shock', stacking: 'add', maxStacks: 8, duration: 'combat', abilities: ['shockTick'] },
     curse: { short: 'CURSE', name: 'Curse', stacking: 'add', duration: 'combat', abilities: [] },
@@ -17,4 +18,4 @@ export const catalog = {
   }
 }
 /** Lab mocks and evolved items never drop as dungeon or campaign loot. */
-export const notLoot = new Set([...Object.keys(labItems), ...Object.keys(evolvedItems)])
+export const notLoot = new Set([...Object.keys(labItems), ...Object.keys(evolvedItems), ...Object.keys(consumableItems)])

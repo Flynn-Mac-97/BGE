@@ -3,7 +3,7 @@
  * `node tools/descent-sim.mjs [runs] [crew] [tower ranks as JSON]`. A balance probe, not a measure of fun.
  */
 import { rules, itemReference } from '../plugins/bell/rules.js'
-import { createRun, finishFloor, collectChest, chooseCard, readyEvolutions, recipeFor } from '../plugins/bell/descent/run.js'
+import { createRun, finishFloor, collectChest, chooseCard, readyEvolutions, recipeFor, readyItem, armReadied, chargesLeft } from '../plugins/bell/descent/run.js'
 import { evolutionRecipes } from '../plugins/bell/descent/evolutions.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 
@@ -46,6 +46,18 @@ function cardChoice(run) {
   return run.cards.map((card, index) => ({ index, score: score(card) })).sort((first, second) => second.score - first.score)[0].index
 }
 
+/** Tap consumables like a careful player: everything on elites and bosses from the first cycle, the healers when hurt. */
+function tapConsumables(journey) {
+  const run = journey.descent, hero = journey.battle.actors.recruit
+  const isBig = run.enemy.kind !== 'normal', isHurt = hero.health < hero.maxHealth / 2
+  for (const [id, item] of Object.entries(run.items)) {
+    if (!chargesLeft(item)) continue
+    const isHealer = ['mendingDraught', 'brambleWard'].includes(item.type)
+    if (isBig ? !isHealer || isHurt : isHealer && isHurt) readyItem(journey, id)
+  }
+  armReadied(journey)
+}
+
 function playRun(seed) {
   const random = seededRandom(seed)
   const journey = createRun({ tower }, crew, random)
@@ -53,6 +65,7 @@ function playRun(seed) {
   while (journey.phase !== 'dead' && guard++ < 5000) {
     if (journey.phase === 'battle') {
       placeReserve(journey)
+      tapConsumables(journey)
       journey.battle = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] }).state
       finishFloor(journey, random)
     } else if (journey.phase === 'chest') collectChest(journey, random)

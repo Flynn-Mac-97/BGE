@@ -16,5 +16,8 @@ export const tuning = {
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
   bells: { normal: 1, elite: 3, boss: 10 },
-  cycleCap: 30
+  cycleCap: 30,
+  // Tomes cost run Bells, which then do not come home. A tome's price grows by priceStep each time that tome is bought
+  // (Might counts per item). Vigor adds max health; Might adds `bonus` to every nonzero number on one item.
+  tomes: { vigor: { price: 3, priceStep: 2, health: 4 }, might: { price: 2, priceStep: 2, bonus: 1 } }
 }

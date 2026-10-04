@@ -8,7 +8,8 @@ import { descentCrew } from './pool.js'
 import { towerUpgrades } from './tower.js'
 import { evolutionRecipes } from './evolutions.js'
 import { unlockedCrew } from './profile-save.js'
-import { embersNeeded, regionOf, cardStats, recipeFor, readyEvolutions, maxHealthOf } from './run.js'
+import { embersNeeded, regionOf, cardStats, recipeFor, readyEvolutions, maxHealthOf, chargesLeft, itemStat } from './run.js'
+import { tomePrice, canBuyTomes } from './tomes.js'
 
 const itemName = type => rules.catalog.items[type].name
 const pips = (filled, total) => '●'.repeat(filled) + '○'.repeat(total - filled)
@@ -43,7 +44,9 @@ export function levelBadge(journey, id, readyIds) {
   const item = journey.descent.items[id]
   if (!item) return ''
   const isEvolved = rules.catalog.items[item.type].tags.includes('evolved')
-  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : ''}</span>`
+  const left = chargesLeft(item)
+  const charges = left === null ? '' : `<span class="charge-badge ${item.readied ? 'readied' : left ? '' : 'spent'}">${item.readied ? 'READY' : '◆'.repeat(left) || 'EMPTY'}</span>`
+  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : ''}${item.tomes ? ` +${item.tomes}` : ''}</span>${charges}`
 }
 /** Item ids ready to evolve now. */
 export const readyIds = journey => new Set(readyEvolutions(journey).map(ready => ready.id))
@@ -91,3 +94,20 @@ const overlays = {
 
 /** The overlay for the current run phase, or '' while fighting. */
 export const runOverlay = (kit, journey, state) => overlays[journey.phase]?.(kit, journey, state) ?? ''
+
+/** The tome sheet: one Tome of Vigor for the hero, and a Tome of Might for each item. */
+export function tomeSheet(kit, journey) {
+  const run = journey.descent, isOpen = canBuyTomes(journey)
+  const buy = (kind, id) => {
+    const price = tomePrice(run, kind, id)
+    return kit.button(`Read · ${price} Bells`, { action: 'buyTome', value: id ? `${kind}:${id}` : kind, isDisabled: !isOpen || run.bells < price })
+  }
+  const items = Object.entries(run.items).map(([id, item]) => {
+    const definition = rules.catalog.items[item.type]
+    const numbers = Object.entries(definition.stats).filter(([, base]) => base).map(([stat, base]) => `${shortStat(stat)} ${itemStat(base, item)}`).join(' · ')
+    return `<li class="tome-row">${art(kit, item.type, definition.name)}<span><strong>${escape(definition.name)}</strong>${item.tomes ? ` <small>MIGHT ${item.tomes}</small>` : ''}<br><small>${escape(numbers)}</small></span>${buy('might', id)}</li>`
+  }).join('')
+  const hero = `<li class="tome-row">${art(kit, 'boundBook', 'Tome of Vigor')}<span><strong>TOME OF VIGOR</strong>${run.tomes?.vigor ? ` <small>READ ${run.tomes.vigor}</small>` : ''}<br><small>+${tuning.tomes.vigor.health} max HP for this run · now ${maxHealthOf(run)}</small></span>${buy('vigor')}</li>`
+  const note = isOpen ? `${run.bells} BELLS · Bells spent here do not come home.` : 'Tomes can only be read before a fight starts.'
+  return `<div class="menu-shade"><section class="loot-sheet tome-sheet"><h2>TOMES · ${escape(note)}</h2><ul class="tome-list">${hero}</ul><h3>TOME OF MIGHT · +${tuning.tomes.might.bonus} TO EVERY NUMBER ON ONE ITEM</h3><ul class="tome-list">${items}</ul>${kit.button('Close', { action: 'tomes' })}</section></div>`
+}

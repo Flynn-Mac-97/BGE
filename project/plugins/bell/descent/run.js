@@ -7,7 +7,8 @@
  */
 import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
-import { descentPool, descentCrew } from './pool.js'
+import { descentPool, consumablePool, descentCrew } from './pool.js'
+import { consumableCharges } from './consumables.js'
 import { regions, enemyTraits } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
 import { towerBonus } from './tower.js'
@@ -21,7 +22,9 @@ export const floorKind = floor => floor % tuning.enemy.bossEvery === 0 ? 'boss' 
 /** The region a floor is in. */
 export const regionOf = floor => regions.filter(region => region.from <= floor).at(-1)
 /** The recruit's max health at the run's level. */
-export const maxHealthOf = run => tuning.recruit.health + run.bonus.maxHealth + tuning.recruit.healthPerLevel * (run.level - 1)
+export const maxHealthOf = run => tuning.recruit.health + run.bonus.maxHealth + tuning.recruit.healthPerLevel * (run.level - 1) + (run.tomes?.vigor ?? 0) * tuning.tomes.vigor.health
+/** A run item's stat: its level-scaled base plus Tomes of Might. A zero base stays zero. */
+export const itemStat = (base, item) => base ? levelStat(base, item.level) + (item.tomes ?? 0) * tuning.tomes.might.bonus : 0
 /** "the Cellar Rat", or a name that already starts with "The". */
 const theName = name => name.startsWith('The ') ? name : `the ${name}`
 const capital = text => text[0].toUpperCase() + text.slice(1)
@@ -59,7 +62,7 @@ export function battleFor(run) {
     items: Object.entries(run.items).map(([id, item]) => ({ id, type: item.type, owner: 'recruit', position: null })) })
   for (const [id, item] of Object.entries(run.items)) {
     const definition = rules.catalog.items[item.type]
-    for (const [stat, base] of Object.entries(definition.stats)) battle.items[id].stats[stat] = levelStat(base, item.level)
+    for (const [stat, base] of Object.entries(definition.stats)) battle.items[id].stats[stat] = itemStat(base, item)
     if (item.position) rules.place(battle, id, item.position)
   }
   return battle
@@ -88,8 +91,38 @@ export function createRun(profile, crewId, random) {
 }
 
 /** Write the grid's current places into the run, so moves made while planning survive the next floor. */
-function keepPlaces(journey) {
+export function keepPlaces(journey) {
   for (const [id, item] of Object.entries(journey.descent.items)) item.position = journey.battle.items[id]?.position ?? null
+}
+
+/** Charges a consumable has left, or null for any other item. */
+export const chargesLeft = item => consumableCharges[item.type] === undefined ? null : consumableCharges[item.type] - (item.used ?? 0)
+
+/** Tap a placed consumable during a floor: spend a charge; it acts at the start of the next cycle. */
+export function readyItem(journey, id) {
+  const item = journey.descent?.items[id]
+  if (journey.phase !== 'battle' || !item || !journey.battle.items[id]?.position || !chargesLeft(item) || item.readied) return false
+  item.used = (item.used ?? 0) + 1
+  item.readied = true
+  return true
+}
+
+/** Move readied consumables into the battle, just before a cycle resolves. */
+export function armReadied(journey) {
+  for (const [id, item] of Object.entries(journey.descent?.items ?? {})) {
+    if (!item.readied) continue
+    item.readied = false
+    journey.battle.items[id].resources.readied = 1
+  }
+}
+
+// A tap that never got to act (the floor ended first) gives its charge back.
+function refundReadied(journey) {
+  for (const [id, item] of Object.entries(journey.descent.items)) {
+    if (!item.readied && !journey.battle.items[id]?.resources.readied) continue
+    item.readied = false
+    item.used--
+  }
 }
 
 /** Called after each resolved cycle. Returns true once the floor is decided. */
@@ -99,6 +132,7 @@ export function finishFloor(journey, random) {
   const winner = rules.winner(journey.battle)
   if (!winner && journey.battle.cycle <= tuning.cycleCap) return false
   keepPlaces(journey)
+  refundReadied(journey)
   const hero = journey.battle.actors.recruit, foe = journey.battle.actors.enemy
   note(run, `[Floor ${run.floor} ${run.enemy.kind} · ${foe.name}] ${journey.battle.cycle - 1} cycles · ${run.crew} HP ${Math.max(0, hero.health)}/${hero.maxHealth} · foe HP ${Math.max(0, foe.health)}/${foe.maxHealth}`)
   if (winner !== 'crew') {
@@ -115,6 +149,7 @@ export function finishFloor(journey, random) {
   const health = journey.battle.actors.recruit.health
   run.health = Math.min(maxHealthOf(run), health + Math.round(maxHealthOf(run) * (tuning.recruit.recoverShare + run.bonus.recoverShare)))
   run.chest = kind === 'normal' ? null : openChest(journey, kind, random)
+  if (run.chest) for (const item of Object.values(run.items)) item.used = 0
   const levels = run.pendingLevels ? ` ${run.pendingLevels} level${run.pendingLevels > 1 ? 's' : ''} gained.` : ''
   tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${tuning.bells[kind]} Bell${tuning.bells[kind] > 1 ? 's' : ''}.${levels}`)
   if (run.chest) journey.phase = 'chest'
@@ -183,7 +218,7 @@ export function drawCards(run, random) {
   const count = tuning.cards.count + run.bonus.cards
   for (let draw = 0; draw < count; draw++) {
     const levels = Object.keys(run.items).filter(id => !cards.some(card => card.id === id))
-    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...consumablePool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
       { weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
@@ -251,7 +286,7 @@ function cardSummary(run, card) {
 export function cardStats(run, card) {
   if (card.kind !== 'level') return []
   const item = run.items[card.id]
-  return Object.entries(rules.catalog.items[item.type].stats).map(([stat, base]) => ({ stat, from: levelStat(base, item.level), to: levelStat(base, item.level + 1) })).filter(change => change.from || change.to)
+  return Object.entries(rules.catalog.items[item.type].stats).map(([stat, base]) => ({ stat, from: itemStat(base, item), to: itemStat(base, { ...item, level: item.level + 1 }) })).filter(change => change.from || change.to)
 }
 
 /** The recipe an item type can evolve by, or null. */
