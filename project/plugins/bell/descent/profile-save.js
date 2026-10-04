@@ -1,21 +1,28 @@
 /**
  * The Descent profile and its one storage boundary.
- * Profile: `{ version: 1, bells, bestFloor, runs, tower: { upgradeId: rank }, journey }`, where `journey` is the active run or null.
+ * Profile: `{ version: 1, bells, bestFloor, runs, tower: { upgradeId: rank }, forged: [record], duels: [record], journey }`, where `journey` is the active run or null.
+ * Saves from before the Forge and the Duel Pit load with empty `forged` and `duels`.
  * An unreadable save is kept, not overwritten, and the session runs without saving.
  */
 import { rules } from '../rules.js'
 import { assertState } from '../../grid-game/state.js'
 import { descentCrew } from './pool.js'
 import { towerUpgrades } from './tower.js'
+import { isForgeValid, registerForged, forgeLimit } from './forge.js'
 
 export const profileSaveKey = 'black-bell-descent-v1'
 /** A fresh profile. */
-export const createProfile = () => ({ version: 1, bells: 0, bestFloor: 0, runs: 0, tower: {}, journey: null })
+export const createProfile = () => ({ version: 1, bells: 0, bestFloor: 0, runs: 0, tower: {}, forged: [], duels: [], journey: null })
 const count = value => Number.isInteger(value) && value >= 0
 
 function validate(profile) {
   if (profile?.version !== 1 || !count(profile.bells) || !count(profile.bestFloor) || !count(profile.runs) || typeof profile.tower !== 'object' || Array.isArray(profile.tower)) throw new Error('Invalid profile')
   for (const [id, rank] of Object.entries(profile.tower)) if (!towerUpgrades[id] || !count(rank) || rank > towerUpgrades[id].cost.length) throw new Error('Invalid tower rank')
+  profile.forged ??= []
+  profile.duels ??= []
+  if (!Array.isArray(profile.forged) || profile.forged.length > forgeLimit || !profile.forged.every(record => /^forged\d+$/.test(record.id) && isForgeValid(record)) || !Array.isArray(profile.duels)) throw new Error('Invalid forge or duel records')
+  // Forged items must be in the rules before a saved run that carries them is checked.
+  registerForged(profile.forged)
   const journey = profile.journey
   if (!journey) return profile
   if (!descentCrew[journey.descent?.crew] || !['battle', 'levelUp', 'chest', 'dead'].includes(journey.phase)) throw new Error('Invalid run')

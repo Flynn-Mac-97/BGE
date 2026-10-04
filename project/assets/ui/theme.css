@@ -479,3 +479,74 @@ header>div { display:flex; gap:6px; }
   .descent-card>.ink-art { width:44px; height:44px; grid-row:span 2; }
   .descent-card>strong,.descent-card>small { grid-column:2; }
 }
+/* The Forge: part buttons in rows, the chosen one inverted, and a preview card of the item it makes. */
+.descent-hub-body.forge-body .forge-parts .ui-button { width:auto; display:inline-block; margin:0 4px 4px 0; min-height:32px; padding:4px 8px; font-size:11px; }
+.forge-parts h3:first-child { margin-top:0; }
+.ui-button.picked,.ui-button.picked:hover { background:#fff; color:#000; font-weight:700; }
+.forge-card { border:2px solid #fff; padding:12px; display:grid; justify-items:center; gap:6px; text-align:center; }
+.forge-art { border:1px dashed #fff; padding:6px; background:none; cursor:pointer; }
+.forge-art .ink-art { width:84px; height:84px; }
+.forge-card>strong { font-size:16px; }
+.forge-card>p { margin:0; }
+.forge-price { font-size:18px; font-weight:700; letter-spacing:.1em; }
+.forge-list .hub-kit { width:100%; align-items:flex-start; }
+/* The Duel Pit: rule cards in a grid, the fun log, the drafting player, and the rival's double frame. */
+.rule-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; margin-bottom:10px; }
+.descent-hub-body .rule-card { margin:0; min-height:52px; }
+.duel-body { grid-template-columns:minmax(0,1.6fr) minmax(170px,1fr); }
+.fun-list { list-style:none; padding:0; }.fun-list li { margin-bottom:6px; }
+.duel-draft { grid-column:1/-1; grid-row:1/-1; display:grid; align-content:start; gap:8px; padding:10px; overflow:auto; min-height:0; }
+.duel-drafter { display:flex; gap:12px; align-items:center; }
+.duel-drafter h2 { margin:0 0 4px; font-size:15px; }
+.duel-drafter p { margin:0 0 4px; }
+.drafter-portrait { border:3px solid #fff; padding:3px; background:none; cursor:pointer; flex:none; }
+.drafter-portrait .ink-art { width:84px; height:84px; }
+.duel-count { font-weight:700; letter-spacing:.08em; }
+.rule-chips { list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:4px; }
+.rule-chips li { border:1px solid #fff; padding:2px 6px; font-size:11px; }
+.duel-hint { margin:0; }
+.duel-sheet { text-align:center; display:grid; gap:10px; justify-items:center; }
+.duel-winner { display:flex; gap:12px; align-items:center; }
+.duel-winner .ink-art { width:84px; height:84px; border:3px solid #fff; }
+.fun-buttons,.duel-next { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.fun-buttons .ui-button { min-width:80px; min-height:40px; }
+.rank-rival .frame-motion { border:4px double #fff; }
+/* A duel fight board: both grids with a gap column, each labelled. */
+.duel-side-label { grid-row:1; align-self:start; justify-self:start; z-index:3; pointer-events:none; background:#fff; color:#000; font:700 10px monospace; padding:0 4px; }
+.duel-board .grid-cell { font-size:0; }
+@media (max-width:760px) {
+  .duel-body { grid-template-columns:minmax(0,1fr); }
+  .rule-cards { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .descent-hub-body.forge-body>aside.forge-parts { display:block; }
+}
+@media (orientation:landscape) and (max-height:500px) {
+  .duel-draft { padding:4px; gap:4px; }
+  .drafter-portrait .ink-art,.duel-winner .ink-art { width:56px; height:56px; }
+  .forge-art .ink-art { width:56px; height:56px; }
+  .duel-sheet { gap:6px; }
+}
+/* Drafting a duel on a landscape phone: the shelf goes under the draft panel, so it has room to scroll. */
+@media (orientation:landscape) and (max-height:500px) {
+  .bell-game.descent-run.duel-drafting { grid-template-columns:minmax(0,1fr) auto 84px; grid-template-rows:34px 96px minmax(0,1fr) auto; }
+  .duel-drafting>.dock { display:contents; }
+  .duel-drafting>.stage { grid-column:1; grid-row:2; }
+  .duel-drafting .reserve { grid-column:1; grid-row:3; font-size:inherit; }
+  .duel-drafting .reserve-items { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+  .duel-drafting .loadout { grid-column:2; grid-row:2/4; }
+  .duel-drafting .bell-controls { grid-column:3; grid-row:2/4; }
+  .duel-drafting .duel-draft p:not(.duel-count) small,.duel-drafting .rule-chips { display:none; }
+}
+/* A duel fight board shrinks its cells to fit both grids in the dock. */
+.descent-run .board.duel-board { min-width:0; grid-template-columns:repeat(var(--board-columns),minmax(0,1fr)); }
+.duel-winner h2 { font-size:20px; margin:0 0 4px; }
+/* Drafting a duel in portrait: a short draft panel, the shelf with the most room, then the grid and controls. */
+@media (orientation:portrait) {
+  .bell-game.descent-run.duel-drafting { grid-template-columns:minmax(0,1fr) 90px; grid-template-rows:auto 112px minmax(0,1fr) 236px auto; }
+  .duel-drafting>header,.duel-drafting>.stage,.duel-drafting>:last-child:not(.menu-shade) { grid-column:1/-1; }
+  .duel-drafting>.dock { display:contents; }
+  .duel-drafting .reserve { grid-column:1/-1; grid-row:3; min-height:0; overflow:auto; }
+  .duel-drafting .loadout { grid-column:1; grid-row:4; }
+  .duel-drafting .bell-controls { grid-column:2; grid-row:4; }
+  .duel-drafting .duel-draft p:not(.duel-count) small,.duel-drafting .rule-chips { display:none; }
+  .duel-drafting .drafter-portrait .ink-art { width:56px; height:56px; }
+}

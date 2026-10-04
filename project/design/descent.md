@@ -51,8 +51,32 @@ any change to the numbers.
 | `plugins/bell/descent/run.js` | The run: floors, Embers, cards, chests, evolution, death. Plain records in and out. |
 | `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
 | `plugins/bell/descent/view.js` | The hub, the run header, cards, chest and summary screens. |
+| `plugins/bell/descent/forge.js` | Forge parts (WHEN, DO, TO, POWER), their costs, and how a record becomes an item and an ability. |
+| `plugins/bell/descent/forge-view.js` | The Forge screen. |
+| `plugins/bell/duel/duel-rules.js` | Duel Pit rule cards and their options. |
+| `plugins/bell/duel/duel.js` | A same-screen duel: draft in turn, pass the phone, fight, rate. |
+| `plugins/bell/duel/view.js` | Duel Pit screens: rules and fun log, draft panel, handoff, result. |
 | `plugins/bell/descent/battle-stage.js` | The battle stage: framed portraits, nameplates with HP and Embers, the battle text box, and the per-step effects. Styles are in `assets/ui/theme.css`. |
 
 To add an item to the run, add it to the catalog, then to `pool.js`. To add an
 evolution, add one recipe and one item record in `evolutions.js`. No logic
 changes are needed for either.
+
+## The Forge
+
+At the Lantern, spend Bells to make an item from four parts: WHEN it acts,
+what it DOES, TO whom, and its POWER. The price is `(when + do) × power`.
+A forged item is 1×1, joins the card pool of every new run, and can stand on
+the Duel Pit shelf. The profile holds at most 12. Records are saved as parts,
+not as items, so changing a part's numbers in `forge.js` changes every forged
+item.
+
+## The Duel Pit
+
+Two players share one screen. Each rule card cycles through its options:
+items each, item level, grid columns, hero health, shelf size, evolved items,
+forged items and sudden death. Player 1 drafts from the shelf, passes the
+phone, then Player 2 drafts. The builds fight on two separate grids; the board
+shows P1's grid on the left and P2's on the right. After each fight the
+players rate it Dull, OK or Great. The profile keeps the last 60 ratings, and
+the rules screen lists the rule options with the best average fun.

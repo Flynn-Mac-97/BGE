@@ -1,6 +1,6 @@
 /**
- * The Descent battle stage, laid out like a handheld monster battle: the enemy's framed portrait top right
- * with its nameplate, the hero bottom left with HP and Embers, and a battle text box. Each resolved step
+ * The battle stage, laid out like a handheld monster battle: the foe's framed portrait top right
+ * with its nameplate, the hero bottom left with HP, and a battle text box. The Descent and the Duel Pit share it. Each resolved step
  * plays short CSS effects (lunge, hit blink, HP drain, pop-ups, faint), keyed by the step so each plays once.
  */
 import { art } from '../art.js'
@@ -15,7 +15,12 @@ const crest = { normal: '', elite: '◆ ELITE', boss: '♛ BOSS' }
 // A hit that takes this share of max health or more shakes the whole stage and is called a crushing blow.
 const QUAKE_SHARE = 0.4
 
-const nameOf = (battle, subject) => subject.kind === 'item' ? itemDefinition(battle, subject.id).name : battle.actors[subject.id].name
+// In a duel both sides may own the same item, so an item's name carries its owner's tag, such as (P2).
+const nameOf = (battle, subject) => {
+  if (subject.kind !== 'item') return battle.actors[subject.id].name
+  const owner = battle.actors[battle.items[subject.id].owner]
+  return itemDefinition(battle, subject.id).name + (owner.short ? ` (${owner.short})` : '')
+}
 const percent = (health, max) => Math.max(0, Math.min(100, Math.round(100 * health / max)))
 
 /** What a resolved step did to each fighter: `{ recruit: moment, enemy: moment, attacker }`. */
@@ -107,27 +112,47 @@ function portrait(kit, side, image, label, actor, moments, state, floor, rank) {
   return `<div class="battle-frame ${side}-frame rank-${rank}" data-key="${side}-frame:${floor}"><div class="frame-motion ${classes}" data-key="${side}-motion:${motionKey}">${art(kit, image, label)}</div><div class="frame-glow ${glow}" data-key="${side}-glow:${glow ? state.serial : 'rest'}"></div>${pops(moments[side], state.serial)}<div class="platform"></div></div>`
 }
 
-function gearStrip(kit, journey) {
-  return placedItems(journey.battle).map(item => `<span class="gear-chip">${art(kit, item.type, itemDefinition(journey.battle, item.id).name)}<b>${journey.descent.items[item.id]?.level ?? 1}</b></span>`).join('')
+function gearStrip(kit, gear) {
+  return gear.map(entry => `<span class="gear-chip">${art(kit, entry.type, rules.catalog.items[entry.type].name)}<b>${entry.level}</b></span>`).join('')
 }
 
-/** The whole stage for a Descent journey: both fighters, their plates, the effects of the current step and the battle box. */
-export function battleStage(kit, state) {
-  const journey = state.journey, run = journey.descent, battle = journey.battle
-  const crew = descentCrew[run.crew]
+/**
+ * Who stands on the stage, as plain facts: `{ key, idle, hero: fighter, foe: fighter }`, where a fighter is
+ * `{ portrait, title, tag, rank, meter, gear: [{ type, level }], showNumbers }`. `key` changes when a new fight begins,
+ * which replays the portraits' entrance; `meter` is a 0–100 share or null.
+ */
+function plate(kit, fighter, actor, moment, serial, side) {
+  const meter = fighter.meter === null ? '' : `<div class="xp-line"><b>EMB</b><div class="xp-bar"><i style="width:${fighter.meter}%"></i></div></div>`
+  const numbers = fighter.showNumbers ? `<div class="hp-numbers">${Math.max(0, actor.health)} / ${actor.maxHealth}</div>` : ''
+  const gear = fighter.gear.length ? `<div class="gear-strip">${gearStrip(kit, fighter.gear)}</div>` : ''
+  return `<div class="battle-plate ${side}-plate"><div class="plate-name"><strong>${escape(fighter.title.toUpperCase())}</strong><small>${escape(fighter.tag)}</small></div><div class="pills">${statusPills(actor)}</div>${hpBar(actor, moment, serial)}${numbers}${meter}${gear}</div>`
+}
+
+/** The cast of a Descent floor: the crew member below, the floor's enemy above. */
+export function descentCast(state) {
+  const journey = state.journey, run = journey.descent, crew = descentCrew[run.crew]
+  const need = embersNeeded(run.level + run.pendingLevels)
+  return {
+    key: run.floor,
+    idle: state.message || (journey.battle.started ? journey.message : `${run.story.at(-1) ?? ''} What will ${crew.name} do?`),
+    hero: { portrait: crew.portrait, title: crew.name, tag: `LV ${run.level}`, rank: 'hero', meter: percent(run.embers, need), showNumbers: true,
+      gear: placedItems(journey.battle).map(item => ({ type: item.type, level: run.items[item.id]?.level ?? 1 })) },
+    foe: { portrait: run.enemy.portrait, title: journey.battle.actors.enemy.name, tag: crest[run.enemy.kind] || `FLOOR ${run.floor}`, rank: run.enemy.kind, meter: null, showNumbers: false, gear: [] }
+  }
+}
+
+/** The whole stage: both fighters, their plates, the effects of the current step and the battle box. */
+export function battleStage(kit, state, cast) {
+  const journey = state.journey, battle = journey.battle
   const hero = battle.actors.recruit, foe = battle.actors.enemy
   const moments = stepMoments(state.step)
   const isQuake = ['recruit', 'enemy'].some(id => moments[id].hit >= battle.actors[id].maxHealth * QUAKE_SHARE)
   const line = battleLine(state.step)
-  // Quiet steps (cycle start, planning) keep the last line on screen instead of flashing back to the floor text.
+  // Quiet steps (cycle start, planning) keep the last line on screen instead of flashing back to the idle text.
   const held = !line && battle.started && state.battleLine ? state.battleLine : null
-  const idle = state.message || (battle.started ? journey.message : `${run.story.at(-1) ?? ''} What will ${crew.name} do?`)
-  const need = embersNeeded(run.level + run.pendingLevels)
-  const foePlate = `<div class="battle-plate foe-plate"><div class="plate-name"><strong>${escape(foe.name.toUpperCase())}</strong><small>${crest[run.enemy.kind] || `FLOOR ${run.floor}`}</small></div><div class="pills">${statusPills(foe)}</div>${hpBar(foe, moments.enemy, state.serial)}</div>`
-  const heroPlate = `<div class="battle-plate hero-plate"><div class="plate-name"><strong>${escape(crew.name.toUpperCase())}</strong><small>LV ${run.level}</small></div><div class="pills">${statusPills(hero)}</div>${hpBar(hero, moments.recruit, state.serial)}<div class="hp-numbers">${Math.max(0, hero.health)} / ${hero.maxHealth}</div><div class="xp-line"><b>EMB</b><div class="xp-bar"><i style="width:${percent(run.embers, need)}%"></i></div></div><div class="gear-strip">${gearStrip(kit, journey)}</div></div>`
-  const boxKey = line ? state.serial : held ? held.serial : `idle:${run.floor}:${journey.phase}`
-  const box = `<div class="battle-box" data-key="box:${boxKey}"><p class="${line || held ? 'typing' : ''}">${escape(line || held?.text || idle)}</p><span class="box-cursor">▼</span></div>`
+  const boxKey = line ? state.serial : held ? held.serial : `idle:${cast.key}:${journey.phase}`
+  const box = `<div class="battle-box" data-key="box:${boxKey}"><p class="${line || held ? 'typing' : ''}">${escape(line || held?.text || cast.idle)}</p><span class="box-cursor">▼</span></div>`
   // The field is never re-keyed: replacing it would rebuild both portraits and replay their entrance.
   // Two identical shakes alternate by step, so back-to-back big hits each restart the shake.
-  return `<div class="battle-field ${isQuake ? `quake-${state.serial % 2}` : ''}">${foePlate}${portrait(kit, 'enemy', run.enemy.portrait, foe.name, foe, moments, state, run.floor, run.enemy.kind)}${portrait(kit, 'recruit', crew.portrait, crew.name, hero, moments, state, run.floor, 'hero')}${heroPlate}</div>${box}`
+  return `<div class="battle-field ${isQuake ? `quake-${state.serial % 2}` : ''}">${plate(kit, cast.foe, foe, moments.enemy, state.serial, 'foe')}${portrait(kit, 'enemy', cast.foe.portrait, foe.name, foe, moments, state, cast.key, cast.foe.rank)}${portrait(kit, 'recruit', cast.hero.portrait, hero.name, hero, moments, state, cast.key, cast.hero.rank)}${plate(kit, cast.hero, hero, moments.recruit, state.serial, 'hero')}</div>${box}`
 }

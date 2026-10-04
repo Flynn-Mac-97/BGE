@@ -2,7 +2,7 @@
  * One Descent run as plain records. The journey keeps the shape the grid view reads
  * (`battle`, `phase`, `message`) and adds `descent`, the run itself:
  * `{ crew, floor, level, embers, pendingLevels, rerolls, bonus, columns, health, items: { id: { type, level, position } },
- *    nextItem, enemy, cards, chest, bells, evolutions, settled, story }`.
+ *    nextItem, enemy, cards, chest, bells, evolutions, settled, story, forged }`. `forged` lists the forged item types this run may offer.
  * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'dead'. Callers pass the engine's random.
  */
 import { rules, itemReference } from '../rules.js'
@@ -75,7 +75,8 @@ export function createRun(profile, crewId, random) {
   const items = Object.fromEntries(crew.kit.map(([type, position], index) => ['item-' + (index + 1), { type, level: 1 + bonus.startLevel, position: [...position] }]))
   const run = { crew: crewId, floor: 1, level: 1, embers: 0, pendingLevels: 0, rerolls: tuning.rerolls + bonus.rerolls, bonus,
     columns: Math.min(tuning.grid.maxColumns, tuning.grid.columns + bonus.columns + (crew.columns ?? 0)), health: 0,
-    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [] }
+    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [],
+    forged: (profile.forged ?? []).map(record => record.id) }
   run.health = maxHealthOf(run)
   const journey = { descent: run, battle: battleFor(run), phase: 'battle', message: '' }
   tell(journey, `${crew.name} takes the lantern. ${floorMessage(run)}`)
@@ -176,7 +177,7 @@ export function drawCards(run, random) {
   const count = tuning.cards.count + run.bonus.cards
   for (let draw = 0; draw < count; draw++) {
     const levels = Object.keys(run.items).filter(id => !cards.some(card => card.id === id))
-    const fresh = ownedCount < tuning.cards.maxItems ? descentPool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
       { weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
