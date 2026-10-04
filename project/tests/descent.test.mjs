@@ -230,3 +230,14 @@ test('a level-3 item names what its evolution still needs, and consumables keep 
   for (let draw = 0; draw < 200; draw++) if (drawCards(journey.descent, random).some(card => consumablePool.includes(card.type))) draws++
   assert.ok(draws > 60, `consumables in ${draws} of 200 draws`)
 })
+
+test('a draw holds at most two level cards and ends with something new while new things are left', () => {
+  const random = seededRandom(11)
+  const journey = createRun(createProfile(), 'pip', random)
+  for (const type of ['sword', 'hammer', 'buckler', 'salve']) journey.descent.items[`extra-${type}`] = { type, level: 1, position: null }
+  for (let draw = 0; draw < 300; draw++) {
+    const cards = drawCards(journey.descent, random)
+    assert.ok(cards.filter(card => card.kind === 'level').length <= 2)
+    assert.ok(cards.some(card => ['item', 'tome'].includes(card.kind)), JSON.stringify(cards))
+  }
+})

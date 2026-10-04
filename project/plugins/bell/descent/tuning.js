@@ -9,7 +9,7 @@ export const tuning = {
   embers: { perFloor: 5, perFloorGrowth: 0.6, elite: 2, boss: 3, firstNeed: 3, needGrowth: 3 },
   // Card weights: each owned item, each new item (falling as you own more), one wider grid, one tome, one new consumable.
   // Consumables have their own weight, so they keep turning up however many items you own.
-  cards: { count: 3, upgradeWeight: 4, newItemWeight: 6, newItemFalloff: 0.8, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
+  cards: { count: 3, maxLevelCards: 2, upgradeWeight: 2.5, newItemWeight: 8, newItemFalloff: 0.9, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
   rerolls: 2,
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.

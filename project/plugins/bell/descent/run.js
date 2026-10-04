@@ -212,27 +212,32 @@ function nextFloor(journey, random) {
   tell(journey, floorMessage(run))
 }
 
-/** Cards are drawn by group weight, then a random member; no card repeats in one draw. */
+/**
+ * Cards are drawn by group weight, then a random member; no card repeats in one draw.
+ * A draw holds at most `maxLevelCards` level cards, and its last card is new (an item, a consumable or a tome) whenever one is left.
+ */
 export function drawCards(run, random) {
   const ownedTypes = new Set(Object.values(run.items).map(item => item.type))
   const ownedCount = Object.keys(run.items).length
   const cards = []
   const count = tuning.cards.count + run.bonus.cards
   for (let draw = 0; draw < count; draw++) {
-    const levels = Object.keys(run.items).filter(id => !cards.some(card => card.id === id))
+    const levels = cards.filter(card => card.kind === 'level').length < tuning.cards.maxLevelCards ? Object.keys(run.items).filter(id => !cards.some(card => card.id === id)) : []
     const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
-      { weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
-      { weight: flasks.length ? tuning.cards.consumableWeight : 0, card: () => ({ kind: 'item', type: pick(flasks, random) }) },
-      { weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
+      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
+      { isNew: true, weight: flasks.length ? tuning.cards.consumableWeight : 0, card: () => ({ kind: 'item', type: pick(flasks, random) }) },
+      { isNew: true, weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
       { weight: run.columns < tuning.grid.maxColumns && !cards.some(card => card.kind === 'widen') ? tuning.cards.widenWeight : 0, card: () => ({ kind: 'widen' }) }
     ]
-    const total = groups.reduce((sum, group) => sum + group.weight, 0)
+    const needsNew = draw === count - 1 && !cards.some(card => ['item', 'tome'].includes(card.kind)) && groups.some(group => group.isNew && group.weight > 0)
+    const open = needsNew ? groups.filter(group => group.isNew) : groups
+    const total = open.reduce((sum, group) => sum + group.weight, 0)
     if (!total) { if (!cards.some(card => card.kind === 'mend')) cards.push({ kind: 'mend' }); continue }
     let roll = Math.max(0, random()) * total
-    const group = groups.find(group => (roll -= group.weight) < 0 && group.weight > 0) ?? groups.findLast(group => group.weight > 0)
+    const group = open.find(group => (roll -= group.weight) < 0 && group.weight > 0) ?? open.findLast(group => group.weight > 0)
     cards.push(group.card())
   }
   return cards

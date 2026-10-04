@@ -53,6 +53,12 @@ the reserve says what it still needs: find the partner, touch it, reach level
 Consumables have their own card weight, so they keep turning up however many
 items the run owns.
 
+A level-up draw holds at most two level cards, and its last card is always new
+(an item, a consumable or a tome) while any are left. Level cards weigh less
+than they did, and new items fall off more slowly as the run owns more. Before
+this, about 70% of all cards offered were level cards and a run saw about 10
+of the 21 new items; now under half are level cards and a run sees about 14.
+
 ## Data, by file
 
 | File | Holds |
