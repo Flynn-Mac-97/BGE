@@ -29,7 +29,11 @@ const capital = text => text[0].toUpperCase() + text.slice(1)
 function tell(journey, text) {
   journey.message = text
   journey.descent.story = [...journey.descent.story, text].slice(-6)
+  note(journey.descent, text)
 }
+// The run's full log for the play log; runs saved before it existed start one on their next line.
+const LOG_LIMIT = 400
+const note = (run, text) => { run.log = [...(run.log ?? []), text].slice(-LOG_LIMIT) }
 const pick = (list, random) => list[Math.min(list.length - 1, Math.floor(Math.max(0, random()) * list.length))]
 
 function pickEnemy(floor, random) {
@@ -75,7 +79,7 @@ export function createRun(profile, crewId, random) {
   const items = Object.fromEntries(crew.kit.map(([type, position], index) => ['item-' + (index + 1), { type, level: 1 + bonus.startLevel, position: [...position] }]))
   const run = { crew: crewId, floor: 1, level: 1, embers: 0, pendingLevels: 0, rerolls: tuning.rerolls + bonus.rerolls, bonus,
     columns: Math.min(tuning.grid.maxColumns, tuning.grid.columns + bonus.columns + (crew.columns ?? 0)), health: 0,
-    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [],
+    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [],
     forged: (profile.forged ?? []).map(record => record.id) }
   run.health = maxHealthOf(run)
   const journey = { descent: run, battle: battleFor(run), phase: 'battle', message: '' }
@@ -95,6 +99,8 @@ export function finishFloor(journey, random) {
   const winner = rules.winner(journey.battle)
   if (!winner && journey.battle.cycle <= tuning.cycleCap) return false
   keepPlaces(journey)
+  const hero = journey.battle.actors.recruit, foe = journey.battle.actors.enemy
+  note(run, `[Floor ${run.floor} ${run.enemy.kind} · ${foe.name}] ${journey.battle.cycle - 1} cycles · ${run.crew} HP ${Math.max(0, hero.health)}/${hero.maxHealth} · foe HP ${Math.max(0, foe.health)}/${foe.maxHealth}`)
   if (winner !== 'crew') {
     journey.phase = 'dead'
     tell(journey, winner ? `${descentCrew[run.crew].name} falls on floor ${run.floor}. ${capital(theName(run.enemy.name))} keeps the lantern.` : `Floor ${run.floor}: the fight drags on until the lantern gutters out. A build must kill to go deeper.`)

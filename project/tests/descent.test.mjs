@@ -194,3 +194,19 @@ test('every effect a pool item can make has a battle box sentence, not an arrow'
     for (const line of trace.map(battleLine)) assert.ok(!line.includes('→'), `${type}: ${line}`)
   }
 })
+
+test('a banked run goes into the play log with its build and each floor fought', async () => {
+  const { playLogText } = await import('../plugins/bell/descent/play-log.js')
+  const profile = createProfile()
+  const random = seededRandom(9)
+  const journey = createRun(profile, 'rook', random)
+  fightFloor(journey, random)
+  while (journey.phase === 'levelUp') chooseCard(journey, 0, random)
+  abandonRun(journey)
+  settleRun(profile, journey)
+  assert.equal(profile.history.length, 1)
+  const text = playLogText(profile)
+  assert.match(text, /RUN 1: Rook · floor 2/)
+  assert.match(text, /\[Floor 1 normal · .+\] \d+ cycles/)
+  assert.match(text, /Build: Rusty Dagger L\d @/)
+})

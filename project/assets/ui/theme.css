@@ -550,3 +550,7 @@ header>div { display:flex; gap:6px; }
   .duel-drafting .duel-draft p:not(.duel-count) small,.duel-drafting .rule-chips { display:none; }
   .duel-drafting .drafter-portrait .ink-art { width:56px; height:56px; }
 }
+/* The play log: one tall text box under the copy button. */
+.play-log { grid-template-rows:auto auto minmax(0,1fr); }
+.play-log-body { min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:8px; }
+.play-log-body textarea { width:100%; height:100%; min-height:62vh; box-sizing:border-box; resize:none; background:#000; color:#fff; border:1px solid #fff; font:11px/1.4 monospace; padding:8px; user-select:text; -webkit-user-select:text; }

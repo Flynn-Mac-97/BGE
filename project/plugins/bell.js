@@ -19,6 +19,7 @@ import { forgeView, forgeDraft, pickForgePart } from './bell/descent/forge-view.
 import { createDuel, canPlaceDraft, nextHero, readyDraft, takeHandoff, finishDuel, rateDuel, fightAgain, redraft } from './bell/duel/duel.js'
 import { startingRules, nextRule } from './bell/duel/duel-rules.js'
 import { duelRulesView } from './bell/duel/view.js'
+import { playLogView, playLogText } from './bell/descent/play-log.js'
 const sessions = new WeakMap()
 /** The hub's first line: a welcome, or the last result. */
 const hubWelcome = profile => profile.runs ? `The Last Lantern. ${profile.runs} run${profile.runs === 1 ? '' : 's'} so far; the deepest reached floor ${profile.bestFloor}. The stair waits.` : 'The Last Lantern, at the top of a stair that has no bottom. Choose who goes down. Whatever they find, the Bells they bring back stay with you.'
@@ -54,6 +55,7 @@ export default {
       hub: () => hubView(context.gameUi.kit, state),
       forge: () => forgeView(context.gameUi.kit, state),
       duelRules: () => duelRulesView(context.gameUi.kit, state),
+      playLog: () => playLogView(context.gameUi.kit, state),
       expedition: () => view(context.gameUi.kit, state)
     }
     const closeInspection = () => { state.selected = null; state.moving = false; state.expanded = false; state.link = null }
@@ -108,6 +110,13 @@ export default {
         const record = forgeItem(state.profile, state.forgeDraft)
         state.forgeNotice = record ? `The anvil rings. ${forgeName(record)} is yours: it can drop in the Descent and stands on the Duel Pit shelf.` : 'The forge cannot make that now.'
         redraw()
+      },
+      openLog() { state.screen = 'playLog'; state.logNotice = ''; redraw() },
+      copyLog() {
+        const copied = () => { state.logNotice = 'Copied. Paste it into the chat.'; redraw() }
+        const failed = () => { state.logNotice = 'This device would not copy. Long-press the text, Select all, then Copy.'; redraw() }
+        // The clipboard is outside the game, so a refusal is expected on some devices.
+        try { globalThis.navigator.clipboard.writeText(playLogText(state.profile)).then(copied, failed) } catch { failed() }
       },
       openDuel() { if (!state.queue.length) { state.screen = 'duelRules'; clearPresentation(); redraw() } },
       duelRule(id) { state.duelRules = nextRule(state.duelRules, id); redraw() },

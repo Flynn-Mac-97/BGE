@@ -1,6 +1,6 @@
 /**
  * The Descent profile and its one storage boundary.
- * Profile: `{ version: 1, bells, bestFloor, runs, tower: { upgradeId: rank }, forged: [record], duels: [record], journey }`, where `journey` is the active run or null.
+ * Profile: `{ version: 1, bells, bestFloor, runs, tower: { upgradeId: rank }, forged: [record], duels: [record], history: [run record, newest first], journey }`, where `journey` is the active run or null.
  * Saves from before the Forge and the Duel Pit load with empty `forged` and `duels`.
  * An unreadable save is kept, not overwritten, and the session runs without saving.
  */
@@ -9,10 +9,11 @@ import { assertState } from '../../grid-game/state.js'
 import { descentCrew } from './pool.js'
 import { towerUpgrades } from './tower.js'
 import { isForgeValid, registerForged, forgeLimit } from './forge.js'
+import { runRecord, HISTORY_LIMIT } from './play-log.js'
 
 export const profileSaveKey = 'black-bell-descent-v1'
 /** A fresh profile. */
-export const createProfile = () => ({ version: 1, bells: 0, bestFloor: 0, runs: 0, tower: {}, forged: [], duels: [], journey: null })
+export const createProfile = () => ({ version: 1, bells: 0, bestFloor: 0, runs: 0, tower: {}, forged: [], duels: [], history: [], journey: null })
 const count = value => Number.isInteger(value) && value >= 0
 
 function validate(profile) {
@@ -20,7 +21,8 @@ function validate(profile) {
   for (const [id, rank] of Object.entries(profile.tower)) if (!towerUpgrades[id] || !count(rank) || rank > towerUpgrades[id].cost.length) throw new Error('Invalid tower rank')
   profile.forged ??= []
   profile.duels ??= []
-  if (!Array.isArray(profile.forged) || profile.forged.length > forgeLimit || !profile.forged.every(record => /^forged\d+$/.test(record.id) && isForgeValid(record)) || !Array.isArray(profile.duels)) throw new Error('Invalid forge or duel records')
+  profile.history ??= []
+  if (!Array.isArray(profile.forged) || profile.forged.length > forgeLimit || !profile.forged.every(record => /^forged\d+$/.test(record.id) && isForgeValid(record)) || !Array.isArray(profile.duels) || !Array.isArray(profile.history)) throw new Error('Invalid forge or duel records')
   // Forged items must be in the rules before a saved run that carries them is checked.
   registerForged(profile.forged)
   const journey = profile.journey
@@ -57,6 +59,7 @@ export function settleRun(profile, journey) {
   profile.bells += run.bells
   profile.bestFloor = Math.max(profile.bestFloor, run.floor)
   profile.runs++
+  profile.history = [runRecord(run), ...profile.history].slice(0, HISTORY_LIMIT)
   return run.bells
 }
 
