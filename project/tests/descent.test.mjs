@@ -210,3 +210,23 @@ test('a banked run goes into the play log with its build and each floor fought',
   assert.match(text, /\[Floor 1 normal · .+\] \d+ cycles/)
   assert.match(text, /Build: Rusty Dagger L\d @/)
 })
+
+test('a level-3 item names what its evolution still needs, and consumables keep turning up in draws', async () => {
+  const { evolutionHints } = await import('../plugins/bell/descent/view.js')
+  const random = seededRandom(7)
+  const journey = createRun(createProfile(), 'pip', random)
+  const hint = () => evolutionHints(journey)[0]?.text
+  assert.equal(hint(), undefined)
+  journey.descent.items['item-1'].level = 3
+  journey.battle = battleFor(journey.descent)
+  assert.equal(hint(), "Rusty Dagger L3 → Widow's Fang: reach L5.")
+  rules.place(journey.battle, 'item-2', [3, 2])
+  assert.equal(hint(), "Rusty Dagger L3 → Widow's Fang: touch Venom Vial.")
+  delete journey.descent.items['item-2']
+  journey.battle = battleFor(journey.descent)
+  assert.equal(hint(), "Rusty Dagger L3 → Widow's Fang: find Venom Vial.")
+  const { consumablePool } = await import('../plugins/bell/descent/pool.js')
+  let draws = 0
+  for (let draw = 0; draw < 200; draw++) if (drawCards(journey.descent, random).some(card => consumablePool.includes(card.type))) draws++
+  assert.ok(draws > 60, `consumables in ${draws} of 200 draws`)
+})

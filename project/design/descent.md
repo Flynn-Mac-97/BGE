@@ -36,8 +36,22 @@ Enemy health and damage grow by a fixed factor every floor (exponential). Item
 levels grow linearly, and evolutions and synergies multiply them, so a good
 build stays ahead for a long time and then is overrun. Elites and bosses
 multiply health. All factors are in `tuning.js`. `node tools/descent-sim.mjs`
-plays seeded runs with a simple bot and prints the depths reached; use it after
-any change to the numbers.
+plays seeded runs with a simple bot and prints the depths reached, then, for
+each floor kind, the average fight length, the share of health lost and the
+deaths; use it after any change to the numbers.
+
+The kind multipliers aim for a curve, not walls: normal floors cost about
+15% of health, elites about 30%, bosses about 60%, and bosses cause a little
+over half of all deaths (before this tuning they caused 80%, and normal floors
+cost under 10%). Measured with 40 bot runs each of Nettle, Rook and Briar,
+median floor about 20.
+
+From level 3, an item that can evolve shows ⇄ on its badge, and the list under
+the reserve says what it still needs: find the partner, touch it, reach level
+5, or wait for the next chest.
+
+Consumables have their own card weight, so they keep turning up however many
+items the run owns.
 
 ## Data, by file
 

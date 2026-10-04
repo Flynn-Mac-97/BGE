@@ -7,12 +7,14 @@ export const tuning = {
   // Embers for a floor: perFloor + perFloorGrowth × floor, times the floor kind's multiplier.
   // Embers needed for the next player level: firstNeed + needGrowth × (level − 1).
   embers: { perFloor: 5, perFloorGrowth: 0.6, elite: 2, boss: 3, firstNeed: 3, needGrowth: 3 },
-  // Card weights: each owned item, each new item (falling as you own more), one wider grid.
-  cards: { count: 3, upgradeWeight: 4, newItemWeight: 6, newItemFalloff: 0.8, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, mendShare: 0.5 },
+  // Card weights: each owned item, each new item (falling as you own more), one wider grid, one tome, one new consumable.
+  // Consumables have their own weight, so they keep turning up however many items you own.
+  cards: { count: 3, upgradeWeight: 4, newItemWeight: 6, newItemFalloff: 0.8, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
   rerolls: 2,
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.
-  enemy: { healthGrowth: 1.13, damageGrowth: 1.08, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 1, damage: 1 }, elite: { health: 1.4, damage: 1.1 }, boss: { health: 1.7, damage: 1.1 } } },
+  // The kinds are set so normal floors cost some health and bosses do not cause most deaths (see design/descent.md, Scaling).
+  enemy: { healthGrowth: 1.13, damageGrowth: 1.08, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 1.3, damage: 1.25 }, elite: { health: 1.35, damage: 1.05 }, boss: { health: 1.45, damage: 0.95 } } },
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
   bells: { normal: 1, elite: 3, boss: 10 },

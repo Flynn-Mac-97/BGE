@@ -561,3 +561,7 @@ header>div { display:flex; gap:6px; }
 .equipment-shape .charge-badge.readied { background:#fff; color:#000; animation:readied-pulse .8s ease-in-out infinite alternate; }
 @keyframes readied-pulse { to { box-shadow:0 0 8px #fff; } }
 @media (prefers-reduced-motion:reduce) { .equipment-shape .charge-badge.readied { animation:none; } }
+/* Evolution hints under the reserve: one line per item on its way to evolving. */
+.evolve-hints { list-style:none; padding:0; margin:4px 0; font-size:11px; line-height:1.35; }
+.evolve-hints li { border-left:2px solid #fff; padding-left:5px; margin-bottom:3px; }
+.evolve-hints li.ready { font-weight:700; }

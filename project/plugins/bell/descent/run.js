@@ -218,10 +218,12 @@ export function drawCards(run, random) {
   const count = tuning.cards.count + run.bonus.cards
   for (let draw = 0; draw < count; draw++) {
     const levels = Object.keys(run.items).filter(id => !cards.some(card => card.id === id))
-    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...consumablePool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
       { weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
+      { weight: flasks.length ? tuning.cards.consumableWeight : 0, card: () => ({ kind: 'item', type: pick(flasks, random) }) },
       { weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
       { weight: run.columns < tuning.grid.maxColumns && !cards.some(card => card.kind === 'widen') ? tuning.cards.widenWeight : 0, card: () => ({ kind: 'widen' }) }
     ]

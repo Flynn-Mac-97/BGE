@@ -1,6 +1,6 @@
 /** Descent screens in the monochrome text style: the Lantern hub, the run header, cards, chest and summary. */
 import { art } from '../art.js'
-import { rules } from '../rules.js'
+import { rules, itemReference } from '../rules.js'
 import { escape } from '../inspection.js'
 import { shortStat } from '../glance.js'
 import { tuning } from './tuning.js'
@@ -45,8 +45,21 @@ export function levelBadge(journey, id, readyIds) {
   const isEvolved = rules.catalog.items[item.type].tags.includes('evolved')
   const left = chargesLeft(item)
   const charges = left === null ? '' : `<span class="charge-badge ${item.readied ? 'readied' : left ? '' : 'spent'}">${item.readied ? 'READY' : '◆'.repeat(left) || 'EMPTY'}</span>`
-  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : ''}</span>${charges}`
+  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : item.level >= tuning.evolveLevel - 2 && recipeFor(item.type) ? ' ⇄' : ''}</span>${charges}`
 }
+/** From level 3, what each placed item still needs to evolve: `[{ id, text, isReady }]`. */
+export function evolutionHints(journey) {
+  const ready = readyIds(journey)
+  return Object.entries(journey.descent.items).flatMap(([id, item]) => {
+    const recipe = recipeFor(item.type)
+    if (!recipe || item.level < tuning.evolveLevel - 2 || !journey.battle.items[id]?.position) return []
+    const isOwned = Object.values(journey.descent.items).some(other => other.type === recipe.partner)
+    const isTouching = rules.targets(journey.battle, itemReference(id), { kind: 'adjacentItems', ownerOnly: true }).some(target => journey.battle.items[target.id].type === recipe.partner)
+    const need = ready.has(id) ? 'evolves at the next chest' : isTouching ? `reach L${tuning.evolveLevel}` : isOwned ? `touch ${itemName(recipe.partner)}` : `find ${itemName(recipe.partner)}`
+    return [{ id, text: `${itemName(item.type)} L${item.level} → ${itemName(recipe.into)}: ${need}.`, isReady: ready.has(id) }]
+  })
+}
+
 /** Item ids ready to evolve now. */
 export const readyIds = journey => new Set(readyEvolutions(journey).map(ready => ready.id))
 

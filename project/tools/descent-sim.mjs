@@ -5,6 +5,7 @@
 import { rules, itemReference } from '../plugins/bell/rules.js'
 import { createRun, finishFloor, collectChest, chooseCard, readyEvolutions, recipeFor, readyItem, armReadied, chargesLeft } from '../plugins/bell/descent/run.js'
 import { evolutionRecipes } from '../plugins/bell/descent/evolutions.js'
+import { consumablePool } from '../plugins/bell/descent/pool.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 
 const runs = Number(process.argv[2] ?? 12)
@@ -36,6 +37,7 @@ function placeReserve(journey) {
 function cardChoice(run) {
   const owned = new Set(Object.values(run.items).map(item => item.type))
   const score = card => {
+    if (card.kind === 'item' && consumablePool.includes(card.type)) return 11
     if (card.kind === 'item') return Object.keys(run.items).length < 5 ? 30 : 8
     if (card.kind === 'widen') return Object.keys(run.items).length > run.columns * 2 ? 25 : 2
     if (card.kind === 'mend') return 1
@@ -63,18 +65,23 @@ function playRun(seed) {
   const random = seededRandom(seed)
   const journey = createRun({ tower }, crew, random)
   let guard = 0
+  const fights = []
   while (journey.phase !== 'dead' && guard++ < 5000) {
     if (journey.phase === 'battle') {
       placeReserve(journey)
+      const kind = journey.descent.enemy.kind, hero = journey.battle.actors.recruit
+      if (!journey.battle.started) fights.push({ kind, start: hero.health, max: hero.maxHealth })
       tapConsumables(journey)
       journey.battle = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] }).state
+      const fight = fights.at(-1)
+      Object.assign(fight, { cycles: journey.battle.cycle, end: Math.max(0, journey.battle.actors.recruit.health) })
       finishFloor(journey, random)
     } else if (journey.phase === 'chest') collectChest(journey, random)
     else if (journey.phase === 'levelUp') chooseCard(journey, cardChoice(journey.descent), random)
     if (journey.descent.floor > 200) break
   }
   const run = journey.descent
-  return { seed, killer: run.enemy.name, floor: run.floor, level: run.level, bells: run.bells, evolutions: run.evolutions, ready: readyEvolutions(journey).length,
+  return { seed, fights, deathKind: run.enemy.kind, killer: run.enemy.name, floor: run.floor, level: run.level, bells: run.bells, evolutions: run.evolutions, ready: readyEvolutions(journey).length,
     items: Object.values(run.items).map(item => `${rules.catalog.items[item.type].name} ${item.level}`).join(', ') }
 }
 
@@ -82,3 +89,11 @@ const results = Array.from({ length: runs }, (_, index) => playRun(index + 1))
 for (const result of results) console.log(`seed ${result.seed}: floor ${result.floor} (${result.killer}) · level ${result.level} · bells ${result.bells} · evolutions ${result.evolutions} · ${result.items}`)
 const floors = results.map(result => result.floor).sort((first, second) => first - second)
 console.log(`median floor ${floors[Math.floor(floors.length / 2)]} · min ${floors[0]} · max ${floors.at(-1)}`)
+
+// Per floor kind: how long fights last and how much of the hero's health they take. A smooth curve has normal floors cost something.
+const average = list => list.length ? list.reduce((sum, value) => sum + value, 0) / list.length : 0
+for (const kind of ['normal', 'elite', 'boss']) {
+  const fights = results.flatMap(result => result.fights).filter(fight => fight.kind === kind)
+  const deaths = results.filter(result => result.deathKind === kind).length
+  console.log(`${kind}: ${fights.length} fights · ${average(fights.map(fight => fight.cycles)).toFixed(1)} cycles · ${Math.round(100 * average(fights.map(fight => (fight.start - fight.end) / fight.max)))}% HP lost · ${deaths} deaths`)
+}
