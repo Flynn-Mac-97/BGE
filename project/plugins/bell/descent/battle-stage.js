@@ -6,14 +6,14 @@
 import { art } from '../art.js'
 import { rules, itemDefinition } from '../rules.js'
 import { escape } from '../inspection.js'
-import { statusText } from '../glance.js'
+import { statusText, shortStat } from '../glance.js'
 import { placedItems } from '../../grid-game/grid.js'
 import { descentCrew } from './pool.js'
 import { embersNeeded } from './run.js'
 
 const crest = { normal: '', elite: '◆ ELITE', boss: '♛ BOSS' }
-// A hit that takes this share of max health or more shakes the whole stage.
-const QUAKE_SHARE = 0.25
+// A hit that takes this share of max health or more shakes the whole stage and is called a crushing blow.
+const QUAKE_SHARE = 0.4
 
 const nameOf = (battle, subject) => subject.kind === 'item' ? itemDefinition(battle, subject.id).name : battle.actors[subject.id].name
 const percent = (health, max) => Math.max(0, Math.min(100, Math.round(100 * health / max)))
@@ -56,6 +56,10 @@ export function battleLine(step) {
         return `${source} hits ${target} for ${effect.amount}!${effect.amount >= actor.maxHealth * QUAKE_SHARE ? ' A crushing blow!' : ''}`
       },
       heal: () => `${target} recovers ${effect.amount} HP.`,
+      modifyStat: () => `${source} readies ${target}: ${effect.amount > 0 ? '+' : ''}${effect.amount} ${shortStat(effect.stat)}.`,
+      resource: () => `${target} gains ${effect.amount} ${effect.resource}.`,
+      removeGuard: () => `${source} breaks ${effect.amount} of ${target}'s guard!`,
+      triggerItem: () => `${source} rings: ${target} acts again!`,
       guard: () => `${target} braces: +${effect.amount} guard.`,
       applyStatus: () => actor ? `${target} suffers ${rules.catalog.statuses[effect.status].name}: ${statusText(effect.status, effect.amount)}.` : `${target} is readied: ${statusText(effect.status, effect.amount)}.`
     }
@@ -123,5 +127,7 @@ export function battleStage(kit, state) {
   const heroPlate = `<div class="battle-plate hero-plate"><div class="plate-name"><strong>${escape(crew.name.toUpperCase())}</strong><small>LV ${run.level}</small></div><div class="pills">${statusPills(hero)}</div>${hpBar(hero, moments.recruit, state.serial)}<div class="hp-numbers">${Math.max(0, hero.health)} / ${hero.maxHealth}</div><div class="xp-line"><b>EMB</b><div class="xp-bar"><i style="width:${percent(run.embers, need)}%"></i></div></div><div class="gear-strip">${gearStrip(kit, journey)}</div></div>`
   const boxKey = line ? state.serial : held ? held.serial : `idle:${run.floor}:${journey.phase}`
   const box = `<div class="battle-box" data-key="box:${boxKey}"><p class="${line || held ? 'typing' : ''}">${escape(line || held?.text || idle)}</p><span class="box-cursor">▼</span></div>`
-  return `<div class="battle-field ${isQuake ? 'quake' : ''}" data-key="field:${isQuake ? state.serial : 'calm'}">${foePlate}${portrait(kit, 'enemy', run.enemy.portrait, foe.name, foe, moments, state, run.floor, run.enemy.kind)}${portrait(kit, 'recruit', crew.portrait, crew.name, hero, moments, state, run.floor, 'hero')}${heroPlate}</div>${box}`
+  // The field is never re-keyed: replacing it would rebuild both portraits and replay their entrance.
+  // Two identical shakes alternate by step, so back-to-back big hits each restart the shake.
+  return `<div class="battle-field ${isQuake ? `quake-${state.serial % 2}` : ''}">${foePlate}${portrait(kit, 'enemy', run.enemy.portrait, foe.name, foe, moments, state, run.floor, run.enemy.kind)}${portrait(kit, 'recruit', crew.portrait, crew.name, hero, moments, state, run.floor, 'hero')}${heroPlate}</div>${box}`
 }

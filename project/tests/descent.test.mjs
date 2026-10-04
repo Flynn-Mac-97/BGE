@@ -165,3 +165,32 @@ test('a won floor shows the faint line before the reward screen covers the stage
   assert.ok(sawFaint)
   assert.equal(game.read().journey.phase, 'levelUp')
 })
+
+test('portrait frames keep one key through a whole floor, so their entrance never replays mid-fight', async () => {
+  const { fixture } = await import('../tools/ui-fixture.mjs')
+  const game = fixture({ hub: true })
+  game.panel.on.goDown('rook')
+  game.panel.on.fight()
+  const keys = new Set()
+  for (let tick = 0; tick < 400 && game.read().journey.phase === 'battle'; tick++) {
+    game.tick(1, 0.05)
+    const html = game.panel.html()
+    assert.doesNotMatch(html, /class="battle-field[^"]*" data-key/)
+    for (const [, key] of html.matchAll(/data-key="((?:enemy|recruit)-frame:\d+)"/g)) keys.add(key)
+  }
+  assert.deepEqual([...keys].sort(), ['enemy-frame:1', 'recruit-frame:1'])
+})
+
+test('every effect a pool item can make has a battle box sentence, not an arrow', async () => {
+  const { battleLine } = await import('../plugins/bell/descent/battle-stage.js')
+  const { descentPool } = await import('../plugins/bell/descent/pool.js')
+  for (const type of descentPool) {
+    const random = seededRandom(3)
+    const journey = createRun(createProfile(), 'rook', random)
+    journey.descent.items['item-3'] = { type, level: 3, position: null }
+    journey.battle = battleFor(journey.descent)
+    for (const item of Object.values(journey.battle.items)) if (!item.position) for (let y = 0; y < 3 && !item.position; y++) for (let x = 0; x < 4 && !item.position; x++) rules.place(journey.battle, item.id, [x, y])
+    const trace = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] }).trace
+    for (const line of trace.map(battleLine)) assert.ok(!line.includes('→'), `${type}: ${line}`)
+  }
+})

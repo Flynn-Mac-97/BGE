@@ -373,7 +373,7 @@ header>div { display:flex; gap:6px; }
 .hit.tick { animation:wobble .6s ease-in-out, hit-blink .7s steps(1) .2s; }
 .hit.faint,.lunge.faint { animation:hit-blink .5s steps(1), faint 1s ease-in .5s forwards; }
 .faint { animation:faint 1s ease-in .3s forwards; }
-.quake { animation:quake .45s; }
+.quake-0 { animation:quake .45s; }.quake-1 { animation:quake-again .45s; }
 .battle-box { position:absolute; left:0; right:0; bottom:0; height:var(--box); box-sizing:border-box; border:4px double #fff; border-radius:6px; background:#000; padding:6px 28px 6px 12px; display:flex; align-items:center; overflow:hidden; }
 .battle-box p { margin:0; font-size:14px; line-height:1.25; }
 .battle-box p.typing { animation:type-in .55s steps(28) both; }
@@ -409,6 +409,7 @@ header>div { display:flex; gap:6px; }
 @keyframes hp-drain { to { width:var(--to); } }
 @keyframes low-blink { 50% { opacity:.25; } }
 @keyframes quake { 20% { transform:translate(-6px,3px); } 40% { transform:translate(6px,-3px); } 60% { transform:translate(-4px,2px); } 80% { transform:translate(3px,-1px); } }
+@keyframes quake-again { 20% { transform:translate(-6px,3px); } 40% { transform:translate(6px,-3px); } 60% { transform:translate(-4px,2px); } 80% { transform:translate(3px,-1px); } }
 @keyframes type-in { from { clip-path:inset(0 100% 0 0); } to { clip-path:inset(0 0 0 0); } }
 @media (prefers-reduced-motion:reduce) { .battle-stage *,.battle-stage *::before { animation:none !important; } .faint { opacity:.2; } }
 /* Evolution: over-bright flashes alternate between the old and new item, faster and faster, then the new one shows. */
