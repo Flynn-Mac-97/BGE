@@ -561,9 +561,3 @@ header>div { display:flex; gap:6px; }
 .equipment-shape .charge-badge.readied { background:#fff; color:#000; animation:readied-pulse .8s ease-in-out infinite alternate; }
 @keyframes readied-pulse { to { box-shadow:0 0 8px #fff; } }
 @media (prefers-reduced-motion:reduce) { .equipment-shape .charge-badge.readied { animation:none; } }
-/* The tome sheet: one row per tome, with its price on the right. */
-.tome-list { list-style:none; padding:0; margin:0 0 10px; display:grid; gap:6px; }
-.tome-row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; gap:8px; align-items:center; border:1px solid #fff; padding:4px 6px; }
-.tome-row>.ink-art { width:40px; height:40px; }
-.tome-row .ui-button { min-height:36px; white-space:nowrap; }
-.tome-sheet h2 { font-size:13px; }

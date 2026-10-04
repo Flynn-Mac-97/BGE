@@ -39,6 +39,7 @@ function cardChoice(run) {
     if (card.kind === 'item') return Object.keys(run.items).length < 5 ? 30 : 8
     if (card.kind === 'widen') return Object.keys(run.items).length > run.columns * 2 ? 25 : 2
     if (card.kind === 'mend') return 1
+    if (card.kind === 'tome') return 9
     const item = run.items[card.id]
     const recipe = recipeFor(item.type)
     return 10 + (recipe && owned.has(recipe.partner) ? 10 : 0) + (rules.catalog.items[item.type].tags.includes('weapon') ? 4 : 0)

@@ -8,7 +8,7 @@ export const tuning = {
   // Embers needed for the next player level: firstNeed + needGrowth × (level − 1).
   embers: { perFloor: 5, perFloorGrowth: 0.6, elite: 2, boss: 3, firstNeed: 3, needGrowth: 3 },
   // Card weights: each owned item, each new item (falling as you own more), one wider grid.
-  cards: { count: 3, upgradeWeight: 4, newItemWeight: 6, newItemFalloff: 0.8, maxItems: 9, widenWeight: 1.5, mendShare: 0.5 },
+  cards: { count: 3, upgradeWeight: 4, newItemWeight: 6, newItemFalloff: 0.8, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, mendShare: 0.5 },
   rerolls: 2,
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.
@@ -17,7 +17,6 @@ export const tuning = {
   chest: { elite: 1, boss: 3 },
   bells: { normal: 1, elite: 3, boss: 10 },
   cycleCap: 30,
-  // Tomes cost run Bells, which then do not come home. A tome's price grows by priceStep each time that tome is bought
-  // (Might counts per item). Vigor adds max health; Might adds `bonus` to every nonzero number on one item.
-  tomes: { vigor: { price: 3, priceStep: 2, health: 4 }, might: { price: 2, priceStep: 2, bonus: 1 } }
+  // Tomes come as level-up cards and stack for the run. Vigor adds max health; Might adds `bonus` to every nonzero number on all gear.
+  tomes: { vigor: { health: 6 }, might: { bonus: 1 } }
 }

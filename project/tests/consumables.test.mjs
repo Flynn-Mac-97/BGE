@@ -1,9 +1,8 @@
-/** Consumables act once at the next cycle start after a tap, spend a charge, and refill at a chest; tomes trade run Bells for boosts. */
+/** Consumables act once at the next cycle start after a tap, spend a charge, and refill at a chest; tome cards stack for the run. */
 import { defineSuite } from '../tools/node-suite.mjs'
 import assert from 'node:assert/strict'
 import { rules } from '../plugins/bell/rules.js'
-import { createRun, readyItem, armReadied, chargesLeft, finishFloor, battleFor, maxHealthOf, levelStat } from '../plugins/bell/descent/run.js'
-import { buyTome, tomePrice } from '../plugins/bell/descent/tomes.js'
+import { createRun, readyItem, armReadied, chargesLeft, finishFloor, battleFor, maxHealthOf, levelStat, chooseCard, drawCards } from '../plugins/bell/descent/run.js'
 import { createProfile } from '../plugins/bell/descent/profile-save.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 const { test, suite } = defineSuite('Consumables and tomes')
@@ -64,41 +63,34 @@ test('a tap the floor never used comes back, and a chest refills every charge', 
   assert.equal(chargesLeft(journey.descent.items['item-9']), 2)
 })
 
-test('tomes cost run Bells, grow in price, and only sell before the fight starts', () => {
-  const journey = createRun(createProfile(), 'rook', seededRandom(2))
+test('a tome card stacks for the run: Vigor adds max health, Might adds to every number on all gear', () => {
+  const random = seededRandom(2)
+  const journey = createRun(createProfile(), 'rook', random)
   const run = journey.descent
-  run.bells = 20
   const health = maxHealthOf(run)
-  assert.ok(buyTome(journey, 'vigor'))
-  assert.equal(maxHealthOf(run), health + 4)
-  assert.equal(journey.battle.actors.recruit.maxHealth, health + 4)
-  assert.equal(tomePrice(run, 'vigor'), 5)
-  assert.ok(buyTome(journey, 'might', 'item-1'))
-  assert.equal(journey.battle.items['item-1'].stats.damage, levelStat(rules.catalog.items.dagger.stats.damage, 1) + 1)
-  assert.deepEqual(journey.battle.items['item-1'].position, run.items['item-1'].position)
-  assert.equal(run.bells, 20 - 3 - 2)
-  journey.battle = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] }).state
-  assert.equal(buyTome(journey, 'vigor'), false)
+  for (const id of ['vigor', 'might', 'might']) {
+    journey.phase = 'levelUp'; run.pendingLevels = 1; run.cards = [{ kind: 'tome', id }]
+    assert.ok(chooseCard(journey, 0, random))
+  }
+  assert.deepEqual(run.tomes, { vigor: 1, might: 2 })
+  assert.equal(maxHealthOf(run), health + 3 * 2 + 6)
+  const battle = battleFor(run)
+  assert.equal(battle.items['item-1'].stats.damage, levelStat(rules.catalog.items.dagger.stats.damage, 1) + 2)
+  assert.equal(battle.items['item-1'].stats.poisonOnHit ?? 0, 0)
+  for (let draw = 0; draw < 40; draw++) assert.ok(drawCards(run, random).filter(card => card.kind === 'tome').length <= 1)
 })
 
-test('through the panel: read a tome before the fight, then tap a draught while the fight plays', async () => {
+test('through the panel: tap a draught while the fight plays', async () => {
   const { fixture } = await import('../tools/ui-fixture.mjs')
   const profile = createProfile()
-  const journey = runWith('mendingDraught')
-  journey.descent.bells = 5
-  profile.journey = journey
+  profile.journey = runWith('mendingDraught')
   const storage = new Map([['black-bell-descent-v1', JSON.stringify(profile)]])
   const game = fixture({ hub: true, storage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) } })
   game.panel.on.continueRun()
-  game.panel.on.tomes()
-  assert.match(game.panel.html(), /TOME OF VIGOR/)
-  for (const [, action] of game.panel.html().matchAll(/data-action="([^"]+)"/g)) assert.equal(typeof game.panel.on[action], 'function', action)
-  game.panel.on.buyTome('vigor')
-  assert.equal(game.read().journey.descent.bells, 2)
-  game.panel.on.tomes()
   game.panel.on.fight()
   game.panel.on.select('item-9')
   assert.match(game.panel.html(), /Use · 1 left/)
+  for (const [, action] of game.panel.html().matchAll(/data-action="([^"]+)"/g)) assert.equal(typeof game.panel.on[action], 'function', action)
   game.panel.on.useItem('item-9')
   assert.match(game.panel.html(), /Readied · next cycle/)
   for (let tick = 0; tick < 400 && game.read().journey.descent.items['item-9'].readied; tick++) game.tick(1, 0.5)

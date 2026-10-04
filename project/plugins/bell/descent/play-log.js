@@ -1,6 +1,6 @@
 /**
  * The play log: a plain-text account of finished and current runs, forged items and rated duels,
- * for a player to copy and share. A run record is `{ crew, floor, level, bells, evolutions, build: [{ type, level, position }], log: [line] }`.
+ * for a player to copy and share. A run record is `{ crew, floor, level, bells, evolutions, tomes: { vigor, might }, build: [{ type, level, position }], log: [line] }`.
  */
 import { rules } from '../rules.js'
 import { escape } from '../inspection.js'
@@ -12,14 +12,14 @@ export const HISTORY_LIMIT = 20
 
 /** The record of a run, for the profile's history. */
 export function runRecord(run) {
-  return { crew: run.crew, floor: run.floor, level: run.level, bells: run.bells, evolutions: run.evolutions,
+  return { crew: run.crew, floor: run.floor, level: run.level, bells: run.bells, evolutions: run.evolutions, tomes: run.tomes ?? {},
     build: Object.values(run.items).map(item => ({ type: item.type, level: item.level, position: item.position })), log: run.log ?? run.story }
 }
 
 function runText(record, heading) {
   const crew = descentCrew[record.crew]?.name ?? record.crew
   const build = record.build.map(item => `${rules.catalog.items[item.type]?.name ?? item.type} L${item.level} ${item.position ? `@${item.position.join(',')}` : '(reserve)'}`).join('; ')
-  return [`== ${heading}: ${crew} · floor ${record.floor} · LV ${record.level} · ${record.bells} Bells · ${record.evolutions} evolutions`, `Build: ${build}`, ...record.log.map(line => '  ' + line)].join('\n')
+  return [`== ${heading}: ${crew} · floor ${record.floor} · LV ${record.level} · ${record.bells} Bells · ${record.evolutions} evolutions${record.tomes?.vigor || record.tomes?.might ? ` · tomes: vigor ${record.tomes.vigor ?? 0}, might ${record.tomes.might ?? 0}` : ''}`, `Build: ${build}`, ...record.log.map(line => '  ' + line)].join('\n')
 }
 
 /** The whole log as text, newest run first. */

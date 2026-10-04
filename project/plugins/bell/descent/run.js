@@ -24,7 +24,7 @@ export const regionOf = floor => regions.filter(region => region.from <= floor).
 /** The recruit's max health at the run's level. */
 export const maxHealthOf = run => tuning.recruit.health + run.bonus.maxHealth + tuning.recruit.healthPerLevel * (run.level - 1) + (run.tomes?.vigor ?? 0) * tuning.tomes.vigor.health
 /** A run item's stat: its level-scaled base plus Tomes of Might. A zero base stays zero. */
-export const itemStat = (base, item) => base ? levelStat(base, item.level) + (item.tomes ?? 0) * tuning.tomes.might.bonus : 0
+export const itemStat = (base, item, run) => base ? levelStat(base, item.level) + (run.tomes?.might ?? 0) * tuning.tomes.might.bonus : 0
 /** "the Cellar Rat", or a name that already starts with "The". */
 const theName = name => name.startsWith('The ') ? name : `the ${name}`
 const capital = text => text[0].toUpperCase() + text.slice(1)
@@ -62,7 +62,7 @@ export function battleFor(run) {
     items: Object.entries(run.items).map(([id, item]) => ({ id, type: item.type, owner: 'recruit', position: null })) })
   for (const [id, item] of Object.entries(run.items)) {
     const definition = rules.catalog.items[item.type]
-    for (const [stat, base] of Object.entries(definition.stats)) battle.items[id].stats[stat] = itemStat(base, item)
+    for (const [stat, base] of Object.entries(definition.stats)) battle.items[id].stats[stat] = itemStat(base, item, run)
     if (item.position) rules.place(battle, id, item.position)
   }
   return battle
@@ -82,7 +82,7 @@ export function createRun(profile, crewId, random) {
   const items = Object.fromEntries(crew.kit.map(([type, position], index) => ['item-' + (index + 1), { type, level: 1 + bonus.startLevel, position: [...position] }]))
   const run = { crew: crewId, floor: 1, level: 1, embers: 0, pendingLevels: 0, rerolls: tuning.rerolls + bonus.rerolls, bonus,
     columns: Math.min(tuning.grid.maxColumns, tuning.grid.columns + bonus.columns + (crew.columns ?? 0)), health: 0,
-    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [],
+    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [], tomes: { vigor: 0, might: 0 },
     forged: (profile.forged ?? []).map(record => record.id) }
   run.health = maxHealthOf(run)
   const journey = { descent: run, battle: battleFor(run), phase: 'battle', message: '' }
@@ -134,7 +134,7 @@ export function finishFloor(journey, random) {
   keepPlaces(journey)
   refundReadied(journey)
   const hero = journey.battle.actors.recruit, foe = journey.battle.actors.enemy
-  note(run, `[Floor ${run.floor} ${run.enemy.kind} · ${foe.name}] ${journey.battle.cycle - 1} cycles · ${run.crew} HP ${Math.max(0, hero.health)}/${hero.maxHealth} · foe HP ${Math.max(0, foe.health)}/${foe.maxHealth}`)
+  note(run, `[Floor ${run.floor} ${run.enemy.kind} · ${foe.name}] ${journey.battle.cycle} cycles · ${run.crew} HP ${Math.max(0, hero.health)}/${hero.maxHealth} · foe HP ${Math.max(0, foe.health)}/${foe.maxHealth}`)
   if (winner !== 'crew') {
     journey.phase = 'dead'
     tell(journey, winner ? `${descentCrew[run.crew].name} falls on floor ${run.floor}. ${capital(theName(run.enemy.name))} keeps the lantern.` : `Floor ${run.floor}: the fight drags on until the lantern gutters out. A build must kill to go deeper.`)
@@ -222,6 +222,7 @@ export function drawCards(run, random) {
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
       { weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
+      { weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
       { weight: run.columns < tuning.grid.maxColumns && !cards.some(card => card.kind === 'widen') ? tuning.cards.widenWeight : 0, card: () => ({ kind: 'widen' }) }
     ]
     const total = groups.reduce((sum, group) => sum + group.weight, 0)
@@ -237,6 +238,7 @@ const applyCard = {
   level: (run, card) => { run.items[card.id].level++ },
   item: (run, card) => { run.items['item-' + run.nextItem++] = { type: card.type, level: 1, position: null } },
   widen: run => { run.columns = Math.min(tuning.grid.maxColumns, run.columns + 1) },
+  tome: (run, card) => { run.tomes = { ...run.tomes, [card.id]: (run.tomes?.[card.id] ?? 0) + 1 }; if (card.id === 'vigor') run.health += tuning.tomes.vigor.health },
   mend: run => { run.health = Math.min(maxHealthOf(run), run.health + Math.round(maxHealthOf(run) * tuning.cards.mendShare)) }
 }
 
@@ -271,13 +273,17 @@ export function abandonRun(journey) {
   return true
 }
 
+/** Tome names, for cards and the log. */
+export const tomeNames = { vigor: 'Tome of Vigor', might: 'Tome of Might' }
+
 /** One line for the log after a card is taken. */
 function cardSummary(run, card) {
   const lines = {
     level: () => `${rules.catalog.items[run.items[card.id].type].name} reaches level ${run.items[card.id].level}.`,
     item: () => `${rules.catalog.items[card.type].name} found. Place it on the grid.`,
     widen: () => `Your back is wider: ${run.columns} columns.`,
-    mend: () => 'You rest and mend.'
+    mend: () => 'You rest and mend.',
+    tome: () => `You read the ${tomeNames[card.id]} (${run.tomes[card.id]} read).`
   }
   return lines[card.kind]()
 }
@@ -286,7 +292,7 @@ function cardSummary(run, card) {
 export function cardStats(run, card) {
   if (card.kind !== 'level') return []
   const item = run.items[card.id]
-  return Object.entries(rules.catalog.items[item.type].stats).map(([stat, base]) => ({ stat, from: itemStat(base, item), to: itemStat(base, { ...item, level: item.level + 1 }) })).filter(change => change.from || change.to)
+  return Object.entries(rules.catalog.items[item.type].stats).map(([stat, base]) => ({ stat, from: itemStat(base, item, run), to: itemStat(base, { ...item, level: item.level + 1 }, run) })).filter(change => change.from || change.to)
 }
 
 /** The recipe an item type can evolve by, or null. */

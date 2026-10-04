@@ -52,7 +52,6 @@ any change to the numbers.
 | `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
 | `plugins/bell/descent/view.js` | The hub, the run header, cards, chest and summary screens. |
 | `plugins/bell/descent/consumables.js` | Consumable items, their tap abilities, charges and grid labels. |
-| `plugins/bell/descent/tomes.js` | Tomes: prices and what each one adds. Numbers are in `tuning.js`. |
 | `plugins/bell/descent/forge.js` | Forge parts (WHEN, DO, TO, POWER), their costs, and how a record becomes an item and an ability. |
 | `plugins/bell/descent/forge-view.js` | The Forge screen. |
 | `plugins/bell/duel/duel-rules.js` | Duel Pit rule cards and their options. |
@@ -95,8 +94,7 @@ on elites and bosses, and taps the healers below half health.
 
 ## Tomes
 
-Before a floor's fight starts, the Tomes button spends run Bells. A Tome of
-Vigor adds max health for the run; a Tome of Might adds 1 to every nonzero
-number on one item. Each tome's price grows each time it is bought (Might
-counts per item). Bells spent on tomes do not come home, so a tome trades
-Bell Tower progress for depth in this run.
+A level-up draw can hold one tome card in place of an item or level card.
+A Tome of Vigor adds 6 max health for the run; a Tome of Might adds 1 to
+every nonzero number on all gear, including gear found later. Tomes stack.
+Bells are never spent in a run: every run brings all its Bells home.

@@ -11,7 +11,6 @@ import { itemLinks } from './bell/inspection.js'
 import { describeStep, stepDuration } from './bell/feedback.js'
 import { profileStore, settleRun, buyUpgrade, unlockedCrew } from './bell/descent/profile-save.js'
 import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun, readyItem, armReadied } from './bell/descent/run.js'
-import { buyTome } from './bell/descent/tomes.js'
 import { hubView } from './bell/descent/view.js'
 import { battleLine } from './bell/descent/battle-stage.js'
 import { descentCrew } from './bell/descent/pool.js'
@@ -61,7 +60,7 @@ export default {
     }
     const closeInspection = () => { state.selected = null; state.moving = false; state.expanded = false; state.link = null }
     const editable = () => state.screen === 'expedition' && !state.queue.length && state.journey.phase === 'battle' && state.journey.battle.phase === 'planning'
-    const clearPresentation = () => { state.queue = []; state.step = null; state.battleLine = null; state.log = []; state.paused = false; state.menu = false; state.history = false; state.tomes = false; state.message = ''; state.left = 0; closeInspection() }
+    const clearPresentation = () => { state.queue = []; state.step = null; state.battleLine = null; state.log = []; state.paused = false; state.menu = false; state.history = false; state.message = ''; state.left = 0; closeInspection() }
     // The closing marker settles the cycle only after the last step has had its full time on screen,
     // so a killing blow and its faint are seen before any reward screen covers them.
     const queueCycle = () => { armReadied(state.journey); state.queue = [...rules.resolveCycle(state.journey.battle, { afterCycle: ['enemy'] }).trace, { kind: 'settle' }] }
@@ -130,8 +129,6 @@ export default {
       duelRedraft() { if (!state.queue.length && redraft(state.journey)) { clearPresentation(); redraw() } },
       leaveDuel() { if (state.journey.duel) { state.journey = createJourney(); actions.openDuel() } },
       useItem(id) { if (readyItem(state.journey, id)) { state.message = `${itemDefinition(state.journey.battle, id).name} readied: it acts at the start of the next cycle.`; redraw() } },
-      tomes() { state.tomes = !state.tomes; redraw() },
-      buyTome(value) { const [kind, id] = String(value).split(':'); if (buyTome(state.journey, kind, id)) { closeInspection(); redraw() } },
       continueRun() { if (state.profile.journey) { state.journey = state.profile.journey; state.screen = 'expedition'; clearPresentation(); redraw() } },
       buy(id) { if (buyUpgrade(state.profile, id)) { state.hubNotice = `The ${id === 'deepPockets' ? 'tower' : 'bell'} rings. ${state.profile.bells} Bells left.`; redraw() } },
       card(index) { if (!state.queue.length && chooseCard(state.journey, Number(index), () => context.random())) { closeInspection(); redraw() } },

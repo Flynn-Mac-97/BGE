@@ -8,8 +8,7 @@ import { descentCrew } from './pool.js'
 import { towerUpgrades } from './tower.js'
 import { evolutionRecipes } from './evolutions.js'
 import { unlockedCrew } from './profile-save.js'
-import { embersNeeded, regionOf, cardStats, recipeFor, readyEvolutions, maxHealthOf, chargesLeft, itemStat } from './run.js'
-import { tomePrice, canBuyTomes } from './tomes.js'
+import { embersNeeded, regionOf, cardStats, recipeFor, readyEvolutions, maxHealthOf, chargesLeft, tomeNames } from './run.js'
 
 const itemName = type => rules.catalog.items[type].name
 const pips = (filled, total) => '●'.repeat(filled) + '○'.repeat(total - filled)
@@ -46,7 +45,7 @@ export function levelBadge(journey, id, readyIds) {
   const isEvolved = rules.catalog.items[item.type].tags.includes('evolved')
   const left = chargesLeft(item)
   const charges = left === null ? '' : `<span class="charge-badge ${item.readied ? 'readied' : left ? '' : 'spent'}">${item.readied ? 'READY' : '◆'.repeat(left) || 'EMPTY'}</span>`
-  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : ''}${item.tomes ? ` +${item.tomes}` : ''}</span>${charges}`
+  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : ''}</span>${charges}`
 }
 /** Item ids ready to evolve now. */
 export const readyIds = journey => new Set(readyEvolutions(journey).map(ready => ready.id))
@@ -66,6 +65,8 @@ const cardFaces = {
   },
   item: (run, card) => ({ image: card.type, title: itemName(card.type), sub: `NEW · ${rules.catalog.items[card.type].footprint.join('×')}`, text: rules.catalog.items[card.type].description, hint: evolutionHint(run, card.type) }),
   widen: run => ({ image: 'pack', title: 'Wider Back', sub: `GRID ${run.columns} → ${run.columns + 1} COLUMNS`, text: 'Room for one more column of gear.', hint: '' }),
+  tome: (run, card) => ({ image: 'boundBook', title: tomeNames[card.id], sub: `TOME · READ ${run.tomes?.[card.id] ?? 0} → ${(run.tomes?.[card.id] ?? 0) + 1}`,
+    text: card.id === 'vigor' ? `+${tuning.tomes.vigor.health} max HP for the rest of the run.` : `+${tuning.tomes.might.bonus} to every number on all your gear, now and for every item you find.`, hint: '' }),
   mend: run => ({ image: 'salve', title: 'Mend', sub: 'REST ON THE STAIR', text: `Recover ${Math.round(maxHealthOf(run) * tuning.cards.mendShare)} health.`, hint: '' })
 }
 
@@ -95,19 +96,3 @@ const overlays = {
 /** The overlay for the current run phase, or '' while fighting. */
 export const runOverlay = (kit, journey, state) => overlays[journey.phase]?.(kit, journey, state) ?? ''
 
-/** The tome sheet: one Tome of Vigor for the hero, and a Tome of Might for each item. */
-export function tomeSheet(kit, journey) {
-  const run = journey.descent, isOpen = canBuyTomes(journey)
-  const buy = (kind, id) => {
-    const price = tomePrice(run, kind, id)
-    return kit.button(`Read · ${price} Bells`, { action: 'buyTome', value: id ? `${kind}:${id}` : kind, isDisabled: !isOpen || run.bells < price })
-  }
-  const items = Object.entries(run.items).map(([id, item]) => {
-    const definition = rules.catalog.items[item.type]
-    const numbers = Object.entries(definition.stats).filter(([, base]) => base).map(([stat, base]) => `${shortStat(stat)} ${itemStat(base, item)}`).join(' · ')
-    return `<li class="tome-row">${art(kit, item.type, definition.name)}<span><strong>${escape(definition.name)}</strong>${item.tomes ? ` <small>MIGHT ${item.tomes}</small>` : ''}<br><small>${escape(numbers)}</small></span>${buy('might', id)}</li>`
-  }).join('')
-  const hero = `<li class="tome-row">${art(kit, 'boundBook', 'Tome of Vigor')}<span><strong>TOME OF VIGOR</strong>${run.tomes?.vigor ? ` <small>READ ${run.tomes.vigor}</small>` : ''}<br><small>+${tuning.tomes.vigor.health} max HP for this run · now ${maxHealthOf(run)}</small></span>${buy('vigor')}</li>`
-  const note = isOpen ? `${run.bells} BELLS · Bells spent here do not come home.` : 'Tomes can only be read before a fight starts.'
-  return `<div class="menu-shade"><section class="loot-sheet tome-sheet"><h2>TOMES · ${escape(note)}</h2><ul class="tome-list">${hero}</ul><h3>TOME OF MIGHT · +${tuning.tomes.might.bonus} TO EVERY NUMBER ON ONE ITEM</h3><ul class="tome-list">${items}</ul>${kit.button('Close', { action: 'tomes' })}</section></div>`
-}
