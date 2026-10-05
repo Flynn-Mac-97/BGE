@@ -249,7 +249,7 @@ test('every Descent item shows its power family on the grid, the tooltip and the
   assert.ok(descentPool.filter(type => !rules.catalog.items[type].tags.includes('consumable')).every(type => familyOf(rules.catalog.items[type])), 'each pool item that is not a consumable names a family')
   const game = fixture({ hub: true })
   game.panel.on.goDown('rook')
-  assert.match(game.panel.html(), /class="equipment-shape[^"]*"[^>]*style="--family:#6fa8dc;/)
+  assert.match(game.panel.html(), /class="equipment-shape[^>]*>(?:<span class="scan-marker"[^<]*<\/span>)?<span class="family-emblem" title="Combat family">/)
   game.panel.on.select(Object.keys(game.read().journey.battle.items)[0])
   assert.match(game.panel.html(), /COMBAT FAMILY/)
   game.panel.on.fight()
