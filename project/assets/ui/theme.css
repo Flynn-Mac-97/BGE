@@ -431,10 +431,14 @@ header>div { display:flex; gap:6px; }
   .bell-game.descent-run { grid-template-columns:minmax(0,1fr) auto; grid-template-rows:34px minmax(0,1fr) auto; gap:4px 10px; }
   .descent-run>header { grid-column:1/-1; }
   .descent-run>.stage { grid-column:1; grid-row:2; }
-  .descent-run>.dock { grid-column:2; grid-row:2; grid-template-columns:calc(var(--visible-columns) * 46px) 84px; grid-template-rows:auto minmax(0,1fr); gap:6px 8px; }
+  .descent-run>.dock { grid-column:2; grid-row:2; grid-template-columns:calc(var(--visible-columns) * 46px) 112px; grid-template-rows:auto minmax(100px,1fr); gap:6px 8px; }
+  /* The controls pack into three short rows, so the reserve below them always keeps room for its items. */
+  .descent-run .bell-controls { display:grid; grid-template-columns:1fr 1fr; gap:2px; max-width:none; }
+  .descent-run .bell-controls>.ui-button,.descent-run .bell-controls>.ui-toggle { min-height:30px; font-size:10px; padding:2px; }
+  .descent-run .bell-controls>.bell-button { grid-column:1/-1; min-height:36px; }
   .descent-run .loadout { grid-column:1; grid-row:1/-1; }
   .descent-run .bell-controls { grid-column:2; grid-row:1; }
-  .descent-run .reserve { grid-column:2; grid-row:2; min-height:0; overflow:auto; font-size:9px; }
+  .descent-run .reserve { grid-column:2; grid-row:2; min-height:100px; overflow:auto; font-size:9px; }
   .descent-run .reserve-items { grid-template-columns:1fr; }
   .descent-run>:last-child:not(.menu-shade) { grid-column:1/-1; }
   .descent-run .inspection.full { top:42px; }
@@ -590,3 +594,7 @@ strong>.family-emblem { vertical-align:middle; margin-left:5px; }
 /* An enemy's threats, as small chips on its nameplate. */
 .threat-chips { display:flex; flex-wrap:wrap; gap:3px; margin:2px 0; }
 .threat-chip { font:700 8px monospace; letter-spacing:.05em; border:1px solid #fff; padding:0 3px; }
+/* The reserve list never shrinks: the panel scrolls instead, so every reserve item can always be tapped.
+   Family powers and evolution hints come after the list and scroll with it. */
+.reserve { overflow-y:auto; overscroll-behavior:contain; }
+.reserve-items { flex:none; min-height:auto; overflow:visible; }
