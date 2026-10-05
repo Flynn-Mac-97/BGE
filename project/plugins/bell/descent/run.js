@@ -3,7 +3,8 @@
  * (`battle`, `phase`, `message`) and adds `descent`, the run itself:
  * `{ crew, floor, level, embers, pendingLevels, rerolls, bonus, columns, health, items: { id: { type, level, position } },
  *    nextItem, enemy, cards, chest, bells, evolutions, settled, story, forged }`. `forged` lists the forged item types this run may offer.
- *    coin, peddler }`. `coin` is spent at the Peddler (`peddler.js`), who visits after each boss.
+ *    coin, peddler, bestBefore, mastery, masteryGain }`. `coin` is spent at the Peddler (`peddler.js`), who visits after each boss.
+ * `mastery` is the profile's mastery levels when the run began; `masteryGain` is the xp this run earns (`mastery.js`).
  * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'train' (a level-up's free item level), 'peddler', 'dead'. Callers pass the engine's random.
  */
 import { rules, itemReference } from '../rules.js'
@@ -14,6 +15,7 @@ import { regions, enemyTraits } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
 import { towerBonus } from './tower.js'
 import { peddlerStock, buyWare, sellItem } from './peddler.js'
+import { masteryLevels, gainMastery } from './mastery.js'
 
 /** A catalog stat at an item level. */
 export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)))
@@ -24,9 +26,9 @@ export const floorKind = floor => floor % tuning.enemy.bossEvery === 0 ? 'boss' 
 /** The region a floor is in. */
 export const regionOf = floor => regions.filter(region => region.from <= floor).at(-1)
 /** The recruit's max health at the run's level. */
-export const maxHealthOf = run => tuning.recruit.health + run.bonus.maxHealth + tuning.recruit.healthPerLevel * (run.level - 1) + (run.tomes?.vigor ?? 0) * tuning.tomes.vigor.health
+export const maxHealthOf = run => Math.round((tuning.recruit.health + tuning.recruit.healthPerLevel * (run.level - 1) + (run.tomes?.vigor ?? 0) * tuning.tomes.vigor.health) * (1 + (run.bonus.maxHealthShare ?? 0)))
 /** A run item's stat: its level-scaled base plus Tomes of Might. A zero base stays zero. */
-export const itemStat = (base, item, run) => base ? levelStat(base, item.level) + (run.tomes?.might ?? 0) * tuning.tomes.might.bonus : 0
+export const itemStat = (base, item, run) => base ? Math.round((levelStat(base, item.level) + (run.tomes?.might ?? 0) * tuning.tomes.might.bonus) * (1 + (run.bonus.itemShare ?? 0) + tuning.mastery.share * (run.mastery?.[item.type] ?? 0))) : 0
 /** "the Cellar Rat", or a name that already starts with "The". */
 const theName = name => name.startsWith('The ') ? name : `the ${name}`
 const capital = text => text[0].toUpperCase() + text.slice(1)
@@ -99,6 +101,7 @@ export function createRun(profile, crewId, random) {
   const run = { crew: crewId, floor: 1, level: 1, embers: 0, pendingLevels: 0, rerolls: tuning.rerolls + bonus.rerolls, bonus,
     columns: Math.min(tuning.grid.maxColumns, tuning.grid.columns + bonus.columns + (crew.columns ?? 0)), health: 0,
     items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [], tomes: { vigor: 0, might: 0 }, coin: 0, peddler: null,
+    bestBefore: profile.bestFloor ?? 0, mastery: masteryLevels(profile.mastery), masteryGain: {},
     forged: (profile.forged ?? []).map(record => record.id) }
   run.health = maxHealthOf(run)
   const journey = { descent: run, battle: battleFor(run), phase: 'battle', message: '' }
@@ -159,8 +162,11 @@ export function finishFloor(journey, random) {
     return true
   }
   const kind = run.enemy.kind
-  run.bells += tuning.bells[kind]
-  run.coin = (run.coin ?? 0) + tuning.coin[kind]
+  const bells = bellsFor(run)
+  run.bells += bells
+  const coin = Math.round(tuning.coin[kind] * (1 + (run.bonus.coinShare ?? 0)))
+  run.coin = (run.coin ?? 0) + coin
+  gainMastery(run, Object.values(run.items).filter(item => item.position).map(item => item.type))
   if (kind === 'boss') run.peddler = { stock: peddlerStock(run, random) }
   const multiplier = { normal: 1, elite: tuning.embers.elite, boss: tuning.embers.boss }[kind]
   const gained = Math.round((tuning.embers.perFloor + tuning.embers.perFloorGrowth * run.floor) * multiplier * (1 + run.bonus.emberShare))
@@ -171,10 +177,20 @@ export function finishFloor(journey, random) {
   run.chest = kind === 'normal' ? null : openChest(journey, kind, random)
   if (run.chest) for (const item of Object.values(run.items)) item.used = 0
   const levels = run.pendingLevels ? ` ${run.pendingLevels} level${run.pendingLevels > 1 ? 's' : ''} gained.` : ''
-  tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${tuning.coin[kind]} Coin, +${tuning.bells[kind]} Bell${tuning.bells[kind] > 1 ? 's' : ''}.${levels}`)
+  tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${coin} Coin, +${bells} Bell${bells > 1 ? 's' : ''}${run.floor > run.bestBefore ? ' (new record!)' : ''}.${levels}`)
   if (run.chest) journey.phase = 'chest'
   else afterRewards(journey, random)
   return true
+}
+
+/**
+ * Bells for a won floor: the floor kind's base, growing by `bells.growth` each floor, plus a record bonus
+ * of `bells.record` × floor for a floor deeper than the profile had reached. Pushing your wall pays most.
+ */
+export function bellsFor(run) {
+  const grown = tuning.bells[run.enemy.kind] * tuning.bells.growth ** (run.floor - 1)
+  const record = run.floor > (run.bestBefore ?? 0) ? tuning.bells.record * run.floor : 0
+  return Math.round(grown + record)
 }
 
 /** Recipes ready now: the item is high enough and its partner touches it on the grid. */

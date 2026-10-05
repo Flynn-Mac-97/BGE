@@ -18,7 +18,10 @@ export const tuning = {
   enemy: { healthGrowth: 1.15, damageGrowth: 1.125, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 1.45, damage: 1.35 }, elite: { health: 1.45, damage: 1.1 }, boss: { health: 1.6, damage: 1.25 } } },
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
-  bells: { normal: 1, elite: 3, boss: 10 },
+  // Bells for a won floor: base × growth^(floor − 1), plus record × floor on a floor deeper than your best (see bellsFor).
+  bells: { normal: 1, elite: 3, boss: 10, growth: 1.09, record: 1 },
+  // Item mastery: level L needs step × L × (L + 1) / 2 floors won with the item on the grid; each level adds share to its numbers.
+  mastery: { step: 10, share: 0.05 },
   // Coin for a floor, spent only at the Peddler, who visits after each boss.
   coin: { normal: 1, elite: 3, boss: 8 },
   // Peddler wares are level 1 + levelsPerVisit per boss beaten; an owned item sells for sellBase + its level.

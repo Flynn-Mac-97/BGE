@@ -36,7 +36,7 @@ test('a won floor gives Embers and Bells, and a level-up card applies once', () 
   const journey = createRun(createProfile(), 'rook', random)
   fightFloor(journey, random)
   assert.equal(journey.phase, 'levelUp')
-  assert.equal(journey.descent.bells, 1)
+  assert.equal(journey.descent.bells, 2)
   assert.equal(journey.descent.cards.length, 3)
   const before = structuredClone(journey.descent)
   const card = journey.descent.cards[0]
@@ -101,7 +101,7 @@ test('a death banks Bells and best floor once, and the profile survives a save',
   profile.journey = createRun(profile, 'nettle', random)
   assert.ok(store.save(profile))
   assert.deepEqual(store.load(), profile)
-  assert.equal(profile.journey.battle.actors.recruit.maxHealth, 29)
+  assert.equal(profile.journey.battle.actors.recruit.maxHealth, 25)
   assert.deepEqual(unlockedCrew(profile), ['rook', 'nettle', 'pip'])
 })
 
@@ -139,9 +139,9 @@ test('the Lantern hub starts a run, a card is taken through the panel, and givin
   game.panel.on.lantern()
   const profile = game.read().profile
   assert.equal(game.read().screen, 'hub')
-  assert.equal(profile.bells, 1)
+  assert.equal(profile.bells, 2)
   assert.equal(profile.journey, null)
-  assert.equal(JSON.parse(storage.get('black-bell-descent-v1')).bells, 1)
+  assert.equal(JSON.parse(storage.get('black-bell-descent-v1')).bells, 2)
 })
 
 test('the battle box narrates hits, poison and statuses, and skips stack bookkeeping', async () => {
@@ -344,4 +344,41 @@ test('the Peddler visits after a boss with one ware per family, and buying and s
   assert.ok(leavePeddler(journey, random))
   assert.equal(journey.phase, 'battle')
   assert.equal(run.floor, 11)
+})
+
+test('Bells grow with depth and pay a record bonus; endless tower ranks never cap', async () => {
+  const { bellsFor } = await import('../plugins/bell/descent/run.js')
+  const { upgradeCost } = await import('../plugins/bell/descent/tower.js')
+  const run = { floor: 30, bestBefore: 40, enemy: { kind: 'normal' } }
+  const deep = bellsFor(run)
+  assert.ok(deep > bellsFor({ ...run, floor: 10 }) * 3, 'floor 30 pays several times floor 10')
+  assert.equal(bellsFor({ ...run, bestBefore: 20 }), deep + 30, 'a record floor adds record × floor')
+  assert.ok(upgradeCost('vigor', 50) > upgradeCost('vigor', 49))
+  assert.equal(upgradeCost('deepPockets', 1), null)
+})
+
+test('item mastery grows across runs and adds to that item’s numbers', async () => {
+  const { masteryLevel } = await import('../plugins/bell/descent/mastery.js')
+  const profile = createProfile()
+  for (let runIndex = 0; runIndex < 2; runIndex++) {
+    const random = seededRandom(9)
+    const journey = createRun(profile, 'rook', random)
+    for (let floor = 0; floor < 3 && journey.phase !== 'dead'; floor++) {
+      fightFloor(journey, random)
+      while (journey.phase !== 'battle' && journey.phase !== 'dead') {
+        if (journey.phase === 'chest') collectChest(journey, random)
+        else if (journey.phase === 'peddler') leavePeddler(journey, random)
+        else takeCard(journey, 0, random)
+      }
+    }
+    abandonRun(journey)
+    settleRun(profile, journey)
+  }
+  assert.equal(profile.mastery.dagger, 6)
+  assert.equal(masteryLevel(profile.mastery.dagger), 0)
+  profile.mastery.dagger = 30
+  const run = createRun(profile, 'rook', seededRandom(1)).descent
+  assert.equal(run.mastery.dagger, 2)
+  run.items['item-1'].level = 5
+  assert.equal(battleFor(run).items['item-1'].stats.damage, 11, 'level 5 dagger: 10 damage, +10% from mastery 2')
 })

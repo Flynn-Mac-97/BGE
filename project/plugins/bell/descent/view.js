@@ -6,7 +6,8 @@ import { escape } from '../inspection.js'
 import { shortStat } from '../glance.js'
 import { tuning } from './tuning.js'
 import { descentCrew } from './pool.js'
-import { towerUpgrades } from './tower.js'
+import { towerUpgrades, upgradeCost, isEndless } from './tower.js'
+import { masteryLevel, nextMasteryXp } from './mastery.js'
 import { evolutionRecipes } from './evolutions.js'
 import { unlockedCrew } from './profile-save.js'
 import { sellPrice } from './peddler.js'
@@ -26,10 +27,15 @@ export function hubView(kit, state) {
   const run = profile.journey?.descent
   const go = run ? button(`Continue · ${descentCrew[run.crew].name} on floor ${run.floor}`, 'continueRun') : button(unlocked.includes(selected) ? `Descend with ${crew.name}` : `Reach floor ${crew.unlock} to meet ${crew.name}`, 'goDown', selected, !unlocked.includes(selected))
   const tower = Object.entries(towerUpgrades).map(([id, upgrade]) => {
-    const rank = profile.tower[id] ?? 0, cost = upgrade.cost[rank]
-    return `<li><strong>${escape(upgrade.name)}</strong> <span class="tower-pips">${pips(rank, upgrade.cost.length)}</span><br><small>${escape(upgrade.text)}</small>${cost === undefined ? '<small> · MAX</small>' : button(`Ring · ${cost} Bells`, 'buy', id, profile.bells < cost || !!run)}</li>`
+    const rank = profile.tower[id] ?? 0, cost = upgradeCost(id, rank)
+    const marks = isEndless(id) ? `RANK ${rank}` : pips(rank, upgrade.cost.length)
+    return `<li><strong>${escape(upgrade.name)}</strong> <span class="tower-pips">${marks}</span><br><small>${escape(upgrade.text)}${isEndless(id) ? ' per rank' : ''}</small>${cost === null ? '<small> · MAX</small>' : button(`Ring · ${cost} Bells`, 'buy', id, profile.bells < cost || !!run)}</li>`
   }).join('')
-  return `<main class="tavern-game descent-hub"><header><strong>THE LAST LANTERN</strong><span>${profile.bells} BELLS · DEEPEST FLOOR ${profile.bestFloor} · ${profile.runs} RUN${profile.runs === 1 ? '' : 'S'}</span><div>${button('The Forge', 'openForge')}${button('Duel Pit', 'openDuel')}${button('Play Log', 'openLog')}${button('Family Lab', 'openLab')}${button('Scribe’s Bench', 'openCrafter')}</div></header><section class="tavern-story" role="status"><p>${escape(state.hubNotice)}</p>${state.saveWarning ? `<p>${escape(state.saveWarning)}</p>` : ''}</section><section class="descent-hub-body"><aside><h2>WHO GOES DOWN</h2>${roster}</aside><article><div class="tavern-portrait">${art(kit, crew.portrait, crew.name)}</div><h2>${escape(crew.name.toUpperCase())}, ${escape(crew.title)}</h2><p>${escape(crew.line)}</p><h3>STARTING KIT</h3><ul class="hub-kit-list">${kitList}</ul>${go}${run ? button('Abandon that run', 'abandon') : ''}</article><aside><h2>THE BELL TOWER</h2><p><small>Bells come back with every run. Each rank lasts forever.</small></p><ul class="tower-list">${tower}</ul></aside></section></main>`
+  const masters = Object.entries(profile.mastery ?? {}).sort((first, second) => second[1] - first[1]).slice(0, 8).map(([type, xp]) => {
+    const level = masteryLevel(xp)
+    return `<li class="hub-kit">${art(kit, type, itemName(type))}<span>${escape(itemName(type))} · ✦${level}<br><small>${xp}/${nextMasteryXp(level)} floors · +${Math.round(level * tuning.mastery.share * 100)}%</small></span></li>`
+  }).join('')
+  return `<main class="tavern-game descent-hub"><header><strong>THE LAST LANTERN</strong><span>${profile.bells} BELLS · DEEPEST FLOOR ${profile.bestFloor} · ${profile.runs} RUN${profile.runs === 1 ? '' : 'S'}</span><div>${button('The Forge', 'openForge')}${button('Duel Pit', 'openDuel')}${button('Play Log', 'openLog')}${button('Family Lab', 'openLab')}${button('Scribe’s Bench', 'openCrafter')}</div></header><section class="tavern-story" role="status"><p>${escape(state.hubNotice)}</p>${state.saveWarning ? `<p>${escape(state.saveWarning)}</p>` : ''}</section><section class="descent-hub-body"><aside><h2>WHO GOES DOWN</h2>${roster}</aside><article><div class="tavern-portrait">${art(kit, crew.portrait, crew.name)}</div><h2>${escape(crew.name.toUpperCase())}, ${escape(crew.title)}</h2><p>${escape(crew.line)}</p><h3>STARTING KIT</h3><ul class="hub-kit-list">${kitList}</ul>${go}${run ? button('Abandon that run', 'abandon') : ''}</article><aside><h2>THE BELL TOWER</h2><p><small>Bells come back with every run. Each rank lasts forever.</small></p><ul class="tower-list">${tower}</ul><h2>ITEM MASTERY</h2><p><small>Every floor won with an item on the grid trains it forever. Each ✦ adds ${Math.round(tuning.mastery.share * 100)}% to all its numbers in every run.</small></p><ul class="hub-kit-list">${masters || '<li><small>Win a floor to start.</small></li>'}</ul></aside></section></main>`
 }
 
 /** The run line above the stage: region, floor, level, Embers, Bells and rerolls. */
@@ -47,7 +53,8 @@ export function levelBadge(journey, id, readyIds) {
   const isEvolved = rules.catalog.items[item.type].tags.includes('evolved')
   const left = chargesLeft(item)
   const charges = left === null ? '' : `<span class="charge-badge ${item.readied ? 'readied' : left ? '' : 'spent'}">${item.readied ? 'READY' : '◆'.repeat(left) || 'EMPTY'}</span>`
-  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${readyIds.has(id) ? ' ★' : item.level >= tuning.evolveLevel - 2 && recipeFor(item.type) ? ' ⇄' : ''}</span>${charges}`
+  const mastery = journey.descent.mastery?.[item.type] ?? 0
+  return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${mastery ? ` ✦${mastery}` : ''}${readyIds.has(id) ? ' ★' : item.level >= tuning.evolveLevel - 2 && recipeFor(item.type) ? ' ⇄' : ''}</span>${charges}`
 }
 /** From level 3, what each placed item still needs to evolve: `[{ id, text, isReady }]`. */
 export function evolutionHints(journey) {
