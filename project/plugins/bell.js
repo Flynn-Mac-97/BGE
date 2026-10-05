@@ -31,7 +31,7 @@ export default {
     if (!storage) try { storage = globalThis.window?.localStorage } catch {}
     const saves = companyStore(storage), company = saves.load()
     const profiles = profileStore(storage), profile = profiles.load()
-    const state = { profile, crewSelected: 'rook', forgeDraft: forgeDraft(), forgeNotice: '', duelRules: startingRules(), hubNotice: hubWelcome(profile), company, screen: 'hub', tavernSelected: Object.keys(company.roster)[0] ?? 'rook', saveWarning: saves.warning(), journey: company.active ?? createJourney(), selected: null, moving: false, expanded: false, link: null, queue: [], step: null, log: [], paused: false, menu: false, history: false, slow: false, auto: true, left: 0, serial: 0, message: '' }
+    const state = { profile, crewSelected: 'rook', forgeDraft: forgeDraft(), forgeNotice: '', duelRules: startingRules(), hubNotice: hubWelcome(profile), company, screen: 'hub', tavernSelected: Object.keys(company.roster)[0] ?? 'rook', saveWarning: saves.warning(), journey: company.active ?? createJourney(), selected: null, moving: false, expanded: false, link: null, queue: [], step: null, log: [], paused: false, menu: false, history: false, speed: 'normal', auto: true, left: 0, serial: 0, message: '' }
     let html = ''
     let savedJourney = null
     let savedAuto = true
@@ -81,7 +81,7 @@ export default {
       state.message = describeStep(step)
       state.log.push(state.message)
       if (state.log.length > 100) state.log.shift()
-      state.serial++; state.left = stepDuration(step, state.slow ? 'slow' : 'normal')
+      state.serial++; state.left = stepDuration(step, state.speed)
       redraw()
     }
     const actions = {
@@ -198,7 +198,8 @@ export default {
       pause() { if (state.queue.length) { state.paused = !state.paused; redraw() } },
       step() { if (state.paused && !state.expanded && !state.menu && !state.history) advance() },
       auto(value) { state.auto = !!value; redraw() },
-      slow(value) { state.slow = !!value; redraw() },
+      slow(value) { state.speed = value ? 'slow' : 'normal'; redraw() },
+      fast(value) { state.speed = value ? 'fast' : 'normal'; redraw() },
       menu() { state.menu = !state.menu; state.history = false; redraw() },
       history() { state.history = !state.history; state.menu = false; redraw() },
       retry() { if (state.journey.expedition) { actions.returnTavern(); return } if (!state.queue.length && (state.journey.sandbox ? resetPractice(state.journey) : retryRoom(state.journey))) { clearPresentation(); redraw() } },

@@ -46,13 +46,21 @@ export function damageFeedback(step) {
 }
 
 /** Damage gets a readable hold; ordinary bookkeeping keeps its existing short timing. */
-export function stepDuration(step, speed) {
-  if (damageFeedback(step).length) return speed === 'slow' ? 2.2 : 1.5
+// Seconds each kind of step is held, by playback speed. Fast is for testing builds: a floor plays in a few seconds.
+const stepSeconds = {
+  damage: { slow: 2.2, normal: 1.5, fast: 0.12 },
   // The end of a fight holds long enough to see the faint and read who fell before any reward screen.
-  if (step?.kind === 'combatEnd') return speed === 'slow' ? 1.8 : 1.1
+  combatEnd: { slow: 1.8, normal: 1.1, fast: 0.3 },
   // A heal, guard or status on a fighter plays a short effect on its portrait, so it gets time to be read.
-  if (step?.kind === 'ability' && step.effects.some(effect => effect.target.kind === 'actor' && effect.amount)) return speed === 'slow' ? 1.2 : 0.7
-  return speed === 'slow' ? 0.8 : 0.22
+  fighterEffect: { slow: 1.2, normal: 0.7, fast: 0.06 },
+  other: { slow: 0.8, normal: 0.22, fast: 0.02 }
+}
+/** How long a step is held at a playback speed: 'slow', 'normal' or 'fast'. */
+export function stepDuration(step, speed) {
+  if (damageFeedback(step).length) return stepSeconds.damage[speed]
+  if (step?.kind === 'combatEnd') return stepSeconds.combatEnd[speed]
+  if (step?.kind === 'ability' && step.effects.some(effect => effect.target.kind === 'actor' && effect.amount)) return stepSeconds.fighterEffect[speed]
+  return stepSeconds.other[speed]
 }
 
 export function stageFeedback(state) {

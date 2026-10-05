@@ -382,3 +382,21 @@ test('item mastery grows across runs and adds to that item’s numbers', async (
   run.items['item-1'].level = 5
   assert.equal(battleFor(run).items['item-1'].stats.damage, 11, 'level 5 dagger: 10 damage, +10% from mastery 2')
 })
+
+test('the Fast toggle plays a floor many times quicker than normal speed', async () => {
+  const { fixture } = await import('../tools/ui-fixture.mjs')
+  const secondsToWin = isFast => {
+    const game = fixture({ hub: true })
+    game.panel.on.goDown('rook')
+    if (isFast) game.panel.on.fast(true)
+    game.panel.on.fight()
+    let ticks = 0
+    while (game.read().journey.phase === 'battle' && ticks < 4000) { game.tick(1, 0.05); ticks++ }
+    return ticks * 0.05
+  }
+  const normal = secondsToWin(false), fast = secondsToWin(true)
+  assert.ok(fast * 4 < normal, `fast ${fast}s, normal ${normal}s`)
+  const game = fixture({ hub: true })
+  game.panel.on.goDown('rook')
+  assert.match(game.panel.html(), /data-action="fast"/)
+})
