@@ -1,6 +1,9 @@
 /** What the Descent can offer, and who can go down. Item types are catalog keys. */
+import { familyBaseItems } from '../catalog/family-bases.js'
+
 export const descentPool = ['dagger', 'sword', 'hammer', 'buckler', 'salve', 'sprig', 'venom', 'stone', 'banner', 'hungryTooth', 'bloodCup', 'sapwoodStaff', 'thornTotem', 'blightMortar', 'sporeIdol', 'thornsapVial',
-  'salt', 'echo', 'stormTotem', 'rootTotem', 'tooth', 'curseIdol', 'reapingSeal', 'salvagePack', 'patchKit', 'pack']
+  'salt', 'echo', 'stormTotem', 'rootTotem', 'tooth', 'curseIdol', 'reapingSeal', 'salvagePack', 'patchKit', 'pack',
+  ...Object.keys(familyBaseItems)]
 
 /** A payoff item that does nothing alone is offered only once the run owns the item that feeds it. */
 export const poolNeeds = { reapingSeal: 'curseIdol', patchKit: 'salvagePack' }

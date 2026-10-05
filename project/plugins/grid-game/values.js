@@ -3,12 +3,25 @@ import { preparedStates } from './prepared.js'
 import { entityOf, targets, reference, sameReference } from './targets.js'
 import { adjacent, placedItems } from './grid.js'
 
+/**
+ * A die roll from 1 to `sides`. The battle keeps `rolls: { seed, count }`; each roll hashes the seed with
+ * the count and advances the count, so a fight replays exactly and the compiled path rolls the same numbers.
+ */
+export function rollDie(state, sides) {
+  state.rolls ??= { seed: 1, count: 0 }
+  let value = (state.rolls.seed + Math.imul(++state.rolls.count, 0x9e3779b9)) | 0
+  value = Math.imul(value ^ (value >>> 16), 0x85ebca6b)
+  value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35)
+  return 1 + ((value ^ (value >>> 16)) >>> 0) % sides
+}
+
 /** Expressions deliberately have no arbitrary scripts or recursive stat references. */
 export function amountOf(frame, expression, subject = frame.source) {
   if (typeof expression === 'number') return expression
   if (expression.previous) return (frame.previousAmount ?? 0) * (expression.scale ?? 1)
   if (expression.eventAmount) return (frame.event?.amount ?? 0) * (expression.scale ?? 1)
   if (expression.stacks) return frame.status?.stacks ?? 0
+  if (expression.roll) return rollDie(frame.state, expression.roll) * (expression.scale ?? 1)
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)
   // A granted ability reads the item that grants it, so a totem's level grows what it gives.
   if (expression.grantorStat) return frame.grantor ? statOf(frame.state, frame.catalog, frame.grantor, expression.grantorStat) : 0

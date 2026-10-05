@@ -72,6 +72,8 @@ export function battleFor(run) {
   const battle = rules.createState({ columns: run.columns, rows: tuning.grid.rows,
     actors: { recruit: { name: descentCrew[run.crew].name, team: 'crew', maxHealth, health: Math.min(maxHealth, run.health), resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 } }, enemy: enemyActor(run.enemy, run.floor) },
     items: Object.entries(run.items).map(([id, item]) => ({ id, type: item.type, owner: 'recruit', position: null })) })
+  // Dice differ from floor to floor but replay the same on one floor.
+  battle.rolls = { seed: run.floor * 7919 + run.level, count: 0 }
   // Packs go first: an item stored in a pack only fits once the pack is attached.
   const packsFirst = Object.entries(run.items).sort(([, first], [, second]) => Number(!rules.catalog.items[first.type].storage) - Number(!rules.catalog.items[second.type].storage))
   for (const [id, item] of packsFirst) {
