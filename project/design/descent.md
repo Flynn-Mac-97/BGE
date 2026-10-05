@@ -15,7 +15,8 @@ its evolved form. Enemies grow every floor, without end.
 | Scale | What happens | Why it pulls |
 | --- | --- | --- |
 | Seconds | A floor is one auto-battle. Items fire in grid order; numbers pop on the grid. | Your build visibly does things. |
-| About a minute | The Ember bar fills. Choose 1 of 3 cards: level up an owned item, or, rarely, a new item. | Constant small choices; every card shows before → after numbers. |
+| About a minute | The Ember bar fills. Choose 1 of 3 cards, then train one item of your choice +1 level. | Constant small choices, and one you aim yourself. |
+| Every boss | The travelling Peddler visits. Spend Coin on wares from every family and one evolved item; sell what you no longer need. | You steer the build: buy the piece you are missing. |
 | About five minutes | Every 5th floor is an elite, and every 10th a boss. Both drop a chest. A chest evolves an eligible item, or gives free level-ups. | A goal you can see coming and plan the grid for. |
 | A run | Depth is the score. New crew unlock at depth 10, 15 and 25. | "One more floor." |
 | Between runs | Bells buy Bell Tower ranks: more health, more Embers, rerolls, a fourth card, higher starting levels, a wider back. | Each death still moves you forward. |
@@ -44,10 +45,9 @@ The kind multipliers aim for a curve, not walls: normal floors cost about
 15% of health, elites about 30%, bosses about 60%, and bosses cause a little
 over half of all deaths. The numbers are set against the test-bout bot
 (`tools/descent-bot.mjs`), which plays well, so a person who plans less goes
-less deep. Measured with 40 runs per crew: median floor 20 for Rook, Nettle
-and Briar and 25 for Pip; normal floors cost 11–16%, elites 28–40%, bosses
-48–68%; bosses cause 85 of 160 deaths. Pip's poison build is still the
-strongest start.
+less deep. Measured with 40 runs per crew, with training and the Peddler: median floor
+20 for every crew; normal floors cost 10–12%, elites 25–38%, bosses 46–56%;
+bosses cause 87 of 160 deaths; about one evolution per run.
 
 From level 3, an item that can evolve shows ⇄ on its badge, and the list under
 the reserve says what it still needs: find the partner, touch it, reach level
@@ -91,6 +91,20 @@ than they did, and new items fall off more slowly as the run owns more. Before
 this, about 70% of all cards offered were level cards and a run saw about 10
 of the 21 new items; now under half are level cards and a run sees about 14.
 
+## Training and the Peddler
+
+Every level-up has two steps: choose one of the cards, then train one owned
+item +1 level (phase `train`). The second step is aimed, so a build can be
+pushed where it is weak.
+
+Every floor gives Coin (`tuning.coin`: 1, 3 for an elite, 8 for a boss). After
+each boss, once the chest and level-ups are done, the travelling Peddler visits
+(phase `peddler`). His stock is one item from each power family the run can
+still take, one evolved item (sold nowhere else) and one consumable; wares come
+at level 1 + 2 per boss beaten. Prices are in `tuning.peddler`. He also buys:
+an owned item sells for 2 + its level. `descent/peddler.js` holds the stock,
+prices, buying and selling.
+
 ## Data, by file
 
 | File | Holds |
@@ -100,7 +114,8 @@ of the 21 new items; now under half are level cards and a run sees about 14.
 | `plugins/bell/descent/enemies.js` | Enemy bands by depth, with their lines of narration. |
 | `plugins/bell/descent/evolutions.js` | Recipes and the evolved items. |
 | `plugins/bell/descent/tower.js` | Bell Tower upgrades, their ranks and costs. |
-| `plugins/bell/descent/run.js` | The run: floors, Embers, cards, chests, evolution, death. Plain records in and out. |
+| `plugins/bell/descent/run.js` | The run: floors, Embers, cards, training, chests, evolution, the Peddler's visit, death. Plain records in and out. |
+| `plugins/bell/descent/peddler.js` | The Peddler's stock, prices, buying and selling. |
 | `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
 | `plugins/bell/descent/view.js` | The hub, the run header, cards, chest and summary screens. |
 | `plugins/bell/descent/consumables.js` | Consumable items, their tap abilities, charges and grid labels. |

@@ -572,3 +572,8 @@ header>div { display:flex; gap:6px; }
 .reserve-art>.family-emblem { margin-left:4px; }
 strong>.family-emblem { vertical-align:middle; margin-left:5px; }
 .equipment-shape:has(>.family-emblem)>.scan-marker { left:18px; }
+/* The Peddler and Train screens: owned gear as compact cards that wrap. */
+.peddler-sheet { max-height:92vh; overflow-y:auto; }
+.peddler-sheet h3 { margin:6px 0 2px; font-size:12px; letter-spacing:.06em; }
+.gear-choices { grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); }
+.gear-card>p { display:none; }

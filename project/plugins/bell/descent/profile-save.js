@@ -27,7 +27,7 @@ function validate(profile) {
   registerForged(profile.forged)
   const journey = profile.journey
   if (!journey) return profile
-  if (!descentCrew[journey.descent?.crew] || !['battle', 'levelUp', 'chest', 'dead'].includes(journey.phase)) throw new Error('Invalid run')
+  if (!descentCrew[journey.descent?.crew] || !['battle', 'levelUp', 'train', 'chest', 'peddler', 'dead'].includes(journey.phase)) throw new Error('Invalid run')
   for (const item of Object.values(journey.descent.items)) if (!rules.catalog.items[item.type] || !count(item.level)) throw new Error('Invalid run item')
   assertState(journey.battle, rules.catalog)
   if (journey.battle.phase === 'resolving') throw new Error('Interrupted frame is not a stable save')

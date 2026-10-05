@@ -15,10 +15,14 @@ export const tuning = {
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.
   // Set against the test-bout bot (tools/descent-bot.mjs) so a median run ends near floor 20 and bosses cause about half the deaths (see design/descent.md, Scaling).
-  enemy: { healthGrowth: 1.13, damageGrowth: 1.09, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 1.45, damage: 1.35 }, elite: { health: 1.45, damage: 1.1 }, boss: { health: 1.6, damage: 1.25 } } },
+  enemy: { healthGrowth: 1.15, damageGrowth: 1.125, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 1.45, damage: 1.35 }, elite: { health: 1.45, damage: 1.1 }, boss: { health: 1.6, damage: 1.25 } } },
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
   bells: { normal: 1, elite: 3, boss: 10 },
+  // Coin for a floor, spent only at the Peddler, who visits after each boss.
+  coin: { normal: 1, elite: 3, boss: 8 },
+  // Peddler wares are level 1 + levelsPerVisit per boss beaten; an owned item sells for sellBase + its level.
+  peddler: { levelsPerVisit: 2, sellBase: 2, price: { family: 6, evolved: 14, consumable: 3 } },
   cycleCap: 30,
   // Tomes come as level-up cards and stack for the run. Vigor adds max health; Might adds `bonus` to every nonzero number on all gear.
   tomes: { vigor: { health: 6 }, might: { bonus: 1 } }

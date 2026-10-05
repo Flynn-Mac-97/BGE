@@ -10,7 +10,7 @@ import { view } from './bell/view.js'
 import { itemLinks } from './bell/inspection.js'
 import { describeStep, stepDuration } from './bell/feedback.js'
 import { profileStore, settleRun, buyUpgrade, unlockedCrew } from './bell/descent/profile-save.js'
-import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun, readyItem, armReadied } from './bell/descent/run.js'
+import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun, readyItem, armReadied, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from './bell/descent/run.js'
 import { hubView } from './bell/descent/view.js'
 import { battleLine } from './bell/descent/battle-stage.js'
 import { descentCrew } from './bell/descent/pool.js'
@@ -134,6 +134,10 @@ export default {
       card(index) { if (!state.queue.length && chooseCard(state.journey, Number(index), () => context.random())) { closeInspection(); redraw() } },
       reroll() { if (rerollCards(state.journey, () => context.random())) redraw() },
       chest() { if (collectChest(state.journey, () => context.random())) redraw() },
+      train(id) { if (trainItem(state.journey, id, () => context.random())) redraw() },
+      peddlerBuy(index) { if (buyFromPeddler(state.journey, Number(index))) redraw() },
+      peddlerSell(id) { if (sellToPeddler(state.journey, id)) redraw() },
+      peddlerLeave() { if (leavePeddler(state.journey, () => context.random())) { closeInspection(); redraw() } },
       abandon() {
         const journey = state.journey.descent ? state.journey : state.profile.journey
         if (!journey || state.queue.length || !abandonRun(journey)) return

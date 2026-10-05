@@ -3,9 +3,9 @@
  * `node tools/descent-sim.mjs [runs] [crew] [tower ranks as JSON]`. A balance probe, not a measure of fun.
  */
 import { rules } from '../plugins/bell/rules.js'
-import { createRun, finishFloor, collectChest, chooseCard, readyEvolutions, readyItem, armReadied, chargesLeft } from '../plugins/bell/descent/run.js'
+import { createRun, finishFloor, collectChest, chooseCard, readyEvolutions, readyItem, armReadied, chargesLeft, trainItem, leavePeddler } from '../plugins/bell/descent/run.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
-import { arrange, cardChoice } from './descent-bot.mjs'
+import { arrange, cardChoice, trainChoice, shop } from './descent-bot.mjs'
 
 const runs = Number(process.argv[2] ?? 12)
 const crew = process.argv[3] ?? 'rook'
@@ -40,6 +40,8 @@ function playRun(seed) {
       finishFloor(journey, random)
     } else if (journey.phase === 'chest') collectChest(journey, random)
     else if (journey.phase === 'levelUp') chooseCard(journey, cardChoice(journey), random)
+    else if (journey.phase === 'train') trainItem(journey, trainChoice(journey), random)
+    else if (journey.phase === 'peddler') { shop(journey); leavePeddler(journey, random) }
     if (journey.descent.floor > 200) break
   }
   const run = journey.descent

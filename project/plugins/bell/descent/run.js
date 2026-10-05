@@ -3,7 +3,8 @@
  * (`battle`, `phase`, `message`) and adds `descent`, the run itself:
  * `{ crew, floor, level, embers, pendingLevels, rerolls, bonus, columns, health, items: { id: { type, level, position } },
  *    nextItem, enemy, cards, chest, bells, evolutions, settled, story, forged }`. `forged` lists the forged item types this run may offer.
- * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'dead'. Callers pass the engine's random.
+ *    coin, peddler }`. `coin` is spent at the Peddler (`peddler.js`), who visits after each boss.
+ * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'train' (a level-up's free item level), 'peddler', 'dead'. Callers pass the engine's random.
  */
 import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
@@ -12,6 +13,7 @@ import { consumableCharges } from './consumables.js'
 import { regions, enemyTraits } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
 import { towerBonus } from './tower.js'
+import { peddlerStock, buyWare, sellItem } from './peddler.js'
 
 /** A catalog stat at an item level. */
 export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)))
@@ -94,7 +96,7 @@ export function createRun(profile, crewId, random) {
   const items = Object.fromEntries(crew.kit.map(([type, position], index) => ['item-' + (index + 1), { type, level: 1 + bonus.startLevel, position: [...position] }]))
   const run = { crew: crewId, floor: 1, level: 1, embers: 0, pendingLevels: 0, rerolls: tuning.rerolls + bonus.rerolls, bonus,
     columns: Math.min(tuning.grid.maxColumns, tuning.grid.columns + bonus.columns + (crew.columns ?? 0)), health: 0,
-    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [], tomes: { vigor: 0, might: 0 },
+    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [], tomes: { vigor: 0, might: 0 }, coin: 0, peddler: null,
     forged: (profile.forged ?? []).map(record => record.id) }
   run.health = maxHealthOf(run)
   const journey = { descent: run, battle: battleFor(run), phase: 'battle', message: '' }
@@ -156,6 +158,8 @@ export function finishFloor(journey, random) {
   }
   const kind = run.enemy.kind
   run.bells += tuning.bells[kind]
+  run.coin = (run.coin ?? 0) + tuning.coin[kind]
+  if (kind === 'boss') run.peddler = { stock: peddlerStock(run, random) }
   const multiplier = { normal: 1, elite: tuning.embers.elite, boss: tuning.embers.boss }[kind]
   const gained = Math.round((tuning.embers.perFloor + tuning.embers.perFloorGrowth * run.floor) * multiplier * (1 + run.bonus.emberShare))
   run.embers += gained
@@ -165,7 +169,7 @@ export function finishFloor(journey, random) {
   run.chest = kind === 'normal' ? null : openChest(journey, kind, random)
   if (run.chest) for (const item of Object.values(run.items)) item.used = 0
   const levels = run.pendingLevels ? ` ${run.pendingLevels} level${run.pendingLevels > 1 ? 's' : ''} gained.` : ''
-  tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${tuning.bells[kind]} Bell${tuning.bells[kind] > 1 ? 's' : ''}.${levels}`)
+  tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${tuning.coin[kind]} Coin, +${tuning.bells[kind]} Bell${tuning.bells[kind] > 1 ? 's' : ''}.${levels}`)
   if (run.chest) journey.phase = 'chest'
   else afterRewards(journey, random)
   return true
@@ -211,7 +215,44 @@ export function collectChest(journey, random) {
 function afterRewards(journey, random) {
   const run = journey.descent
   if (run.pendingLevels) { journey.phase = 'levelUp'; run.cards = drawCards(run, random); return }
+  if (run.peddler) { journey.phase = 'peddler'; journey.battle = battleFor(run); tell(journey, 'A travelling Peddler sets down his pack on the stair.'); return }
   nextFloor(journey, random)
+}
+
+/** A level-up's second gift: one more level on an item the player picks. */
+export function trainItem(journey, id, random) {
+  const item = journey.descent.items[id]
+  if (journey.phase !== 'train' || !item) return false
+  item.level++
+  tell(journey, `${rules.catalog.items[item.type].name} trains to level ${item.level}.`)
+  afterRewards(journey, random)
+  return true
+}
+
+/** Buy a Peddler's ware into the reserve. */
+export function buyFromPeddler(journey, index) {
+  const ware = journey.descent.peddler?.stock[index]
+  if (journey.phase !== 'peddler' || !buyWare(journey.descent, index)) return false
+  journey.battle = battleFor(journey.descent)
+  tell(journey, `Bought ${rules.catalog.items[ware.type].name} (level ${ware.level}) for ${ware.price} Coin.`)
+  return true
+}
+
+/** Sell an owned item to the Peddler. */
+export function sellToPeddler(journey, id) {
+  const type = journey.descent.items[id]?.type
+  if (journey.phase !== 'peddler' || !sellItem(journey.descent, id)) return false
+  journey.battle = battleFor(journey.descent)
+  tell(journey, `Sold ${rules.catalog.items[type].name}.`)
+  return true
+}
+
+/** Send the Peddler on his way and go down. */
+export function leavePeddler(journey, random) {
+  if (journey.phase !== 'peddler') return false
+  journey.descent.peddler = null
+  afterRewards(journey, random)
+  return true
 }
 
 function nextFloor(journey, random) {
@@ -272,7 +313,7 @@ export function chooseCard(journey, index, random) {
   run.level++; run.pendingLevels--
   run.health = Math.min(maxHealthOf(run), run.health + tuning.recruit.healthPerLevel)
   tell(journey, `Level ${run.level}. ${cardSummary(run, card)}`)
-  afterRewards(journey, random)
+  journey.phase = 'train'
   return true
 }
 
@@ -287,7 +328,7 @@ export function rerollCards(journey, random) {
 
 /** Give up the run where it stands; it ends as a death. */
 export function abandonRun(journey) {
-  if (!['battle', 'levelUp', 'chest'].includes(journey.phase)) return false
+  if (!['battle', 'levelUp', 'train', 'chest', 'peddler'].includes(journey.phase)) return false
   keepPlaces(journey)
   journey.phase = 'dead'
   tell(journey, `${descentCrew[journey.descent.crew].name} turns back on floor ${journey.descent.floor}. The lantern goes out on the stair.`)

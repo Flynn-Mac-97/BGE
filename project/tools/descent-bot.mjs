@@ -4,10 +4,12 @@
  *
  *   arrange(journey)     places new items in their best cell, then moves items that do nothing where they are
  *   cardChoice(journey)  the index of the level-up card worth most
+ *   trainChoice(journey) the item whose free training level is worth most
+ *   shop(journey)        buys the Peddler's wares worth their price, selling gear that does nothing to make room
  */
 import { rules, itemReference } from '../plugins/bell/rules.js'
 import { evolutionRecipes } from '../plugins/bell/descent/evolutions.js'
-import { battleFor, recipeFor, maxHealthOf, completesOwned } from '../plugins/bell/descent/run.js'
+import { battleFor, recipeFor, maxHealthOf, completesOwned, buyFromPeddler, sellToPeddler } from '../plugins/bell/descent/run.js'
 import { consumablePool, poolNeeds } from '../plugins/bell/descent/pool.js'
 import { tuning } from '../plugins/bell/descent/tuning.js'
 
@@ -83,7 +85,8 @@ export function arrange(journey) {
 function battleAfter(run, card) {
   const copy = structuredClone(run)
   if (card.kind === 'level') copy.items[card.id].level++
-  if (card.kind === 'item') copy.items['trial'] = { type: card.type, level: 1, position: null }
+  if (card.kind === 'item') copy.items['trial'] = { type: card.type, level: card.level ?? 1, position: null }
+  if (card.kind === 'sell') delete copy.items[card.id]
   if (card.kind === 'tome') copy.tomes[card.id] = (copy.tomes[card.id] ?? 0) + 1
   if (card.kind === 'widen') copy.columns++
   const battle = battleFor(copy)
@@ -100,21 +103,48 @@ const SYNERGY_BONUS = 0.15
 const CONSUMABLE_WORTH = 0.08
 const VIGOR_WORTH = 0.1
 
-/** Index of the card worth most: its test-bout gain over the current gear, plus synergy. */
+/** What a card does for the run, as a share of the current test-bout score, plus synergy. */
+function cardWorth(run, base, card) {
+  if (card.kind === 'mend') return (1 - run.health / maxHealthOf(run)) * 0.5
+  if (card.kind === 'item' && consumablePool.includes(card.type)) return CONSUMABLE_WORTH
+  if (card.kind === 'tome' && card.id === 'vigor') return VIGOR_WORTH
+  let value = (layoutScore(battleAfter(run, card)) - base) / Math.max(1, Math.abs(base))
+  if (card.kind === 'item' && isSynergy(run, card.type)) value += SYNERGY_BONUS
+  const item = run.items[card.id]
+  const recipe = item && card.kind === 'level' && recipeFor(item.type)
+  if (recipe && item.level < tuning.evolveLevel && Object.values(run.items).some(other => other.type === recipe.partner)) value += SYNERGY_BONUS
+  return value
+}
+
+/** The entry of `options` worth most, by `worthOf`. */
+const best = (options, worthOf) => options.map(option => ({ option, value: worthOf(option) })).sort((first, second) => second.value - first.value)[0]
+
+/** Index of the card worth most. */
 export function cardChoice(journey) {
+  const run = journey.descent, base = layoutScore(battleFor(run))
+  return best(run.cards.map((card, index) => index), index => cardWorth(run, base, run.cards[index])).option
+}
+
+/** The item id whose training level is worth most. */
+export function trainChoice(journey) {
+  const run = journey.descent, base = layoutScore(battleFor(run))
+  return best(Object.keys(run.items), id => cardWorth(run, base, { kind: 'level', id })).option
+}
+
+// A ware is bought only when it is worth at least this share of the score per Coin it costs.
+const WORTH_PER_COIN = 0.01
+
+/** Shop until nothing more is worth its price: sell gear that adds nothing, then buy the best affordable ware. */
+export function shop(journey) {
   const run = journey.descent
-  const base = layoutScore(battleFor(run))
-  const share = score => (score - base) / Math.max(1, Math.abs(base))
-  const worth = card => {
-    if (card.kind === 'mend') return (1 - run.health / maxHealthOf(run)) * 0.5
-    if (card.kind === 'item' && consumablePool.includes(card.type)) return CONSUMABLE_WORTH
-    if (card.kind === 'tome' && card.id === 'vigor') return VIGOR_WORTH
-    let value = share(layoutScore(battleAfter(run, card)))
-    if (card.kind === 'item' && isSynergy(run, card.type)) value += SYNERGY_BONUS
-    const item = run.items[card.id]
-    const recipe = item && recipeFor(item.type)
-    if (recipe && item.level < tuning.evolveLevel && Object.values(run.items).some(other => other.type === recipe.partner)) value += SYNERGY_BONUS
-    return value
+  for (let guard = 0; guard < 12; guard++) {
+    const base = layoutScore(battleFor(run))
+    const dead = Object.keys(run.items).find(id => !isSynergy(run, run.items[id].type) && cardWorth(run, base, { kind: 'sell', id }) >= 0)
+    if (dead && Object.keys(run.items).length > 1) { sellToPeddler(journey, dead); continue }
+    const affordable = run.peddler.stock.map((ware, index) => index).filter(index => run.peddler.stock[index].price <= run.coin)
+    if (!affordable.length || Object.keys(run.items).length >= tuning.cards.maxItems) return
+    const pick = best(affordable, index => cardWorth(run, base, { kind: 'item', ...run.peddler.stock[index] }) / run.peddler.stock[index].price)
+    if (pick.value < WORTH_PER_COIN) return
+    buyFromPeddler(journey, pick.option)
   }
-  return run.cards.map((card, index) => ({ index, value: worth(card) })).sort((first, second) => second.value - first.value)[0].index
 }

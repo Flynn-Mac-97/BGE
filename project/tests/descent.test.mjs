@@ -2,11 +2,17 @@
 import { defineSuite } from '../tools/node-suite.mjs'
 import assert from 'node:assert/strict'
 import { rules } from '../plugins/bell/rules.js'
-import { createRun, finishFloor, collectChest, chooseCard, rerollCards, readyEvolutions, battleFor, levelStat, abandonRun, drawCards } from '../plugins/bell/descent/run.js'
+import { createRun, finishFloor, collectChest, chooseCard, rerollCards, readyEvolutions, battleFor, levelStat, abandonRun, drawCards, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from '../plugins/bell/descent/run.js'
 import { createProfile, profileStore, settleRun, buyUpgrade, unlockedCrew } from '../plugins/bell/descent/profile-save.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 const { test, suite } = defineSuite('The Descent')
 export default suite
+
+/** Take a level-up card, then put its free training level on the first item. */
+function takeCard(journey, index, random) {
+  chooseCard(journey, index, random)
+  trainItem(journey, Object.keys(journey.descent.items)[0], random)
+}
 
 /** Resolve cycles until the floor is decided. */
 function fightFloor(journey, random) {
@@ -37,7 +43,11 @@ test('a won floor gives Embers and Bells, and a level-up card applies once', () 
   assert.ok(chooseCard(journey, 0, random))
   assert.equal(journey.descent.level, before.level + 1)
   if (card.kind === 'level') assert.equal(journey.descent.items[card.id].level, before.items[card.id].level + 1)
-  assert.equal(chooseCard(journey, 0, random), journey.phase === 'levelUp')
+  assert.equal(journey.phase, 'train')
+  const trained = Object.keys(journey.descent.items).at(-1), levelBefore = journey.descent.items[trained].level
+  assert.ok(trainItem(journey, trained, random))
+  assert.equal(journey.descent.items[trained].level, levelBefore + 1)
+  assert.notEqual(journey.phase, 'train')
 })
 
 test('rerolls are limited and new item cards never repeat an owned type', () => {
@@ -78,7 +88,7 @@ test('a death banks Bells and best floor once, and the profile survives a save',
   const random = seededRandom(9)
   const journey = createRun(profile, 'rook', random)
   fightFloor(journey, random)
-  while (journey.phase === 'levelUp') chooseCard(journey, 0, random)
+  while (journey.phase === 'levelUp') takeCard(journey, 0, random)
   assert.ok(abandonRun(journey))
   assert.equal(settleRun(profile, journey), journey.descent.bells)
   assert.equal(settleRun(profile, journey), 0)
@@ -101,7 +111,8 @@ test('a seeded bot run reaches the first elite and every floor stays decidable',
   for (let guard = 0; guard < 2000 && journey.phase !== 'dead' && journey.descent.floor <= 6; guard++) {
     if (journey.phase === 'battle') fightFloor(journey, random)
     else if (journey.phase === 'chest') collectChest(journey, random)
-    else chooseCard(journey, 0, random)
+    else if (journey.phase === 'peddler') leavePeddler(journey, random)
+    else takeCard(journey, 0, random)
   }
   assert.ok(journey.descent.floor > 5, journey.message)
 })
@@ -201,7 +212,7 @@ test('a banked run goes into the play log with its build and each floor fought',
   const random = seededRandom(9)
   const journey = createRun(profile, 'rook', random)
   fightFloor(journey, random)
-  while (journey.phase === 'levelUp') chooseCard(journey, 0, random)
+  while (journey.phase === 'levelUp') takeCard(journey, 0, random)
   abandonRun(journey)
   settleRun(profile, journey)
   assert.equal(profile.history.length, 1)
@@ -304,4 +315,33 @@ test('a new item that completes something owned is offered more often than one t
     for (const card of drawCards(journey.descent, seededRandom(seed))) if (card.type in offers) offers[card.type]++
   }
   assert.ok(offers.reapingSeal > offers.salt * 2, JSON.stringify(offers))
+})
+
+test('the Peddler visits after a boss with one ware per family, and buying and selling move Coin', () => {
+  const random = seededRandom(4)
+  const journey = createRun(createProfile(), 'rook', random)
+  const run = journey.descent
+  run.floor = 10; run.coin = 20
+  run.enemy = { ...run.enemy, kind: 'boss' }
+  journey.battle.actors.enemy.health = 0
+  finishFloor(journey, random)
+  while (journey.phase !== 'peddler') {
+    if (journey.phase === 'chest') collectChest(journey, random)
+    else takeCard(journey, 0, random)
+  }
+  assert.equal(run.coin, 20 + 8)
+  const kinds = run.peddler.stock.map(ware => ware.kind)
+  assert.equal(kinds.filter(kind => kind === 'family').length, 5)
+  assert.ok(kinds.includes('evolved'))
+  const ware = run.peddler.stock[0], owned = Object.keys(run.items).length
+  assert.ok(buyFromPeddler(journey, 0))
+  assert.equal(run.coin, 28 - ware.price)
+  assert.equal(Object.keys(run.items).length, owned + 1)
+  assert.equal(Object.values(run.items).at(-1).level, 3)
+  const sold = Object.keys(run.items)[0], price = 2 + run.items[sold].level
+  assert.ok(sellToPeddler(journey, sold))
+  assert.equal(run.coin, 28 - ware.price + price)
+  assert.ok(leavePeddler(journey, random))
+  assert.equal(journey.phase, 'battle')
+  assert.equal(run.floor, 11)
 })
