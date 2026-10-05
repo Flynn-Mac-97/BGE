@@ -19,7 +19,7 @@ export const tuning = {
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
   // Bells for a won floor: base × growth^(floor − 1), plus record × floor on a floor deeper than your best (see bellsFor).
-  bells: { normal: 1, elite: 3, boss: 10, growth: 1.09, record: 1 },
+  bells: { normal: 1, elite: 3, boss: 10, growth: 1.1, record: 1 },
   // Item mastery: level L needs step × L × (L + 1) / 2 floors won with the item on the grid; each level adds share to its numbers.
   mastery: { step: 10, share: 0.05 },
   // Coin for a floor, spent only at the Peddler, who visits after each boss.

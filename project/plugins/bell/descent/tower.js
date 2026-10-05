@@ -4,10 +4,10 @@
  * rank r costs baseCost × costGrowth^r, without end, so every run's Bells buy something.
  */
 export const towerUpgrades = {
-  vigor: { name: 'Vigor', text: '+4% max health', baseCost: 5, costGrowth: 1.35, bonus: { maxHealthShare: 0.04 } },
-  might: { name: 'Might', text: '+3% to every item number', baseCost: 10, costGrowth: 1.4, bonus: { itemShare: 0.03 } },
-  kindling: { name: 'Kindling', text: '+6% Embers', baseCost: 8, costGrowth: 1.35, bonus: { emberShare: 0.06 } },
-  fortune: { name: 'Fortune', text: '+8% Coin', baseCost: 6, costGrowth: 1.3, bonus: { coinShare: 0.08 } },
+  vigor: { name: 'Vigor', text: '+6% max health', baseCost: 5, costGrowth: 1.12, bonus: { maxHealthShare: 0.06 } },
+  might: { name: 'Might', text: '+4.5% to every item number', baseCost: 10, costGrowth: 1.12, bonus: { itemShare: 0.045 } },
+  kindling: { name: 'Kindling', text: '+9% Embers', baseCost: 8, costGrowth: 1.12, bonus: { emberShare: 0.09 } },
+  fortune: { name: 'Fortune', text: '+12% Coin', baseCost: 6, costGrowth: 1.12, bonus: { coinShare: 0.12 } },
   lanternOil: { name: 'Lantern Oil', text: '+10% health recovered after each floor', cost: [10, 25, 50], bonus: { recoverShare: 0.1 } },
   secondLook: { name: 'Second Look', text: '+1 reroll each run', cost: [10, 25, 50], bonus: { rerolls: 1 } },
   heirloom: { name: 'Heirloom', text: 'Starting items begin one level higher', cost: [30, 90], bonus: { startLevel: 1 } },

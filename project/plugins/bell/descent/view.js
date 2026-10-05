@@ -135,7 +135,7 @@ const overlays = {
   },
   dead: (kit, journey, state) => {
     const run = journey.descent
-    return `<div class="menu-shade"><section class="loot-sheet"><h2>THE LANTERN GOES OUT</h2><p>${escape(journey.message)}</p><ul class="run-summary"><li>Floor reached · ${run.floor}</li><li>Level · ${run.level}</li><li>Evolutions · ${run.evolutions}</li><li>Bells earned · ${run.bells}</li><li>Deepest floor · ${state.profile.bestFloor}</li></ul>${kit.button('Return to the Lantern', { action: 'lantern' })}</section></div>`
+    return `<div class="menu-shade"><section class="loot-sheet"><h2>THE LANTERN GOES OUT</h2><p>${escape(journey.message)}</p><ul class="run-summary"><li>Floor reached · ${run.floor}</li><li>Level · ${run.level}</li><li>Evolutions · ${run.evolutions}</li><li>Bells earned · ${run.bells}${run.floor > (run.bestBefore ?? 0) ? ' · NEW RECORD' : ''}</li><li>Deepest floor · ${state.profile.bestFloor}</li>${Object.keys(run.masteryGain ?? {}).length ? `<li>Mastery · ${Object.entries(run.masteryGain).map(([type, xp]) => `${escape(itemName(type))} +${xp}`).join(', ')}</li>` : ''}</ul><p><small>Spend Bells at the Bell Tower; mastery stays with each item for every run.</small></p>${kit.button('Return to the Lantern', { action: 'lantern' })}</section></div>`
   }
 }
 

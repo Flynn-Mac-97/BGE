@@ -19,7 +19,7 @@ its evolved form. Enemies grow every floor, without end.
 | Every boss | The travelling Peddler visits. Spend Coin on wares from every family and one evolved item; sell what you no longer need. | You steer the build: buy the piece you are missing. |
 | About five minutes | Every 5th floor is an elite, and every 10th a boss. Both drop a chest. A chest evolves an eligible item, or gives free level-ups. | A goal you can see coming and plan the grid for. |
 | A run | Depth is the score. New crew unlock at depth 10, 15 and 25. | "One more floor." |
-| Between runs | Bells buy Bell Tower ranks: more health, more Embers, rerolls, a fourth card, higher starting levels, a wider back. | Each death still moves you forward. |
+| Between runs | Bells buy Bell Tower ranks, and every item you used gains mastery. Vigor, Might, Kindling and Fortune never cap. | You hit a wall, prestige, and break it next time. |
 
 ## Rules
 
@@ -91,6 +91,22 @@ than they did, and new items fall off more slowly as the run owns more. Before
 this, about 70% of all cards offered were level cards and a run saw about 10
 of the 21 new items; now under half are level cards and a run sees about 14.
 
+## Prestige: Bells, the endless Tower and mastery
+
+Bells for a won floor grow with depth (`bells.growth` per floor), and a floor
+deeper than your best pays a record bonus of `bells.record` × floor, so
+pushing your wall is the best farm. Vigor (+6% max health), Might (+4.5% to
+every item number), Kindling (+9% Embers) and Fortune (+12% Coin) are endless:
+rank r costs baseCost × 1.12^r. The unlock upgrades keep their caps. Item
+mastery (`descent/mastery.js`): each floor won with an item on the grid gives
+that item type 1 xp; level L needs 10 × L × (L + 1) / 2 xp; each level adds 5%
+to the item's numbers in every run, shown as ✦ on the grid badge.
+
+`node tools/descent-prestige.mjs [runs] [crew]` plays runs in a row on one
+profile, spending Bells on the cheapest rank after each. Rook: 20, 26, 28, 30,
+30, 32, 35, 35, 40, 38, 40, then about 40. Nettle: 11, 22, 30, 38, then 30–40.
+The floor 40 boss is the wall after about ten runs.
+
 ## Training and the Peddler
 
 Every level-up has two steps: choose one of the cards, then train one owned
@@ -113,7 +129,8 @@ prices, buying and selling.
 | `plugins/bell/descent/pool.js` | Which items can drop, and the starting crew and their kits. |
 | `plugins/bell/descent/enemies.js` | Enemy bands by depth, with their lines of narration. |
 | `plugins/bell/descent/evolutions.js` | Recipes and the evolved items. |
-| `plugins/bell/descent/tower.js` | Bell Tower upgrades, their ranks and costs. |
+| `plugins/bell/descent/tower.js` | Bell Tower upgrades: capped ranks and endless ones, and their costs. |
+| `plugins/bell/descent/mastery.js` | Item mastery: xp per floor, levels and their bonus. |
 | `plugins/bell/descent/run.js` | The run: floors, Embers, cards, training, chests, evolution, the Peddler's visit, death. Plain records in and out. |
 | `plugins/bell/descent/peddler.js` | The Peddler's stock, prices, buying and selling. |
 | `plugins/bell/descent/profile-save.js` | The saved profile: Bells, best depth, tower ranks, the active run. |
