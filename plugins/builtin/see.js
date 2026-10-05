@@ -138,10 +138,11 @@ export default {
     {
       id: 'see.gif',
       label: 'Record part of the editor as a GIF',
-      // args: {"panel":"kimodo","seconds":3} or {"selector":"#viewport"}, and fps, width, name; writes agent-runs/see/<name>.gif
+      // args: {"panel":"kimodo","seconds":3} or {"selector":"#viewport"}, and fps, width, name, lane; writes agent-runs/see/<name>.gif
       inputSchema: {
         type: 'object',
         properties: {
+          lane: { type: 'string' },
           panel: { type: 'string' },
           selector: { type: 'string' },
           seconds: { type: 'number', minimum: 0.5, maximum: 20 },

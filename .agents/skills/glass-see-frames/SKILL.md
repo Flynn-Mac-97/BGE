@@ -40,7 +40,8 @@ node bin/engine.mjs --headless run see.gif '{"panel":"kimodo","seconds":4,"name"
   selector; with neither it records the game view (`#viewport`).
 - `seconds` (3), `fps` (12), `width` (480 pixels at most). A frame's delay is
   the time it really showed, so the GIF plays at the right speed.
-- It needs the editor window the supervisor opened (`supervisor.open
+- `lane` records a lane browser instead; see `from-a-terminal.md`.
+- Without `lane` it needs the editor window the supervisor opened (`supervisor.open
   editor-browser`); it reaches it through that window's debugging port. The
   panel must be open. The recorder is `see/gif-recording.mjs`.
 

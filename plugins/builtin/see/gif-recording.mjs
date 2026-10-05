@@ -6,6 +6,7 @@
  *
  *   recordGif(checkout, { panel: 'kimodo', seconds: 3 })   the canvas in one panel
  *   recordGif(checkout, { selector: '#viewport' })          any element; the game view when neither is given
+ *   recordGif(checkout, { lane: 'sight', selector: 'main' }) a lane browser's page instead of the editor window
  *
  * `seconds` (3), `fps` (12) and `width` (480 pixels at most) set the length,
  * the frames a second asked for and the size. `play` runs one page command
@@ -16,6 +17,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { readSupervisorRecord } from '../../../engine/supervisor-transport.mjs'
+import { readLaneBrowsers } from '../../../engine/lane-browsers.mjs'
 import { decodePng } from '../art-direction/image.js'
 import { encodeGif } from './gif-encoding.js'
 
@@ -34,6 +36,25 @@ async function editorPage(checkout) {
   const origin = new URL(browser.url).origin
   const page = (await localJson(browser.port, '/json/list')).find(one => one.type === 'page' && one.url.startsWith(origin))
   if (!page) throw new Error(`the editor window has no page on ${origin}`)
+  return page
+}
+
+/**
+ * The recorded browser for a lane name, from `lanes`' records. A container has
+ * no display for the editor window, so a lane is the only page there is.
+ */
+export function laneBrowserOf(browsers, lane) {
+  const browser = browsers.find(one => one.client === lane)
+  if (!browser) throw new Error(`no lane browser named ${lane}: node bin/engine.mjs lanes.start ${lane}`)
+  return browser
+}
+
+/** The page of one lane browser, as its debugging port lists it. */
+async function lanePage(checkout, lane) {
+  const browser = laneBrowserOf(readLaneBrowsers(checkout), lane)
+  const origin = new URL(browser.url).origin
+  const page = (await localJson(browser.port, '/json/list')).find(one => one.type === 'page' && one.url.startsWith(origin))
+  if (!page) throw new Error(`lane ${lane} has no page on ${origin}`)
   return page
 }
 
@@ -114,7 +135,7 @@ async function framesOf(session, area, settings) {
  */
 export async function recordGif(checkout, options = {}) {
   const settings = { ...DEFAULTS, ...options }
-  const session = sessionOn(await editorPage(checkout))
+  const session = sessionOn(await (settings.lane ? lanePage(checkout, settings.lane) : editorPage(checkout)))
   try {
     if (settings.play) await playOn(session, settings.play)
     const frames = await framesOf(session, await areaOf(session, selectorOf(settings)), settings)
