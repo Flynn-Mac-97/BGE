@@ -21,7 +21,7 @@ function validateTarget(selector, path) {
 function validateAmount(amount, path) {
   if (typeof amount === 'number' && Number.isFinite(amount)) return
   if (dictionary(amount) && (amount.previous === true || amount.eventAmount === true) && Object.keys(amount).every(key => ['previous', 'eventAmount', 'scale'].includes(key)) && !(amount.previous && amount.eventAmount) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
-  if (dictionary(amount) && Number.isInteger(amount.roll) && amount.roll > 1 && Object.keys(amount).every(key => ['roll', 'scale'].includes(key)) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale > 0))) return
+  if (dictionary(amount) && Number.isInteger(amount.roll) && amount.roll > 1 && Object.keys(amount).every(key => ['roll', 'scale', 'scaleStat'].includes(key)) && (amount.scaleStat === undefined || typeof amount.scaleStat === 'string') && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale > 0))) return
   if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.grantorStat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
   const scaled = ['stat', 'resource', 'targetStat'].find(key => typeof amount?.[key] === 'string')
   if (dictionary(amount) && scaled && Object.keys(amount).every(key => [scaled, 'scale'].includes(key)) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return

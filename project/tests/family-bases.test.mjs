@@ -91,7 +91,7 @@ test('Antler Charm gives its touching items potency, and the gift grows every cy
     items: [{ id: 'mortar', type: 'blightMortar', owner: 'recruit', position: [0, 0] }, { id: 'charm', type: 'antlerCharm', owner: 'recruit', position: [1, 0] }] })
   const before = rules.stat(battle, { kind: 'item', id: 'mortar' }, 'potency')
   const after = rules.stat(rules.resolveCycle(rules.resolveCycle(battle).state).state, { kind: 'item', id: 'mortar' }, 'potency')
-  assert.equal(before, 2)
+  assert.equal(before, 3, 'Blight Mortar 2 + Antler Charm 1')
   assert.ok(after > before, `${before} → ${after}`)
 })
 
@@ -100,7 +100,7 @@ test('Travel Satchel gives the items inside it +2 potency', () => {
   rules.addItem(battle, 'satchel', 'travelSatchel', 'recruit'); rules.addItem(battle, 'mortar', 'blightMortar', 'recruit')
   assert.ok(rules.place(battle, 'satchel', [4, 0]))
   assert.ok(rules.place(battle, 'mortar', [4, 1]))
-  assert.equal(rules.stat(battle, { kind: 'item', id: 'mortar' }, 'potency'), 3)
+  assert.equal(rules.stat(battle, { kind: 'item', id: 'mortar' }, 'potency'), 4, 'Blight Mortar 2 + Satchel 2')
 })
 
 test('dice replay the same for one seed and change with the seed', () => {
@@ -114,4 +114,11 @@ test('Bone Club hurting you does not make Thorn Totem or Sapwood Staff poison or
   const { state } = testFight({ kit: [['woodenClub', right], ['thornTotem', [3, 0]], ['sapwoodStaff', [4, 0]]] })
   for (const item of Object.values(state.items)) assert.deepEqual(Object.keys(item.statuses).filter(id => ['poison', 'sapped'].includes(id)), [], item.type)
   assert.ok(state.actors.enemy.statuses.poison, 'the enemy still gets poisoned when it hits you')
+})
+
+test('a die with scaleStat is multiplied by the item stat: a level-1 Grave Shovel (potency 3) digs 3 to 18', () => {
+  const { trace } = testFight({ kit: [['handShovel', right]] })
+  const digs = trace.filter(step => step.kind === 'ability' && step.source?.id === 'handShovel').flatMap(step => step.effects.map(effect => effect.amount))
+  assert.ok(digs.length > 0)
+  for (const amount of digs) assert.ok(amount >= 3 && amount <= 18 && amount % 3 === 0, String(amount))
 })

@@ -24,7 +24,8 @@ export function amountOf(frame, expression, subject = frame.source, target = nul
   if (expression.previous) return (frame.previousAmount ?? 0) * (expression.scale ?? 1)
   if (expression.eventAmount) return (frame.event?.amount ?? 0) * (expression.scale ?? 1)
   if (expression.stacks) return frame.status?.stacks ?? 0
-  if (expression.roll) return rollDie(frame.state, expression.roll) * (expression.scale ?? 1)
+  // `scaleStat` multiplies the die by a stat of the item rolling it, so a die grows with the item's level.
+  if (expression.roll) return rollDie(frame.state, expression.roll) * (expression.scale ?? 1) * (expression.scaleStat ? statOf(frame.state, frame.catalog, subject, expression.scaleStat) : 1)
   if (expression.targetStat) return target ? Math.floor(statOf(frame.state, frame.catalog, target, expression.targetStat) * (expression.scale ?? 1)) : 0
   if (expression.stat && expression.scale !== undefined) return Math.floor(statOf(frame.state, frame.catalog, subject, expression.stat) * expression.scale)
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)

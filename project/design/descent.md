@@ -45,8 +45,9 @@ The kind multipliers aim for a curve, not walls: normal floors cost about
 15% of health, elites about 30%, bosses about 60%, and bosses cause a little
 over half of all deaths. The numbers are set against the test-bout bot
 (`tools/descent-bot.mjs`), which plays well, so a person who plans less goes
-less deep. Measured with 40 runs per crew, with training and the Peddler: median floor
-20 for every crew; normal floors cost 10–12%, elites 25–38%, bosses 46–56%;
+less deep. After the Build Lab pass, elites and bosses were eased (elite ×1.2 health,
+×0.8 damage; boss ×1.45, ×1): median floor 18–22 by crew. Before it, with
+training and the Peddler: median floor 20 for every crew; normal floors cost 10–12%, elites 25–38%, bosses 46–56%;
 bosses cause 87 of 160 deaths; about one evolution per run.
 
 From level 3, an item that can evolve shows ⇄ on its badge, and the list under
@@ -113,6 +114,37 @@ moving a piece off the grid turns its power off. The list beside the grid shows
 each family's count. Pip starts with Scholarship pieces and Moss with
 Scavenging ones, so not every run starts in Combat or Growth. With the bot, 139
 of 180 final builds reach a family power, across all five families.
+
+## Build Lab: which builds are strongest, and why
+
+`node tools/build-lab.mjs run [evaluations]` searches for the strongest builds
+and writes `agent-runs/build-lab/report.md`; `report` rebuilds the report from
+the last run. A build is 7 base items at level 8, laid out by the test-bout bot.
+It fights a gauntlet (a plain foe, one foe per threat, a three-threat boss),
+climbing floors 14–44 against each until it loses; its score is the mean depth.
+Six searches run in parallel: one open, and one per family (at least 3 of it),
+each a hill climb from four random starts. The report holds:
+
+- the best build per search and its share of the overall best (viability);
+- a threat matrix: each best build's depth against each foe;
+- removal tests: what each best build loses without each item;
+- pair synergy over every build tried: the mean score with both items, minus
+  what each brings alone, over the mean with neither;
+- item use in the top tenth of builds, and the items least used;
+- balance metrics with targets: weakest family at least 90% of the best, no
+  item in more than 40% of top builds, the hardest threat at 75–90% of plain.
+
+Tuning passes with it: Throwing Knife opens with one throw and is 1×2;
+Tower Shield and Penitent Chains give less guard; Iron Sword hits for 4;
+Honeycomb stores a fixed 2 Honey; dice can grow with an item stat
+(`{roll, scaleStat}`), so Lucky Purse, Lockpicks, Grave Shovel and Lucky Quiver
+keep up with depth; Heavy Blow lands every 2nd cycle; Purifier cleans on its
+turn, before statuses tick; Plated, Purifier and Regrowth hit harder and
+Spiked softer; under-used Hunger, poison and support pieces were raised.
+After them: every family's best is 93% or more of the best; the most-used item
+(Flail) is in 46% of top builds; the hardest threat sits at 90% of plain; and
+each family's best build has a different weak spot (Growth and Hunger to Heavy
+Blow, Scholarship to Swarm, Regrowth and Spiked, Combat to Heavy Blow).
 
 ## Prestige: Bells, the endless Tower and mastery
 

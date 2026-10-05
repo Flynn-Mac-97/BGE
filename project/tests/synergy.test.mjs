@@ -28,16 +28,16 @@ const abilitySteps = (trace, id) => trace.filter(step => step.kind === 'ability'
 const total = (trace, id) => abilitySteps(trace, id).flatMap(step => step.effects).reduce((sum, effect) => sum + effect.amount, 0)
 const poisonFor = stacks => ({ poison: { stacks, duration: 'combat', expires: null, source: null } })
 
-test('Heavy Blow lands only on every 3rd cycle', () => {
+test('Heavy Blow lands only on every 2nd cycle', () => {
   const { trace } = fight({ traits: ['heavyBlow'], cycles: 6 })
-  assert.equal(abilitySteps(trace, 'heavyBlow').length, 2)
+  assert.equal(abilitySteps(trace, 'heavyBlow').length, 3)
 })
 
 test('Plated grows a thick guard each cycle', () => {
   assert.ok(total(fight({ traits: ['plated'] }).trace, 'plating') >= 12)
 })
 
-test('Purifier washes Poison off itself', () => {
+test('Purifier washes Poison off itself on its turn, before the poison ticks', () => {
   const { trace } = fight({ traits: ['purifier'], foeStatuses: poisonFor(10) })
   assert.ok(total(trace, 'purify') >= 4)
 })

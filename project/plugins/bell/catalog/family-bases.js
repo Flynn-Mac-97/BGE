@@ -28,13 +28,14 @@ export const familyBaseAbilities = {
   cleave: { trigger: { event: 'ownTurn' }, target: enemy, conditions: [{ kind: 'cycleEvery', amount: 2 }], effects: [{ type: 'damage', amount: { stat: 'damage' }, bypassGuard: true }] },
   hookAndBrace: { trigger: { event: 'ownTurn' }, target: enemy, effects: [{ type: 'removeGuard', amount: { stat: 'potency' } }, { type: 'guard', amount: { previous: true }, target: owner }, { type: 'damage', amount: { stat: 'damage' } }] },
   flurry: { trigger: { event: 'ownTurn' }, target: enemy, effects: [{ type: 'damage', amount: { stat: 'damage' } }, { type: 'damage', amount: { stat: 'damage' } }, { type: 'damage', amount: { stat: 'damage' } }] },
-  openingThrow: { trigger: { event: 'combatStart' }, target: enemy, effects: [{ type: 'damage', amount: { stat: 'damage' } }, { type: 'damage', amount: { stat: 'damage' } }] },
+  openingThrow: { trigger: { event: 'combatStart' }, target: enemy, effects: [{ type: 'damage', amount: { stat: 'damage' } }] },
   shieldBash: { trigger: whenHit, target: { kind: 'directionalNeighbour', direction: 'right', tags: ['weapon'], ownerOnly: true }, effects: [{ type: 'triggerItem' }], limit: { perCycle: 1 } },
   gainGrit: { trigger: whenHit, target: owner, effects: [{ type: 'applyStatus', status: 'grit', amount: { stat: 'potency' } }] },
   grip: { trigger: { event: 'damageDealt', source: { kind: 'directionalNeighbour', direction: 'right', tags: ['weapon'], ownerOnly: true } }, target: { kind: 'eventSource' }, effects: [{ type: 'modifyStat', stat: 'damage', amount: { stat: 'potency' } }], limit: { perCycle: 1 } },
   // Growth
   antlerGrowth: { trigger: { event: 'cycleStart' }, target: selfItem, effects: [{ type: 'modifyStat', stat: 'potency', amount: 1 }] },
-  storeHoney: { trigger: { event: 'cycleEnd' }, target: owner, effects: [{ type: 'resource', resource: 'honey', amount: { stat: 'potency' } }] },
+  // Honey is stored at a fixed 2 a cycle, so its 6-Honey cost keeps the meal every third cycle at any level; the heal grows.
+  storeHoney: { trigger: { event: 'cycleEnd' }, target: owner, effects: [{ type: 'resource', resource: 'honey', amount: 2 }] },
   eatHoney: { trigger: { event: 'ownTurn' }, target: owner, conditions: [{ kind: 'healthBelow', ratio: 0.5 }], costs: [{ target: owner, resource: 'honey', amount: 6 }], effects: [{ type: 'heal', amount: { stat: 'heal' } }] },
   rebirth: { trigger: { event: 'cycleStart' }, target: owner, conditions: [{ kind: 'healthBelow', ratio: 0.3 }], effects: [{ type: 'heal', amount: { stat: 'heal' } }], limit: { perCombat: 1 } },
   breakBread: { trigger: { event: 'combatStart' }, target: owner, effects: [{ type: 'applyStatus', status: 'regeneration', amount: { stat: 'potency' } }] },
@@ -62,13 +63,13 @@ export const familyBaseAbilities = {
   noose: { trigger: { event: 'statusApplied', status: 'curse', target: enemy }, target: { kind: 'eventTarget' }, effects: [{ type: 'applyStatus', status: 'curse', amount: { stat: 'potency' } }], limit: { perCycle: 1 } },
   desperation: { trigger: { event: 'cycleStart' }, target: touchingWeapons, conditions: [{ kind: 'healthBelow', ratio: 0.5, subject: 'owner' }], effects: [{ type: 'modifyStat', stat: 'damage', amount: { stat: 'potency' }, duration: 'cycle' }] },
   // Scavenging
-  luckyRoll: { trigger: { event: 'cycleStart' }, target: touching, effects: [{ type: 'modifyStat', stat: 'damage', amount: { roll: 6 }, duration: 'cycle' }, { type: 'modifyStat', stat: 'potency', amount: { roll: 6 }, duration: 'cycle' }] },
+  luckyRoll: { trigger: { event: 'cycleStart' }, target: touching, effects: [{ type: 'modifyStat', stat: 'damage', amount: { roll: 6, scaleStat: 'potency' }, duration: 'cycle' }, { type: 'modifyStat', stat: 'potency', amount: { roll: 6 }, duration: 'cycle' }] },
   gamblersChest: { trigger: { event: 'cycleStart' }, target: owner, effects: [{ type: 'resource', resource: 'salvage', amount: { roll: 6 } }] },
-  pickLock: { trigger: { event: 'ownTurn' }, target: enemy, costs: [{ target: owner, resource: 'salvage', amount: 1 }], effects: [{ type: 'removeGuard', amount: { roll: 6 } }] },
+  pickLock: { trigger: { event: 'ownTurn' }, target: enemy, costs: [{ target: owner, resource: 'salvage', amount: 1 }], effects: [{ type: 'removeGuard', amount: { roll: 6, scaleStat: 'potency' } }] },
   prospect: { trigger: { event: 'ownTurn' }, target: enemy, effects: [{ type: 'damage', amount: { stat: 'damage' } }, { type: 'resource', resource: 'salvage', amount: 1, target: owner }] },
-  digDeep: { trigger: { event: 'ownTurn' }, target: enemy, costs: [{ target: owner, resource: 'salvage', amount: 3 }], effects: [{ type: 'damage', amount: { roll: 6, scale: 3 } }] },
+  digDeep: { trigger: { event: 'ownTurn' }, target: enemy, costs: [{ target: owner, resource: 'salvage', amount: 3 }], effects: [{ type: 'damage', amount: { roll: 6, scaleStat: 'potency' } }] },
   tailor: { trigger: { event: 'cycleEnd' }, target: touchingWeapons, costs: [{ target: owner, resource: 'salvage', amount: 4 }], effects: [{ type: 'modifyStat', stat: 'damage', amount: { stat: 'potency' } }] },
-  looseArrow: { trigger: { event: 'damageDealt', source: touchingWeapons }, target: enemy, effects: [{ type: 'damage', amount: { roll: 4 } }], limit: { perCycle: 2 } }
+  looseArrow: { trigger: { event: 'damageDealt', source: touchingWeapons }, target: enemy, effects: [{ type: 'damage', amount: { roll: 4, scaleStat: 'potency' } }], limit: { perCycle: 1 } }
 }
 
 const item = (name, family, kind, footprint, stats, abilities, description, extra = {}) => ({ name, mark: name[0], footprint, tags: [kind, family].filter(Boolean), stats, abilities, description, ...extra })
@@ -79,13 +80,13 @@ export const familyBaseItems = {
   battleAxe: item('Battle Axe', 'combat', 'weapon', [1, 2], { damage: 7 }, ['cleave'], 'Every 2nd cycle, cleave for its damage straight through guard.'),
   halberd: item('Halberd', 'combat', 'weapon', [1, 3], { damage: 4, potency: 3 }, ['hookAndBrace'], 'Hook away up to 3 of the foe’s guard, keep it as your own, then strike.'),
   flail: item('Flail', 'combat', 'weapon', [1, 2], { damage: 1 }, ['flurry'], 'Strike three times. Every bonus to its damage counts three times.'),
-  throwingKnife: item('Throwing Knife', 'combat', 'weapon', [1, 1], { damage: 3 }, ['openingThrow', 'strike'], 'Throw twice when the fight starts, then strike each turn.'),
-  towerShield: item('Tower Shield', 'combat', 'armour', [1, 2], { guard: 4 }, ['protect', 'shieldBash'], 'Gain 4 guard each turn. When you are hit, the weapon to its right strikes back. Once per cycle.'),
+  throwingKnife: item('Throwing Knife', 'combat', 'weapon', [1, 2], { damage: 2 }, ['openingThrow', 'strike'], 'Throw once when the fight starts, then strike each turn.'),
+  towerShield: item('Tower Shield', 'combat', 'armour', [1, 2], { guard: 3 }, ['protect', 'shieldBash'], 'Gain 3 guard each turn. When you are hit, the weapon to its right strikes back. Once per cycle.'),
   ironHelm: item('Iron Helm', 'combat', 'armour', [1, 1], { potency: 1 }, ['gainGrit'], 'Each time you are hit, gain 1 Grit. Every cycle starts with guard equal to your Grit. Stacks all fight.'),
-  plateGlove: item('Plate Glove', 'combat', 'tool', [1, 1], { potency: 1 }, ['grip'], 'When the weapon to its right hits, that weapon gains +1 damage for the rest of the fight. Once per cycle.'),
+  plateGlove: item('Plate Glove', 'combat', 'tool', [1, 1], { potency: 2 }, ['grip'], 'When the weapon to its right hits, that weapon gains +2 damage for the rest of the fight. Once per cycle.'),
   // Growth: healing that grows, and thorns.
   antlerCharm: item('Antler Charm', 'growth', 'relic', [1, 1], { potency: 1 }, ['antlerGrowth'], 'Touching items have +potency. Its potency grows by 1 every cycle.', { auras: [{ target: touching, stat: 'potency', amount: { stat: 'potency' } }] }),
-  honeycomb: item('Honeycomb', 'growth', 'herb', [1, 1], { potency: 2, heal: 8 }, ['storeHoney', 'eatHoney'], 'Store 2 Honey at each cycle end. Below half health, eat 6 Honey to heal 8.'),
+  honeycomb: item('Honeycomb', 'growth', 'herb', [1, 1], { heal: 8 }, ['storeHoney', 'eatHoney'], 'Store 2 Honey at each cycle end. Below half health, eat 6 Honey to heal 8.'),
   feather: item('Phoenix Feather', 'growth', 'relic', [1, 1], { heal: 12 }, ['rebirth'], 'Once per fight, when a cycle starts with you below 30% health, heal 12.'),
   breadLoaf: item('Bread Loaf', 'growth', 'herb', [1, 1], { potency: 3 }, ['breakBread'], 'When the fight starts, gain 3 Regeneration.'),
   waterSkin: item('Water Skin', 'growth', 'herb', [1, 1], { potency: 3 }, ['quench'], 'Each turn, wash out up to 3 Poison and heal as much as it washed out.'),
@@ -107,16 +108,16 @@ export const familyBaseItems = {
   woodenClub: item('Bone Club', 'hunger', 'weapon', [1, 2], { damage: 5 }, ['bloodPrice'], 'Strike hard, and hurt yourself for 1. The wound sets off everything that wakes when you are hit.'),
   sling: item('Spite Sling', 'hunger', 'weapon', [1, 1], { damage: 3 }, ['spite'], 'Each time you are hit, sling 3 damage back. Twice per cycle.'),
   leatherCap: item('Blood-Rage Cap', 'hunger', 'armour', [1, 1], { potency: 1 }, ['rage'], 'Each time you are hit, touching weapons gain 1 Rage: +1 damage for the rest of the fight.'),
-  chainShirt: item('Penitent Chains', 'hunger', 'armour', [1, 2], { guard: 3 }, ['protect', 'penance'], 'Gain 3 guard each turn. Each time you are hit, curse the foe with 1 Curse.'),
-  ropeCoil: item('Hangman’s Rope', 'hunger', 'relic', [1, 1], { potency: 1 }, ['noose'], 'Whenever the foe gains Curse, add 1 more. Once per cycle.'),
-  ironBoots: item('Bloodied Boots', 'hunger', 'armour', [1, 1], { potency: 3 }, ['desperation'], 'While you are below half health, touching weapons have +3 damage each cycle.'),
+  chainShirt: item('Penitent Chains', 'hunger', 'armour', [1, 2], { guard: 2 }, ['protect', 'penance'], 'Gain 2 guard each turn. Each time you are hit, curse the foe with 1 Curse.'),
+  ropeCoil: item('Hangman’s Rope', 'hunger', 'relic', [1, 1], { potency: 2 }, ['noose'], 'Whenever the foe gains Curse, add 2 more. Once per cycle.'),
+  ironBoots: item('Bloodied Boots', 'hunger', 'armour', [1, 1], { potency: 5 }, ['desperation'], 'While you are below half health, touching weapons have +5 damage each cycle.'),
   // Scavenging: luck, loot and Salvage.
-  coinPurse: item('Lucky Purse', 'scavenging', 'relic', [1, 1], {}, ['luckyRoll'], 'At each cycle start, every touching item rolls a die: +1 to +6 damage and +1 to +6 potency for the cycle.'),
+  coinPurse: item('Lucky Purse', 'scavenging', 'relic', [1, 1], { potency: 1 }, ['luckyRoll'], 'At each cycle start, every touching item rolls a die: +1 to +6 damage (times the Purse’s potency) and +1 to +6 potency for the cycle.'),
   woodenChest: item('Gambler’s Chest', 'scavenging', 'tool', [1, 1], {}, ['gamblersChest'], 'At each cycle start, roll a die and gain that much Salvage.'),
-  lockpicks: item('Lockpicks', 'scavenging', 'tool', [1, 1], {}, ['pickLock'], 'Each turn, spend 1 Salvage to pick away 1 to 6 of the foe’s guard.'),
+  lockpicks: item('Lockpicks', 'scavenging', 'tool', [1, 1], { potency: 2 }, ['pickLock'], 'Each turn, spend 1 Salvage to pick away a die roll of the foe’s guard, times its potency (2 to 12).'),
   pickaxe: item('Pickaxe', 'scavenging', 'weapon', [1, 2], { damage: 3 }, ['prospect'], 'Strike and dig up 1 Salvage.'),
-  handShovel: item('Grave Shovel', 'scavenging', 'weapon', [1, 1], {}, ['digDeep'], 'Spend 3 Salvage to dig up a fortune: 3 to 18 damage.'),
+  handShovel: item('Grave Shovel', 'scavenging', 'weapon', [1, 1], { potency: 3 }, ['digDeep'], 'Spend 3 Salvage to dig up a fortune: a die roll times its potency (3 to 18 damage).'),
   travelSatchel: item('Travel Satchel', 'scavenging', 'storage', [1, 1], { potency: 2 }, [], 'Attach at the right edge: a 1-column bag. Items inside have +2 potency.', { storage: { columns: 1 }, auras: [{ target: { kind: 'containerItems', ownerOnly: true }, stat: 'potency', amount: { stat: 'potency' } }] }),
   sewingKit: item('Sewing Kit', 'scavenging', 'tool', [1, 1], { potency: 1 }, ['tailor'], 'At each cycle end, spend 4 Salvage: touching weapons gain +1 damage for the rest of the fight.'),
-  quiver: item('Lucky Quiver', 'scavenging', 'relic', [1, 1], {}, ['looseArrow'], 'When a touching weapon hits, loose an arrow for 1 to 4 damage. Twice per cycle.')
+  quiver: item('Lucky Quiver', 'scavenging', 'relic', [1, 1], { potency: 1 }, ['looseArrow'], 'When a touching weapon hits, loose an arrow for a d4 times its potency. Once per cycle.')
 }
