@@ -295,3 +295,13 @@ test('a payoff item is offered only once the run owns the item that feeds it', a
   for (const payoff of Object.keys(poolNeeds)) assert.ok(!without.has(payoff), payoff + ' is offered without its feeder')
   assert.ok(offered('curseIdol').has('reapingSeal'))
 })
+
+test('a new item that completes something owned is offered more often than one that does not', () => {
+  const offers = { reapingSeal: 0, salt: 0 }
+  for (let seed = 1; seed <= 400; seed++) {
+    const journey = createRun(createProfile(), 'rook', seededRandom(seed))
+    journey.descent.items['item-9'] = { type: 'curseIdol', level: 1, position: null }
+    for (const card of drawCards(journey.descent, seededRandom(seed))) if (card.type in offers) offers[card.type]++
+  }
+  assert.ok(offers.reapingSeal > offers.salt * 2, JSON.stringify(offers))
+})

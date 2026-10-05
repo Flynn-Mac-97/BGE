@@ -62,10 +62,22 @@ them keeps its place. New evolutions: Storm Totem + Echo Chime → Tempest Totem
 Curse Idol + Reaping Seal → Hex Idol, Patch Kit + Salvager Pack → Scrap
 Crossbow (a weapon, so it can sit inside the pack and fund its own shots).
 
-The sim bot does not plan layouts (it never puts a weapon inside a pack or a
-weapon under Echo Chime), so after the wider pool its median depth fell for
-Rook (18 → 14) and Nettle (20 → 15) and held for Pip (25 → 24). Treat that as
-the bot's limit, not a measure of the new builds.
+`tools/descent-sim.mjs` plays with the bot in `tools/descent-bot.mjs`, which
+plans by trying: each candidate cell or card gets a two-cycle test bout against
+the floor's enemy (which cannot die), scored as damage dealt minus health lost.
+It places each new item in its best cell, moves items that add nothing where
+they are, values a cell touching an evolution partner a quarter more, and adds
+a bonus for cards that complete something it owns. The older bot, which placed
+by evolution adjacency alone, made the wider pool look weaker than it is.
+
+A new item that completes something the run owns (an evolution partner, or the
+payoff a feeder unlocks) is `cards.synergyWeight` times as likely to be offered,
+so builds come together.
+
+Measured with 40 bot runs each, median floor: Rook 23, Nettle 30, Pip 30
+(the older bot on the old pool: 18, 20, 25). 0.63 evolutions a run, two thirds
+of them Widow's Fang: every crew starts with the Rusty Dagger and Venom Vial is
+a common drop, so the poison evolution is the easiest one to reach.
 
 Consumables have their own card weight, so they keep turning up however many
 items the run owns.

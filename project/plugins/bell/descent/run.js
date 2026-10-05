@@ -38,6 +38,16 @@ function tell(journey, text) {
 const LOG_LIMIT = 400
 const note = (run, text) => { run.log = [...(run.log ?? []), text].slice(-LOG_LIMIT) }
 const pick = (list, random) => list[Math.min(list.length - 1, Math.floor(Math.max(0, random()) * list.length))]
+/** One entry of a list, each as likely as its weight. */
+function pickWeighted(list, weightOf, random) {
+  let roll = Math.max(0, random()) * list.reduce((sum, entry) => sum + weightOf(entry), 0)
+  return list.find(entry => (roll -= weightOf(entry)) < 0) ?? list.at(-1)
+}
+
+/** True when a type completes something the run owns: an evolution partner, or the payoff a feeder unlocks. */
+export function completesOwned(ownedTypes, type) {
+  return evolutionRecipes.some(recipe => (recipe.partner === type && ownedTypes.has(recipe.from)) || (recipe.from === type && ownedTypes.has(recipe.partner))) || ownedTypes.has(poolNeeds[type])
+}
 
 function pickEnemy(floor, random) {
   const kind = floorKind(floor)
@@ -229,7 +239,7 @@ export function drawCards(run, random) {
     const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
-      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
+      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pickWeighted(fresh, type => completesOwned(ownedTypes, type) ? tuning.cards.synergyWeight : 1, random) }) },
       { isNew: true, weight: flasks.length ? tuning.cards.consumableWeight : 0, card: () => ({ kind: 'item', type: pick(flasks, random) }) },
       { isNew: true, weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
       { weight: run.columns < tuning.grid.maxColumns && !cards.some(card => card.kind === 'widen') ? tuning.cards.widenWeight : 0, card: () => ({ kind: 'widen' }) }
