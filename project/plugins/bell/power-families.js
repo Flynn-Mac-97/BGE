@@ -17,9 +17,3 @@ export function familyEmblem(kit, definition) {
   return `<span class="family-emblem" title="${powerFamilies[family].name} family">${kit.portrait(`ui/families/${family}.png`, { alt: powerFamilies[family].name + ' family' })}</span>`
 }
 
-/** A line naming the family, with its emblem, or '' for an item with no family. */
-export function familyLabel(kit, definition) {
-  const family = familyOf(definition)
-  if (!family) return ''
-  return `<small class="family-label">${familyEmblem(kit, definition)}${powerFamilies[family].name.toUpperCase()} FAMILY</small>`
-}

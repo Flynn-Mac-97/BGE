@@ -1,6 +1,6 @@
 /** Descent screens in the monochrome text style: the Lantern hub, the run header, cards, chest and summary. */
 import { art } from '../art.js'
-import { familyLabel } from '../power-families.js'
+import { familyEmblem } from '../power-families.js'
 import { rules, itemReference } from '../rules.js'
 import { escape } from '../inspection.js'
 import { shortStat } from '../glance.js'
@@ -89,7 +89,7 @@ const overlays = {
     const run = journey.descent
     const cards = run.cards.map((card, index) => {
       const face = cardFaces[card.kind](run, card)
-      return `<section class="loot-card descent-card">${art(kit, face.image, face.title)}<strong>${escape(face.title)}</strong>${face.type ? familyLabel(kit, rules.catalog.items[face.type]) : ''}<small>${escape(face.sub)}</small><p>${escape(face.text)}</p>${face.hint ? `<p class="card-hint">${escape(face.hint)}</p>` : ''}${kit.button('Take', { action: 'card', value: index })}</section>`
+      return `<section class="loot-card descent-card">${art(kit, face.image, face.title)}<strong>${escape(face.title)}${face.type ? familyEmblem(kit, rules.catalog.items[face.type]) : ''}</strong><small>${escape(face.sub)}</small><p>${escape(face.text)}</p>${face.hint ? `<p class="card-hint">${escape(face.hint)}</p>` : ''}${kit.button('Take', { action: 'card', value: index })}</section>`
     }).join('')
     const more = run.pendingLevels > 1 ? ` ${run.pendingLevels - 1} more after this.` : ''
     return `<div class="menu-shade"><section class="loot-sheet"><h2>${escape(descentCrew[run.crew].name.toUpperCase())} GREW TO LEVEL ${run.level + 1}! · CHOOSE ONE</h2><p>${escape(journey.message)}${more}</p><div class="loot-choices">${cards}</div>${kit.button(`Reroll · ${run.rerolls} left`, { action: 'reroll', isDisabled: run.rerolls < 1 })}</section></div>`

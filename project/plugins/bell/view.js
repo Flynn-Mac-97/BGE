@@ -1,6 +1,6 @@
 /** A landscape game field keeps the battle above inventory, with loot shown as a game overlay. */
 import { art, enemyPortrait } from './art.js'
-import { familyEmblem, familyLabel } from './power-families.js'
+import { familyEmblem } from './power-families.js'
 import { familyKits } from './family-lab.js'
 import { cacheCost, findInterval } from './loop.js'
 import { rules, itemDefinition } from './rules.js'
@@ -19,7 +19,7 @@ function rewardOverlay(kit, journey) {
   if (journey.rewardKind === 'salvage') return `<div class="menu-shade"><section class="loot-sheet"><h2>ROOM CLEARED · SALVAGE</h2><p>${escape(journey.message)}</p>${kit.button('Gather salvage & descend', { action: 'descend' })}${retreat}</section></div>`
   return `<div class="menu-shade"><section class="loot-sheet"><h2>${journey.expedition && journey.cleared >= journey.expedition.goal ? 'WARDEN DEFEATED · CHOOSE A KEEPSAKE' : journey.rewardKind === 'room' ? 'VICTORY · CHOOSE YOUR FIND' : 'SCAVENGED CACHE'}</h2><p>${escape(journey.message)}</p><div class="loot-choices">${journey.choices.map(type => {
     const item = rules.catalog.items[type]
-    return `<section class="loot-card">${art(kit, type, item.name)}<strong>${escape(item.name)}</strong>${familyLabel(kit, item)}<small>${item.storage ? item.storage.columns + '×3 container' : item.footprint.join('×') + ' slots'}</small><p>${escape(item.description)}</p>${kit.button('Keep ' + item.name, { action: 'claim', value: type })}</section>`
+    return `<section class="loot-card">${art(kit, type, item.name)}<strong>${escape(item.name)}${familyEmblem(kit, item)}</strong><small>${item.storage ? item.storage.columns + '×3 container' : item.footprint.join('×') + ' slots'}</small><p>${escape(item.description)}</p>${kit.button('Keep ' + item.name, { action: 'claim', value: type })}</section>`
   }).join('')}</div>${retreat}</section></div>`
 }
 function glanceLines(battle, id) {
