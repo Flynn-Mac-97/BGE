@@ -193,3 +193,11 @@ test('resource costs aggregate atomically and resource gains respect caps', () =
   assert.equal(result.state.actors.owner.health, 1)
   assert.equal(result.state.items.vessel.resources.charge, 3)
 })
+test('a stat lowered below zero deals nothing instead of failing the cycle', () => {
+  const rules = createRules({ items: { staff: { name: 'Staff', footprint: [1, 1], stats: { potency: 5 }, abilities: [{ id: 'sap', trigger: { event: 'damageTaken', target: { kind: 'owner' } }, target: { kind: 'eventSource' }, effects: [{ type: 'applyStatus', status: 'sapped', amount: { stat: 'potency' } }] }] } },
+    statuses: { sapped: { name: 'Sapped', stacking: 'max', duration: 'combat', modifiers: [{ stat: 'damage', amount: { stacks: true, scale: -1 } }] } } })
+  let battle = rules.createState({ actors: { hero: { team: 'crew', maxHealth: 20 }, foe: { team: 'dungeon', maxHealth: 20, stats: { damage: 2 }, abilities: [{ id: 'hit', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }] } }, items: [{ id: 'staff', type: 'staff', owner: 'hero', position: [0, 0] }] })
+  battle = rules.resolveCycle(battle, { afterCycle: ['foe'] }).state
+  battle = rules.resolveCycle(battle, { afterCycle: ['foe'] }).state
+  assert.equal(battle.actors.hero.health, 18)
+})

@@ -22,7 +22,10 @@ export function activeStatus(state, catalog, subject, status) {
   return !!source && !!target && state.actors[source.owner].health > 0 && adjacent(state, catalog, source, target)
 }
 
-/** Auras are summed from base constants, so two adjacent aura sources cannot recurse. */
+/** An aura's amount: a constant, or a stat of its source item read without auras or modifiers, so two adjacent aura sources cannot recurse. */
+export const auraAmount = (aura, sourceItem) => typeof aura.amount === 'number' ? aura.amount : sourceItem.stats[aura.amount.stat] ?? 0
+
+/** Auras are summed from base values, so two adjacent aura sources cannot recurse. */
 export function statOf(state, catalog, subject, stat) {
   const entity = entityOf(state, subject)
   let value = entity.stats[stat] ?? 0
@@ -38,7 +41,7 @@ export function statOf(state, catalog, subject, stat) {
     const status = entity.statuses[id]
     if (!activeStatus(state, catalog, subject, status)) continue
     for (const modifier of catalog.statuses[id].modifiers ?? []) {
-      if (modifier.stat === stat) value += typeof modifier.amount === 'number' ? modifier.amount : status.stacks
+      if (modifier.stat === stat) value += typeof modifier.amount === 'number' ? modifier.amount : status.stacks * (modifier.amount.scale ?? 1)
     }
   }
   const prepared = preparedStates.get(state)
@@ -46,7 +49,7 @@ export function statOf(state, catalog, subject, stat) {
     for (const aura of prepared.auras.get(`${subject.kind}:${subject.id}:${stat}`) ?? []) if (state.actors[aura.owner].health > 0) value += aura.amount
     for (const entry of prepared.dynamicAuras) {
       if (entry.aura.stat !== stat || state.actors[entry.owner].health <= 0) continue
-      if (targets({ state, catalog, source: entry.source }, entry.aura.target).some(target => sameReference(target, subject))) value += entry.aura.amount
+      if (targets({ state, catalog, source: entry.source }, entry.aura.target).some(target => sameReference(target, subject))) value += auraAmount(entry.aura, state.items[entry.source.id])
     }
     return value
   }
@@ -54,7 +57,7 @@ export function statOf(state, catalog, subject, stat) {
     for (const aura of catalog.items[source.type].auras ?? []) {
       if (aura.stat !== stat || state.actors[source.owner].health <= 0) continue
       const frame = { state, catalog, source: reference('item', source.id) }
-      if (targets(frame, aura.target).some(target => sameReference(target, subject))) value += aura.amount
+      if (targets(frame, aura.target).some(target => sameReference(target, subject))) value += auraAmount(aura, source)
     }
   }
   return value

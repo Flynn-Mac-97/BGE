@@ -4,6 +4,7 @@ import { defineSuite } from '../tools/node-suite.mjs'
 import { supportMatrix } from '../tools/balance-bench.mjs'
 import { campaignEnemy, campaignChoices, lootPartners } from '../plugins/bell/campaign-rules.js'
 import { rules } from '../plugins/bell/rules.js'
+import { notLoot } from '../plugins/bell/catalog.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 const { test, suite } = defineSuite('Campaign balance contracts')
 export default suite
@@ -35,5 +36,5 @@ test('repeat expedition choices are distinct, include an unowned kit partner, an
     assert.ok(choices.some(type => lootPartners.dagger.includes(type)))
     choices.forEach(type => found.add(type))
   }
-  assert.deepEqual([...found].sort(), Object.keys(rules.catalog.items).sort())
+  assert.deepEqual([...found].sort(), Object.keys(rules.catalog.items).filter(type => !notLoot.has(type)).sort())
 })

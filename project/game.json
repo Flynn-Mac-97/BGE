@@ -12,8 +12,8 @@
     "backend": "webgpu"
   },
   "android": {
-    "package": "com.engine.blackbellprototype",
-    "orientation": "landscape"
+    "package": "com.engine.blackbelldescent",
+    "orientation": "unspecified"
   },
   "plugins": {
     "only": [

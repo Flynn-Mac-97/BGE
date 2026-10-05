@@ -286,3 +286,282 @@ header>div { display:flex; gap:6px; }
 .craft-art-tile[aria-pressed="true"]::after { content:'✓'; position:absolute; top:2px; right:3px; background:#000; color:#fff; font:700 16px monospace; }
 .craft-art-tile:focus-visible { outline:2px dashed #fff; outline-offset:2px; }
 .craft-art-tile>span { max-width:100%; overflow-wrap:anywhere; }
+/* At-a-glance labels: what each item does, and badges on the edges where one item feeds another. */
+.equipment-shape:has(.glance)>small { visibility:hidden; }
+.equipment-shape .glance { position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex; flex-direction:column; gap:1px; }
+.glance-line { background:#fff; color:#000; font:600 8px/1.1 monospace; text-align:center; padding:1px 1px; overflow-wrap:anywhere; }
+.glance-trigger { font-weight:800; text-decoration:underline; }
+.glance-line.boosted { background:#000; color:#fff; outline:1px solid #fff; outline-offset:-1px; }
+.equipment-shape .charge-markers { bottom:auto; top:2px; left:auto; right:2px; }
+.equipment-shape .fired { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4; background:#fff; color:#000; font:800 11px monospace; padding:1px 4px; border:2px solid #000; white-space:nowrap; }
+.edge-anchor { position:relative; z-index:3; pointer-events:none; }
+.edge-badge { position:absolute; background:#000; color:#fff; border:1px solid #fff; font:700 8px/1.1 monospace; padding:1px 3px; white-space:nowrap; text-align:center; }
+.edge-badge.link-late { background:#fff; color:#000; }
+.edge-right { right:0; top:50%; transform:translate(calc(50% + 2px), -50%); }
+.edge-left { left:0; top:50%; transform:translate(calc(-50% - 2px), -50%); }
+.edge-down { bottom:0; left:50%; transform:translate(-50%, calc(50% + 2px)); }
+.edge-up { top:0; left:50%; transform:translate(-50%, calc(-50% - 2px)); }
+.equipment-shape.source { z-index:4; }
+/* The Descent: hub, run header, story caption, level badges, cards and chests. */
+.descent-hub-body { min-height:0; display:grid; grid-template-columns:minmax(150px,1fr) minmax(0,1.6fr) minmax(170px,1.2fr); gap:14px; }
+.descent-hub-body aside,.descent-hub-body article { overflow:auto; min-height:0; }
+.descent-hub-body h2 { font-size:14px; }.descent-hub-body h3 { font-size:12px; margin-top:14px; }
+.descent-hub-body .ui-button { width:100%; white-space:pre-line; margin-bottom:6px; min-height:40px; }
+.hub-kit-list { list-style:none; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
+.hub-kit { display:flex; align-items:center; gap:6px; border:1px solid #fff; padding:3px 8px 3px 3px; }
+.hub-kit>.ink-art { width:36px; height:36px; }
+.tower-list { list-style:none; padding:0; }.tower-list li { margin-bottom:10px; }.tower-list .ui-button { min-height:30px; margin-top:4px; }
+.tower-pips { letter-spacing:2px; }
+.ember-meter { display:flex; align-items:center; gap:6px; flex:1; max-width:260px; }
+.ember-meter small { white-space:nowrap; }.ember-meter .ui-bar { flex:1; min-width:60px; }.ember-meter .ui-bar-head { display:none; }.ember-meter .ui-bar-track { height:7px; border:1px solid #fff; }
+.event-caption .story-past { opacity:.45; }.event-caption .story-now { font-weight:700; }
+.equipment-shape .level-badge { position:absolute; top:2px; right:2px; z-index:3; background:#fff; color:#000; font:800 9px monospace; padding:0 3px; }
+.equipment-shape .level-badge.evolved { background:#000; color:#fff; outline:2px double #fff; }
+.equipment-shape:has(.level-badge.evolved) { border:3px double #fff; }
+.equipment-shape:has(.level-badge) .charge-markers { top:14px; }
+.descent-card .card-hint { flex:0; font-size:10px; border-top:1px dashed #fff; padding-top:4px; }
+.descent-card>.ink-art { width:56px; height:56px; }
+.run-summary { list-style:none; padding:0; font-size:13px; }.run-summary li { padding:3px 0; border-bottom:1px solid #333; }
+@media (max-height:430px) { .descent-hub-body { grid-template-columns:minmax(130px,1fr) minmax(0,1.4fr) minmax(150px,1.1fr); } .tavern-portrait>.ink-art { width:64px; height:64px; } }
+/* Descent battle stage: a 2×2 grid (enemy plate | enemy, hero | hero plate) above the battle box.
+   Portraits are sized from the stage's own size, so nothing overlaps at any screen shape. */
+.battle-stage { font-family:monospace; container-type:size; --box:56px; }
+.battle-field { position:absolute; inset:0 0 calc(var(--box) + 4px) 0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(0,1fr); grid-template-areas:"foeplate foe" "hero heroplate"; gap:8px 16px; padding:6px 10px 8px; box-sizing:border-box; }
+.battle-frame { position:relative; container-type:inline-size; width:min(40cqw, calc((100cqh - var(--box) - 34px) / 2), 180px); aspect-ratio:1; align-self:center; }
+.enemy-frame { grid-area:foe; justify-self:center; animation:enter-right .7s cubic-bezier(.2,.9,.3,1.2); }
+.recruit-frame { grid-area:hero; justify-self:center; animation:enter-left .7s cubic-bezier(.2,.9,.3,1.2); }
+.frame-motion { position:relative; width:100%; height:100%; box-sizing:border-box; border:3px double #fff; background:#000; display:grid; place-items:center; }
+.frame-motion>.ink-art { width:100%; height:100%; object-fit:cover; }
+.frame-motion::before,.frame-motion::after { content:''; position:absolute; width:10px; height:10px; background:#000; border:2px solid #fff; transform:rotate(45deg); }
+.frame-motion::before { top:-8px; left:-8px; }.frame-motion::after { bottom:-8px; right:-8px; }
+.rank-elite .frame-motion { border-width:6px; }
+.rank-boss .frame-motion { border:6px double #fff; outline:2px solid #fff; outline-offset:4px; box-shadow:0 0 18px #fff8; }
+.rank-boss .frame-motion::before,.rank-boss .frame-motion::after { width:16px; height:16px; }
+.rank-hero .frame-motion { border-style:solid; }
+.platform { position:absolute; left:-18%; right:-18%; bottom:-12px; height:20px; border-radius:50%; border-bottom:2px solid #fff; border-top:1px dashed #555; z-index:-1; }
+.battle-plate { width:min(320px,100%); box-sizing:border-box; padding:6px 10px 8px; background:#000; border:2px solid #fff; font-size:11px; min-width:0; }
+.foe-plate { grid-area:foeplate; align-self:start; justify-self:end; border-radius:0 0 0 14px; border-width:2px 2px 4px 2px; }
+.hero-plate { grid-area:heroplate; align-self:end; justify-self:start; border-radius:0 0 14px 0; border-width:2px 4px 4px 2px; }
+.plate-name { display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; }
+.plate-name strong { font-size:14px; letter-spacing:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.plate-name small { font-size:11px; white-space:nowrap; }
+.pills { display:flex; flex-wrap:wrap; gap:4px; min-height:14px; margin:3px 0; }
+.pill { background:#fff; color:#000; font:800 9px monospace; padding:1px 4px; border-radius:6px; }
+.hp-line,.xp-line { display:flex; align-items:center; gap:6px; }
+.hp-line b,.xp-line b { font-size:9px; background:#fff; color:#000; padding:0 3px; }
+.hp-bar { position:relative; flex:1; height:8px; border:1px solid #fff; border-radius:4px; overflow:hidden; }
+.hp-fill { position:absolute; inset:0 auto 0 0; background:#fff; transition:width .5s; }
+.hp-trail { position:absolute; inset:0 auto 0 0; background:repeating-linear-gradient(90deg,#fff 0 2px,#000 2px 4px); animation:hp-drain .9s ease-out .15s forwards; width:var(--from); }
+.hp-bar.low .hp-fill { animation:low-blink .6s steps(2) infinite; }
+.hp-numbers { text-align:right; font-size:13px; font-weight:700; margin:2px 0; }
+.xp-bar { flex:1; height:4px; border:1px solid #fff; }.xp-bar i { display:block; height:100%; background:#fff; }
+.gear-strip { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.gear-chip { position:relative; width:26px; height:26px; border:1px solid #fff; }
+.gear-chip>.ink-art { width:100%; height:100%; }
+.gear-chip b { position:absolute; right:-4px; bottom:-4px; background:#fff; color:#000; font:800 8px monospace; padding:0 2px; }
+/* Pop-ups stay inside the portrait and scale with it, so they never cover a nameplate. */
+.pops { position:absolute; inset:0; pointer-events:none; z-index:3; overflow:hidden; }
+.pop { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%); background:#000; border:2px solid #fff; padding:1px 5px; font-weight:800; white-space:nowrap; max-width:92%; overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; animation:pop-rise 1.4s ease-out forwards; }
+.pop-hit { font-size:clamp(14px,20cqw,30px); background:#fff; color:#000; }.pop-block { font-size:clamp(10px,11cqw,16px); }
+.pop-heal { top:62%; font-size:clamp(12px,14cqw,20px); animation-delay:.1s; }.pop-guard { top:20%; font-size:clamp(9px,9cqw,14px); }.pop-status { top:80%; font-size:clamp(8px,8cqw,12px); animation-delay:.2s; }
+.lunge { animation:lunge-up .45s ease-in-out; }.enemy-frame .lunge { animation-name:lunge-down; }
+.hit { animation:hit-blink .7s steps(1) .2s, hit-shake .35s .2s; }
+.tick { animation:wobble .6s ease-in-out; }
+.frame-glow { position:absolute; inset:0; pointer-events:none; z-index:2; }
+.frame-glow.healed { animation:heal-glow .9s ease-out; }
+.frame-glow.guarded { animation:guard-flash .6s steps(2); }
+.frame-glow.healed.guarded { animation:heal-glow .9s ease-out, guard-flash .6s steps(2); }
+.hit.tick { animation:wobble .6s ease-in-out, hit-blink .7s steps(1) .2s; }
+.hit.faint,.lunge.faint { animation:hit-blink .5s steps(1), faint 1s ease-in .5s forwards; }
+.faint { animation:faint 1s ease-in .3s forwards; }
+.quake-0 { animation:quake .45s; }.quake-1 { animation:quake-again .45s; }
+.battle-box { position:absolute; left:0; right:0; bottom:0; height:var(--box); box-sizing:border-box; border:4px double #fff; border-radius:6px; background:#000; padding:6px 28px 6px 12px; display:flex; align-items:center; overflow:hidden; }
+.battle-box p { margin:0; font-size:14px; line-height:1.25; }
+.battle-box p.typing { animation:type-in .55s steps(28) both; }
+.box-cursor { position:absolute; right:10px; bottom:6px; font-size:11px; animation:low-blink .8s steps(2) infinite; }
+/* A narrow stage (portrait phones): smaller plates and text. */
+@container (max-width:520px) {
+  .battle-field { gap:6px 8px; padding:4px 4px 8px; }
+  .battle-frame { width:min(44cqw, calc((100cqh - var(--box) - 30px) / 2), 170px); }
+  .battle-plate { font-size:9px; padding:4px 6px 5px; }.plate-name strong { font-size:11px; letter-spacing:0; }.plate-name small { font-size:9px; }
+  .hp-numbers { font-size:11px; }.gear-chip { width:20px; height:20px; }
+  .battle-box p { font-size:12px; }
+}
+/* A short stage (landscape phones, or any stage with item details open below it): one row, hero plate and enemy plate in the middle. */
+@container (max-height:290px) {
+  .battle-field,.battle-box { --box:40px; }
+  .battle-field { grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto; grid-template-rows:minmax(0,1fr); grid-template-areas:"hero heroplate foeplate foe"; gap:8px; }
+  .battle-frame { width:min(24cqw, calc(100cqh - var(--box) - 22px), 160px); }
+  .foe-plate,.hero-plate { align-self:center; justify-self:stretch; width:auto; }
+  .gear-strip { display:none; }
+  .battle-box p { font-size:11px; }
+}
+@keyframes enter-right { from { transform:translateX(60vw); } }
+@keyframes enter-left { from { transform:translateX(-60vw); } }
+@keyframes lunge-up { 40% { transform:translate(36px,-22px) rotate(4deg); } }
+@keyframes lunge-down { 40% { transform:translate(-36px,22px) rotate(-4deg); } }
+@keyframes hit-blink { 0%,40%,80% { opacity:0; } 20%,60%,100% { opacity:1; } }
+@keyframes hit-shake { 25% { transform:translateX(-8px); } 50% { transform:translateX(8px); } 75% { transform:translateX(-4px); } }
+@keyframes wobble { 30% { transform:skewX(-6deg); } 60% { transform:skewX(6deg); } }
+@keyframes heal-glow { 30% { box-shadow:0 0 0 6px #fff, 0 0 26px #fff; } }
+@keyframes guard-flash { 50% { outline:4px solid #fff; outline-offset:6px; } }
+@keyframes faint { to { transform:translateY(45%) scaleY(.6); opacity:0; } }
+@keyframes pop-rise { 0% { transform:translate(-50%,-20%) scale(.6); opacity:0; } 15% { transform:translate(-50%,-50%) scale(1.15); opacity:1; } 70% { opacity:1; } 100% { transform:translate(-50%,-140%) scale(1); opacity:0; } }
+@keyframes hp-drain { to { width:var(--to); } }
+@keyframes low-blink { 50% { opacity:.25; } }
+@keyframes quake { 20% { transform:translate(-6px,3px); } 40% { transform:translate(6px,-3px); } 60% { transform:translate(-4px,2px); } 80% { transform:translate(3px,-1px); } }
+@keyframes quake-again { 20% { transform:translate(-6px,3px); } 40% { transform:translate(6px,-3px); } 60% { transform:translate(-4px,2px); } 80% { transform:translate(3px,-1px); } }
+@keyframes type-in { from { clip-path:inset(0 100% 0 0); } to { clip-path:inset(0 0 0 0); } }
+@media (prefers-reduced-motion:reduce) { .battle-stage *,.battle-stage *::before { animation:none !important; } .faint { opacity:.2; } }
+/* Evolution: over-bright flashes alternate between the old and new item, faster and faster, then the new one shows. */
+.evolution-morph { position:relative; width:150px; height:150px; margin:8px auto; }
+.evolution-morph>span { position:absolute; inset:0; }.evolution-morph .ink-art { width:100%; height:100%; }
+.morph-from { animation:morph-from 2.6s linear forwards; }
+.morph-into { opacity:0; animation:morph-into 2.6s linear forwards; }
+.morph-into .ink-art { animation:morph-glow 2.6s linear forwards; }
+.morph-from .ink-art { animation:morph-white 2.6s linear forwards; }
+.evolve-done { opacity:0; animation:evolve-done .4s ease-out 2.6s forwards; }
+@keyframes morph-from { 0%,30%,45%,57%,66%,73%,79%,84%,88%,92% { opacity:1; } 25%,40%,52%,62%,70%,77%,82%,86%,90%,95%,100% { opacity:0; } }
+@keyframes morph-into { 0%,30%,45%,57%,66%,73%,79%,84%,88%,92% { opacity:0; } 25%,40%,52%,62%,70%,77%,82%,86%,90%,95%,100% { opacity:1; } }
+@keyframes morph-white { 0%,15% { filter:none; } 20%,100% { filter:brightness(3.2) contrast(1.4); } }
+@keyframes morph-glow { 0%,94% { filter:brightness(3.2) contrast(1.4); } 100% { filter:none; } }
+@keyframes evolve-done { to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .morph-from { display:none; } .morph-into,.evolve-done,.morph-into .ink-art { animation:none; opacity:1; filter:none; } }
+/* Descent run on a phone in landscape: the battle stage and the grid sit side by side, so the stage keeps its height. */
+@media (orientation:landscape) and (max-height:500px) {
+  .bell-game.descent-run { grid-template-columns:minmax(0,1fr) auto; grid-template-rows:34px minmax(0,1fr) auto; gap:4px 10px; }
+  .descent-run>header { grid-column:1/-1; }
+  .descent-run>.stage { grid-column:1; grid-row:2; }
+  .descent-run>.dock { grid-column:2; grid-row:2; grid-template-columns:calc(var(--visible-columns) * 46px) 84px; grid-template-rows:auto minmax(0,1fr); gap:6px 8px; }
+  .descent-run .loadout { grid-column:1; grid-row:1/-1; }
+  .descent-run .bell-controls { grid-column:2; grid-row:1; }
+  .descent-run .reserve { grid-column:2; grid-row:2; min-height:0; overflow:auto; font-size:9px; }
+  .descent-run .reserve-items { grid-template-columns:1fr; }
+  .descent-run>:last-child:not(.menu-shade) { grid-column:1/-1; }
+  .descent-run .inspection.full { top:42px; }
+}
+/* Descent run in portrait: a two-line header, and grid cells small enough for six columns. */
+@media (orientation:portrait) {
+  .bell-game.descent-run { grid-template-rows:auto minmax(0,1fr) 306px auto; }
+  .descent-run>header { flex-wrap:wrap; row-gap:4px; }
+  .descent-run>header>span { flex:1 1 60%; }
+  .descent-run .ember-meter { order:3; flex:1 1 100%; max-width:none; }
+  .descent-run .board { grid-template-columns:repeat(var(--board-columns),minmax(36px,1fr)); min-width:calc(var(--board-columns) * 40px - 4px); }
+  .descent-run .loadout { max-width:100%; }
+}
+@media (max-width:600px) { .run-region { display:none; } }
+/* The Lantern hub on a narrow screen: one scrolling column. */
+@media (max-width:760px) {
+  .tavern-game.descent-hub { overflow-y:auto; grid-template-rows:auto auto auto; align-content:start; }
+  .descent-hub>header { flex-wrap:wrap; }
+  .descent-hub>.tavern-story { max-height:none; overflow:visible; }
+  .descent-hub-body { grid-template-columns:minmax(0,1fr); overflow:visible; min-height:auto; }
+  .descent-hub-body aside,.descent-hub-body article { overflow:visible; min-height:auto; }
+  .descent-hub-body>aside:first-child { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; align-content:start; }
+  .descent-hub-body>aside:first-child h2 { grid-column:1/-1; }
+  .descent-hub-body>aside:first-child .ui-button { margin:0; }
+}
+/* Short landscape screens: smaller evolution art and card art, so the buttons stay on screen. */
+@media (orientation:landscape) and (max-height:500px) {
+  .evolution-morph { width:90px; height:90px; margin:4px auto; }
+  .descent-card>.ink-art { width:36px; height:36px; }
+  .loot-sheet h2 { font-size:13px; }
+}
+/* Level-up cards: as many columns as fit (four with Deep Pockets), compact on short and narrow screens. */
+.loot-sheet .loot-choices:has(.descent-card) { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+@media (orientation:landscape) and (max-height:500px) {
+  .descent-card { padding:6px; gap:3px; }
+  .descent-card>p { font-size:10px; line-height:1.25; }
+  .descent-card>.ui-button { min-height:34px; }
+  .loot-sheet { padding:8px; }
+}
+@media (orientation:portrait) {
+  .loot-card.descent-card { grid-template-columns:44px minmax(0,1fr); column-gap:10px; align-items:center; }
+  .descent-card>.ink-art { width:44px; height:44px; grid-row:span 2; }
+  .descent-card>strong,.descent-card>small { grid-column:2; }
+}
+/* The Forge: part buttons in rows, the chosen one inverted, and a preview card of the item it makes. */
+.descent-hub-body.forge-body .forge-parts .ui-button { width:auto; display:inline-block; margin:0 4px 4px 0; min-height:32px; padding:4px 8px; font-size:11px; }
+.forge-parts h3:first-child { margin-top:0; }
+.ui-button.picked,.ui-button.picked:hover { background:#fff; color:#000; font-weight:700; }
+.forge-card { border:2px solid #fff; padding:12px; display:grid; justify-items:center; gap:6px; text-align:center; }
+.forge-art { border:1px dashed #fff; padding:6px; background:none; cursor:pointer; }
+.forge-art .ink-art { width:84px; height:84px; }
+.forge-card>strong { font-size:16px; }
+.forge-card>p { margin:0; }
+.forge-price { font-size:18px; font-weight:700; letter-spacing:.1em; }
+.forge-list .hub-kit { width:100%; align-items:flex-start; }
+/* The Duel Pit: rule cards in a grid, the fun log, the drafting player, and the rival's double frame. */
+.rule-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; margin-bottom:10px; }
+.descent-hub-body .rule-card { margin:0; min-height:52px; }
+.duel-body { grid-template-columns:minmax(0,1.6fr) minmax(170px,1fr); }
+.fun-list { list-style:none; padding:0; }.fun-list li { margin-bottom:6px; }
+.duel-draft { grid-column:1/-1; grid-row:1/-1; display:grid; align-content:start; gap:8px; padding:10px; overflow:auto; min-height:0; }
+.duel-drafter { display:flex; gap:12px; align-items:center; }
+.duel-drafter h2 { margin:0 0 4px; font-size:15px; }
+.duel-drafter p { margin:0 0 4px; }
+.drafter-portrait { border:3px solid #fff; padding:3px; background:none; cursor:pointer; flex:none; }
+.drafter-portrait .ink-art { width:84px; height:84px; }
+.duel-count { font-weight:700; letter-spacing:.08em; }
+.rule-chips { list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:4px; }
+.rule-chips li { border:1px solid #fff; padding:2px 6px; font-size:11px; }
+.duel-hint { margin:0; }
+.duel-sheet { text-align:center; display:grid; gap:10px; justify-items:center; }
+.duel-winner { display:flex; gap:12px; align-items:center; }
+.duel-winner .ink-art { width:84px; height:84px; border:3px solid #fff; }
+.fun-buttons,.duel-next { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.fun-buttons .ui-button { min-width:80px; min-height:40px; }
+.rank-rival .frame-motion { border:4px double #fff; }
+/* A duel fight board: both grids with a gap column, each labelled. */
+.duel-side-label { grid-row:1; align-self:start; justify-self:start; z-index:3; pointer-events:none; background:#fff; color:#000; font:700 10px monospace; padding:0 4px; }
+.duel-board .grid-cell { font-size:0; }
+@media (max-width:760px) {
+  .duel-body { grid-template-columns:minmax(0,1fr); }
+  .rule-cards { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .descent-hub-body.forge-body>aside.forge-parts { display:block; }
+}
+@media (orientation:landscape) and (max-height:500px) {
+  .duel-draft { padding:4px; gap:4px; }
+  .drafter-portrait .ink-art,.duel-winner .ink-art { width:56px; height:56px; }
+  .forge-art .ink-art { width:56px; height:56px; }
+  .duel-sheet { gap:6px; }
+}
+/* Drafting a duel on a landscape phone: the shelf goes under the draft panel, so it has room to scroll. */
+@media (orientation:landscape) and (max-height:500px) {
+  .bell-game.descent-run.duel-drafting { grid-template-columns:minmax(0,1fr) auto 84px; grid-template-rows:34px 96px minmax(0,1fr) auto; }
+  .duel-drafting>.dock { display:contents; }
+  .duel-drafting>.stage { grid-column:1; grid-row:2; }
+  .duel-drafting .reserve { grid-column:1; grid-row:3; font-size:inherit; }
+  .duel-drafting .reserve-items { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+  .duel-drafting .loadout { grid-column:2; grid-row:2/4; }
+  .duel-drafting .bell-controls { grid-column:3; grid-row:2/4; }
+  .duel-drafting .duel-draft p:not(.duel-count) small,.duel-drafting .rule-chips { display:none; }
+}
+/* A duel fight board shrinks its cells to fit both grids in the dock. */
+.descent-run .board.duel-board { min-width:0; grid-template-columns:repeat(var(--board-columns),minmax(0,1fr)); }
+.duel-winner h2 { font-size:20px; margin:0 0 4px; }
+/* Drafting a duel in portrait: a short draft panel, the shelf with the most room, then the grid and controls. */
+@media (orientation:portrait) {
+  .bell-game.descent-run.duel-drafting { grid-template-columns:minmax(0,1fr) 90px; grid-template-rows:auto 112px minmax(0,1fr) 236px auto; }
+  .duel-drafting>header,.duel-drafting>.stage,.duel-drafting>:last-child:not(.menu-shade) { grid-column:1/-1; }
+  .duel-drafting>.dock { display:contents; }
+  .duel-drafting .reserve { grid-column:1/-1; grid-row:3; min-height:0; overflow:auto; }
+  .duel-drafting .loadout { grid-column:1; grid-row:4; }
+  .duel-drafting .bell-controls { grid-column:2; grid-row:4; }
+  .duel-drafting .duel-draft p:not(.duel-count) small,.duel-drafting .rule-chips { display:none; }
+  .duel-drafting .drafter-portrait .ink-art { width:56px; height:56px; }
+}
+/* The play log: one tall text box under the copy button. */
+.play-log { grid-template-rows:auto auto minmax(0,1fr); }
+.play-log-body { min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:8px; }
+.play-log-body textarea { width:100%; height:100%; min-height:62vh; box-sizing:border-box; resize:none; background:#000; color:#fff; border:1px solid #fff; font:11px/1.4 monospace; padding:8px; user-select:text; -webkit-user-select:text; }
+/* Consumables: charges under the level badge, a dashed border, and a pulse while readied. */
+.equipment-shape:has(.charge-badge) { border-style:dashed; }
+.equipment-shape .charge-badge { position:absolute; top:16px; right:2px; z-index:3; background:#000; color:#fff; border:1px solid #fff; font:800 9px monospace; padding:0 3px; }
+.equipment-shape .charge-badge.spent { opacity:.5; }
+.equipment-shape .charge-badge.readied { background:#fff; color:#000; animation:readied-pulse .8s ease-in-out infinite alternate; }
+@keyframes readied-pulse { to { box-shadow:0 0 8px #fff; } }
+@media (prefers-reduced-motion:reduce) { .equipment-shape .charge-badge.readied { animation:none; } }
+/* Evolution hints under the reserve: one line per item on its way to evolving. */
+.evolve-hints { list-style:none; padding:0; margin:4px 0; font-size:11px; line-height:1.35; }
+.evolve-hints li { border-left:2px solid #fff; padding-left:5px; margin-bottom:3px; }
+.evolve-hints li.ready { font-weight:700; }

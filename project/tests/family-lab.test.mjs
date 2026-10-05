@@ -18,7 +18,7 @@ for (const family of Object.keys(familyKits)) test(family + ' kit plays full cyc
     journey.battle = result.state
   }
   assert.equal(rules.winner(journey.battle), 'crew')
-  const expected = { growth: 'rootMend', combat: 'breakArmour', scholarship: 'shockTick', hunger: 'reapCurse', scavenging: 'patchGuard' }[family]
+  const expected = { growth: 'rootMend', combat: 'breakArmour', scholarship: 'shockTick', hunger: 'reapCurse', scavenging: 'patchGuard', thorn: 'thornLash' }[family]
   assert.ok(events.some(step => step.kind === 'ability' && step.ability.id.includes(expected) && step.effects.some(effect => effect.amount > 0)), expected)
   assert.ok(finishBattle(journey, () => 0))
   assert.equal(journey.phase, 'practiceComplete')
@@ -54,4 +54,26 @@ test('entering practice cannot discard a pending dungeon combat', () => {
   const before = game.read()
   game.panel.on.family('growth')
   assert.deepEqual(game.read(), before)
+})
+test('Thorn Warden reacts only to hits on its owner, and Sapped lowers the next hit', () => {
+  let battle = createFamilyJourney('thorn').battle
+  const fired = []
+  for (let cycle = 0; cycle < 3; cycle++) {
+    const result = rules.resolveCycle(battle, { afterCycle: ['enemy'] })
+    fired.push(...result.trace.filter(step => step.kind === 'ability'))
+    battle = result.state
+  }
+  const hits = fired.filter(step => step.ability.id === 'dummyAttack')
+  assert.equal(fired.filter(step => step.ability.id === 'thornLash').length, hits.length)
+  assert.deepEqual(hits.map(step => step.effects[0].amount), [2, 1, 1])
+})
+test('the grid shows live item effects and labelled edge links without selecting anything', () => {
+  const game = fixture()
+  game.panel.on.family('thorn')
+  const html = game.panel.html()
+  // The Spore Idol raises the Totem from 2 to 3 potency, so its label is live and marked boosted.
+  assert.match(html, /glance-line boosted"><span class="glance-trigger">HIT<\/span> 3 PSN/)
+  assert.match(html, /glance-trigger">HIT<\/span> −1 DMG/)
+  assert.match(html, /edge-badge edge-right link-target">\+2 POT ▶/)
+  assert.match(html, /edge-badge edge-down link-aura">\+1 POT ▼/)
 })

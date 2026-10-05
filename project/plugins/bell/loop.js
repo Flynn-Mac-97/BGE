@@ -1,6 +1,7 @@
 /** Endless rooms and loot are separate from combat rules and contain no item effect logic. */
 import { campaignEnemy, campaignChoices } from './campaign-rules.js'
 import { familyItems } from './catalog/families.js'
+import { notLoot } from './catalog.js'
 import { rules, itemDefinition } from './rules.js'
 
 const encounters = [
@@ -11,7 +12,7 @@ const encounters = [
 export const cacheCost = 12
 export const findInterval = 4
 const firstFinds = ['venom', 'stormTotem', 'salve']
-const lootPool = Object.keys(rules.catalog.items)
+const lootPool = Object.keys(rules.catalog.items).filter(type => !notLoot.has(type))
 
 function enemyFor(room, campaign) {
   if (campaign) return campaignEnemy(room)

@@ -1,9 +1,12 @@
 ---
 category: gameplay
-description: Black Bell's monochrome tavern, persistent crew, expeditions and grid battles.
-triggers: black bell, equipment demo, fight loop, loot, endless battler
+description: Black Bell's endless Descent run, the Lantern hub and Bell Tower, the older tavern campaign, and grid battles.
+triggers: black bell, descent, consumable, tome, forge, duel pit, pvp, endless run, level up, evolution, bell tower, equipment demo, fight loop, loot, endless battler
 ---
 # Black Bell Prototype
+
+The start screen is the Lantern hub of **The Descent**, the endless run. Read `design/descent.md` first: the loop, the numbers in `bell/descent/tuning.js`, and which file holds which data. `bell/descent/run.js` is the run (plain records; phases battle, chest, levelUp, dead). `bell/descent/profile-save.js` saves the profile under `black-bell-descent-v1`. `bell/descent/view.js` draws the hub, run header, cards, chest and summary. `bell/descent/battle-stage.js` draws a run's stage like a handheld monster battle: enemy top right, hero bottom left, nameplates, a battle text box from `battleLine(step)`, and CSS effects keyed by `state.serial` so each plays once per step. Actions: `crew`, `goDown`, `continueRun`, `buy`, `card`, `reroll`, `chest`, `abandon`, `lantern`, `oldCompany`, `openLab`. The Forge (`bell/descent/forge.js`, actions `openForge`, `forgePart`, `forgeArt`, `forgeBuy`) makes 1×1 items from parts for Bells. The Duel Pit (`bell/duel/`, actions `openDuel`, `duelRule`, `duelStart`, `duelHero`, `duelReady`, `duelHandoff`, `duelRate`, `duelAgain`, `duelRedraft`, `leaveDuel`) is a same-screen two-player draft and fight; a duel journey has `journey.duel` instead of `journey.descent`. Consumables (`bell/descent/consumables.js`, action `useItem`) are tapped mid-floor and act at the next cycle start; `armReadied` runs before each cycle resolves. Tomes are a level-up card kind (`tome`, id `vigor` or `might`) counted in `run.tomes`. The Play Log (`bell/descent/play-log.js`, actions `openLog`, `copyLog`) shows the last 20 runs as plain text to copy: each run's build, every story line and one line per floor fought (cycles and both HP totals), plus forged items and rated duels. `node tools/descent-sim.mjs [runs] [crew] [tower JSON]` plays seeded bot runs; run it after changing numbers.
+
 
 Uses Black Bell Grid and Game UI. `context.blackBell.read()` returns an isolated snapshot. `context.blackBell.action(name,value)` drives the same actions as touch controls. Commands: `bell.read`, `bell.action {action,value}`.
 
