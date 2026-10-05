@@ -8,7 +8,7 @@ import { consumableItems, consumableAbilities } from './descent/consumables.js'
 export const catalog = {
   items: { ...items, ...familyItems, ...labItems, ...evolvedItems, ...consumableItems }, abilities: { ...abilities, ...familyAbilities, ...labAbilities, ...evolvedAbilities, ...consumableAbilities },
   statuses: {
-    shock: { short: 'SHOCK', name: 'Shock', stacking: 'add', maxStacks: 8, duration: 'combat', abilities: ['shockTick'] },
+    shock: { short: 'SHOCK', name: 'Shock', stacking: 'add', maxStacks: 99, duration: 'combat', abilities: ['shockTick'] },
     curse: { short: 'CURSE', name: 'Curse', stacking: 'add', duration: 'combat', abilities: [] },
     poison: { short: 'PSN', name: 'Poison', stacking: 'add', duration: 'combat', abilities: ['poisonTick'] },
     coating: { name: 'Venom ready', stacking: 'replace', duration: 'nextAction', expires: 'cycle', modifiers: [{ stat: 'poisonOnHit', amount: { stacks: true } }] },

@@ -7,7 +7,7 @@
  */
 import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
-import { descentPool, consumablePool, descentCrew } from './pool.js'
+import { descentPool, consumablePool, descentCrew, poolNeeds } from './pool.js'
 import { consumableCharges } from './consumables.js'
 import { regions, enemyTraits } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
@@ -60,7 +60,9 @@ export function battleFor(run) {
   const battle = rules.createState({ columns: run.columns, rows: tuning.grid.rows,
     actors: { recruit: { name: descentCrew[run.crew].name, team: 'crew', maxHealth, health: Math.min(maxHealth, run.health), resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 } }, enemy: enemyActor(run.enemy, run.floor) },
     items: Object.entries(run.items).map(([id, item]) => ({ id, type: item.type, owner: 'recruit', position: null })) })
-  for (const [id, item] of Object.entries(run.items)) {
+  // Packs go first: an item stored in a pack only fits once the pack is attached.
+  const packsFirst = Object.entries(run.items).sort(([, first], [, second]) => Number(!rules.catalog.items[first.type].storage) - Number(!rules.catalog.items[second.type].storage))
+  for (const [id, item] of packsFirst) {
     const definition = rules.catalog.items[item.type]
     for (const [stat, base] of Object.entries(definition.stats)) battle.items[id].stats[stat] = itemStat(base, item, run)
     if (item.position) rules.place(battle, id, item.position)
@@ -223,7 +225,7 @@ export function drawCards(run, random) {
   const count = tuning.cards.count + run.bonus.cards
   for (let draw = 0; draw < count; draw++) {
     const levels = cards.filter(card => card.kind === 'level').length < tuning.cards.maxLevelCards ? Object.keys(run.items).filter(id => !cards.some(card => card.id === id)) : []
-    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type) && (!poolNeeds[type] || ownedTypes.has(poolNeeds[type]))) : []
     const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },

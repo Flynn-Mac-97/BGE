@@ -257,3 +257,41 @@ test('every Descent item shows its power family on the grid, the tooltip and the
   assert.equal(game.read().journey.phase, 'levelUp')
   assert.ok((game.panel.html().match(/<\/span><\/strong>/g) ?? []).length >= 1, 'a level-up card shows the family emblem by its name')
 })
+
+test('a pack is placed before the items inside it, so both keep their places from floor to floor', () => {
+  const journey = createRun(createProfile(), 'rook', seededRandom(1))
+  const run = journey.descent
+  run.items['item-3'] = { type: 'scrapCrossbow', level: 1, position: [run.columns, 0] }
+  run.items['item-4'] = { type: 'salvagePack', level: 1, position: [run.columns, 0] }
+  const battle = battleFor(run)
+  assert.deepEqual(battle.items['item-4'].position, [run.columns, 0])
+  assert.deepEqual(battle.items['item-3'].position, [run.columns, 0])
+})
+
+test('an ability a totem grants grows with the totem’s level, not the weapon’s', () => {
+  const salvageAfterOneCycle = level => {
+    const journey = createRun(createProfile(), 'rook', seededRandom(1))
+    const run = journey.descent
+    run.items['item-3'] = { type: 'salvagePack', level, position: [run.columns, 0] }
+    run.items['item-1'].position = [run.columns, 0]
+    return rules.resolveCycle(battleFor(run), { afterCycle: ['enemy'] }).state.actors.recruit.resources.salvage
+  }
+  assert.equal(salvageAfterOneCycle(1), 2)
+  assert.equal(salvageAfterOneCycle(3), levelStat(2, 3))
+})
+
+test('a payoff item is offered only once the run owns the item that feeds it', async () => {
+  const { poolNeeds } = await import('../plugins/bell/descent/pool.js')
+  const offered = owned => {
+    const seen = new Set()
+    for (let seed = 1; seed <= 300; seed++) {
+      const journey = createRun(createProfile(), 'rook', seededRandom(seed))
+      if (owned) journey.descent.items['item-9'] = { type: owned, level: 1, position: null }
+      for (const card of drawCards(journey.descent, seededRandom(seed))) if (card.kind === 'item') seen.add(card.type)
+    }
+    return seen
+  }
+  const without = offered(null)
+  for (const payoff of Object.keys(poolNeeds)) assert.ok(!without.has(payoff), payoff + ' is offered without its feeder')
+  assert.ok(offered('curseIdol').has('reapingSeal'))
+})

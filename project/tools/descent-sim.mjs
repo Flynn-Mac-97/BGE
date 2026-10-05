@@ -27,6 +27,8 @@ function bestPlace(battle, id) {
 }
 
 function placeReserve(journey) {
+  // A pack attaches at the right edge first, so the items after it can go inside.
+  for (const item of Object.values(journey.battle.items)) if (!item.position && rules.catalog.items[item.type].storage) rules.place(journey.battle, item.id, [journey.battle.grid.columns, 0])
   for (const item of Object.values(journey.battle.items)) if (!item.position) {
     const position = bestPlace(journey.battle, item.id)
     if (position) rules.place(journey.battle, item.id, position)

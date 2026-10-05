@@ -50,6 +50,23 @@ From level 3, an item that can evolve shows ⇄ on its badge, and the list under
 the reserve says what it still needs: find the partner, touch it, reach level
 5, or wait for the next chest.
 
+Every power family can drop. Scholarship (Purifying Salt, Echo Chime, Storm
+Totem), Hunger (Ward Tooth, Curse Idol, Reaping Seal) and Scavenging (Salvager
+Pack, Patch Kit, Worn Pack) joined the pool alongside Root Totem; their fixed
+numbers became stats, so they grow with level like everything else (level 1 is
+unchanged). A payoff that does nothing alone is offered only once the run owns
+what feeds it: `poolNeeds` in `pool.js` (Reaping Seal needs Curse Idol, Patch
+Kit needs Salvager Pack). Packs attach at the right edge in a run as in the
+Family Lab, and are placed first when a floor starts, so what is stored inside
+them keeps its place. New evolutions: Storm Totem + Echo Chime → Tempest Totem,
+Curse Idol + Reaping Seal → Hex Idol, Patch Kit + Salvager Pack → Scrap
+Crossbow (a weapon, so it can sit inside the pack and fund its own shots).
+
+The sim bot does not plan layouts (it never puts a weapon inside a pack or a
+weapon under Echo Chime), so after the wider pool its median depth fell for
+Rook (18 → 14) and Nettle (20 → 15) and held for Pip (25 → 24). Treat that as
+the bot's limit, not a measure of the new builds.
+
 Consumables have their own card weight, so they keep turning up however many
 items the run owns.
 

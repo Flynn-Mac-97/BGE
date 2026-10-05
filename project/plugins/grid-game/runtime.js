@@ -71,7 +71,7 @@ function costsFor(frame) {
 }
 
 function runAbility(runtime, task) {
-  const frame = { source: task.source, ability: task.ability, statusId: task.statusId, status: task.status, path: task.path, event: task.event, state: runtime.state, catalog: runtime.catalog, previousAmount: 0, events: [], extra: [] }
+  const frame = { source: task.source, grantor: task.grantor ?? null, ability: task.ability, statusId: task.statusId, status: task.status, path: task.path, event: task.event, state: runtime.state, catalog: runtime.catalog, previousAmount: 0, events: [], extra: [] }
   if (!isAlive(frame.state, frame.source) || (task.grantor && !activeGrant(frame.state, task.grantor))) return
   if (task.statusId) {
     frame.status = entityOf(frame.state, frame.source).statuses[task.statusId]

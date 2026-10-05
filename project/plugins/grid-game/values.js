@@ -10,6 +10,8 @@ export function amountOf(frame, expression, subject = frame.source) {
   if (expression.eventAmount) return (frame.event?.amount ?? 0) * (expression.scale ?? 1)
   if (expression.stacks) return frame.status?.stacks ?? 0
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)
+  // A granted ability reads the item that grants it, so a totem's level grows what it gives.
+  if (expression.grantorStat) return frame.grantor ? statOf(frame.state, frame.catalog, frame.grantor, expression.grantorStat) : 0
   if (expression.resource) return entityOf(frame.state, subject).resources[expression.resource] ?? 0
   return 0
 }

@@ -20,6 +20,8 @@ function liveAmount(battle, id, expression) {
     const amount = rules.stat(battle, itemReference(id), expression.stat)
     return { amount, isBoosted: amount !== (itemDefinition(battle, id).stats?.[expression.stat] ?? 0) }
   }
+  // A granted ability's amount reads the granting item, which is the item this glance is for.
+  if (expression.grantorStat) return liveAmount(battle, id, { stat: expression.grantorStat })
   if (expression.resource) return { amount: battle.items[id].resources[expression.resource] ?? battle.actors[battle.items[id].owner].resources[expression.resource] ?? 0, isBoosted: false }
   return { amount: null, isBoosted: false }
 }

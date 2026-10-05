@@ -21,8 +21,8 @@ function validateTarget(selector, path) {
 function validateAmount(amount, path) {
   if (typeof amount === 'number' && Number.isFinite(amount)) return
   if (dictionary(amount) && (amount.previous === true || amount.eventAmount === true) && Object.keys(amount).every(key => ['previous', 'eventAmount', 'scale'].includes(key)) && !(amount.previous && amount.eventAmount) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
-  if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
-  fail(path, 'expected finite number or {stat}, {resource}, {stacks:true}')
+  if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.grantorStat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
+  fail(path, 'expected finite number or {stat}, {grantorStat}, {resource}, {stacks:true}')
 }
 function validateCondition(condition, path, catalog) {
   if (!conditionNames.includes(condition.kind)) fail(path, 'unknown condition')
