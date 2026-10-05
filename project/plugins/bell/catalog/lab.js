@@ -9,7 +9,7 @@ export const labAbilities = {
 export const labItems = {
   sapwoodStaff: { name: 'Sapwood Staff', mark: '|', footprint: [1, 3], tags: ['growth', 'staff'], stats: { potency: 1 }, abilities: ['sapAttacker'], description: 'When your recruit is hit, the attacker is Sapped: it deals less damage, equal to potency (1), for the rest of the fight. Does not stack.' },
   thornTotem: { name: 'Thorn Totem', mark: 'Y', footprint: [1, 2], tags: ['growth', 'totem'], stats: { potency: 2 }, abilities: ['thornLash'], description: 'When your recruit is hit, give the attacker Poison equal to its potency (2).' },
-  blightMortar: { name: 'Blight Mortar', mark: 'O', footprint: [1, 1], tags: ['alchemy', 'tool'], stats: { potency: 1 }, abilities: ['blight'], description: 'At cycle start, give the enemy Poison equal to its potency (1).' },
+  blightMortar: { name: 'Blight Mortar', mark: 'O', footprint: [1, 1], tags: ['alchemy', 'growth', 'tool'], stats: { potency: 1 }, abilities: ['blight'], description: 'At cycle start, give the enemy Poison equal to its potency (1).' },
   sporeIdol: { name: 'Spore Idol', mark: '*', footprint: [1, 1], tags: ['growth', 'relic'], abilities: [], stats: { potency: 1 }, auras: [{ target: { kind: 'adjacentItems', ownerOnly: true }, stat: 'potency', amount: { stat: 'potency' } }], description: 'Every edge-touching item has +1 potency. Only items that use potency benefit.' },
   thornsapVial: { name: 'Thornsap Vial', mark: 'v', footprint: [1, 1], tags: ['alchemy', 'growth'], stats: { potency: 2 }, abilities: ['coatTotem'], description: 'Totem touching the right edge: +2 potency until cycle end. Once per cycle.' }
 }

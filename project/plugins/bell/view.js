@@ -1,6 +1,6 @@
 /** A landscape game field keeps the battle above inventory, with loot shown as a game overlay. */
 import { art, enemyPortrait } from './art.js'
-import { familyItems } from './catalog/families.js'
+import { familyEmblem, familyLabel, familyTint } from './power-families.js'
 import { familyKits } from './family-lab.js'
 import { cacheCost, findInterval } from './loop.js'
 import { rules, itemDefinition } from './rules.js'
@@ -19,7 +19,7 @@ function rewardOverlay(kit, journey) {
   if (journey.rewardKind === 'salvage') return `<div class="menu-shade"><section class="loot-sheet"><h2>ROOM CLEARED · SALVAGE</h2><p>${escape(journey.message)}</p>${kit.button('Gather salvage & descend', { action: 'descend' })}${retreat}</section></div>`
   return `<div class="menu-shade"><section class="loot-sheet"><h2>${journey.expedition && journey.cleared >= journey.expedition.goal ? 'WARDEN DEFEATED · CHOOSE A KEEPSAKE' : journey.rewardKind === 'room' ? 'VICTORY · CHOOSE YOUR FIND' : 'SCAVENGED CACHE'}</h2><p>${escape(journey.message)}</p><div class="loot-choices">${journey.choices.map(type => {
     const item = rules.catalog.items[type]
-    return `<section class="loot-card">${art(kit, type, item.name)}<strong>${escape(item.name)}</strong>${familyItems[type] ? '<small>FAMILY ITEM</small>' : ''}<small>${item.storage ? item.storage.columns + '×3 container' : item.footprint.join('×') + ' slots'}</small><p>${escape(item.description)}</p>${kit.button('Keep ' + item.name, { action: 'claim', value: type })}</section>`
+    return `<section class="loot-card">${art(kit, type, item.name)}<strong>${escape(item.name)}</strong>${familyLabel(kit, item)}<small>${item.storage ? item.storage.columns + '×3 container' : item.footprint.join('×') + ' slots'}</small><p>${escape(item.description)}</p>${kit.button('Keep ' + item.name, { action: 'claim', value: type })}</section>`
   }).join('')}</div>${retreat}</section></div>`
 }
 function glanceLines(battle, id) {
@@ -65,7 +65,7 @@ export function view(kit, state) {
     const connected = preview?.links.filter(link => [link.source, link.target].includes(item.id)) ?? []
     const isLate = connected.some(link => link.kind === 'late')
     const marker = planning ? `<span class="scan-marker" aria-label="${order[item.id] ? 'Normal turn ' + order[item.id] : 'Passive from cycle start'}">${order[item.id] ?? 'P'}</span>` : ''
-    return `<div class="equipment-shape ${connected.length ? 'preview-linked' : ''} ${isLate ? 'preview-late' : ''} ${item.id === state.selected ? 'selected' : ''} ${state.link && [state.link, state.selected].includes(item.id) ? 'linked' : ''} ${item.id === state.step?.source?.id ? 'source item-attack' : ''} ${item.id === state.step?.target?.id ? 'target' : ''}" data-item="${item.id}" data-key="item:${item.id}:${item.id === state.step?.source?.id ? state.serial : 0}" style="grid-column:${item.position[0] + 1 + shiftOf(item.id)}/span ${definition.footprint[0]};grid-row:${item.position[1] + 1}/span ${definition.footprint[1]}">${marker}${connected.length ? `<span class="connection-marker">${isLate ? '!' : '↔'}</span>` : ''}${art(kit, item.type, definition.name)}<small>${escape(definition.name)}</small>${journey.descent ? levelBadge(journey, item.id, ready) : ''}${glanceLines(battle, item.id)}${item.id === state.step?.source?.id && state.step.kind === 'ability' ? `<span class="fired">${escape(firedGlance(state.step))}</span>` : ''}${equipmentFeedback(item)}</div>`
+    return `<div class="equipment-shape ${connected.length ? 'preview-linked' : ''} ${isLate ? 'preview-late' : ''} ${item.id === state.selected ? 'selected' : ''} ${state.link && [state.link, state.selected].includes(item.id) ? 'linked' : ''} ${item.id === state.step?.source?.id ? 'source item-attack' : ''} ${item.id === state.step?.target?.id ? 'target' : ''}" data-item="${item.id}" data-key="item:${item.id}:${item.id === state.step?.source?.id ? state.serial : 0}" style="${familyTint(definition)}grid-column:${item.position[0] + 1 + shiftOf(item.id)}/span ${definition.footprint[0]};grid-row:${item.position[1] + 1}/span ${definition.footprint[1]}">${marker}${familyEmblem(kit, definition)}${connected.length ? `<span class="connection-marker">${isLate ? '!' : '↔'}</span>` : ''}${art(kit, item.type, definition.name)}<small>${escape(definition.name)}</small>${journey.descent ? levelBadge(journey, item.id, ready) : ''}${glanceLines(battle, item.id)}${item.id === state.step?.source?.id && state.step.kind === 'ability' ? `<span class="fired">${escape(firedGlance(state.step))}</span>` : ''}${equipmentFeedback(item)}</div>`
   })
   const badges = edgeBadges(battle, connectionLinks(battle).links).map(badge => `<div class="edge-anchor" style="grid-column:${badge.cell[0] + 1 + shiftOf(badge.source)};grid-row:${badge.cell[1] + 1}"><span class="edge-badge edge-${badge.side} ${badge.kinds.map(kind => 'link-' + kind).join(' ')}">${badge.labels.map(escape).join('<br>')}</span></div>`)
   const packs = Object.values(battle.items).filter(item => item.position && itemDefinition(battle, item.id).storage)
@@ -74,7 +74,7 @@ export function view(kit, state) {
   const socket = hasReservePack ? kit.button('＋\nPACK', { action: 'snap', class: 'pack-socket valid', label: 'Attach selected pack to right edge' }) : ''
   const reserve = Object.values(battle.items).filter(item => !item.position || itemDefinition(battle, item.id).storage).map(item => {
     const definition = itemDefinition(battle, item.id)
-    return `<div class="reserve-art">${art(kit, item.type, definition.name)}${kit.button(`${definition.name}\n${definition.storage ? item.position ? 'ATTACHED' : definition.storage.columns + '×3 container' : definition.footprint.join('×')}`, { action: 'select', value: item.id, class: 'item-choice' })}</div>`
+    return `<div class="reserve-art" style="${familyTint(definition)}">${familyEmblem(kit, definition)}${art(kit, item.type, definition.name)}${kit.button(`${definition.name}\n${definition.storage ? item.position ? 'ATTACHED' : definition.storage.columns + '×3 container' : definition.footprint.join('×')}`, { action: 'select', value: item.id, class: 'item-choice' })}</div>`
   })
   const actor = id => {
     const actor = battle.actors[id]

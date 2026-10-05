@@ -241,3 +241,19 @@ test('a draw holds at most two level cards and ends with something new while new
     assert.ok(cards.some(card => ['item', 'tome'].includes(card.kind)), JSON.stringify(cards))
   }
 })
+
+test('every Descent item shows its power family on the grid, the tooltip and the level-up cards', async () => {
+  const { fixture } = await import('../tools/ui-fixture.mjs')
+  const { familyOf } = await import('../plugins/bell/power-families.js')
+  const { descentPool } = await import('../plugins/bell/descent/pool.js')
+  assert.ok(descentPool.filter(type => !rules.catalog.items[type].tags.includes('consumable')).every(type => familyOf(rules.catalog.items[type])), 'each pool item that is not a consumable names a family')
+  const game = fixture({ hub: true })
+  game.panel.on.goDown('rook')
+  assert.match(game.panel.html(), /class="equipment-shape[^"]*"[^>]*style="--family:#6fa8dc;/)
+  game.panel.on.select(Object.keys(game.read().journey.battle.items)[0])
+  assert.match(game.panel.html(), /COMBAT FAMILY/)
+  game.panel.on.fight()
+  for (let tick = 0; tick < 600 && game.read().journey.phase === 'battle'; tick++) game.tick(1, 0.05)
+  assert.equal(game.read().journey.phase, 'levelUp')
+  assert.ok((game.panel.html().match(/class="family-label"/g) ?? []).length >= 2)
+})

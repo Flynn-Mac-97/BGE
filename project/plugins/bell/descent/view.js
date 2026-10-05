@@ -1,5 +1,6 @@
 /** Descent screens in the monochrome text style: the Lantern hub, the run header, cards, chest and summary. */
 import { art } from '../art.js'
+import { familyLabel } from '../power-families.js'
 import { rules, itemReference } from '../rules.js'
 import { escape } from '../inspection.js'
 import { shortStat } from '../glance.js'
@@ -74,9 +75,9 @@ const cardFaces = {
   level: (run, card) => {
     const item = run.items[card.id]
     const changes = cardStats(run, card).map(change => `${shortStat(change.stat)} ${change.from} → ${change.to}`).join(' · ')
-    return { image: item.type, title: itemName(item.type), sub: `LEVEL ${item.level} → ${item.level + 1}`, text: changes, hint: evolutionHint(run, item.type) }
+    return { image: item.type, type: item.type, title: itemName(item.type), sub: `LEVEL ${item.level} → ${item.level + 1}`, text: changes, hint: evolutionHint(run, item.type) }
   },
-  item: (run, card) => ({ image: card.type, title: itemName(card.type), sub: `NEW · ${rules.catalog.items[card.type].footprint.join('×')}`, text: rules.catalog.items[card.type].description, hint: evolutionHint(run, card.type) }),
+  item: (run, card) => ({ image: card.type, type: card.type, title: itemName(card.type), sub: `NEW · ${rules.catalog.items[card.type].footprint.join('×')}`, text: rules.catalog.items[card.type].description, hint: evolutionHint(run, card.type) }),
   widen: run => ({ image: 'pack', title: 'Wider Back', sub: `GRID ${run.columns} → ${run.columns + 1} COLUMNS`, text: 'Room for one more column of gear.', hint: '' }),
   tome: (run, card) => ({ image: 'boundBook', title: tomeNames[card.id], sub: `TOME · READ ${run.tomes?.[card.id] ?? 0} → ${(run.tomes?.[card.id] ?? 0) + 1}`,
     text: card.id === 'vigor' ? `+${tuning.tomes.vigor.health} max HP for the rest of the run.` : `+${tuning.tomes.might.bonus} to every number on all your gear, now and for every item you find.`, hint: '' }),
@@ -88,7 +89,7 @@ const overlays = {
     const run = journey.descent
     const cards = run.cards.map((card, index) => {
       const face = cardFaces[card.kind](run, card)
-      return `<section class="loot-card descent-card">${art(kit, face.image, face.title)}<strong>${escape(face.title)}</strong><small>${escape(face.sub)}</small><p>${escape(face.text)}</p>${face.hint ? `<p class="card-hint">${escape(face.hint)}</p>` : ''}${kit.button('Take', { action: 'card', value: index })}</section>`
+      return `<section class="loot-card descent-card">${art(kit, face.image, face.title)}<strong>${escape(face.title)}</strong>${face.type ? familyLabel(kit, rules.catalog.items[face.type]) : ''}<small>${escape(face.sub)}</small><p>${escape(face.text)}</p>${face.hint ? `<p class="card-hint">${escape(face.hint)}</p>` : ''}${kit.button('Take', { action: 'card', value: index })}</section>`
     }).join('')
     const more = run.pendingLevels > 1 ? ` ${run.pendingLevels - 1} more after this.` : ''
     return `<div class="menu-shade"><section class="loot-sheet"><h2>${escape(descentCrew[run.crew].name.toUpperCase())} GREW TO LEVEL ${run.level + 1}! · CHOOSE ONE</h2><p>${escape(journey.message)}${more}</p><div class="loot-choices">${cards}</div>${kit.button(`Reroll · ${run.rerolls} left`, { action: 'reroll', isDisabled: run.rerolls < 1 })}</section></div>`
