@@ -42,9 +42,12 @@ deaths; use it after any change to the numbers.
 
 The kind multipliers aim for a curve, not walls: normal floors cost about
 15% of health, elites about 30%, bosses about 60%, and bosses cause a little
-over half of all deaths (before this tuning they caused 80%, and normal floors
-cost under 10%). Measured with 40 bot runs each of Nettle, Rook and Briar,
-median floor about 20.
+over half of all deaths. The numbers are set against the test-bout bot
+(`tools/descent-bot.mjs`), which plays well, so a person who plans less goes
+less deep. Measured with 40 runs per crew: median floor 20 for Rook, Nettle
+and Briar and 25 for Pip; normal floors cost 11–16%, elites 28–40%, bosses
+48–68%; bosses cause 85 of 160 deaths. Pip's poison build is still the
+strongest start.
 
 From level 3, an item that can evolve shows ⇄ on its badge, and the list under
 the reserve says what it still needs: find the partner, touch it, reach level
@@ -74,8 +77,8 @@ A new item that completes something the run owns (an evolution partner, or the
 payoff a feeder unlocks) is `cards.synergyWeight` times as likely to be offered,
 so builds come together.
 
-Measured with 40 bot runs each, median floor: Rook 23, Nettle 30, Pip 30
-(the older bot on the old pool: 18, 20, 25). 0.63 evolutions a run, two thirds
+Before the enemy retune, this bot reached median floor 23 (Rook), 30 (Nettle)
+and 30 (Pip); the older bot on the old pool reached 18, 20 and 25. 0.63 evolutions a run, two thirds
 of them Widow's Fang: every crew starts with the Rusty Dagger and Venom Vial is
 a common drop, so the poison evolution is the easiest one to reach.
 
