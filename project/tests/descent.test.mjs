@@ -14,6 +14,14 @@ function takeCard(journey, index, random) {
   trainItem(journey, Object.keys(journey.descent.items)[0], random)
 }
 
+/** A fresh run holding the dagger and Venom Vial, Widow's Fang's recipe: the dagger is item-1, the vial item-2. */
+function daggerAndVenomRun(random) {
+  const journey = createRun(createProfile(), 'rook', random)
+  journey.descent.items = { 'item-1': { type: 'dagger', level: 1, position: [1, 0] }, 'item-2': { type: 'venom', level: 1, position: [0, 0] } }
+  journey.battle = battleFor(journey.descent)
+  return journey
+}
+
 /** Resolve cycles until the floor is decided. */
 function fightFloor(journey, random) {
   while (journey.phase === 'battle') {
@@ -65,7 +73,7 @@ test('rerolls are limited and new item cards never repeat an owned type', () => 
 
 test('an evolution needs its level and its partner touching on the grid', () => {
   const random = seededRandom(7)
-  const journey = createRun(createProfile(), 'pip', random)
+  const journey = daggerAndVenomRun(random)
   journey.descent.items['item-1'].level = 5
   journey.battle = battleFor(journey.descent)
   assert.deepEqual(readyEvolutions(journey).map(ready => ready.into), ['widowFang'])
@@ -147,7 +155,7 @@ test('the Lantern hub starts a run, a card is taken through the panel, and givin
 test('the battle box narrates hits, poison and statuses, and skips stack bookkeeping', async () => {
   const { battleLine } = await import('../plugins/bell/descent/battle-stage.js')
   const random = seededRandom(2)
-  const journey = createRun(createProfile(), 'pip', random)
+  const journey = daggerAndVenomRun(random)
   const lines = []
   for (let cycle = 0; cycle < 3 && journey.phase === 'battle'; cycle++) {
     const result = rules.resolveCycle(journey.battle, { afterCycle: ['enemy'] })
@@ -225,7 +233,7 @@ test('a banked run goes into the play log with its build and each floor fought',
 test('a level-3 item names what its evolution still needs, and consumables keep turning up in draws', async () => {
   const { evolutionHints } = await import('../plugins/bell/descent/view.js')
   const random = seededRandom(7)
-  const journey = createRun(createProfile(), 'pip', random)
+  const journey = daggerAndVenomRun(random)
   const hint = () => evolutionHints(journey)[0]?.text
   assert.equal(hint(), undefined)
   journey.descent.items['item-1'].level = 3

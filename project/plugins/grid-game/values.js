@@ -15,17 +15,22 @@ export function rollDie(state, sides) {
   return 1 + ((value ^ (value >>> 16)) >>> 0) % sides
 }
 
-/** Expressions deliberately have no arbitrary scripts or recursive stat references. */
-export function amountOf(frame, expression, subject = frame.source) {
+/**
+ * Expressions deliberately have no arbitrary scripts or recursive stat references. `target` is the effect's target:
+ * `{ targetStat, scale }` reads it. A `scale` on a stat, resource or target stat rounds down, so health stays whole.
+ */
+export function amountOf(frame, expression, subject = frame.source, target = null) {
   if (typeof expression === 'number') return expression
   if (expression.previous) return (frame.previousAmount ?? 0) * (expression.scale ?? 1)
   if (expression.eventAmount) return (frame.event?.amount ?? 0) * (expression.scale ?? 1)
   if (expression.stacks) return frame.status?.stacks ?? 0
   if (expression.roll) return rollDie(frame.state, expression.roll) * (expression.scale ?? 1)
+  if (expression.targetStat) return target ? Math.floor(statOf(frame.state, frame.catalog, target, expression.targetStat) * (expression.scale ?? 1)) : 0
+  if (expression.stat && expression.scale !== undefined) return Math.floor(statOf(frame.state, frame.catalog, subject, expression.stat) * expression.scale)
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)
   // A granted ability reads the item that grants it, so a totem's level grows what it gives.
   if (expression.grantorStat) return frame.grantor ? statOf(frame.state, frame.catalog, frame.grantor, expression.grantorStat) : 0
-  if (expression.resource) return entityOf(frame.state, subject).resources[expression.resource] ?? 0
+  if (expression.resource) return Math.floor((entityOf(frame.state, subject).resources[expression.resource] ?? 0) * (expression.scale ?? 1))
   return 0
 }
 

@@ -91,6 +91,29 @@ than they did, and new items fall off more slowly as the run owns more. Before
 this, about 70% of all cards offered were level cards and a run saw about 10
 of the 21 new items; now under half are level cards and a run sees about 14.
 
+## Enemy threats and family powers
+
+Every enemy has threats that ask a build for a different answer
+(`descent/enemies.js`, `enemyTraits`): Heavy Blow (a huge hit every 3rd cycle:
+Sap, Smoke, guard), Plated (thick guard each cycle: strip it or go through it),
+Purifier (washes off Poison, Bleed, Burn, Shock and Curse: hit it directly),
+Swarm (three extra small blows: thorns and hit-triggered items), Regrowth
+(heals a lot: Bleed, Curse, burst) and Spiked (hurts you when hit: few big
+hits). Normal enemies have one, elites two, bosses three; they show as chips
+on the enemy's nameplate and in the floor's opening line.
+
+Family powers (`descent/family-powers.js`): with 3 items of one family on the
+grid its power is on; with 5 it applies twice. Arms Drill (Combat): weapons
++25% damage. Living Bark (Growth): every heal also gives that much guard.
+Resonance (Scholarship): each status stack put on the foe also deals 1 damage
+through guard. Blood Frenzy (Hunger): below half health, weapons +40% damage.
+Lucky Haul (Scavenging): a d6 of Salvage each cycle, and weapons +1 damage per
+2 Salvage. They are recruit abilities with a `tagCountAtLeast` condition, so
+moving a piece off the grid turns its power off. The list beside the grid shows
+each family's count. Pip starts with Scholarship pieces and Moss with
+Scavenging ones, so not every run starts in Combat or Growth. With the bot, 139
+of 180 final builds reach a family power, across all five families.
+
 ## Prestige: Bells, the endless Tower and mastery
 
 Bells for a won floor grow with depth (`bells.growth` per floor), and a floor

@@ -57,6 +57,8 @@ test('entering practice cannot discard a pending dungeon combat', () => {
 })
 test('Thorn Warden reacts only to hits on its owner, and Sapped lowers the next hit', () => {
   let battle = createFamilyJourney('thorn').battle
+  // The kit holds seven Growth items, so its family power would turn heals into guard and block the dummy; this test is about the thorns.
+  battle.actors.recruit.abilities = []
   const fired = []
   for (let cycle = 0; cycle < 3; cycle++) {
     const result = rules.resolveCycle(battle, { afterCycle: ['enemy'] })

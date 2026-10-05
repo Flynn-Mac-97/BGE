@@ -12,6 +12,8 @@ import { evolutionRecipes } from '../plugins/bell/descent/evolutions.js'
 import { battleFor, recipeFor, maxHealthOf, completesOwned, buyFromPeddler, sellToPeddler } from '../plugins/bell/descent/run.js'
 import { consumablePool, poolNeeds } from '../plugins/bell/descent/pool.js'
 import { tuning } from '../plugins/bell/descent/tuning.js'
+import { familyOf } from '../plugins/bell/power-families.js'
+import { familyPowerThresholds } from '../plugins/bell/descent/family-powers.js'
 
 // Two cycles see cycle-end payoffs (Shock, Curse, Poison) and keep a test bout cheap.
 const TEST_CYCLES = 2
@@ -96,7 +98,15 @@ function battleAfter(run, card) {
 }
 
 /** True when a type is worth more than its bout shows: it completes something owned, or it feeds a payoff. */
-const isSynergy = (run, type) => completesOwned(new Set(Object.values(run.items).map(item => item.type)), type) || Object.values(poolNeeds).includes(type)
+const isSynergy = (run, type) => completesOwned(new Set(Object.values(run.items).map(item => item.type)), type) || Object.values(poolNeeds).includes(type) || isNearFamilyPower(run, type)
+
+/** True when owning this type brings its family to within one item of a power threshold (2, 3, 4 or 5 of a family). */
+function isNearFamilyPower(run, type) {
+  const family = familyOf(rules.catalog.items[type])
+  if (!family) return false
+  const owned = Object.values(run.items).filter(item => familyOf(rules.catalog.items[item.type]) === family).length + 1
+  return familyPowerThresholds.some(threshold => owned === threshold || owned === threshold - 1)
+}
 
 // What a card is worth besides its test bout, as a share of the current score.
 const SYNERGY_BONUS = 0.15

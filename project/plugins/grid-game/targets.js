@@ -61,6 +61,8 @@ const conditions = {
   cycleEvery: (frame, condition) => frame.state.cycle % condition.amount === 0,
   eventAmountAtLeast: (frame, condition) => (frame.event?.amount ?? 0) >= condition.amount,
   hasTag: (frame, condition, subject) => definitionOf(frame.state, frame.catalog, subject).tags?.includes(condition.tag) ?? false,
+  // How many placed items the subject's owner has with a tag: a family count for set powers.
+  tagCountAtLeast: (frame, condition, subject) => placedItems(frame.state).filter(item => item.owner === ownerOf(frame.state, subject).id && frame.catalog.items[item.type].tags?.includes(condition.tag)).length >= condition.amount,
   hasStatus: (frame, condition, subject) => (entityOf(frame.state, subject).statuses[condition.status]?.stacks ?? 0) >= (condition.amount ?? 1),
   resourceAtLeast: (frame, condition, subject) => (entityOf(frame.state, subject).resources[condition.resource] ?? 0) >= condition.amount,
   healthBelow: (frame, condition, subject) => {

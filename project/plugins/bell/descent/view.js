@@ -11,6 +11,8 @@ import { masteryLevel, nextMasteryXp } from './mastery.js'
 import { evolutionRecipes } from './evolutions.js'
 import { unlockedCrew } from './profile-save.js'
 import { sellPrice } from './peddler.js'
+import { familyPowers, familyPowerThresholds, familyCounts } from './family-powers.js'
+import { powerFamilies } from '../power-families.js'
 import { embersNeeded, regionOf, cardStats, recipeFor, readyEvolutions, maxHealthOf, chargesLeft, tomeNames } from './run.js'
 
 const itemName = type => rules.catalog.items[type].name
@@ -56,6 +58,18 @@ export function levelBadge(journey, id, readyIds) {
   const mastery = journey.descent.mastery?.[item.type] ?? 0
   return `<span class="level-badge ${isEvolved ? 'evolved' : ''}">L${item.level}${mastery ? ` ✦${mastery}` : ''}${readyIds.has(id) ? ' ★' : item.level >= tuning.evolveLevel - 2 && recipeFor(item.type) ? ' ⇄' : ''}</span>${charges}`
 }
+/** Each family's count on the grid and its power, lit at 3 and doubled at 5. */
+export function familyPowerList(kit, battle) {
+  const counts = familyCounts(battle)
+  const rows = Object.keys(powerFamilies).map(family => {
+    const count = counts[family], [first, second] = familyPowerThresholds
+    const state = count >= second ? 'doubled' : count >= first ? 'active' : ''
+    const label = state === 'doubled' ? '×2' : state ? 'ON' : `${count}/${first}`
+    return `<li class="family-power ${state}" title="${escape(familyPowers[family].text)}">${familyEmblem(kit, { tags: [family] })}<span><b>${escape(familyPowers[family].title)}</b> ${label}<small>${escape(familyPowers[family].text)}</small></span></li>`
+  }).join('')
+  return `<ul class="family-powers">${rows}</ul>`
+}
+
 /** From level 3, what each placed item still needs to evolve: `[{ id, text, isReady }]`. */
 export function evolutionHints(journey) {
   const ready = readyIds(journey)

@@ -16,6 +16,7 @@ import { evolutionRecipes } from './evolutions.js'
 import { towerBonus } from './tower.js'
 import { peddlerStock, buyWare, sellItem } from './peddler.js'
 import { masteryLevels, gainMastery } from './mastery.js'
+import { familyPowerAbilities } from './family-powers.js'
 
 /** A catalog stat at an item level. */
 export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)))
@@ -72,7 +73,7 @@ function enemyActor(enemy, floor) {
 export function battleFor(run) {
   const maxHealth = maxHealthOf(run)
   const battle = rules.createState({ columns: run.columns, rows: tuning.grid.rows,
-    actors: { recruit: { name: descentCrew[run.crew].name, team: 'crew', maxHealth, health: Math.min(maxHealth, run.health), resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 } }, enemy: enemyActor(run.enemy, run.floor) },
+    actors: { recruit: { name: descentCrew[run.crew].name, team: 'crew', maxHealth, health: Math.min(maxHealth, run.health), resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 }, abilities: familyPowerAbilities }, enemy: enemyActor(run.enemy, run.floor) },
     items: Object.entries(run.items).map(([id, item]) => ({ id, type: item.type, owner: 'recruit', position: null })) })
   // Dice differ from floor to floor but replay the same on one floor.
   battle.rolls = { seed: run.floor * 7919 + run.level, count: 0 }
@@ -90,7 +91,8 @@ function floorMessage(run) {
   const region = regionOf(run.floor)
   const entered = region.from === run.floor ? `You descend into ${region.name}. ${region.line} ` : ''
   const kind = { normal: '', elite: 'An elite blocks the stair. ', boss: 'The stair ends at a great door. ' }[run.enemy.kind]
-  return `Floor ${run.floor}. ${entered}${kind}${run.enemy.line}`
+  const threats = (run.enemy.traits ?? []).map(id => enemyTraits[id].name)
+  return `Floor ${run.floor}. ${entered}${kind}${run.enemy.line}${threats.length ? ` Threat: ${threats.join(', ')}.` : ''}`
 }
 
 /** A new run for one crew member, with the profile's Bell Tower ranks applied. */

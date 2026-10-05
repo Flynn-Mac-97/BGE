@@ -109,3 +109,9 @@ test('dice replay the same for one seed and change with the seed', () => {
   assert.notDeepEqual(rolls(7), rolls(8))
   for (const amount of [...rolls(7), ...rolls(8)]) assert.ok(amount >= 1 && amount <= 6, String(amount))
 })
+
+test('Bone Club hurting you does not make Thorn Totem or Sapwood Staff poison or sap your own club', () => {
+  const { state } = testFight({ kit: [['woodenClub', right], ['thornTotem', [3, 0]], ['sapwoodStaff', [4, 0]]] })
+  for (const item of Object.values(state.items)) assert.deepEqual(Object.keys(item.statuses).filter(id => ['poison', 'sapped'].includes(id)), [], item.type)
+  assert.ok(state.actors.enemy.statuses.poison, 'the enemy still gets poisoned when it hits you')
+})

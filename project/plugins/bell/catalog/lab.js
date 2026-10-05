@@ -1,7 +1,9 @@
 /** Lab-only design mocks: playable in Family Lab, never offered as dungeon or campaign loot. */
 export const labAbilities = {
-  sapAttacker: { trigger: { event: 'damageTaken', target: { kind: 'owner' } }, target: { kind: 'eventSource' }, effects: [{ type: 'applyStatus', status: 'sapped', amount: { stat: 'potency' } }] },
-  thornLash: { trigger: { event: 'damageTaken', target: { kind: 'owner' } }, target: { kind: 'eventSource' }, effects: [{ type: 'applyStatus', status: 'poison', amount: { stat: 'potency' } }] },
+  // Only an enemy's hit counts: your own Bone Club also hurts you, and an item must not be poisoned or Sapped.
+  sapAttacker: { trigger: { event: 'damageTaken', target: { kind: 'owner' }, source: { kind: 'enemy' } }, target: { kind: 'eventSource' }, effects: [{ type: 'applyStatus', status: 'sapped', amount: { stat: 'potency' } }] },
+  // Only an enemy's hit counts: your own Bone Club also hurts you, and an item must not be poisoned or Sapped.
+  thornLash: { trigger: { event: 'damageTaken', target: { kind: 'owner' }, source: { kind: 'enemy' } }, target: { kind: 'eventSource' }, effects: [{ type: 'applyStatus', status: 'poison', amount: { stat: 'potency' } }] },
   blight: { trigger: { event: 'cycleStart' }, target: { kind: 'enemy' }, effects: [{ type: 'applyStatus', status: 'poison', amount: { stat: 'potency' } }] },
   coatTotem: { trigger: { event: 'ownTurn' }, target: { kind: 'directionalNeighbour', direction: 'right', tags: ['totem'], ownerOnly: true },
     effects: [{ type: 'applyStatus', status: 'thornsap', amount: { stat: 'potency' } }], limit: { perCycle: 1 } }

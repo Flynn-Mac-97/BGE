@@ -41,7 +41,7 @@ export function duelDraftStage(kit, state) {
 /** Player 1 below, Player 2 above, both with their gear. */
 export function duelCast(state) {
   const journey = state.journey, duel = journey.duel
-  const fighter = (index, owner) => ({ portrait: descentCrew[duel.players[index].portrait].portrait, title: descentCrew[duel.players[index].portrait].name, tag: `P${index + 1}`, rank: index ? 'rival' : 'hero', meter: null, showNumbers: true,
+  const fighter = (index, owner) => ({ portrait: descentCrew[duel.players[index].portrait].portrait, title: descentCrew[duel.players[index].portrait].name, tag: `P${index + 1}`, rank: index ? 'rival' : 'hero', meter: null, showNumbers: true, threats: [],
     gear: placedItems(journey.battle).filter(item => item.owner === owner).map(item => ({ type: item.type, level: duel.rules.level })) })
   return { key: `duel-${duel.fights ?? 0}`, idle: state.message || journey.message, hero: fighter(0, 'recruit'), foe: fighter(1, 'enemy') }
 }
