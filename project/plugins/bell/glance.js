@@ -38,7 +38,7 @@ const effectText = {
   damage: (effect, amount) => `${amount} DMG`, heal: (effect, amount) => `+${amount} HP`, guard: (effect, amount) => `+${amount} GD`,
   applyStatus: (effect, amount) => statusText(effect.status, amount), removeStatus: (effect, amount) => `−${amount} ${shortStatus(effect.status)}`,
   modifyStat: (effect, amount) => `${signed(amount)} ${shortStat(effect.stat)}`, resource: (effect, amount) => `${signed(amount)} ${resourceShort[effect.resource] ?? effect.resource.toUpperCase()}`,
-  removeGuard: (effect, amount) => `−${amount} GD`, consumeStatus: (effect, amount) => `SPEND ${amount} ${shortStatus(effect.status)}`,
+  removeGuard: (effect, amount) => `−${amount} GD`, consumeStatus: (effect, amount) => `SPEND ${amount >= 99 ? 'ALL' : amount} ${shortStatus(effect.status)}`,
   transferResource: (effect, amount) => `MOVE ${amount} ${resourceShort[effect.resource] ?? effect.resource.toUpperCase()}`,
   modifyCharges: (effect, amount) => `${signed(amount)} USES`, triggerItem: () => 'AGAIN'
 }
