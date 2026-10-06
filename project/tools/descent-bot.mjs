@@ -15,18 +15,20 @@ import { tuning } from '../plugins/bell/descent/tuning.js'
 import { familyOf } from '../plugins/bell/power-families.js'
 import { familyPowerThresholds } from '../plugins/bell/descent/family-powers.js'
 
-// Two cycles see cycle-end payoffs (Shock, Curse, Poison) and keep a test bout cheap.
+// Two cycles see cycle-end payoffs (Shock, Curse, Poison) and keep a placement bout cheap. A card is worth what it does
+// over a whole fight, so stacking and growing items count: eight cycles is longer than a boss fight lasts.
 const TEST_CYCLES = 2
+const WORTH_CYCLES = 8
 const ENDLESS = 1e6
 
-/** Damage dealt minus health lost in a test bout against the floor's enemy, which cannot die. */
-export function layoutScore(battle) {
+/** Damage dealt minus health lost in a test bout of `cycles` against the floor's enemy, which cannot die. */
+export function layoutScore(battle, cycles = TEST_CYCLES) {
   let bout = structuredClone(battle)
   bout.actors.enemy.health = bout.actors.enemy.maxHealth = ENDLESS
   // Half health, so healing counts and "waits if health is full" items act.
   bout.actors.recruit.maxHealth = ENDLESS
   bout.actors.recruit.health = ENDLESS / 2
-  for (let cycle = 0; cycle < TEST_CYCLES; cycle++) bout = rules.resolveCycle(bout, { afterCycle: ['enemy'] }).state
+  for (let cycle = 0; cycle < cycles; cycle++) bout = rules.resolveCycle(bout, { afterCycle: ['enemy'] }).state
   return (ENDLESS - bout.actors.enemy.health) - (ENDLESS / 2 - bout.actors.recruit.health)
 }
 
@@ -118,7 +120,7 @@ function cardWorth(run, base, card) {
   if (card.kind === 'mend') return (1 - run.health / maxHealthOf(run)) * 0.5
   if (card.kind === 'item' && consumablePool.includes(card.type)) return CONSUMABLE_WORTH
   if (card.kind === 'tome' && card.id === 'vigor') return VIGOR_WORTH
-  let value = (layoutScore(battleAfter(run, card)) - base) / Math.max(1, Math.abs(base))
+  let value = (layoutScore(battleAfter(run, card), WORTH_CYCLES) - base) / Math.max(1, Math.abs(base))
   if (card.kind === 'item' && isSynergy(run, card.type)) value += SYNERGY_BONUS
   const item = run.items[card.id]
   const recipe = item && card.kind === 'level' && recipeFor(item.type)
@@ -129,15 +131,21 @@ function cardWorth(run, base, card) {
 /** The entry of `options` worth most, by `worthOf`. */
 const best = (options, worthOf) => options.map(option => ({ option, value: worthOf(option) })).sort((first, second) => second.value - first.value)[0]
 
+/** What each offered card is worth, in offer order: a whole-fight test bout as a share of the current score, plus synergy. */
+export function cardWorths(journey) {
+  const run = journey.descent, base = layoutScore(battleFor(run), WORTH_CYCLES)
+  return run.cards.map(card => cardWorth(run, base, card))
+}
+
 /** Index of the card worth most. */
 export function cardChoice(journey) {
-  const run = journey.descent, base = layoutScore(battleFor(run))
-  return best(run.cards.map((card, index) => index), index => cardWorth(run, base, run.cards[index])).option
+  const worths = cardWorths(journey)
+  return worths.indexOf(Math.max(...worths))
 }
 
 /** The item id whose training level is worth most. */
 export function trainChoice(journey) {
-  const run = journey.descent, base = layoutScore(battleFor(run))
+  const run = journey.descent, base = layoutScore(battleFor(run), WORTH_CYCLES)
   return best(Object.keys(run.items), id => cardWorth(run, base, { kind: 'level', id })).option
 }
 
@@ -148,7 +156,7 @@ const WORTH_PER_COIN = 0.01
 export function shop(journey) {
   const run = journey.descent
   for (let guard = 0; guard < 12; guard++) {
-    const base = layoutScore(battleFor(run))
+    const base = layoutScore(battleFor(run), WORTH_CYCLES)
     const dead = Object.keys(run.items).find(id => !isSynergy(run, run.items[id].type) && cardWorth(run, base, { kind: 'sell', id }) >= 0)
     if (dead && Object.keys(run.items).length > 1) { sellToPeddler(journey, dead); continue }
     const affordable = run.peddler.stock.map((ware, index) => index).filter(index => run.peddler.stock[index].price <= run.coin)

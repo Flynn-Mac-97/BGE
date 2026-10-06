@@ -67,8 +67,10 @@ Curse Idol + Reaping Seal → Hex Idol, Patch Kit + Salvager Pack → Scrap
 Crossbow (a weapon, so it can sit inside the pack and fund its own shots).
 
 `tools/descent-sim.mjs` plays with the bot in `tools/descent-bot.mjs`, which
-plans by trying: each candidate cell or card gets a two-cycle test bout against
+plans by trying: each candidate cell gets a two-cycle test bout against
 the floor's enemy (which cannot die), scored as damage dealt minus health lost.
+A card, a training level or a ware gets an eight-cycle bout instead, longer than
+a boss fight, so items that stack or grow are valued for the whole fight.
 It places each new item in its best cell, moves items that add nothing where
 they are, values a cell touching an evolution partner a quarter more, and adds
 a bonus for cards that complete something it owns. The older bot, which placed
