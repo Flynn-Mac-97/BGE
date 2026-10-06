@@ -12,7 +12,7 @@ export const familyPowers = {
   combat: { title: 'Arms Drill', text: 'Weapons deal +25% damage.' },
   growth: { title: 'Living Bark', text: 'Every heal you receive also gives that much guard.' },
   scholarship: { title: 'Resonance', text: 'Every status stack you put on the foe also deals 1 damage, through guard.' },
-  hunger: { title: 'Blood Frenzy', text: 'Below half health, weapons deal +40% damage.' },
+  hunger: { title: 'Blood Frenzy', text: 'Each hit you take feeds you 1 Hunger. Below half health, weapons deal +40% damage.' },
   scavenging: { title: 'Lucky Haul', text: 'Each cycle, roll a die for Salvage; weapons get +1 damage per 2 Salvage you hold.' }
 }
 
@@ -25,6 +25,8 @@ const powerAbilities = {
   growth: amount => ({ trigger: { event: 'healed', target: { kind: 'self' } }, target: { kind: 'self' }, conditions: [hasFamily('growth', amount)], effects: [{ type: 'guard', amount: { eventAmount: true } }] }),
   scholarship: amount => ({ trigger: { event: 'statusApplied', target: { kind: 'enemy' } }, target: { kind: 'eventTarget' }, conditions: [hasFamily('scholarship', amount)], effects: [{ type: 'damage', amount: { eventAmount: true }, bypassGuard: true }], limit: { perCycle: 8 } }),
   hunger: amount => ({ trigger: { event: 'cycleStart' }, target: weapons, conditions: [hasFamily('hunger', amount), { kind: 'healthBelow', ratio: 0.5, subject: 'self' }], effects: [{ type: 'modifyStat', stat: 'damage', amount: { targetStat: 'damage', scale: 0.4 }, duration: 'cycle' }] }),
+  // Feeds the Hunger that Blood Cup, Raw Meat and Hungry Tooth spend, so a family of hits pays for itself.
+  hungerFeed: amount => ({ trigger: { event: 'damageTaken', target: { kind: 'self' } }, target: { kind: 'self' }, conditions: [hasFamily('hunger', amount)], effects: [{ type: 'resource', resource: 'hunger', amount: 1 }], limit: { perCycle: 3 } }),
   scavenging: amount => ({ trigger: { event: 'cycleStart' }, target: weapons, conditions: [hasFamily('scavenging', amount)], effects: [{ type: 'resource', resource: 'salvage', amount: { roll: 6 }, target: { kind: 'self' } }, { type: 'modifyStat', stat: 'damage', amount: { resource: 'salvage', scale: 0.5 }, duration: 'cycle' }] })
 }
 

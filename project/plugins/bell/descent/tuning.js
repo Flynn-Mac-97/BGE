@@ -11,7 +11,7 @@ export const tuning = {
   // Consumables have their own weight, so they keep turning up however many items you own.
   // synergyWeight: a new item that completes something you own (an evolution partner, a payoff) is this many times as likely.
   // newFamilyWeight: likewise for an item of a power family you own nothing of; repeatFamilyWeight: for one whose family this draw already offers.
-  cards: { synergyWeight: 6, newFamilyWeight: 2, repeatFamilyWeight: 0.25,  count: 3, maxLevelCards: 1, upgradeWeight: 2.5, newItemWeight: 8, newItemFalloff: 0.9, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
+  cards: { synergyWeight: 6, newFamilyWeight: 2, repeatFamilyWeight: 0.25, count: 3, maxLevelCards: 1, upgradeWeight: 2.5, newItemWeight: 8, newItemFalloff: 0.9, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
   rerolls: 2,
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.

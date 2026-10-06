@@ -109,7 +109,7 @@ Family powers (`descent/family-powers.js`): with 3 items of one family on the
 grid its power is on; with 5 it applies twice. Arms Drill (Combat): weapons
 +25% damage. Living Bark (Growth): every heal also gives that much guard.
 Resonance (Scholarship): each status stack put on the foe also deals 1 damage
-through guard. Blood Frenzy (Hunger): below half health, weapons +40% damage.
+through guard. Blood Frenzy (Hunger): each hit you take feeds you 1 Hunger (up to 3 a cycle), and below half health weapons +40% damage.
 Lucky Haul (Scavenging): a d6 of Salvage each cycle, and weapons +1 damage per
 2 Salvage. They are recruit abilities with a `tagCountAtLeast` condition, so
 moving a piece off the grid turns its power off. The list beside the grid shows
@@ -245,3 +245,17 @@ Bells are never spent in a run: every run brings all its Bells home.
 A new item is `synergyWeight` (6) times as likely when it completes something owned, `newFamilyWeight` (2) times when the run owns nothing of its family, and `repeatFamilyWeight` (0.25) times when the same draw already offers its family, so a draw shows different families and crews leave their kit family. The Peddler's stock is drawn when he arrives, after the level-ups, so he never sells a type the run has just taken.
 
 Threat numbers after the floor-68 ruler (stat at floor 1, grown like damage): Heavy Blow 1.8 every 2nd cycle, Plated 10, Regrowth 8, Swarm 0.25, Spiked 0.45. Heavy Blow at 5 killed even the best builds in one hit by floors 40+, so every family lost one step to it; at 1.8 the best family matches its Plain depth and guard or healing is the answer. Plated and Regrowth were raised so Build Lab bursts no longer ignore them; tire starts at cycle 14 so they still cost a weak build a long fight but never a stall.
+
+
+## Items, kits and builds (gauntlet round 4)
+
+The ruler now values cards over a whole fight, so items that stack or grow count. Changes a player feels:
+
+- **Hunger is a stock any build can burn.** Raw Meat: touching weapons deal +1 damage per 2 Hunger you hold (it grows through the fight; any family's weapons want it). Blood Cup now earns its own Hunger from hits (1 a cycle) instead of waiting on Hungry Tooth. The Hunger power feeds Hunger from every hit, so Cup, Meat and Tooth pay for a build that takes hits. Resource amounts read by an item fall back to its owner's stock (`values.js`).
+- **Amplifiers work alone.** Wax Candle opens the fight with 2 Shock, Signet Ring with 2 Poison, and both still add 2 whenever the foe gains that status. Gambler's Chest also gives touching weapons +1 damage per 4 Salvage held. Purifying Salt gains 2 guard a turn besides washing out Poison.
+- **Kits.** Rook starts with Raw Meat beside the dagger (a soldier's rations; the first Hunger piece and an early cross-family payoff). Nettle starts with Purifying Salt (guard and a Poison wash for the Hedge Doctor). Rook's builds end mixed, Combat with Hunger, Growth and Scholarship pieces.
+- **A fourth evolution for the kit item every Rook has.** Whetstone touching the Rusty Dagger at level 5 becomes the Grindstone: touching weapons +potency damage, and the weapon to its right is sharpened for the same again. Rook and Nettle now meet an evolution on their own.
+- **Offers favour known pairs.** Twelve pairs the Build Lab found beat their parts (across families: Oil Lantern + Ward Tooth, Lockpicks + Plate Glove, Bedroll + Ward Tooth, Purifying Salt + Signet Ring, Torn Banner + Spore Idol, and more; `synergyPairs` in `pool.js`) count as "completes something owned": the second item is `synergyWeight` times as likely, and the bot values it for the synergy.
+- **Defence before a boss.** In a level-up draw one or two floors before a boss (floors 8-9, 18-19, ...), the first card is always a new item that guards or heals while one is left. Threats are unchanged.
+
+Seeded bot runs (5 crews x 10): mean floor 27.6 -> about 32; Rook median 15 -> 23; evolution in 28 of 46 runs that reach floor 15 (was 19 of 44).

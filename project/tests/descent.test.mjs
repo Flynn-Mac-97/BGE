@@ -2,7 +2,7 @@
 import { defineSuite } from '../tools/node-suite.mjs'
 import assert from 'node:assert/strict'
 import { rules } from '../plugins/bell/rules.js'
-import { createRun, finishFloor, collectChest, chooseCard, rerollCards, readyEvolutions, battleFor, levelStat, abandonRun, drawCards, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from '../plugins/bell/descent/run.js'
+import { completesOwned, createRun, finishFloor, collectChest, chooseCard, rerollCards, readyEvolutions, battleFor, levelStat, abandonRun, drawCards, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from '../plugins/bell/descent/run.js'
 import { createProfile, profileStore, settleRun, buyUpgrade, unlockedCrew } from '../plugins/bell/descent/profile-save.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 const { test, suite } = defineSuite('The Descent')
@@ -407,4 +407,26 @@ test('the Fast toggle plays a floor many times quicker than normal speed', async
   const game = fixture({ hub: true })
   game.panel.on.goDown('rook')
   assert.match(game.panel.html(), /data-action="fast"/)
+})
+
+test('a draw one or two floors before a boss opens with a new item that guards or heals; other draws are not forced', () => {
+  const isDefence = type => (rules.catalog.items[type].stats?.guard ?? 0) > 0 || (rules.catalog.items[type].stats?.heal ?? 0) > 0
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const run = createRun(createProfile(), 'rook', seededRandom(seed)).descent
+    for (const floor of [8, 9, 18, 19]) {
+      run.floor = floor
+      const first = drawCards(run, seededRandom(seed + floor))[0]
+      assert.ok(first.kind === 'item' && isDefence(first.type), `floor ${floor} seed ${seed}`)
+    }
+  }
+  const quiet = createRun(createProfile(), 'rook', seededRandom(1)).descent
+  quiet.floor = 5
+  const firsts = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(seed => drawCards(quiet, seededRandom(seed * 7919))[0].kind))
+  assert.ok(firsts.size > 1, 'away from a boss the first card varies in kind')
+})
+
+test('a known strong pair across families makes the second item count as completing the first', () => {
+  assert.ok(completesOwned(new Set(['dagger', 'tooth']), 'oilLantern'))
+  assert.ok(completesOwned(new Set(['oilLantern']), 'tooth'))
+  assert.ok(!completesOwned(new Set(['dagger']), 'oilLantern'))
 })

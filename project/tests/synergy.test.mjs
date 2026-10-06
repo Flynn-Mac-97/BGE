@@ -89,3 +89,11 @@ test('Lucky Haul: Scavenging at 3 items rolls Salvage every cycle', () => {
   const kit = [['pickaxe', [0, 0]], ['coinPurse', [1, 0]], ['lockpicks', [2, 0]]]
   assert.ok(fight({ kit, cycles: 2 }).battle.actors.recruit.resources.salvage > 0)
 })
+
+test('Blood Frenzy: Hunger at 3 items feeds Hunger from every hit taken, and Raw Meat burns it for weapon damage', () => {
+  const hungerKit = [['warPick', [0, 0]], ['ropeCoil', [1, 0]], ['leatherCap', [2, 0]]]
+  assert.ok(fight({ kit: hungerKit, cycles: 2 }).battle.actors.recruit.resources.hunger > 0)
+  assert.equal(fight({ kit: hungerKit.slice(0, 2), cycles: 2 }).battle.actors.recruit.resources.hunger, 0)
+  const foeHealth = position => fight({ kit: [['dagger', [0, 0]], ['meatJoint', position]], cycles: 5 }).battle.actors.enemy.health
+  assert.ok(foeHealth([1, 0]) < foeHealth([4, 2]), 'a touching Raw Meat adds damage; a distant one does not')
+})

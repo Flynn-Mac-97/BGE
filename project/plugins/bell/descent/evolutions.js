@@ -11,7 +11,8 @@ export const evolutionRecipes = [
   { from: 'banner', partner: 'stone', into: 'warStandard' },
   { from: 'stormTotem', partner: 'echo', into: 'tempestTotem' },
   { from: 'curseIdol', partner: 'reapingSeal', into: 'hexIdol' },
-  { from: 'patchKit', partner: 'salvagePack', into: 'scrapCrossbow' }
+  { from: 'patchKit', partner: 'salvagePack', into: 'scrapCrossbow' },
+  { from: 'stone', partner: 'dagger', into: 'grindstone' }
 ]
 
 export const evolvedAbilities = {
@@ -38,8 +39,9 @@ export const evolvedItems = {
   warStandard: { name: 'War Standard', mark: 'Ŝ', footprint: [1, 2], tags: ['evolved', 'relic', 'combat'], stats: { potency: 3 }, abilities: [], auras: [{ target: { kind: 'adjacentItems', tags: ['weapon'], ownerOnly: true }, stat: 'damage', amount: { stat: 'potency' } }], description: 'Every touching weapon has more damage, equal to its potency. Evolved from the Torn Banner.' },
   tempestTotem: { name: 'Tempest Totem', mark: 'Ṫ', footprint: [1, 1], tags: ['evolved', 'scholarship', 'relic'], stats: { potency: 4 }, grants: [{ id: 'tempest', target: { kind: 'area', shape: 'rays', directions: ['up', 'down', 'left', 'right'], range: 1, tags: ['weapon'], ownerOnly: true }, abilities: ['stormHit'] }], abilities: [], description: 'Touching weapons apply Shock equal to its potency on a damaging hit, twice per weapon per cycle. Shock discharges at cycle end, through guard. Evolved from the Storm Totem.' },
   hexIdol: { name: 'Hex Idol', mark: 'Ḣ', footprint: [1, 1], tags: ['evolved', 'hunger', 'relic'], stats: { potency: 2 }, abilities: ['hexDawn', 'deepenCurse'], description: 'Curse the enemy by its potency at the start and the end of every cycle. Evolved from the Curse Idol.' },
+  grindstone: { name: 'Grindstone', mark: 'Ğ', footprint: [1, 1], tags: ['evolved', 'tool', 'combat'], stats: { potency: 3 }, abilities: ['sharpen'], auras: [{ target: { kind: 'adjacentItems', tags: ['weapon'], ownerOnly: true }, stat: 'damage', amount: { stat: 'potency' } }], description: 'Every touching weapon has +potency damage, and the weapon to its right is sharpened for the same again. Evolved from the Whetstone.' },
   scrapCrossbow: { name: 'Scrap Crossbow', mark: 'Ẋ', footprint: [1, 1], tags: ['evolved', 'weapon', 'scavenging'], stats: { damage: 6, guard: 3 }, abilities: ['scrapShot'], description: 'Spend 2 combat Salvage to shoot for its damage and gain its guard. A weapon: inside the Salvager Pack it feeds itself. Evolved from the Patch Kit.' }
 }
 
 /** Placeholder art for evolved items, from the existing ink library. */
-export const evolvedArt = { widowFang: 'curvedSword', graveEdge: 'greatSword', bellHammer: 'spikedMace', heartleaf: 'oakLeaf', vampireChalice: 'ritualSkull', brambleThrone: 'rootBundle', rotCauldron: 'powderBomb', rootwardenStaff: 'spear', warStandard: 'runeTablet', tempestTotem: 'coilBattery', hexIdol: 'scryingEye', scrapCrossbow: 'crossbow' }
+export const evolvedArt = { widowFang: 'curvedSword', graveEdge: 'greatSword', bellHammer: 'spikedMace', heartleaf: 'oakLeaf', vampireChalice: 'ritualSkull', brambleThrone: 'rootBundle', rotCauldron: 'powderBomb', rootwardenStaff: 'spear', warStandard: 'runeTablet', tempestTotem: 'coilBattery', hexIdol: 'scryingEye', scrapCrossbow: 'crossbow', grindstone: 'mortarPestle' }

@@ -9,7 +9,7 @@
  */
 import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
-import { descentPool, consumablePool, descentCrew, poolNeeds } from './pool.js'
+import { descentPool, consumablePool, descentCrew, poolNeeds, synergyPairs } from './pool.js'
 import { consumableCharges } from './consumables.js'
 import { regions, enemyTraits, tireAbility } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
@@ -50,9 +50,11 @@ function pickWeighted(list, weightOf, random) {
   return list.find(entry => (roll -= weightOf(entry)) < 0) ?? list.at(-1)
 }
 
-/** True when a type completes something the run owns: an evolution partner, or the payoff a feeder unlocks. */
+/** True when a type completes something the run owns: an evolution partner, the payoff a feeder unlocks, or a known strong pair. */
 export function completesOwned(ownedTypes, type) {
-  return evolutionRecipes.some(recipe => (recipe.partner === type && ownedTypes.has(recipe.from)) || (recipe.from === type && ownedTypes.has(recipe.partner))) || ownedTypes.has(poolNeeds[type])
+  const isPartner = recipe => (recipe.partner === type && ownedTypes.has(recipe.from)) || (recipe.from === type && ownedTypes.has(recipe.partner))
+  const isPair = ([first, second]) => (first === type && ownedTypes.has(second)) || (second === type && ownedTypes.has(first))
+  return evolutionRecipes.some(isPartner) || synergyPairs.some(isPair) || ownedTypes.has(poolNeeds[type])
 }
 
 function pickEnemy(floor, random) {
@@ -302,19 +304,29 @@ function freshWeight(type, ownedTypes, cards) {
   return completes * isNewFamily * isRepeat
 }
 
+/** True for an item that gives guard or healing on its own. */
+function isDefence(type) {
+  const stats = rules.catalog.items[type]?.stats ?? {}
+  return stats.guard > 0 || stats.heal > 0
+}
+
 /**
  * Cards are drawn by group weight, then a random member; no card repeats in one draw.
  * A draw holds at most `maxLevelCards` level cards, and its last card is new (an item, a consumable or a tome) whenever one is left.
+ * In a draw one or two floors before a boss, the first card is a new item that guards or heals (when one is left), so the run can always find an answer.
  */
 export function drawCards(run, random) {
   const ownedTypes = new Set(Object.values(run.items).map(item => item.type))
   const ownedCount = Object.keys(run.items).length
   const cards = []
   const count = tuning.cards.count + run.bonus.cards
+  const isBossNear = [1, 2].some(floorsAhead => floorKind(run.floor + floorsAhead) === 'boss')
   for (let draw = 0; draw < count; draw++) {
     const levels = cards.filter(card => card.kind === 'level').length < tuning.cards.maxLevelCards ? Object.keys(run.items).filter(id => !cards.some(card => card.id === id)) : []
     const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type) && (!poolNeeds[type] || ownedTypes.has(poolNeeds[type]))) : []
     const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const eveDefence = isBossNear && draw === 0 ? fresh.filter(isDefence) : []
+    if (eveDefence.length) { cards.push({ kind: 'item', type: pickWeighted(eveDefence, type => freshWeight(type, ownedTypes, cards), random) }); continue }
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
       { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pickWeighted(fresh, type => freshWeight(type, ownedTypes, cards), random) }) },

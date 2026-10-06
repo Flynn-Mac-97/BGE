@@ -93,17 +93,17 @@ test('owner Hunger is gained by reactions and atomically spent by a later cup', 
   const battle = battleWith({ dagger: [0, 0], hungryTooth: [1, 0], bloodCup: [2, 0] }, { health: 5 })
   battle.actors.recruit.resources.hunger = 2
   const result = cycle(battle)
-  assert.equal(result.state.actors.recruit.resources.hunger, 0)
+  assert.equal(result.state.actors.recruit.resources.hunger, 1, 'the cup spent 3 of 4 Hunger, then the hit it took gave 1')
   assert.equal(result.state.actors.recruit.health, 7)
   assert.deepEqual(result.state.items.hungryTooth.resources, {})
 })
 test('unaffordable costs do not partially spend or heal and conditions protect a full-health cup', () => {
   const battle = battleWith({ bloodCup: [0, 0], dagger: [1, 0] }, { health: 5 })
   battle.actors.recruit.resources.hunger = 2
-  assert.equal(cycle(battle).state.actors.recruit.resources.hunger, 2)
+  assert.equal(cycle(battle).state.actors.recruit.resources.hunger, 3, 'unaffordable: only the hit it took added Hunger')
   battle.actors.recruit.health = 12
   battle.actors.recruit.resources.hunger = 3
-  assert.equal(cycle(battle).state.actors.recruit.resources.hunger, 3)
+  assert.equal(cycle(battle).state.actors.recruit.resources.hunger, 4)
 })
 test('poison and regeneration reuse effects at their declared lifecycle events', () => {
   const battle = battleWith({ sprig: [0, 0], dagger: [1, 0] }, { health: 6 })
@@ -118,7 +118,7 @@ test('cleansing removes status before its damage event', () => {
   const battle = battleWith({ salt: [0, 0], dagger: [1, 0] })
   battle.actors.recruit.statuses.poison = { stacks: 3, duration: 'combat' }
   const result = cycle(battle)
-  assert.equal(result.state.actors.recruit.health, 8)
+  assert.equal(result.state.actors.recruit.health, 10, 'the salt guards the hit that poison would have followed')
   assert.deepEqual(result.state.actors.recruit.statuses, {})
 })
 test('echo grants an extra weapon action once per combat, then normal scan still happens', () => {

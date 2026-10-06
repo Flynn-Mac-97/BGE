@@ -15,6 +15,12 @@ export function rollDie(state, sides) {
   return 1 + ((value ^ (value >>> 16)) >>> 0) % sides
 }
 
+/** A resource an entity holds; an item that holds none reads its owner's, so a relic can burn the recruit's Hunger or Salvage. */
+function resourceStock(state, subject, resource) {
+  const entity = entityOf(state, subject)
+  return entity.resources[resource] ?? state.actors[entity.owner]?.resources[resource] ?? 0
+}
+
 /**
  * Expressions deliberately have no arbitrary scripts or recursive stat references. `target` is the effect's target:
  * `{ targetStat, scale }` reads it. A `scale` on a stat, resource or target stat rounds down, so health stays whole.
@@ -31,7 +37,7 @@ export function amountOf(frame, expression, subject = frame.source, target = nul
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)
   // A granted ability reads the item that grants it, so a totem's level grows what it gives.
   if (expression.grantorStat) return frame.grantor ? statOf(frame.state, frame.catalog, frame.grantor, expression.grantorStat) : 0
-  if (expression.resource) return Math.floor((entityOf(frame.state, subject).resources[expression.resource] ?? 0) * (expression.scale ?? 1))
+  if (expression.resource) return Math.floor(resourceStock(frame.state, subject, expression.resource) * (expression.scale ?? 1))
   return 0
 }
 
