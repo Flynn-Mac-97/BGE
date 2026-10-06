@@ -10,12 +10,13 @@ export const tuning = {
   // Card weights: each owned item, each new item (falling as you own more), one wider grid, one tome, one new consumable.
   // Consumables have their own weight, so they keep turning up however many items you own.
   // synergyWeight: a new item that completes something you own (an evolution partner, a payoff) is this many times as likely.
-  cards: { synergyWeight: 4, count: 3, maxLevelCards: 2, upgradeWeight: 2.5, newItemWeight: 8, newItemFalloff: 0.9, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
+  // newFamilyWeight: likewise for an item of a power family you own nothing of; repeatFamilyWeight: for one whose family this draw already offers.
+  cards: { synergyWeight: 6, newFamilyWeight: 2, repeatFamilyWeight: 0.25,  count: 3, maxLevelCards: 1, upgradeWeight: 2.5, newItemWeight: 8, newItemFalloff: 0.9, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
   rerolls: 2,
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.
   // Set against the test-bout bot (tools/descent-bot.mjs) so a median run ends near floor 20 and bosses cause about half the deaths (see design/descent.md, Scaling).
-  enemy: { healthGrowth: 1.2, damageGrowth: 1.1, tire: { from: 12, share: 0.08 }, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 2, damage: 0.9 }, elite: { health: 1.6, damage: 0.5 }, boss: { health: 2, damage: 0.65 } } },
+  enemy: { healthGrowth: 1.17, damageGrowth: 1.07, tire: { from: 12, share: 0.08 }, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 3, damage: 1.5 }, elite: { health: 2.4, damage: 0.8 }, boss: { health: 3, damage: 1 } } },
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
   // Bells for a won floor: base × growth^(floor − 1), plus record × floor on a floor deeper than your best (see bellsFor).

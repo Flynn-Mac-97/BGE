@@ -17,6 +17,7 @@ import { towerBonus } from './tower.js'
 import { peddlerStock, buyWare, sellItem } from './peddler.js'
 import { masteryLevels, gainMastery } from './mastery.js'
 import { familyPowerAbilities } from './family-powers.js'
+import { familyOf } from '../power-families.js'
 
 /** A catalog stat at an item level. */
 export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)))
@@ -171,7 +172,7 @@ export function finishFloor(journey, random) {
   const coin = Math.round(tuning.coin[kind] * (1 + (run.bonus.coinShare ?? 0)))
   run.coin = (run.coin ?? 0) + coin
   gainMastery(run, Object.values(run.items).filter(item => item.position).map(item => item.type))
-  if (kind === 'boss') run.peddler = { stock: peddlerStock(run, random) }
+  if (kind === 'boss') run.peddler = { stock: [] }
   const multiplier = { normal: 1, elite: tuning.embers.elite, boss: tuning.embers.boss }[kind]
   const gained = Math.round((tuning.embers.perFloor + tuning.embers.perFloorGrowth * run.floor) * multiplier * (1 + run.bonus.emberShare))
   run.embers += gained
@@ -237,7 +238,7 @@ export function collectChest(journey, random) {
 function afterRewards(journey, random) {
   const run = journey.descent
   if (run.pendingLevels) { journey.phase = 'levelUp'; run.cards = drawCards(run, random); return }
-  if (run.peddler) { journey.phase = 'peddler'; journey.battle = battleFor(run); tell(journey, 'A travelling Peddler sets down his pack on the stair.'); return }
+  if (run.peddler) { run.peddler.stock = peddlerStock(run, random); journey.phase = 'peddler'; journey.battle = battleFor(run); tell(journey, 'A travelling Peddler sets down his pack on the stair.'); return }
   nextFloor(journey, random)
 }
 
@@ -287,6 +288,20 @@ function nextFloor(journey, random) {
   tell(journey, floorMessage(run))
 }
 
+const familyOfType = type => familyOf(rules.catalog.items[type] ?? {})
+
+/**
+ * How likely a new item is to be offered: `synergyWeight` times when it completes something owned, `newFamilyWeight` times when
+ * the run owns nothing of its family, and `repeatFamilyWeight` times when this draw already offers its family, so a draw shows different families.
+ */
+function freshWeight(type, ownedTypes, cards) {
+  const family = familyOfType(type)
+  const completes = completesOwned(ownedTypes, type) ? tuning.cards.synergyWeight : 1
+  const isNewFamily = family && ![...ownedTypes].some(owned => familyOfType(owned) === family) ? tuning.cards.newFamilyWeight : 1
+  const isRepeat = family && cards.some(card => card.kind === 'item' && familyOfType(card.type) === family) ? tuning.cards.repeatFamilyWeight : 1
+  return completes * isNewFamily * isRepeat
+}
+
 /**
  * Cards are drawn by group weight, then a random member; no card repeats in one draw.
  * A draw holds at most `maxLevelCards` level cards, and its last card is new (an item, a consumable or a tome) whenever one is left.
@@ -302,7 +317,7 @@ export function drawCards(run, random) {
     const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
-      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pickWeighted(fresh, type => completesOwned(ownedTypes, type) ? tuning.cards.synergyWeight : 1, random) }) },
+      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pickWeighted(fresh, type => freshWeight(type, ownedTypes, cards), random) }) },
       { isNew: true, weight: flasks.length ? tuning.cards.consumableWeight : 0, card: () => ({ kind: 'item', type: pick(flasks, random) }) },
       { isNew: true, weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
       { weight: run.columns < tuning.grid.maxColumns && !cards.some(card => card.kind === 'widen') ? tuning.cards.widenWeight : 0, card: () => ({ kind: 'widen' }) }
