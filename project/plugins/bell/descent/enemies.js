@@ -1,3 +1,5 @@
+import { tuning } from './tuning.js'
+
 /** Enemies by depth band. Numbers are floor-1 values; tuning.js grows them. Traits are named blocks below. */
 export const regions = [
   { from: 1, name: 'The Cellars', line: 'Wet stone. Rats, and worse than rats.',
@@ -56,3 +58,6 @@ export const enemyTraits = {
   regrowth: { stat: 'regrow', base: 5, name: 'Regrowth', text: 'Heals a lot each cycle. Bleed, Curse and burst damage beat it.', ability: { id: 'regrowth', trigger: { event: 'cycleEnd' }, target: { kind: 'self' }, effects: [{ type: 'heal', amount: { stat: 'regrow' } }] } },
   spiked: { stat: 'spikes', base: 0.6, name: 'Spiked', text: 'Each time it is hit, spikes hurt you. Few big hits beat many small ones.', ability: { id: 'spikes', trigger: { event: 'damageTaken', target: { kind: 'self' } }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'spikes' } }], limit: { perCycle: 4 } } }
 }
+
+/** Every foe tires in a long fight: from cycle `tuning.enemy.tire.from` it loses `tire.share` of its health each cycle, through guard. A build that cannot kill it can still outlast it. */
+export const tireAbility = { id: 'tire', trigger: { event: 'cycleStart' }, target: { kind: 'self' }, conditions: [{ kind: 'cycleAtLeast', amount: tuning.enemy.tire.from }], effects: [{ type: 'damage', amount: { stat: 'tire' }, bypassGuard: true }] }

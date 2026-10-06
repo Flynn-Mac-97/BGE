@@ -11,7 +11,7 @@ import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
 import { descentPool, consumablePool, descentCrew, poolNeeds } from './pool.js'
 import { consumableCharges } from './consumables.js'
-import { regions, enemyTraits } from './enemies.js'
+import { regions, enemyTraits, tireAbility } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
 import { towerBonus } from './tower.js'
 import { peddlerStock, buyWare, sellItem } from './peddler.js'
@@ -65,8 +65,10 @@ function enemyActor(enemy, floor) {
   const traits = (enemy.traits ?? []).map(id => enemyTraits[id])
   const stats = { damage: grown(enemy.damage, tuning.enemy.damageGrowth, kind.damage) }
   for (const trait of traits) stats[trait.stat] = grown(trait.base, tuning.enemy.damageGrowth, kind.damage)
-  return { name: enemy.name, mark: enemy.mark, team: 'dungeon', maxHealth: grown(enemy.health, tuning.enemy.healthGrowth, kind.health), stats,
-    abilities: [{ id: 'enemyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }, ...traits.map(trait => trait.ability)] }
+  const maxHealth = grown(enemy.health, tuning.enemy.healthGrowth, kind.health)
+  stats.tire = Math.max(1, Math.round(maxHealth * tuning.enemy.tire.share))
+  return { name: enemy.name, mark: enemy.mark, team: 'dungeon', maxHealth, stats,
+    abilities: [{ id: 'enemyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }, tireAbility, ...traits.map(trait => trait.ability)] }
 }
 
 /** The floor's battle: every run item at its level; an item whose saved place no longer fits waits in reserve. */
