@@ -29,7 +29,7 @@ its evolved form. Enemies grow every floor, without end.
 - **Health carries over.** The recruit recovers a share of health after each floor, and each level-up raises max health a little.
 - **Rerolls.** A run starts with a few rerolls; each redraws the current cards.
 - **Death.** The run ends at once. Bells: 1 per floor cleared, more for elites and bosses.
-- **Stall.** A fight with no winner after the cycle cap is a defeat. Every foe tires: from cycle 12 it loses 8% of its health each cycle, through guard (`tuning.enemy.tire`, `tireAbility` in `enemies.js`). A build that cannot kill a Plated or Regrowth foe can still outlast it.
+- **Stall.** A fight with no winner after the cycle cap is a defeat. Every foe tires: from cycle 14 it loses 10% of its health each cycle, through guard (`tuning.enemy.tire`, `tireAbility` in `enemies.js`). A build that cannot kill a Plated or Regrowth foe can still outlast it.
 
 ## Scaling
 
@@ -241,3 +241,5 @@ Bells are never spent in a run: every run brings all its Bells home.
 ## Offers and the Peddler (gauntlet pass)
 
 A new item is `synergyWeight` (6) times as likely when it completes something owned, `newFamilyWeight` (2) times when the run owns nothing of its family, and `repeatFamilyWeight` (0.25) times when the same draw already offers its family, so a draw shows different families and crews leave their kit family. The Peddler's stock is drawn when he arrives, after the level-ups, so he never sells a type the run has just taken.
+
+Threat numbers after the floor-68 ruler (stat at floor 1, grown like damage): Heavy Blow 1.8 every 2nd cycle, Plated 10, Regrowth 8, Swarm 0.25, Spiked 0.45. Heavy Blow at 5 killed even the best builds in one hit by floors 40+, so every family lost one step to it; at 1.8 the best family matches its Plain depth and guard or healing is the answer. Plated and Regrowth were raised so Build Lab bursts no longer ignore them; tire starts at cycle 14 so they still cost a weak build a long fight but never a stall.
