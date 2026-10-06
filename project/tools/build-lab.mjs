@@ -25,7 +25,7 @@ import { seededRandom } from '../plugins/npc-lab/combo-space.js'
 import { arrange } from './descent-bot.mjs'
 
 const LEVEL = 8, RUN_LEVEL = 17, BUILD_SIZE = 7, FAMILY_MINIMUM = 3, CYCLE_CAP = 30
-const FLOORS = [14, 20, 26, 32, 38, 44]
+const FLOORS = [14, 20, 26, 32, 38, 44, 50, 56, 62, 68]
 const pool = descentPool.filter(type => !rules.catalog.items[type].storage)
 const plain = { name: 'Plain', portrait: 'cellarRat', health: 9, damage: 2, line: '' }
 /** The gauntlet: a plain foe, one foe per threat, and a boss with three threats. */

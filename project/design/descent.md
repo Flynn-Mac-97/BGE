@@ -121,7 +121,7 @@ of 180 final builds reach a family power, across all five families.
 and writes `agent-runs/build-lab/report.md`; `report` rebuilds the report from
 the last run. A build is 7 base items at level 8, laid out by the test-bout bot.
 It fights a gauntlet (a plain foe, one foe per threat, a three-threat boss),
-climbing floors 14–44 against each until it loses; its score is the mean depth.
+climbing floors 14–68 against each until it loses; its score is the mean depth.
 Six searches run in parallel: one open, and one per family (at least 3 of it),
 each a hill climb from four random starts. The report holds:
 
