@@ -15,7 +15,7 @@ export const tuning = {
   evolveLevel: 5,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.
   // Set against the test-bout bot (tools/descent-bot.mjs) so a median run ends near floor 20 and bosses cause about half the deaths (see design/descent.md, Scaling).
-  enemy: { healthGrowth: 1.19, damageGrowth: 1.075, tire: { from: 12, share: 0.08 }, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 2.9, damage: 1 }, elite: { health: 2.4, damage: 0.55 }, boss: { health: 2.9, damage: 0.7 } } },
+  enemy: { healthGrowth: 1.2, damageGrowth: 1.1, tire: { from: 12, share: 0.08 }, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 2, damage: 0.9 }, elite: { health: 1.6, damage: 0.5 }, boss: { health: 2, damage: 0.65 } } },
   // A chest holds an evolution when one is ready; otherwise this many free level-ups.
   chest: { elite: 1, boss: 3 },
   // Bells for a won floor: base × growth^(floor − 1), plus record × floor on a floor deeper than your best (see bellsFor).

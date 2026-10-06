@@ -4,7 +4,7 @@ import { tuning } from './tuning.js'
 export const regions = [
   { from: 1, name: 'The Cellars', line: 'Wet stone. Rats, and worse than rats.',
     normal: [
-      { name: 'Cellar Rat', mark: 'r', portrait: 'cellarRat', health: 6, damage: 2, traits: ['swarm'], line: 'A rat the size of a dog bares yellow teeth.' },
+      { name: 'Cellar Rat', mark: 'r', portrait: 'cellarRat', health: 5, damage: 1, traits: ['swarm'], line: 'A rat the size of a dog bares yellow teeth.' },
       { name: 'Grave Robber', mark: 'x', portrait: 'graveRobber', health: 8, damage: 2, traits: ['heavyBlow'], line: 'A grave robber swings a shovel at your lantern.' },
       { name: 'Venom Leech', mark: 'v', portrait: 'venomLeech', health: 7, damage: 1, traits: ['venom'], line: 'A leech drops from the ceiling, dripping green.' }
     ],
