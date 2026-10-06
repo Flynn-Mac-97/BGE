@@ -29,11 +29,11 @@ its evolved form. Enemies grow every floor, without end.
 - **Health carries over.** The recruit recovers a share of health after each floor, and each level-up raises max health a little.
 - **Rerolls.** A run starts with a few rerolls; each redraws the current cards.
 - **Death.** The run ends at once. Bells: 1 per floor cleared, more for elites and bosses.
-- **Stall.** A fight with no winner after the cycle cap is a defeat. Builds must kill.
+- **Stall.** A fight with no winner after the cycle cap is a defeat. Every foe tires: from cycle 12 it loses 8% of its health each cycle, through guard (`tuning.enemy.tire`, `tireAbility` in `enemies.js`). A build that cannot kill a Plated or Regrowth foe can still outlast it.
 
 ## Scaling
 
-Enemy health and damage grow by a fixed factor every floor (exponential). Item
+Enemy health and damage grow by a fixed factor every floor (exponential). Gauntlet pass: health grows 1.17 per floor from a ×3 base, damage 1.07 per floor from ×1.5 (elite ×0.8, boss ×1), so fights last about 4 cycles instead of 2 and one hit no longer kills; Heavy Blow and the Cellar Rat are the floor-1 to 5 hazards to watch. Item
 levels grow linearly, and evolutions and synergies multiply them, so a good
 build stays ahead for a long time and then is overrun. Elites and bosses
 multiply health. All factors are in `tuning.js`. `node tools/descent-sim.mjs`
@@ -86,7 +86,7 @@ a common drop, so the poison evolution is the easiest one to reach.
 Consumables have their own card weight, so they keep turning up however many
 items the run owns.
 
-A level-up draw holds at most two level cards, and its last card is always new
+A level-up draw holds at most one level card (training is the second step of every level-up), and its last card is always new
 (an item, a consumable or a tome) while any are left. Level cards weigh less
 than they did, and new items fall off more slowly as the run owns more. Before
 this, about 70% of all cards offered were level cards and a run saw about 10
@@ -237,3 +237,7 @@ A level-up draw can hold one tome card in place of an item or level card.
 A Tome of Vigor adds 6 max health for the run; a Tome of Might adds 1 to
 every nonzero number on all gear, including gear found later. Tomes stack.
 Bells are never spent in a run: every run brings all its Bells home.
+
+## Offers and the Peddler (gauntlet pass)
+
+A new item is `synergyWeight` (6) times as likely when it completes something owned, `newFamilyWeight` (2) times when the run owns nothing of its family, and `repeatFamilyWeight` (0.25) times when the same draw already offers its family, so a draw shows different families and crews leave their kit family. The Peddler's stock is drawn when he arrives, after the level-ups, so he never sells a type the run has just taken.

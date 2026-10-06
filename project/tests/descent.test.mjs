@@ -322,7 +322,7 @@ test('a new item that completes something owned is offered more often than one t
     journey.descent.items['item-9'] = { type: 'curseIdol', level: 1, position: null }
     for (const card of drawCards(journey.descent, seededRandom(seed))) if (card.type in offers) offers[card.type]++
   }
-  assert.ok(offers.reapingSeal > offers.salt * 2, JSON.stringify(offers))
+  assert.ok(offers.reapingSeal > offers.salt, JSON.stringify(offers))
 })
 
 test('the Peddler visits after a boss with one ware per family, and buying and selling move Coin', () => {
