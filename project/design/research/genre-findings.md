@@ -65,3 +65,17 @@ with % complete; prestige that changes rules; a difficulty ladder; a reason to c
 For Black Bell, in order of payoff: a death-screen ceremony (count-up, best moment, unlock cards, progress bars); items unlocked
 into the pool by goals; fewer tower nodes that add mechanics instead of percentages. Later: a Lantern scene that grows, a codex,
 a Toll difficulty ladder, offline Bells capped at about 8 hours, and a daily seeded descent.
+
+## 4. Independent review
+
+A separate reviewer answered the same three questions as general design questions, with no knowledge of Black Bell and no access
+to these findings.
+
+| Topic | Agrees | Adds or differs |
+|---|---|---|
+| Interactions | About 8–12 core verbs; depth from many items reusing them; one-hop triggers | Count the decisions a keyword creates, not the keywords. Auto-battlers need a log or replay so a player can see why they lost. Hidden order rules are bad complexity. |
+| Enemies | Each foe tests one axis; enemies use the player's keywords; telegraph big threats | A live intent display does not fit a game with no input during the fight: show a pre-fight scouting screen instead. Rotate which archetype is weak. No foe that punishes a build the player could not have known to avoid. |
+| Rewards | Unlocks and new verbs beat flat %; failure must pay; flat % is invisible | The run-end screen should credit the build ("Poison dealt 62% of your damage"). Reward rhythm in layers: seconds, a run, a few runs. Legibility matters more than frequency. Prestige only works if the next run is faster and different. |
+
+Its main warning: designers treat complexity as content and build large systems first. Ship a small, legible core and add only
+when players have used up what exists.
