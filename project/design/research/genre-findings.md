@@ -79,3 +79,26 @@ to these findings.
 
 Its main warning: designers treat complexity as content and build large systems first. Ship a small, legible core and add only
 when players have used up what exists.
+
+## 5. Independent review with web search
+
+A third reviewer answered the same general questions with web search. Page fetches were blocked by this environment's network
+policy, so "verified" means confirmed in search-result text, not in the full page.
+
+Verified facts:
+- Backpack Battles has 400+ items that interact by adjacency and tags such as "food" and "dark"; it is mainly asynchronous PvP
+  against other players' saved builds. ([Wikipedia](https://en.wikipedia.org/wiki/Backpack_Battles))
+- The Bazaar's keywords are one sentence each: Haste (charge twice as fast), Slow (half speed), Freeze (no charge, no activation),
+  Shield (blocks damage, ignored by Poison, halves Burn), Regen (heal its amount every second).
+  ([Mobalytics](https://mobalytics.gg/the-bazaar/guides/keywords-and-terms))
+- Slay the Spire has 250+ cards and about 150 relics (one source says 127).
+- Hades has 28 duo boons; Hades II has 37.
+- Vampire Survivors has 46 standard weapons and 5 free weapon slots after the starting one.
+- Cookie Clicker's prestige gives +1% production per prestige level, and Heavenly Chips buy permanent upgrades.
+
+New points from this review:
+- With N keywords, pairwise interactions grow about as N²; keep that count visible and capped.
+- A budget for a new game: about 8–12 statuses, about 5 triggers, every status with one stated rule and one stated counter.
+- Author enemies as builds made from the player's own items and keywords; ghosts of other players need a player base first.
+- Unlocks that only add items to the pool can dilute good builds; meta rewards should add choices before power.
+- A reward is information: "you won because of X, and X now unlocks Y" beats a bigger number.
