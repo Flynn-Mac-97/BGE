@@ -156,11 +156,15 @@ const tasks = { ability: runAbility, activation: activate, event: dispatch, fini
 /** Input and prior snapshots are untouched, including when a malformed loop exceeds its budget. */
 export function execute(catalog, input, queue, options = {}) {
   assertState(input, catalog)
+  return executeOwned(catalog, structuredClone(input), queue, options)
+}
+
+/** Run a queue on a state the caller already copied and owns; the state changes in place. */
+function executeOwned(catalog, state, queue, options) {
   if (options.trace !== undefined && !['full', 'events', 'none'].includes(options.trace)) throw new TypeError('Unknown trace mode')
   const budget = options.budget ?? 1024
   const maxActivations = options.maxActivations ?? 8
   if (!Number.isInteger(budget) || budget < 1 || budget > 4096 || !Number.isInteger(maxActivations) || maxActivations < 1 || maxActivations > 16) throw new RangeError('Invalid rule work limits')
-  const state = structuredClone(input)
   const trace = []
   const runtime = { state, catalog, queue: queue.reverse(), maxActivations, activations: {}, record(kind, detail = {}) {
     if (options.trace === 'none') return
@@ -187,7 +191,8 @@ export function resolveCycle(catalog, input, options = {}) {
   if (input.phase !== 'planning') throw new Error('Only a planning state can start a cycle')
   const state = structuredClone(input)
   const queue = cycleQueue(state, options)
-  return execute(catalog, state, queue, options)
+  assertState(state, catalog)
+  return executeOwned(catalog, state, queue, options)
 }
 
 function cycleQueue(state, options) {

@@ -28,7 +28,7 @@ export function layoutScore(battle, cycles = TEST_CYCLES) {
   // Half health, so healing counts and "waits if health is full" items act.
   bout.actors.recruit.maxHealth = ENDLESS
   bout.actors.recruit.health = ENDLESS / 2
-  for (let cycle = 0; cycle < cycles; cycle++) bout = rules.resolveCycle(bout, { afterCycle: ['enemy'] }).state
+  for (let cycle = 0; cycle < cycles; cycle++) bout = rules.resolveCycle(bout, { afterCycle: ['enemy'], trace: 'none' }).state
   return (ENDLESS - bout.actors.enemy.health) - (ENDLESS / 2 - bout.actors.recruit.health)
 }
 
