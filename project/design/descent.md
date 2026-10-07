@@ -176,8 +176,10 @@ each boss, once the chest and level-ups are done, the travelling Peddler visits
 (phase `peddler`). His stock is one item from each power family the run can
 still take, one evolved item (sold nowhere else) and one consumable; wares come
 at level 1 + 2 per boss beaten. Prices are in `tuning.peddler`. He also buys:
-an owned item sells for 2 + its level. `descent/peddler.js` holds the stock,
-prices, buying and selling.
+an owned item sells for 2 + its level. Only Coin limits buying: the 9-item cap
+(`tuning.cards.maxItems`) stops new-item cards, not the Peddler, and a bought
+item that does not fit on the grid waits in reserve. `descent/peddler.js` holds
+the stock, prices, buying and selling.
 
 ## Data, by file
 

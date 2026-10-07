@@ -2,6 +2,8 @@
 import { defineSuite } from '../tools/node-suite.mjs'
 import assert from 'node:assert/strict'
 import { rules } from '../plugins/bell/rules.js'
+import { tuning } from '../plugins/bell/descent/tuning.js'
+import { peddlerStock } from '../plugins/bell/descent/peddler.js'
 import { completesOwned, createRun, finishFloor, collectChest, chooseCard, rerollCards, readyEvolutions, battleFor, levelStat, abandonRun, drawCards, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from '../plugins/bell/descent/run.js'
 import { createProfile, profileStore, settleRun, buyUpgrade, unlockedCrew } from '../plugins/bell/descent/profile-save.js'
 import { seededRandom } from '../plugins/npc-lab/combo-space.js'
@@ -362,6 +364,21 @@ test('the Peddler visits after a boss with one ware per family, and buying and s
   assert.ok(leavePeddler(journey, random))
   assert.equal(journey.phase, 'battle')
   assert.equal(run.floor, 11)
+})
+
+test('only Coin limits buying from the Peddler: a full bag still buys every ware it can pay for', () => {
+  const random = seededRandom(1)
+  const journey = createRun(createProfile(), 'rook', random)
+  const run = journey.descent
+  for (const type of ['sword', 'buckler', 'salve', 'sprig', 'banner', 'hammer']) run.items['item-' + run.nextItem++] = { type, level: 1, position: null }
+  assert.ok(Object.keys(run.items).length >= tuning.cards.maxItems)
+  run.floor = 10; run.coin = 100
+  run.peddler = { stock: peddlerStock(run, random) }
+  journey.phase = 'peddler'
+  const wares = run.peddler.stock.length
+  let bought = 0
+  while (buyFromPeddler(journey, 0)) bought++
+  assert.equal(bought, wares)
 })
 
 test('Bells grow with depth and pay a record bonus; endless tower ranks never cap', async () => {

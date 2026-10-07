@@ -121,15 +121,14 @@ const overlays = {
   },
   peddler: (kit, journey) => {
     const run = journey.descent, coin = run.coin ?? 0
-    const isFull = Object.keys(run.items).length >= tuning.cards.maxItems
     const wares = run.peddler.stock.map((ware, index) => {
       const definition = rules.catalog.items[ware.type]
       const label = ware.kind === 'evolved' ? 'EVOLVED · ONLY HERE' : ware.kind === 'consumable' ? 'CONSUMABLE' : `LEVEL ${ware.level}`
       const hint = evolutionHint(run, ware.type)
-      return `<section class="loot-card descent-card">${art(kit, ware.type, definition.name)}<strong>${escape(definition.name)}${familyEmblem(kit, definition)}</strong><small>${label}</small><p>${escape(definition.description)}</p>${hint ? `<p class="card-hint">${escape(hint)}</p>` : ''}${kit.button(`Buy · ${ware.price} Coin`, { action: 'peddlerBuy', value: index, isDisabled: coin < ware.price || isFull })}</section>`
+      return `<section class="loot-card descent-card">${art(kit, ware.type, definition.name)}<strong>${escape(definition.name)}${familyEmblem(kit, definition)}</strong><small>${label}</small><p>${escape(definition.description)}</p>${hint ? `<p class="card-hint">${escape(hint)}</p>` : ''}${kit.button(`Buy · ${ware.price} Coin`, { action: 'peddlerBuy', value: index, isDisabled: coin < ware.price })}</section>`
     }).join('')
     const gear = Object.keys(run.items).map(id => gearCard(kit, run, id, kit.button(`Sell · ${sellPrice(run.items[id])} Coin`, { action: 'peddlerSell', value: id, isDisabled: Object.keys(run.items).length < 2 }))).join('')
-    return `<div class="menu-shade"><section class="loot-sheet peddler-sheet"><h2>THE TRAVELLING PEDDLER · ${coin} COIN</h2><p>${escape(journey.message)}${isFull ? ' Your back is full: sell something to buy.' : ''}</p><h3>HIS WARES</h3><div class="loot-choices">${wares || '<p>He has nothing left to sell.</p>'}</div><h3>YOUR GEAR</h3><div class="loot-choices gear-choices">${gear}</div>${kit.button('Go down the stair', { action: 'peddlerLeave', kind: 'primary' })}</section></div>`
+    return `<div class="menu-shade"><section class="loot-sheet peddler-sheet"><h2>THE TRAVELLING PEDDLER · ${coin} COIN</h2><p>${escape(journey.message)}</p><h3>HIS WARES</h3><div class="loot-choices">${wares || '<p>He has nothing left to sell.</p>'}</div><h3>YOUR GEAR</h3><div class="loot-choices gear-choices">${gear}</div>${kit.button('Go down the stair', { action: 'peddlerLeave', kind: 'primary' })}</section></div>`
   },
   levelUp: (kit, journey) => {
     const run = journey.descent

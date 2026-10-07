@@ -36,10 +36,13 @@ export function peddlerStock(run, random) {
   return stock
 }
 
-/** Buy one ware into the reserve. False when he is not here, it is gone, Coin is short or the back is full. */
+/**
+ * Buy one ware into the reserve. False when he is not here, it is gone or Coin is short.
+ * Only Coin limits buying: the item cap (`tuning.cards.maxItems`) stops new-item cards, not the Peddler.
+ */
 export function buyWare(run, index) {
   const ware = run.peddler?.stock[index]
-  if (!ware || (run.coin ?? 0) < ware.price || Object.keys(run.items).length >= tuning.cards.maxItems) return false
+  if (!ware || (run.coin ?? 0) < ware.price) return false
   run.coin -= ware.price
   run.items['item-' + run.nextItem++] = { type: ware.type, level: ware.level, position: null }
   run.peddler.stock.splice(index, 1)
