@@ -114,6 +114,14 @@ test('poison and regeneration reuse effects at their declared lifecycle events',
   assert.equal(regeneration.state.actors.recruit.health, 4)
   assert.equal(regeneration.state.actors.recruit.statuses.regeneration.stacks, 1)
 })
+test('poison ticks its stacks, then fades by 1 and a fifth of the rest', () => {
+  const battle = battleWith({ salt: [0, 0] })
+  battle.actors.enemy.health = battle.actors.enemy.maxHealth = 100
+  battle.actors.enemy.statuses.poison = { stacks: 20, duration: 'combat' }
+  const result = cycle(battle)
+  assert.equal(result.state.actors.enemy.health, 80)
+  assert.equal(result.state.actors.enemy.statuses.poison.stacks, 16)
+})
 test('cleansing removes status before its damage event', () => {
   const battle = battleWith({ salt: [0, 0], dagger: [1, 0] })
   battle.actors.recruit.statuses.poison = { stacks: 3, duration: 'combat' }

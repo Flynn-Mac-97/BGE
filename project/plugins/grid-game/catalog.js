@@ -23,9 +23,10 @@ function validateAmount(amount, path) {
   if (dictionary(amount) && (amount.previous === true || amount.eventAmount === true) && Object.keys(amount).every(key => ['previous', 'eventAmount', 'scale'].includes(key)) && !(amount.previous && amount.eventAmount) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
   if (dictionary(amount) && Number.isInteger(amount.roll) && amount.roll > 1 && Object.keys(amount).every(key => ['roll', 'scale', 'scaleStat'].includes(key)) && (amount.scaleStat === undefined || typeof amount.scaleStat === 'string') && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale > 0))) return
   if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.grantorStat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
+  if (dictionary(amount) && amount.stacks === true && Object.keys(amount).every(key => ['stacks', 'scale'].includes(key)) && Number.isFinite(amount.scale) && amount.scale >= 0) return
   const scaled = ['stat', 'resource', 'targetStat'].find(key => typeof amount?.[key] === 'string')
   if (dictionary(amount) && scaled && Object.keys(amount).every(key => [scaled, 'scale'].includes(key)) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
-  fail(path, 'expected finite number or {stat}, {grantorStat}, {resource}, {targetStat}, {stacks:true}, {roll}')
+  fail(path, 'expected finite number or {stat}, {grantorStat}, {resource}, {targetStat}, {stacks:true, scale?}, {roll}')
 }
 function validateCondition(condition, path, catalog) {
   if (!conditionNames.includes(condition.kind)) fail(path, 'unknown condition')

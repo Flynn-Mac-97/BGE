@@ -21,8 +21,10 @@ export const abilities = {
   echo: { trigger: { event: 'ownTurn' }, target: { kind: 'directionalNeighbour', direction: 'down', tags: ['weapon'], ownerOnly: true },
     effects: [{ type: 'triggerItem' }], limit: { perCombat: 1 } },
   regrow: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' }, effects: [{ type: 'applyStatus', status: 'regeneration', amount: { stat: 'potency' } }], limit: { perCombat: 1 } },
+  // Poison fades by 1 and then by a fifth of what is left each cycle, so a steady stream of stacks levels off instead of growing for the whole fight.
   poisonTick: { trigger: { event: 'cycleEnd' }, target: { kind: 'self' }, effects: [
-    { type: 'damage', amount: { stacks: true }, bypassGuard: true }, { type: 'removeStatus', status: 'poison', amount: 1 }
+    { type: 'damage', amount: { stacks: true }, bypassGuard: true }, { type: 'removeStatus', status: 'poison', amount: 1 },
+    { type: 'removeStatus', status: 'poison', amount: { stacks: true, scale: 0.2 } }
   ] },
   regenerationTick: { trigger: { event: 'cycleStart' }, target: { kind: 'self' }, effects: [
     { type: 'heal', amount: { stacks: true } }, { type: 'removeStatus', status: 'regeneration', amount: 1 }

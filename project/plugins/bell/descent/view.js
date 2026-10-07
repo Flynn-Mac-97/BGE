@@ -13,7 +13,7 @@ import { unlockedCrew } from './profile-save.js'
 import { sellPrice } from './peddler.js'
 import { familyPowers, familyPowerThresholds, familyCounts } from './family-powers.js'
 import { powerFamilies } from '../power-families.js'
-import { embersNeeded, regionOf, cardStats, recipeFor, readyEvolutions, maxHealthOf, chargesLeft, tomeNames } from './run.js'
+import { embersNeeded, regionOf, cardStats, isSurgeLevel, recipeFor, readyEvolutions, maxHealthOf, chargesLeft, tomeNames } from './run.js'
 
 const itemName = type => rules.catalog.items[type].name
 const pips = (filled, total) => '●'.repeat(filled) + '○'.repeat(total - filled)
@@ -97,7 +97,7 @@ const cardFaces = {
   level: (run, card) => {
     const item = run.items[card.id]
     const changes = cardStats(run, card).map(change => `${shortStat(change.stat)} ${change.from} → ${change.to}`).join(' · ')
-    return { image: item.type, type: item.type, title: itemName(item.type), sub: `LEVEL ${item.level} → ${item.level + 1}`, text: changes, hint: evolutionHint(run, item.type) }
+    return { image: item.type, type: item.type, title: itemName(item.type), sub: `LEVEL ${item.level} → ${item.level + 1}${isSurgeLevel(item.level + 1) ? ` · SURGE ×${tuning.surge.share}` : ''}`, text: changes, hint: evolutionHint(run, item.type) }
   },
   item: (run, card) => ({ image: card.type, type: card.type, title: itemName(card.type), sub: `NEW · ${rules.catalog.items[card.type].footprint.join('×')}`, text: rules.catalog.items[card.type].description, hint: evolutionHint(run, card.type) }),
   widen: run => ({ image: 'pack', title: 'Wider Back', sub: `GRID ${run.columns} → ${run.columns + 1} COLUMNS`, text: 'Room for one more column of gear.', hint: '' }),
@@ -117,7 +117,7 @@ const overlays = {
   train: (kit, journey) => {
     const run = journey.descent
     const gear = Object.keys(run.items).map(id => gearCard(kit, run, id, kit.button('Train +1', { action: 'train', value: id }))).join('')
-    return `<div class="menu-shade"><section class="loot-sheet"><h2>TRAIN ONE ITEM · +1 LEVEL</h2><p>${escape(journey.message)} Pick the item you want stronger.</p><div class="loot-choices gear-choices">${gear}</div></section></div>`
+    return `<div class="menu-shade"><section class="loot-sheet"><h2>LUCKY · TRAIN ONE ITEM +1 LEVEL</h2><p>${escape(journey.message)} A spare moment on the stair: pick the item you want stronger.</p><div class="loot-choices gear-choices">${gear}</div></section></div>`
   },
   peddler: (kit, journey) => {
     const run = journey.descent, coin = run.coin ?? 0
@@ -145,7 +145,7 @@ const overlays = {
     const body = chest.kind === 'evolution'
       ? `<p class="evolve-start">What? ${escape(itemName(chest.from))} is evolving!</p><div class="evolution-morph"><span class="morph-from">${art(kit, chest.from, itemName(chest.from))}</span><span class="morph-into">${art(kit, chest.into, itemName(chest.into))}</span></div><h3 class="evolve-done">${escape(itemName(chest.from))} became ${escape(itemName(chest.into)).toUpperCase()}!</h3><p class="evolve-done">${escape(rules.catalog.items[chest.into].description)}</p>`
       : `<ul>${chest.ups.map(up => `<li>${escape(itemName(up.type))} · level ${up.from} → ${up.to}</li>`).join('')}</ul>`
-    return `<div class="menu-shade"><section class="loot-sheet"><h2>${chest.kind === 'evolution' ? 'THE CHEST OPENS · EVOLUTION' : 'THE CHEST OPENS'}</h2><p>${escape(journey.message)}</p>${body}${kit.button('Take it', { action: 'chest' })}</section></div>`
+    return `<div class="menu-shade"><section class="loot-sheet"><h2>${chest.kind === 'evolution' ? 'THE CHEST OPENS · EVOLUTION' : chest.ups.length >= 5 ? 'THE CHEST OVERFLOWS' : 'THE CHEST OPENS'}</h2><p>${escape(journey.message)}</p>${body}${kit.button('Take it', { action: 'chest' })}</section></div>`
   },
   dead: (kit, journey, state) => {
     const run = journey.descent

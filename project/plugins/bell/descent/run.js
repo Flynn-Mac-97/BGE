@@ -5,7 +5,7 @@
  *    nextItem, enemy, cards, chest, bells, evolutions, settled, story, forged }`. `forged` lists the forged item types this run may offer.
  *    coin, peddler, bestBefore, mastery, masteryGain }`. `coin` is spent at the Peddler (`peddler.js`), who visits after each boss.
  * `mastery` is the profile's mastery levels when the run began; `masteryGain` is the xp this run earns (`mastery.js`).
- * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'train' (a level-up's free item level), 'peddler', 'dead'. Callers pass the engine's random.
+ * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'train' (a lucky level-up's free item level, at `tuning.trainChance`), 'peddler', 'dead'. Callers pass the engine's random.
  */
 import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
@@ -20,7 +20,9 @@ import { familyPowerAbilities } from './family-powers.js'
 import { familyOf } from '../power-families.js'
 
 /** A catalog stat at an item level. */
-export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)))
+export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)) * tuning.surge.share ** tuning.surge.levels.filter(surge => surge <= level).length)
+/** True when reaching this item level is a surge: every number the item has jumps by `tuning.surge.share`. */
+export const isSurgeLevel = level => tuning.surge.levels.includes(level)
 /** Embers needed to go from this player level to the next. */
 export const embersNeeded = level => tuning.embers.firstNeed + tuning.embers.needGrowth * (level - 1)
 /** 'boss', 'elite' or 'normal'. */
@@ -222,7 +224,8 @@ function openChest(journey, kind, random) {
     return { kind: 'evolution', id: evolution.id, from: evolution.from, into: evolution.into }
   }
   const ups = []
-  for (let roll = 0; roll < tuning.chest[kind]; roll++) {
+  const { levels } = pickWeighted(tuning.chest[kind], entry => entry.weight, random)
+  for (let roll = 0; roll < levels; roll++) {
     const id = pick(Object.keys(run.items), random)
     ups.push({ id, type: run.items[id].type, from: run.items[id].level, to: ++run.items[id].level })
   }
@@ -362,7 +365,8 @@ export function chooseCard(journey, index, random) {
   run.level++; run.pendingLevels--
   run.health = Math.min(maxHealthOf(run), run.health + tuning.recruit.healthPerLevel)
   tell(journey, `Level ${run.level}. ${cardSummary(run, card)}`)
-  journey.phase = 'train'
+  if (Math.max(0, random()) < tuning.trainChance) journey.phase = 'train'
+  else afterRewards(journey, random)
   return true
 }
 

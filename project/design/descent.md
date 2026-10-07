@@ -15,21 +15,22 @@ its evolved form. Enemies grow every floor, without end.
 | Scale | What happens | Why it pulls |
 | --- | --- | --- |
 | Seconds | A floor is one auto-battle. Items fire in grid order; numbers pop on the grid. | Your build visibly does things. |
-| About a minute | The Ember bar fills. Choose 1 of 3 cards, then train one item of your choice +1 level. | Constant small choices, and one you aim yourself. |
+| About a minute | The Ember bar fills. Choose 1 of 3 cards; sometimes (30%) you also train one item +1 level. An item's surge levels multiply all its numbers. | Constant small choices, and lucky ones you cannot count on. |
 | Every boss | The travelling Peddler visits. Spend Coin on wares from every family and one evolved item; sell what you no longer need. | You steer the build: buy the piece you are missing. |
-| About five minutes | Every 5th floor is an elite, and every 10th a boss. Both drop a chest. A chest evolves an eligible item, or gives free level-ups. | A goal you can see coming and plan the grid for. |
+| About five minutes | Every 5th floor is an elite, and every 10th a boss. Both drop a chest. A chest evolves an eligible item, or rolls free level-ups: usually 1 (elite) or 3 (boss), sometimes 5. | A goal you can see coming and plan the grid for. |
 | A run | Depth is the score. New crew unlock at depth 10, 15 and 25. | "One more floor." |
 | Between runs | Bells buy Bell Tower ranks, and every item you used gains mastery. Vigor, Might, Kindling and Fortune never cap. | You hit a wall, prestige, and break it next time. |
 
 ## Rules
 
-- **Items level without limit.** Every number an item has is a stat. At level L each stat is `base × (1 + growth × (L − 1))`, rounded. `growth` is in `plugins/bell/descent/tuning.js`.
+- **Items level without limit.** Every number an item has is a stat. At level L each stat is `base × (1 + growth × (L − 1))`, times `surge.share` (1.5) for each surge level reached (2, 5, 9, 14, 20, 27), rounded. The card for a surge level says SURGE. `growth` and `surge` are in `plugins/bell/descent/tuning.js`.
 - **No duplicate drops.** A card for an item you own is a level-up. New items are rare: their weight falls with every item you own, and there is a hard cap.
 - **Evolution.** An item at its recipe's level, touching its partner item on the grid, evolves at the next chest. It keeps its level, gains a new name, a new ability and the evolved border. Recipes are in `descent/evolutions.js`.
 - **Health carries over.** The recruit recovers a share of health after each floor, and each level-up raises max health a little.
 - **Rerolls.** A run starts with a few rerolls; each redraws the current cards.
 - **Death.** The run ends at once. Bells: 1 per floor cleared, more for elites and bosses.
-- **Stall.** A fight with no winner after the cycle cap is a defeat. Every foe tires: from cycle 14 it loses 10% of its health each cycle, through guard (`tuning.enemy.tire`, `tireAbility` in `enemies.js`). A build that cannot kill a Plated or Regrowth foe can still outlast it.
+- **Stall.** A fight with no winner after the cycle cap is a defeat. Every foe tires: from cycle 24 it loses 10% of its health each cycle, through guard (`tuning.enemy.tire`, `tireAbility` in `enemies.js`). It is a last resort before the cap, not the usual way a fight ends.
+- **Poison fades.** At each cycle end Poison deals its stacks through guard, then loses 1 stack and a fifth of the rest. A steady stream of Poison levels off at about five times what is added each cycle, so it stays strong against guard but no longer grows for the whole fight.
 
 ## Scaling
 
@@ -88,7 +89,7 @@ a common drop, so the poison evolution is the easiest one to reach.
 Consumables have their own card weight, so they keep turning up however many
 items the run owns.
 
-A level-up draw holds at most one level card (training is the second step of every level-up), and its last card is always new
+A level-up draw holds at most one level card, and its last card is always new
 (an item, a consumable or a tome) while any are left. Level cards weigh less
 than they did, and new items fall off more slowly as the run owns more. Before
 this, about 70% of all cards offered were level cards and a run saw about 10
@@ -166,9 +167,9 @@ The floor 40 boss is the wall after about ten runs.
 
 ## Training and the Peddler
 
-Every level-up has two steps: choose one of the cards, then train one owned
-item +1 level (phase `train`). The second step is aimed, so a build can be
-pushed where it is weak.
+A level-up is a card. With chance `tuning.trainChance` (30%) it is a lucky one:
+you also train one owned item +1 level (phase `train`). Training is aimed, so a
+build can be pushed where it is weak, but a run cannot count on it.
 
 Every floor gives Coin (`tuning.coin`: 1, 3 for an elite, 8 for a boss). After
 each boss, once the chest and level-ups are done, the travelling Peddler visits
@@ -259,3 +260,29 @@ The ruler now values cards over a whole fight, so items that stack or grow count
 - **Defence before a boss.** In a level-up draw one or two floors before a boss (floors 8-9, 18-19, ...), the first card is always a new item that guards or heals while one is left. Threats are unchanged.
 
 Seeded bot runs (5 crews x 10): mean floor 27.6 -> about 32; Rook median 15 -> 23; evolution in 28 of 46 runs that reach floor 15 (was 19 of 44).
+
+## Power spikes and luck (spikes pass)
+
+The gauntlet left a slow burn: every level-up gave a card and a free level, items grew on a line, foes tired from cycle 14, and
+Poison stacks never faded. Late fights all ended near cycle 23 on the tire timer, and weapons did almost nothing past floor 40.
+This pass makes power come in jumps and makes runs differ by luck:
+
+- Surges at item levels 2, 5, 9, 14, 20 and 27 (×1.5 each), so weapons keep pace with foes and a level card can be a big one.
+- Training on 30% of level-ups instead of all; Embers per level grow by 2 instead of 3, so there are more card picks.
+- Chests roll their level-ups by weight (elite 1/3/5 at 70/25/5, boss 3/5 at 70/30).
+- Evolution at item level 4 instead of 5.
+- Poison fades by a fifth each cycle; foes tire from cycle 24; foe health grows 1.15 per floor instead of 1.17.
+
+`node tools/descent-sim.mjs` now prints the share of damage to foes from weapons, Poison, other statuses, tiring and other items by
+depth band, and the power spikes per run (a normal fight at most half as long as the run's recent normal fights).
+Measured with the bot, six runs each, with the tower from a real profile (Fortune 11, Kindling 20, Might 39, Lantern Oil 3, Vigor 10):
+
+| Crew | Weapon share, floors 41–50, before → after | Tiring share, floors 51–60 | Cycles, floors 51–60 | Median floor |
+|---|---|---|---|---|
+| Moss | 50% → 89% | 79% → 1% | 20.0 → 9.8 | 52 → 59 |
+| Rook | 29% → 75% | 28% → none reached | 13.3 → (floors 41–50: 3.2) | 40 → 47 |
+| Briar | 15% → 31% (Poison 67% → 44%) | 41% → 0% | 16.2 → 8.0 | 62 → 54 |
+
+Deaths now come over several floors of growing damage instead of one hit at full health. Spikes per run rose for Briar (1.5 → 2.2)
+and are about 2 for Pip without a tower; with a large tower Rook and Moss win most fights in 1–2 cycles, so the measure sees few.
+

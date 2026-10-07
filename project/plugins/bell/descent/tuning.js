@@ -2,23 +2,27 @@
 export const tuning = {
   grid: { columns: 4, rows: 3, maxColumns: 8 },
   recruit: { health: 24, healthPerLevel: 2, recoverShare: 0.3 },
-  // A stat at level L is base × (1 + itemGrowth × (L − 1)), rounded; level 1 is the catalog value.
+  // A stat at level L is base × (1 + itemGrowth × (L − 1)) × surge.share per surge level reached, rounded; level 1 is the catalog value.
   itemGrowth: 1,
+  // Surges: at each of these item levels every number the item has is multiplied by `share` once more, on top of the line.
+  surge: { levels: [2, 5, 9, 14, 20, 27], share: 1.5 },
   // Embers for a floor: perFloor + perFloorGrowth × floor, times the floor kind's multiplier.
   // Embers needed for the next player level: firstNeed + needGrowth × (level − 1).
-  embers: { perFloor: 5, perFloorGrowth: 0.6, elite: 2, boss: 3, firstNeed: 3, needGrowth: 3 },
+  embers: { perFloor: 5, perFloorGrowth: 0.6, elite: 2, boss: 3, firstNeed: 3, needGrowth: 2 },
   // Card weights: each owned item, each new item (falling as you own more), one wider grid, one tome, one new consumable.
   // Consumables have their own weight, so they keep turning up however many items you own.
   // synergyWeight: a new item that completes something you own (an evolution partner, a payoff) is this many times as likely.
   // newFamilyWeight: likewise for an item of a power family you own nothing of; repeatFamilyWeight: for one whose family this draw already offers.
   cards: { synergyWeight: 6, newFamilyWeight: 2, repeatFamilyWeight: 0.25, count: 3, maxLevelCards: 1, upgradeWeight: 2.5, newItemWeight: 8, newItemFalloff: 0.9, maxItems: 9, widenWeight: 1.5, tomeWeight: 2, consumableWeight: 3, mendShare: 0.5 },
   rerolls: 2,
-  evolveLevel: 5,
+  evolveLevel: 4,
   // Enemy health and damage are base × growth^(floor − 1), then × the floor kind's multiplier.
   // Set against the test-bout bot (tools/descent-bot.mjs) so a median run ends near floor 20 and bosses cause about half the deaths (see design/descent.md, Scaling).
-  enemy: { healthGrowth: 1.17, damageGrowth: 1.07, tire: { from: 14, share: 0.1 }, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 3, damage: 1.5 }, elite: { health: 2.4, damage: 0.8 }, boss: { health: 3, damage: 1 } } },
-  // A chest holds an evolution when one is ready; otherwise this many free level-ups.
-  chest: { elite: 1, boss: 3 },
+  enemy: { healthGrowth: 1.15, damageGrowth: 1.07, tire: { from: 24, share: 0.1 }, eliteEvery: 5, bossEvery: 10, kinds: { normal: { health: 3, damage: 1.5 }, elite: { health: 2.4, damage: 0.8 }, boss: { health: 3, damage: 1 } } },
+  // A chest holds an evolution when one is ready; otherwise a number of free level-ups drawn by weight, so a chest can be a jackpot.
+  chest: { elite: [{ levels: 1, weight: 70 }, { levels: 3, weight: 25 }, { levels: 5, weight: 5 }], boss: [{ levels: 3, weight: 70 }, { levels: 5, weight: 30 }] },
+  // The chance that a level-up also lets you train one item a level.
+  trainChance: 0.3,
   // Bells for a won floor: base × growth^(floor − 1), plus record × floor on a floor deeper than your best (see bellsFor).
   bells: { normal: 1, elite: 3, boss: 10, growth: 1.1, record: 1 },
   // Item mastery: level L needs step × L × (L + 1) / 2 floors won with the item on the grid; each level adds share to its numbers.

@@ -11,7 +11,7 @@ export default suite
 /** Take a level-up card, then put its free training level on the first item. */
 function takeCard(journey, index, random) {
   chooseCard(journey, index, random)
-  trainItem(journey, Object.keys(journey.descent.items)[0], random)
+  if (journey.phase === 'train') trainItem(journey, Object.keys(journey.descent.items)[0], random)
 }
 
 /** A fresh run holding the dagger and Venom Vial, Widow's Fang's recipe: the dagger is item-1, the vial item-2. */
@@ -35,7 +35,8 @@ test('item stats grow with level and the battle uses them', () => {
   journey.descent.items['item-1'].level = 4
   const battle = battleFor(journey.descent)
   assert.equal(battle.items['item-1'].stats.damage, levelStat(2, 4))
-  assert.equal(levelStat(2, 4), 8)
+  assert.equal(levelStat(2, 4), 12, 'base × level, × 1.5 for the level 2 surge')
+  assert.equal(levelStat(2, 5), 23, 'level 5 is the next surge: × 1.5 again')
   assert.deepEqual(battle.items['item-1'].position, [1, 0])
 })
 
@@ -48,13 +49,22 @@ test('a won floor gives Embers and Bells, and a level-up card applies once', () 
   assert.equal(journey.descent.cards.length, 3)
   const before = structuredClone(journey.descent)
   const card = journey.descent.cards[0]
-  assert.ok(chooseCard(journey, 0, random))
+  const lucky = () => 0
+  assert.ok(chooseCard(journey, 0, lucky), 'a roll under trainChance makes this level-up a lucky one')
   assert.equal(journey.descent.level, before.level + 1)
   if (card.kind === 'level') assert.equal(journey.descent.items[card.id].level, before.items[card.id].level + 1)
   assert.equal(journey.phase, 'train')
   const trained = Object.keys(journey.descent.items).at(-1), levelBefore = journey.descent.items[trained].level
   assert.ok(trainItem(journey, trained, random))
   assert.equal(journey.descent.items[trained].level, levelBefore + 1)
+  assert.notEqual(journey.phase, 'train')
+})
+
+test('a level-up without the lucky roll gives no training', () => {
+  const random = seededRandom(3)
+  const journey = createRun(createProfile(), 'rook', random)
+  fightFloor(journey, random)
+  assert.ok(chooseCard(journey, 0, () => 0.99))
   assert.notEqual(journey.phase, 'train')
 })
 
@@ -238,7 +248,7 @@ test('a level-3 item names what its evolution still needs, and consumables keep 
   assert.equal(hint(), undefined)
   journey.descent.items['item-1'].level = 3
   journey.battle = battleFor(journey.descent)
-  assert.equal(hint(), "Rusty Dagger L3 → Widow's Fang: reach L5.")
+  assert.equal(hint(), "Rusty Dagger L3 → Widow's Fang: reach L4.")
   rules.place(journey.battle, 'item-2', [3, 2])
   assert.equal(hint(), "Rusty Dagger L3 → Widow's Fang: touch Venom Vial.")
   delete journey.descent.items['item-2']
@@ -388,7 +398,7 @@ test('item mastery grows across runs and adds to that item’s numbers', async (
   const run = createRun(profile, 'rook', seededRandom(1)).descent
   assert.equal(run.mastery.dagger, 2)
   run.items['item-1'].level = 5
-  assert.equal(battleFor(run).items['item-1'].stats.damage, 11, 'level 5 dagger: 10 damage, +10% from mastery 2')
+  assert.equal(battleFor(run).items['item-1'].stats.damage, 25, 'level 5 dagger: 23 damage after two surges, +10% from mastery 2')
 })
 
 test('the Fast toggle plays a floor many times quicker than normal speed', async () => {

@@ -33,3 +33,19 @@ for (const from of [1, 11, 21, 31]) {
   const fights = results.flatMap(result => result.fights).filter(fight => fight.kind === 'normal' && fight.floor >= from && fight.floor < from + 10)
   if (fights.length) console.log(`normal floors ${from}-${from + 9}: ${fights.length} fights · ${Math.round(100 * average(fights.map(fight => (fight.start - fight.end) / fight.max)))}% HP lost · start at ${Math.round(100 * average(fights.map(fight => fight.start / fight.max)))}% HP`)
 }
+
+// Who kills the foe, by depth band: the share of all damage to foes from weapons, poison, other statuses, tiring and other items.
+const sources = ['weapon', 'poison', 'status', 'tire', 'other']
+for (const from of [1, 11, 21, 31, 41, 51]) {
+  const fights = results.flatMap(result => result.fights).filter(fight => fight.floor >= from && fight.floor < from + 10)
+  const totals = Object.fromEntries(sources.map(source => [source, fights.reduce((sum, fight) => sum + (fight.damage[source] ?? 0), 0)]))
+  const all = Object.values(totals).reduce((sum, value) => sum + value, 0)
+  if (all) console.log(`damage floors ${from}-${from + 9}: ${sources.map(source => `${source} ${Math.round(100 * totals[source] / all)}%`).join(' · ')} · ${average(fights.map(fight => fight.cycles)).toFixed(1)} cycles`)
+}
+
+// Power spikes: a normal fight that takes at most half the cycles of the run's last three normal fights (when those took 3 or more).
+const spikesOf = result => result.fights.filter(fight => fight.kind === 'normal').filter((fight, index, normals) => {
+  const before = normals.slice(Math.max(0, index - 3), index).map(previous => previous.cycles).sort((first, second) => first - second)
+  return before.length === 3 && before[1] >= 3 && fight.cycles <= before[1] / 2
+}).length
+console.log(`power spikes per run: ${results.map(spikesOf).join(', ')}`)
