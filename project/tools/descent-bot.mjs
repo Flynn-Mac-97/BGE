@@ -160,7 +160,7 @@ export function shop(journey) {
     const dead = Object.keys(run.items).find(id => !isSynergy(run, run.items[id].type) && cardWorth(run, base, { kind: 'sell', id }) >= 0)
     if (dead && Object.keys(run.items).length > 1) { sellToPeddler(journey, dead); continue }
     const affordable = run.peddler.stock.map((ware, index) => index).filter(index => run.peddler.stock[index].price <= run.coin)
-    if (!affordable.length || Object.keys(run.items).length >= tuning.cards.maxItems) return
+    if (!affordable.length) return
     const pick = best(affordable, index => cardWorth(run, base, { kind: 'item', ...run.peddler.stock[index] }) / run.peddler.stock[index].price)
     if (pick.value < WORTH_PER_COIN) return
     buyFromPeddler(journey, pick.option)

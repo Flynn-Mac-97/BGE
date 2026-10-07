@@ -2,7 +2,6 @@
 import { defineSuite } from '../tools/node-suite.mjs'
 import assert from 'node:assert/strict'
 import { rules } from '../plugins/bell/rules.js'
-import { tuning } from '../plugins/bell/descent/tuning.js'
 import { peddlerStock } from '../plugins/bell/descent/peddler.js'
 import { completesOwned, createRun, finishFloor, collectChest, chooseCard, rerollCards, readyEvolutions, battleFor, levelStat, abandonRun, drawCards, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from '../plugins/bell/descent/run.js'
 import { createProfile, profileStore, settleRun, buyUpgrade, unlockedCrew } from '../plugins/bell/descent/profile-save.js'
@@ -366,12 +365,20 @@ test('the Peddler visits after a boss with one ware per family, and buying and s
   assert.equal(run.floor, 11)
 })
 
+test('a run with many items is still offered new items at level-ups', () => {
+  const random = seededRandom(2)
+  const run = createRun(createProfile(), 'rook', random).descent
+  for (const type of ['sword', 'buckler', 'salve', 'sprig', 'banner', 'hammer', 'venom', 'hungryTooth', 'bloodCup']) run.items['item-' + run.nextItem++] = { type, level: 1, position: null }
+  assert.ok(Object.keys(run.items).length > 9)
+  const offersNew = Array.from({ length: 50 }, () => drawCards(run, random)).some(cards => cards.some(card => card.kind === 'item'))
+  assert.ok(offersNew)
+})
+
 test('only Coin limits buying from the Peddler: a full bag still buys every ware it can pay for', () => {
   const random = seededRandom(1)
   const journey = createRun(createProfile(), 'rook', random)
   const run = journey.descent
   for (const type of ['sword', 'buckler', 'salve', 'sprig', 'banner', 'hammer']) run.items['item-' + run.nextItem++] = { type, level: 1, position: null }
-  assert.ok(Object.keys(run.items).length >= tuning.cards.maxItems)
   run.floor = 10; run.coin = 100
   run.peddler = { stock: peddlerStock(run, random) }
   journey.phase = 'peddler'

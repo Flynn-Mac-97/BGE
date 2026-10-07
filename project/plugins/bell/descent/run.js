@@ -326,8 +326,8 @@ export function drawCards(run, random) {
   const isBossNear = [1, 2].some(floorsAhead => floorKind(run.floor + floorsAhead) === 'boss')
   for (let draw = 0; draw < count; draw++) {
     const levels = cards.filter(card => card.kind === 'level').length < tuning.cards.maxLevelCards ? Object.keys(run.items).filter(id => !cards.some(card => card.id === id)) : []
-    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type) && (!poolNeeds[type] || ownedTypes.has(poolNeeds[type]))) : []
-    const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const fresh = [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type) && (!poolNeeds[type] || ownedTypes.has(poolNeeds[type])))
+    const flasks = consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type))
     const eveDefence = isBossNear && draw === 0 ? fresh.filter(isDefence) : []
     if (eveDefence.length) { cards.push({ kind: 'item', type: pickWeighted(eveDefence, type => freshWeight(type, ownedTypes, cards), random) }); continue }
     const groups = [

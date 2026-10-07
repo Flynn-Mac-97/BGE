@@ -24,7 +24,7 @@ its evolved form. Enemies grow every floor, without end.
 ## Rules
 
 - **Items level without limit.** Every number an item has is a stat. At level L each stat is `base × (1 + growth × (L − 1))`, times `surge.share` (1.5) for each surge level reached (2, 5, 9, 14, 20, 27), rounded. The card for a surge level says SURGE. `growth` and `surge` are in `plugins/bell/descent/tuning.js`.
-- **No duplicate drops.** A card for an item you own is a level-up. New items are rare: their weight falls with every item you own, and there is a hard cap.
+- **No duplicate drops.** A card for an item you own is a level-up. New items get rarer: their weight falls with every item you own. There is no cap on how many items a run owns; items that do not fit on the grid wait in reserve.
 - **Evolution.** An item at its recipe's level, touching its partner item on the grid, evolves at the next chest. It keeps its level, gains a new name, a new ability and the evolved border. Recipes are in `descent/evolutions.js`.
 - **Health carries over.** The recruit recovers a share of health after each floor, and each level-up raises max health a little.
 - **Rerolls.** A run starts with a few rerolls; each redraws the current cards.
@@ -176,8 +176,7 @@ each boss, once the chest and level-ups are done, the travelling Peddler visits
 (phase `peddler`). His stock is one item from each power family the run can
 still take, one evolved item (sold nowhere else) and one consumable; wares come
 at level 1 + 2 per boss beaten. Prices are in `tuning.peddler`. He also buys:
-an owned item sells for 2 + its level. Only Coin limits buying: the 9-item cap
-(`tuning.cards.maxItems`) stops new-item cards, not the Peddler, and a bought
+an owned item sells for 2 + its level. Only Coin limits buying, and a bought
 item that does not fit on the grid waits in reserve. `descent/peddler.js` holds
 the stock, prices, buying and selling.
 
