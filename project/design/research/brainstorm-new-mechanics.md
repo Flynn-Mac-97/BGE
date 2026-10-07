@@ -1,6 +1,6 @@
 # Brainstorm: new mechanics
 
-Two fresh reviewers brainstormed separately, October 2026, with the same brief and no knowledge of each other or of Black Bell. They knew only the genre (a grid-backpack roguelite auto-battler) and checked novelty with a few web searches. Source A or B is the brainstorm; A + B means both reached the idea on their own. “Black Bell today” was added afterwards.
+Two fresh reviewers brainstormed separately, October 2026, with the same brief and no knowledge of each other or of Black Bell. They knew only the genre (a grid-backpack roguelite auto-battler) and checked novelty with a few web searches. Source A or B is the brainstorm; A + B means both reached the idea on their own; Owner marks the owner’s own ideas, explored in the design session. “Black Bell today” was added afterwards.
 
 ## Crafting your own items
 
@@ -299,6 +299,58 @@ Two fresh reviewers brainstormed separately, October 2026, with the same brief a
 - **First small version:** Hot-seat on one screen with a fixed pair of heroes.
 - **Close games:** Overcooked (shared space)
 - **Black Bell today:** The Duel Pit is already same-screen two-player.
+
+## Your ideas
+
+### 30. Enemy Packs and Section Bosses (Owner)
+
+- **Core rule:** A floor is a group of 2–4 smaller foes, each with one trait (a Swarm rat, a Plated sentry, a healer at the back). Floors form a section that ends with a boss you must beat to move on.
+- **How it feels:** The group is the puzzle: what do my items kill first?
+- **Why it is fresh:** Most backpack auto-battlers fight one opponent; enemy roles make targeting a build choice.
+- **Risk:** Busier screen and battle text; longer fights. Cap at 3 foes and mark who is targeted.
+- **First small version:** Normal floors become 2 foes at about 60% strength each; one new target rule (“all foes”) on 3 items.
+- **Close games:** Slay the Spire (enemy groups), WoW dungeons (pulls and bosses)
+- **Black Bell today:** The engine ends a fight when one team is left, so several foes on one team already work; items hit the first living foe.
+
+### 31. Party Run (several heroes) (Owner)
+
+- **Core rule:** 2–3 heroes in one run, each with a grid, in roles: a tank draws attacks, a healer heals allies, a damage dealer hits. Items can target an ally.
+- **How it feels:** A WoW dungeon in a backpack: each grid supports the others.
+- **Why it is fresh:** Backpack auto-battlers are one hero; party roles across linked grids were not found.
+- **Risk:** The biggest change: double grid management on a phone, and every item must say whom it affects.
+- **First small version:** A two-hero mode with 3×3 grids, one new target (“an ally”), and foes that hit the hero with the most guard.
+- **Close games:** WoW dungeons, Darkest Dungeon (party roles)
+- **Black Bell today:** Fighters can each have their own grid (Duel Pit); there is no “ally” target yet.
+
+### 32. Item Perks (rolled bonuses) (Owner)
+
+- **Core rule:** Items drop with a random extra line by rarity: common none, rare one perk, legendary two or a unique one. Perks are drawn from a pool per family; the Peddler can reroll one for Coin.
+- **How it feels:** Diablo-style luck: the same item can be good or great.
+- **Why it is fresh:** Rolled affixes are rare in grid auto-battlers, and perks can change rules (“acts first”, “counts as two family items”).
+- **Risk:** Longer cards; too many perks become noise. One line each, from a short list.
+- **First small version:** 12 perks; one random perk on 25% of new items, shown as a second card line.
+- **Close games:** Diablo, Path of Exile (affixes)
+- **Black Bell today:** Items have fixed stats that grow by level and surges.
+
+### 33. In-run Stat Shop (Owner)
+
+- **Core rule:** Between floors, spend Coin on small stackable hero stats for this run (+4 max HP, +1 weapon damage, +1 guard at cycle start). Each buy is small and you can buy as many as you can afford; price rises slowly per stat. Optional interest: +1 Coin per 10 held.
+- **How it feels:** Spend now or hoard for a spree before a boss.
+- **Why it is fresh:** Gives Coin a constant use and a player-controlled spike on top of luck.
+- **Risk:** Raw stats can replace building; keep each buy small so items stay the main power. Overlaps with the Bell Tower’s Vigor and Might.
+- **First small version:** A Stat Shrine between floors with 3 stats at 3 Coin, +1 per 5 bought; then check damage by source in the sim.
+- **Close games:** Brotato (stat shop), Teamfight Tactics (interest)
+- **Black Bell today:** Coin is only spent at the Peddler after bosses; Tomes give stats on level-up cards.
+
+### 34. Family Perk Trees (Owner)
+
+- **Core rule:** One tree per family of 8–12 nodes. Early nodes raise numbers; deeper nodes change a rule (“Poison also weakens the foe’s next attack”). Points come from floors won with that family’s items; each tier offers 2 nodes, pick one.
+- **How it feels:** Your Growth is not my Growth.
+- **Why it is fresh:** Ties families, statuses and long-term rewards together; the research favoured nodes that add mechanics over percentages.
+- **Risk:** Five trees is a lot of content; start with one.
+- **First small version:** One 6-node tree for Growth, with points from floors won with 3+ Growth items placed.
+- **Close games:** Path of Exile, Hades (Mirror)
+- **Black Bell today:** Item mastery already counts floors won per item; family powers turn on at 3 and 5 items.
 
 ## What each brainstorm would build first
 
