@@ -20,6 +20,10 @@ function liveAmount(battle, id, expression) {
     const amount = rules.stat(battle, itemReference(id), expression.stat)
     return { amount, isBoosted: amount !== (itemDefinition(battle, id).stats?.[expression.stat] ?? 0) }
   }
+  // A granted ability's amount reads the granting item, which is the item this glance is for.
+  if (expression.grantorStat) return liveAmount(battle, id, { stat: expression.grantorStat })
+  // A die shows as its sides, "d6", since its value is only known when it is rolled.
+  if (expression.roll) return { amount: `d${expression.roll}${expression.scale ? '×' + expression.scale : ''}${expression.scaleStat ? '×' + rules.stat(battle, itemReference(id), expression.scaleStat) : ''}`, isBoosted: false }
   if (expression.resource) return { amount: battle.items[id].resources[expression.resource] ?? battle.actors[battle.items[id].owner].resources[expression.resource] ?? 0, isBoosted: false }
   return { amount: null, isBoosted: false }
 }
@@ -34,7 +38,7 @@ const effectText = {
   damage: (effect, amount) => `${amount} DMG`, heal: (effect, amount) => `+${amount} HP`, guard: (effect, amount) => `+${amount} GD`,
   applyStatus: (effect, amount) => statusText(effect.status, amount), removeStatus: (effect, amount) => `−${amount} ${shortStatus(effect.status)}`,
   modifyStat: (effect, amount) => `${signed(amount)} ${shortStat(effect.stat)}`, resource: (effect, amount) => `${signed(amount)} ${resourceShort[effect.resource] ?? effect.resource.toUpperCase()}`,
-  removeGuard: (effect, amount) => `−${amount} GD`, consumeStatus: (effect, amount) => `SPEND ${amount} ${shortStatus(effect.status)}`,
+  removeGuard: (effect, amount) => `−${amount} GD`, consumeStatus: (effect, amount) => `SPEND ${amount >= 99 ? 'ALL' : amount} ${shortStatus(effect.status)}`,
   transferResource: (effect, amount) => `MOVE ${amount} ${resourceShort[effect.resource] ?? effect.resource.toUpperCase()}`,
   modifyCharges: (effect, amount) => `${signed(amount)} USES`, triggerItem: () => 'AGAIN'
 }

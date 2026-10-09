@@ -1,9 +1,10 @@
 /** Versioned concept records compile to the same item and actor vocabulary used by the game. */
 import { catalog } from '../catalog.js'
 import { artIds } from '../art.js'
+import { powerFamilies } from '../power-families.js'
 import { createRules, vocabulary } from '../../grid-game/api.js'
 export const kinds = ['item', 'character', 'enemy', 'npc']
-export const families = ['combat', 'growth', 'scholarship', 'hunger', 'scavenging']
+export const families = Object.keys(powerFamilies)
 export const statuses = Object.keys(catalog.statuses)
 export const ability = (amount = 2) => ({ id: 'draftAction', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount }] })
 export function newDraft(kind = 'item', number = 1) {

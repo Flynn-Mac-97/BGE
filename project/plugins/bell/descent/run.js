@@ -3,18 +3,26 @@
  * (`battle`, `phase`, `message`) and adds `descent`, the run itself:
  * `{ crew, floor, level, embers, pendingLevels, rerolls, bonus, columns, health, items: { id: { type, level, position } },
  *    nextItem, enemy, cards, chest, bells, evolutions, settled, story, forged }`. `forged` lists the forged item types this run may offer.
- * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'dead'. Callers pass the engine's random.
+ *    coin, peddler, bestBefore, mastery, masteryGain }`. `coin` is spent at the Peddler (`peddler.js`), who visits after each boss.
+ * `mastery` is the profile's mastery levels when the run began; `masteryGain` is the xp this run earns (`mastery.js`).
+ * Phases: 'battle' (planning or fighting), 'chest', 'levelUp', 'train' (a lucky level-up's free item level, at `tuning.trainChance`), 'peddler', 'dead'. Callers pass the engine's random.
  */
 import { rules, itemReference } from '../rules.js'
 import { tuning } from './tuning.js'
-import { descentPool, consumablePool, descentCrew } from './pool.js'
+import { descentPool, consumablePool, descentCrew, poolNeeds, synergyPairs } from './pool.js'
 import { consumableCharges } from './consumables.js'
-import { regions, enemyTraits } from './enemies.js'
+import { regions, enemyTraits, tireAbility } from './enemies.js'
 import { evolutionRecipes } from './evolutions.js'
 import { towerBonus } from './tower.js'
+import { peddlerStock, buyWare, sellItem } from './peddler.js'
+import { masteryLevels, gainMastery } from './mastery.js'
+import { familyPowerAbilities } from './family-powers.js'
+import { familyOf } from '../power-families.js'
 
 /** A catalog stat at an item level. */
-export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)))
+export const levelStat = (base, level) => Math.round(base * (1 + tuning.itemGrowth * (level - 1)) * tuning.surge.share ** tuning.surge.levels.filter(surge => surge <= level).length)
+/** True when reaching this item level is a surge: every number the item has jumps by `tuning.surge.share`. */
+export const isSurgeLevel = level => tuning.surge.levels.includes(level)
 /** Embers needed to go from this player level to the next. */
 export const embersNeeded = level => tuning.embers.firstNeed + tuning.embers.needGrowth * (level - 1)
 /** 'boss', 'elite' or 'normal'. */
@@ -22,9 +30,9 @@ export const floorKind = floor => floor % tuning.enemy.bossEvery === 0 ? 'boss' 
 /** The region a floor is in. */
 export const regionOf = floor => regions.filter(region => region.from <= floor).at(-1)
 /** The recruit's max health at the run's level. */
-export const maxHealthOf = run => tuning.recruit.health + run.bonus.maxHealth + tuning.recruit.healthPerLevel * (run.level - 1) + (run.tomes?.vigor ?? 0) * tuning.tomes.vigor.health
+export const maxHealthOf = run => Math.round((tuning.recruit.health + tuning.recruit.healthPerLevel * (run.level - 1) + (run.tomes?.vigor ?? 0) * tuning.tomes.vigor.health) * (1 + (run.bonus.maxHealthShare ?? 0)))
 /** A run item's stat: its level-scaled base plus Tomes of Might. A zero base stays zero. */
-export const itemStat = (base, item, run) => base ? levelStat(base, item.level) + (run.tomes?.might ?? 0) * tuning.tomes.might.bonus : 0
+export const itemStat = (base, item, run) => base ? Math.round((levelStat(base, item.level) + (run.tomes?.might ?? 0) * tuning.tomes.might.bonus) * (1 + (run.bonus.itemShare ?? 0) + tuning.mastery.share * (run.mastery?.[item.type] ?? 0))) : 0
 /** "the Cellar Rat", or a name that already starts with "The". */
 const theName = name => name.startsWith('The ') ? name : `the ${name}`
 const capital = text => text[0].toUpperCase() + text.slice(1)
@@ -38,6 +46,18 @@ function tell(journey, text) {
 const LOG_LIMIT = 400
 const note = (run, text) => { run.log = [...(run.log ?? []), text].slice(-LOG_LIMIT) }
 const pick = (list, random) => list[Math.min(list.length - 1, Math.floor(Math.max(0, random()) * list.length))]
+/** One entry of a list, each as likely as its weight. */
+function pickWeighted(list, weightOf, random) {
+  let roll = Math.max(0, random()) * list.reduce((sum, entry) => sum + weightOf(entry), 0)
+  return list.find(entry => (roll -= weightOf(entry)) < 0) ?? list.at(-1)
+}
+
+/** True when a type completes something the run owns: an evolution partner, the payoff a feeder unlocks, or a known strong pair. */
+export function completesOwned(ownedTypes, type) {
+  const isPartner = recipe => (recipe.partner === type && ownedTypes.has(recipe.from)) || (recipe.from === type && ownedTypes.has(recipe.partner))
+  const isPair = ([first, second]) => (first === type && ownedTypes.has(second)) || (second === type && ownedTypes.has(first))
+  return evolutionRecipes.some(isPartner) || synergyPairs.some(isPair) || ownedTypes.has(poolNeeds[type])
+}
 
 function pickEnemy(floor, random) {
   const kind = floorKind(floor)
@@ -50,17 +70,23 @@ function enemyActor(enemy, floor) {
   const traits = (enemy.traits ?? []).map(id => enemyTraits[id])
   const stats = { damage: grown(enemy.damage, tuning.enemy.damageGrowth, kind.damage) }
   for (const trait of traits) stats[trait.stat] = grown(trait.base, tuning.enemy.damageGrowth, kind.damage)
-  return { name: enemy.name, mark: enemy.mark, team: 'dungeon', maxHealth: grown(enemy.health, tuning.enemy.healthGrowth, kind.health), stats,
-    abilities: [{ id: 'enemyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }, ...traits.map(trait => trait.ability)] }
+  const maxHealth = grown(enemy.health, tuning.enemy.healthGrowth, kind.health)
+  stats.tire = Math.max(1, Math.round(maxHealth * tuning.enemy.tire.share))
+  return { name: enemy.name, mark: enemy.mark, team: 'dungeon', maxHealth, stats,
+    abilities: [{ id: 'enemyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }, tireAbility, ...traits.map(trait => trait.ability)] }
 }
 
 /** The floor's battle: every run item at its level; an item whose saved place no longer fits waits in reserve. */
 export function battleFor(run) {
   const maxHealth = maxHealthOf(run)
   const battle = rules.createState({ columns: run.columns, rows: tuning.grid.rows,
-    actors: { recruit: { name: descentCrew[run.crew].name, team: 'crew', maxHealth, health: Math.min(maxHealth, run.health), resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 } }, enemy: enemyActor(run.enemy, run.floor) },
+    actors: { recruit: { name: descentCrew[run.crew].name, team: 'crew', maxHealth, health: Math.min(maxHealth, run.health), resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 }, abilities: familyPowerAbilities }, enemy: enemyActor(run.enemy, run.floor) },
     items: Object.entries(run.items).map(([id, item]) => ({ id, type: item.type, owner: 'recruit', position: null })) })
-  for (const [id, item] of Object.entries(run.items)) {
+  // Dice differ from floor to floor but replay the same on one floor.
+  battle.rolls = { seed: run.floor * 7919 + run.level, count: 0 }
+  // Packs go first: an item stored in a pack only fits once the pack is attached.
+  const packsFirst = Object.entries(run.items).sort(([, first], [, second]) => Number(!rules.catalog.items[first.type].storage) - Number(!rules.catalog.items[second.type].storage))
+  for (const [id, item] of packsFirst) {
     const definition = rules.catalog.items[item.type]
     for (const [stat, base] of Object.entries(definition.stats)) battle.items[id].stats[stat] = itemStat(base, item, run)
     if (item.position) rules.place(battle, id, item.position)
@@ -72,7 +98,8 @@ function floorMessage(run) {
   const region = regionOf(run.floor)
   const entered = region.from === run.floor ? `You descend into ${region.name}. ${region.line} ` : ''
   const kind = { normal: '', elite: 'An elite blocks the stair. ', boss: 'The stair ends at a great door. ' }[run.enemy.kind]
-  return `Floor ${run.floor}. ${entered}${kind}${run.enemy.line}`
+  const threats = (run.enemy.traits ?? []).map(id => enemyTraits[id].name)
+  return `Floor ${run.floor}. ${entered}${kind}${run.enemy.line}${threats.length ? ` Threat: ${threats.join(', ')}.` : ''}`
 }
 
 /** A new run for one crew member, with the profile's Bell Tower ranks applied. */
@@ -82,7 +109,8 @@ export function createRun(profile, crewId, random) {
   const items = Object.fromEntries(crew.kit.map(([type, position], index) => ['item-' + (index + 1), { type, level: 1 + bonus.startLevel, position: [...position] }]))
   const run = { crew: crewId, floor: 1, level: 1, embers: 0, pendingLevels: 0, rerolls: tuning.rerolls + bonus.rerolls, bonus,
     columns: Math.min(tuning.grid.maxColumns, tuning.grid.columns + bonus.columns + (crew.columns ?? 0)), health: 0,
-    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [], tomes: { vigor: 0, might: 0 },
+    items, nextItem: crew.kit.length + 1, enemy: pickEnemy(1, random), cards: [], chest: null, bells: 0, evolutions: 0, settled: false, story: [], log: [], tomes: { vigor: 0, might: 0 }, coin: 0, peddler: null,
+    bestBefore: profile.bestFloor ?? 0, mastery: masteryLevels(profile.mastery), masteryGain: {},
     forged: (profile.forged ?? []).map(record => record.id) }
   run.health = maxHealthOf(run)
   const journey = { descent: run, battle: battleFor(run), phase: 'battle', message: '' }
@@ -143,7 +171,12 @@ export function finishFloor(journey, random) {
     return true
   }
   const kind = run.enemy.kind
-  run.bells += tuning.bells[kind]
+  const bells = bellsFor(run)
+  run.bells += bells
+  const coin = Math.round(tuning.coin[kind] * (1 + (run.bonus.coinShare ?? 0)))
+  run.coin = (run.coin ?? 0) + coin
+  gainMastery(run, Object.values(run.items).filter(item => item.position).map(item => item.type))
+  if (kind === 'boss') run.peddler = { stock: [] }
   const multiplier = { normal: 1, elite: tuning.embers.elite, boss: tuning.embers.boss }[kind]
   const gained = Math.round((tuning.embers.perFloor + tuning.embers.perFloorGrowth * run.floor) * multiplier * (1 + run.bonus.emberShare))
   run.embers += gained
@@ -153,10 +186,20 @@ export function finishFloor(journey, random) {
   run.chest = kind === 'normal' ? null : openChest(journey, kind, random)
   if (run.chest) for (const item of Object.values(run.items)) item.used = 0
   const levels = run.pendingLevels ? ` ${run.pendingLevels} level${run.pendingLevels > 1 ? 's' : ''} gained.` : ''
-  tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${tuning.bells[kind]} Bell${tuning.bells[kind] > 1 ? 's' : ''}.${levels}`)
+  tell(journey, `${capital(theName(run.enemy.name))} falls. +${gained} Embers, +${coin} Coin, +${bells} Bell${bells > 1 ? 's' : ''}${run.floor > run.bestBefore ? ' (new record!)' : ''}.${levels}`)
   if (run.chest) journey.phase = 'chest'
   else afterRewards(journey, random)
   return true
+}
+
+/**
+ * Bells for a won floor: the floor kind's base, growing by `bells.growth` each floor, plus a record bonus
+ * of `bells.record` × floor for a floor deeper than the profile had reached. Pushing your wall pays most.
+ */
+export function bellsFor(run) {
+  const grown = tuning.bells[run.enemy.kind] * tuning.bells.growth ** (run.floor - 1)
+  const record = run.floor > (run.bestBefore ?? 0) ? tuning.bells.record * run.floor : 0
+  return Math.round(grown + record)
 }
 
 /** Recipes ready now: the item is high enough and its partner touches it on the grid. */
@@ -181,7 +224,8 @@ function openChest(journey, kind, random) {
     return { kind: 'evolution', id: evolution.id, from: evolution.from, into: evolution.into }
   }
   const ups = []
-  for (let roll = 0; roll < tuning.chest[kind]; roll++) {
+  const { levels } = pickWeighted(tuning.chest[kind], entry => entry.weight, random)
+  for (let roll = 0; roll < levels; roll++) {
     const id = pick(Object.keys(run.items), random)
     ups.push({ id, type: run.items[id].type, from: run.items[id].level, to: ++run.items[id].level })
   }
@@ -199,7 +243,44 @@ export function collectChest(journey, random) {
 function afterRewards(journey, random) {
   const run = journey.descent
   if (run.pendingLevels) { journey.phase = 'levelUp'; run.cards = drawCards(run, random); return }
+  if (run.peddler) { run.peddler.stock = peddlerStock(run, random); journey.phase = 'peddler'; journey.battle = battleFor(run); tell(journey, 'A travelling Peddler sets down his pack on the stair.'); return }
   nextFloor(journey, random)
+}
+
+/** A level-up's second gift: one more level on an item the player picks. */
+export function trainItem(journey, id, random) {
+  const item = journey.descent.items[id]
+  if (journey.phase !== 'train' || !item) return false
+  item.level++
+  tell(journey, `${rules.catalog.items[item.type].name} trains to level ${item.level}.`)
+  afterRewards(journey, random)
+  return true
+}
+
+/** Buy a Peddler's ware into the reserve. */
+export function buyFromPeddler(journey, index) {
+  const ware = journey.descent.peddler?.stock[index]
+  if (journey.phase !== 'peddler' || !buyWare(journey.descent, index)) return false
+  journey.battle = battleFor(journey.descent)
+  tell(journey, `Bought ${rules.catalog.items[ware.type].name} (level ${ware.level}) for ${ware.price} Coin.`)
+  return true
+}
+
+/** Sell an owned item to the Peddler. */
+export function sellToPeddler(journey, id) {
+  const type = journey.descent.items[id]?.type
+  if (journey.phase !== 'peddler' || !sellItem(journey.descent, id)) return false
+  journey.battle = battleFor(journey.descent)
+  tell(journey, `Sold ${rules.catalog.items[type].name}.`)
+  return true
+}
+
+/** Send the Peddler on his way and go down. */
+export function leavePeddler(journey, random) {
+  if (journey.phase !== 'peddler') return false
+  journey.descent.peddler = null
+  afterRewards(journey, random)
+  return true
 }
 
 function nextFloor(journey, random) {
@@ -212,22 +293,46 @@ function nextFloor(journey, random) {
   tell(journey, floorMessage(run))
 }
 
+const familyOfType = type => familyOf(rules.catalog.items[type] ?? {})
+
+/**
+ * How likely a new item is to be offered: `synergyWeight` times when it completes something owned, `newFamilyWeight` times when
+ * the run owns nothing of its family, and `repeatFamilyWeight` times when this draw already offers its family, so a draw shows different families.
+ */
+function freshWeight(type, ownedTypes, cards) {
+  const family = familyOfType(type)
+  const completes = completesOwned(ownedTypes, type) ? tuning.cards.synergyWeight : 1
+  const isNewFamily = family && ![...ownedTypes].some(owned => familyOfType(owned) === family) ? tuning.cards.newFamilyWeight : 1
+  const isRepeat = family && cards.some(card => card.kind === 'item' && familyOfType(card.type) === family) ? tuning.cards.repeatFamilyWeight : 1
+  return completes * isNewFamily * isRepeat
+}
+
+/** True for an item that gives guard or healing on its own. */
+function isDefence(type) {
+  const stats = rules.catalog.items[type]?.stats ?? {}
+  return stats.guard > 0 || stats.heal > 0
+}
+
 /**
  * Cards are drawn by group weight, then a random member; no card repeats in one draw.
  * A draw holds at most `maxLevelCards` level cards, and its last card is new (an item, a consumable or a tome) whenever one is left.
+ * In a draw one or two floors before a boss, the first card is a new item that guards or heals (when one is left), so the run can always find an answer.
  */
 export function drawCards(run, random) {
   const ownedTypes = new Set(Object.values(run.items).map(item => item.type))
   const ownedCount = Object.keys(run.items).length
   const cards = []
   const count = tuning.cards.count + run.bonus.cards
+  const isBossNear = [1, 2].some(floorsAhead => floorKind(run.floor + floorsAhead) === 'boss')
   for (let draw = 0; draw < count; draw++) {
     const levels = cards.filter(card => card.kind === 'level').length < tuning.cards.maxLevelCards ? Object.keys(run.items).filter(id => !cards.some(card => card.id === id)) : []
-    const fresh = ownedCount < tuning.cards.maxItems ? [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
-    const flasks = ownedCount < tuning.cards.maxItems ? consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type)) : []
+    const fresh = [...descentPool, ...(run.forged ?? [])].filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type) && (!poolNeeds[type] || ownedTypes.has(poolNeeds[type])))
+    const flasks = consumablePool.filter(type => !ownedTypes.has(type) && !cards.some(card => card.type === type))
+    const eveDefence = isBossNear && draw === 0 ? fresh.filter(isDefence) : []
+    if (eveDefence.length) { cards.push({ kind: 'item', type: pickWeighted(eveDefence, type => freshWeight(type, ownedTypes, cards), random) }); continue }
     const groups = [
       { weight: levels.length * tuning.cards.upgradeWeight, card: () => ({ kind: 'level', id: pick(levels, random) }) },
-      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pick(fresh, random) }) },
+      { isNew: true, weight: fresh.length ? tuning.cards.newItemWeight * tuning.cards.newItemFalloff ** (ownedCount - 1) : 0, card: () => ({ kind: 'item', type: pickWeighted(fresh, type => freshWeight(type, ownedTypes, cards), random) }) },
       { isNew: true, weight: flasks.length ? tuning.cards.consumableWeight : 0, card: () => ({ kind: 'item', type: pick(flasks, random) }) },
       { isNew: true, weight: cards.some(card => card.kind === 'tome') ? 0 : tuning.cards.tomeWeight, card: () => ({ kind: 'tome', id: pick(Object.keys(tuning.tomes), random) }) },
       { weight: run.columns < tuning.grid.maxColumns && !cards.some(card => card.kind === 'widen') ? tuning.cards.widenWeight : 0, card: () => ({ kind: 'widen' }) }
@@ -260,7 +365,8 @@ export function chooseCard(journey, index, random) {
   run.level++; run.pendingLevels--
   run.health = Math.min(maxHealthOf(run), run.health + tuning.recruit.healthPerLevel)
   tell(journey, `Level ${run.level}. ${cardSummary(run, card)}`)
-  afterRewards(journey, random)
+  if (Math.max(0, random()) < tuning.trainChance) journey.phase = 'train'
+  else afterRewards(journey, random)
   return true
 }
 
@@ -275,7 +381,7 @@ export function rerollCards(journey, random) {
 
 /** Give up the run where it stands; it ends as a death. */
 export function abandonRun(journey) {
-  if (!['battle', 'levelUp', 'chest'].includes(journey.phase)) return false
+  if (!['battle', 'levelUp', 'train', 'chest', 'peddler'].includes(journey.phase)) return false
   keepPlaces(journey)
   journey.phase = 'dead'
   tell(journey, `${descentCrew[journey.descent.crew].name} turns back on floor ${journey.descent.floor}. The lantern goes out on the stair.`)

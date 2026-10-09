@@ -29,6 +29,7 @@ export const effectHandlers = {
     const entity = entityOf(frame.state, target)
     const restored = Math.min(entity.maxHealth - entity.health, amount)
     entity.health += restored
+    if (restored > 0) frame.events.push({ kind: 'healed', source: frame.source, target, amount: restored })
     return result(effect, target, restored)
   },
   guard(frame, effect, target, amount) {
@@ -86,7 +87,7 @@ export const effectHandlers = {
 
 /** Amounts are evaluated once per effect/target against the current source state. */
 export function applyEffect(frame, effect, target) {
-  const resolved = effect.type === 'triggerItem' ? 0 : amountOf(frame, effect.amount)
+  const resolved = effect.type === 'triggerItem' ? 0 : amountOf(frame, effect.amount, frame.source, target)
   const isSigned = ['modifyStat', 'resource', 'modifyCharges'].includes(effect.type)
   // A stat lowered below zero by a status, such as Sapped damage, does nothing; a negative constant is still a catalog error.
   const amount = !isSigned && typeof effect.amount === 'object' && resolved < 0 ? 0 : resolved

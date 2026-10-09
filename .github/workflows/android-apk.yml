@@ -12,6 +12,10 @@ on:
         description: 'Folder of the game inside that repository'
         required: false
         default: '.'
+      game_ref:
+        description: 'Branch, tag or commit of the game repository (empty for its default branch)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -24,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.game_repository }}
+          ref: ${{ inputs.game_ref }}
           path: game-source
       - uses: actions/setup-node@v4
         with:

@@ -10,6 +10,7 @@ import { statusText, shortStat } from '../glance.js'
 import { placedItems } from '../../grid-game/grid.js'
 import { descentCrew } from './pool.js'
 import { embersNeeded } from './run.js'
+import { enemyTraits } from './enemies.js'
 
 const crest = { normal: '', elite: '◆ ELITE', boss: '♛ BOSS' }
 // A hit that takes this share of max health or more shakes the whole stage and is called a crushing blow.
@@ -118,14 +119,15 @@ function gearStrip(kit, gear) {
 
 /**
  * Who stands on the stage, as plain facts: `{ key, idle, hero: fighter, foe: fighter }`, where a fighter is
- * `{ portrait, title, tag, rank, meter, gear: [{ type, level }], showNumbers }`. `key` changes when a new fight begins,
+ * `{ portrait, title, tag, rank, meter, gear: [{ type, level }], showNumbers, threats: [{ name, text }] }`. `key` changes when a new fight begins,
  * which replays the portraits' entrance; `meter` is a 0–100 share or null.
  */
 function plate(kit, fighter, actor, moment, serial, side) {
   const meter = fighter.meter === null ? '' : `<div class="xp-line"><b>EMB</b><div class="xp-bar"><i style="width:${fighter.meter}%"></i></div></div>`
   const numbers = fighter.showNumbers ? `<div class="hp-numbers">${Math.max(0, actor.health)} / ${actor.maxHealth}</div>` : ''
   const gear = fighter.gear.length ? `<div class="gear-strip">${gearStrip(kit, fighter.gear)}</div>` : ''
-  return `<div class="battle-plate ${side}-plate"><div class="plate-name"><strong>${escape(fighter.title.toUpperCase())}</strong><small>${escape(fighter.tag)}</small></div><div class="pills">${statusPills(actor)}</div>${hpBar(actor, moment, serial)}${numbers}${meter}${gear}</div>`
+  const threats = fighter.threats.length ? `<div class="threat-chips">${fighter.threats.map(threat => `<span class="threat-chip" title="${escape(threat.text)}">${escape(threat.name.toUpperCase())}</span>`).join('')}</div>` : ''
+  return `<div class="battle-plate ${side}-plate"><div class="plate-name"><strong>${escape(fighter.title.toUpperCase())}</strong><small>${escape(fighter.tag)}</small></div><div class="pills">${statusPills(actor)}</div>${threats}${hpBar(actor, moment, serial)}${numbers}${meter}${gear}</div>`
 }
 
 /** The cast of a Descent floor: the crew member below, the floor's enemy above. */
@@ -135,9 +137,9 @@ export function descentCast(state) {
   return {
     key: run.floor,
     idle: state.message || (journey.battle.started ? journey.message : `${run.story.at(-1) ?? ''} What will ${crew.name} do?`),
-    hero: { portrait: crew.portrait, title: crew.name, tag: `LV ${run.level}`, rank: 'hero', meter: percent(run.embers, need), showNumbers: true,
+    hero: { portrait: crew.portrait, title: crew.name, tag: `LV ${run.level}`, rank: 'hero', meter: percent(run.embers, need), showNumbers: true, threats: [],
       gear: placedItems(journey.battle).map(item => ({ type: item.type, level: run.items[item.id]?.level ?? 1 })) },
-    foe: { portrait: run.enemy.portrait, title: journey.battle.actors.enemy.name, tag: crest[run.enemy.kind] || `FLOOR ${run.floor}`, rank: run.enemy.kind, meter: null, showNumbers: false, gear: [] }
+    foe: { portrait: run.enemy.portrait, title: journey.battle.actors.enemy.name, tag: crest[run.enemy.kind] || `FLOOR ${run.floor}`, rank: run.enemy.kind, meter: null, showNumbers: false, gear: [], threats: (run.enemy.traits ?? []).map(id => enemyTraits[id]) }
   }
 }
 

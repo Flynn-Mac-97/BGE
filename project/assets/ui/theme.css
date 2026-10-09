@@ -431,10 +431,14 @@ header>div { display:flex; gap:6px; }
   .bell-game.descent-run { grid-template-columns:minmax(0,1fr) auto; grid-template-rows:34px minmax(0,1fr) auto; gap:4px 10px; }
   .descent-run>header { grid-column:1/-1; }
   .descent-run>.stage { grid-column:1; grid-row:2; }
-  .descent-run>.dock { grid-column:2; grid-row:2; grid-template-columns:calc(var(--visible-columns) * 46px) 84px; grid-template-rows:auto minmax(0,1fr); gap:6px 8px; }
+  .descent-run>.dock { grid-column:2; grid-row:2; grid-template-columns:calc(var(--visible-columns) * 46px) 112px; grid-template-rows:auto minmax(100px,1fr); gap:6px 8px; }
+  /* The controls pack into three short rows, so the reserve below them always keeps room for its items. */
+  .descent-run .bell-controls { display:grid; grid-template-columns:1fr 1fr; gap:2px; max-width:none; }
+  .descent-run .bell-controls>.ui-button,.descent-run .bell-controls>.ui-toggle { min-height:30px; font-size:10px; padding:2px; }
+  .descent-run .bell-controls>.bell-button { grid-column:1/-1; min-height:36px; }
   .descent-run .loadout { grid-column:1; grid-row:1/-1; }
   .descent-run .bell-controls { grid-column:2; grid-row:1; }
-  .descent-run .reserve { grid-column:2; grid-row:2; min-height:0; overflow:auto; font-size:9px; }
+  .descent-run .reserve { grid-column:2; grid-row:2; min-height:100px; overflow:auto; font-size:9px; }
   .descent-run .reserve-items { grid-template-columns:1fr; }
   .descent-run>:last-child:not(.menu-shade) { grid-column:1/-1; }
   .descent-run .inspection.full { top:42px; }
@@ -565,3 +569,32 @@ header>div { display:flex; gap:6px; }
 .evolve-hints { list-style:none; padding:0; margin:4px 0; font-size:11px; line-height:1.35; }
 .evolve-hints li { border-left:2px solid #fff; padding-left:5px; margin-bottom:3px; }
 .evolve-hints li.ready { font-weight:700; }
+/* Power families: a small white emblem in an item's top-left corner. The filter draws the emblem's silhouette in white. */
+.family-emblem { display:inline-flex; flex:none; width:14px; height:14px; }
+.family-emblem>.ui-portrait { width:100%; height:100%; border:0; border-radius:0; object-fit:contain; filter:brightness(0) invert(1); }
+.equipment-shape>.family-emblem { position:absolute; top:3px; left:3px; z-index:3; }
+.reserve-art>.family-emblem { margin-left:4px; }
+strong>.family-emblem { vertical-align:middle; margin-left:5px; }
+.equipment-shape:has(>.family-emblem)>.scan-marker { left:18px; }
+/* The Peddler and Train screens: owned gear as compact cards that wrap. */
+.peddler-sheet { max-height:92vh; overflow-y:auto; }
+.peddler-sheet h3 { margin:6px 0 2px; font-size:12px; letter-spacing:.06em; }
+.gear-choices { grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); }
+.gear-card>p { display:none; }
+/* Family powers beside the grid: each family's count, lit when its power is on. */
+.family-powers { list-style:none; padding:0; margin:4px 0; display:flex; flex-wrap:wrap; gap:3px 8px; font-size:10px; line-height:1.25; }
+.family-power { display:flex; align-items:flex-start; gap:4px; opacity:.55; }
+.family-power b { display:none; }
+.family-power.active,.family-power.doubled { flex-basis:100%; }
+.family-power.active b,.family-power.doubled b { display:inline; }
+.family-power.active,.family-power.doubled { opacity:1; }
+.family-power.active b,.family-power.doubled b { text-decoration:underline; }
+.family-power small { display:none; }
+.family-power.active small,.family-power.doubled small { display:block; }
+/* An enemy's threats, as small chips on its nameplate. */
+.threat-chips { display:flex; flex-wrap:wrap; gap:3px; margin:2px 0; }
+.threat-chip { font:700 8px monospace; letter-spacing:.05em; border:1px solid #fff; padding:0 3px; }
+/* The reserve list never shrinks: the panel scrolls instead, so every reserve item can always be tapped.
+   Family powers and evolution hints come after the list and scroll with it. */
+.reserve { overflow-y:auto; overscroll-behavior:contain; }
+.reserve-items { flex:none; min-height:auto; overflow:visible; }

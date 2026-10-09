@@ -1,5 +1,6 @@
 /** Reversible practice kits expose the whole item shelf without changing dungeon acquisition. */
 import { rules } from './rules.js'
+import { familyPowerAbilities } from './descent/family-powers.js'
 export const familyKits = {
   growth: { name: 'Growth', hint: 'Root Totem heals through nearby weapons. Move it and inspect the links.', placed: [['dagger', [1, 0]], ['rootTotem', [2, 1]], ['salve', [0, 0]], ['sprig', [0, 1]], ['hammer', [3, 1]]] },
   combat: { name: 'Combat', hint: 'Whetstone prepares the hammer to its right. The hammer strips guard before damage.', placed: [['stone', [0, 0]], ['hammer', [1, 0]], ['banner', [2, 0]], ['sword', [3, 0]]] },
@@ -10,7 +11,7 @@ export const familyKits = {
 }
 function practiceBattle(items) {
   return rules.createState({ columns: 5, rows: 3, actors: {
-    recruit: { name: 'Practice Recruit', team: 'crew', maxHealth: 30, health: 20, resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 } },
+    recruit: { name: 'Practice Recruit', team: 'crew', maxHealth: 30, health: 20, resources: { hunger: 0, salvage: 0 }, resourceCaps: { hunger: 9, salvage: 99 }, abilities: familyPowerAbilities },
     enemy: { name: 'Armoured Dummy', mark: 'T', team: 'dungeon', maxHealth: 60, stats: { damage: 2 }, abilities: [
       { id: 'dummyGuard', trigger: { event: 'cycleStart' }, target: { kind: 'self' }, effects: [{ type: 'guard', amount: 2 }] },
       { id: 'dummyAttack', trigger: { event: 'ownTurn' }, target: { kind: 'enemy' }, effects: [{ type: 'damage', amount: { stat: 'damage' } }] }

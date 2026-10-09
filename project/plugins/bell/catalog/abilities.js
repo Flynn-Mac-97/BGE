@@ -12,17 +12,19 @@ export const abilities = {
   protect: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' }, effects: [{ type: 'guard', amount: { stat: 'guard' } }] },
   mend: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' }, effects: [{ type: 'heal', amount: { stat: 'heal' } }], limit: { charges: 1, refill: 'cycle' } },
   venomGuard: { trigger: { event: 'statusApplied', status: 'poison', source: { kind: 'adjacentItems', tags: ['weapon'], ownerOnly: true } },
-    target: { kind: 'owner' }, effects: [{ type: 'guard', amount: 2 }], limit: { perCycle: 1 } },
+    target: { kind: 'owner' }, effects: [{ type: 'guard', amount: { stat: 'guard' } }], limit: { perCycle: 1 } },
   feed: { trigger: { event: 'damageDealt', source: { kind: 'adjacentItems', tags: ['weapon'], ownerOnly: true } },
     target: { kind: 'owner' }, effects: [{ type: 'resource', resource: 'hunger', amount: { stat: 'potency' } }], limit: { perCycle: 1 } },
   drink: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' },
     conditions: [{ kind: 'healthBelow', ratio: 1 }], costs: [{ target: { kind: 'owner' }, resource: 'hunger', amount: 3 }], effects: [{ type: 'heal', amount: { stat: 'heal' } }] },
-  cleanse: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' }, effects: [{ type: 'removeStatus', status: 'poison', amount: 3 }] },
+  cleanse: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' }, effects: [{ type: 'removeStatus', status: 'poison', amount: { stat: 'potency' } }] },
   echo: { trigger: { event: 'ownTurn' }, target: { kind: 'directionalNeighbour', direction: 'down', tags: ['weapon'], ownerOnly: true },
     effects: [{ type: 'triggerItem' }], limit: { perCombat: 1 } },
   regrow: { trigger: { event: 'ownTurn' }, target: { kind: 'owner' }, effects: [{ type: 'applyStatus', status: 'regeneration', amount: { stat: 'potency' } }], limit: { perCombat: 1 } },
+  // Poison fades by 1 and then by a fifth of what is left each cycle, so a steady stream of stacks levels off instead of growing for the whole fight.
   poisonTick: { trigger: { event: 'cycleEnd' }, target: { kind: 'self' }, effects: [
-    { type: 'damage', amount: { stacks: true }, bypassGuard: true }, { type: 'removeStatus', status: 'poison', amount: 1 }
+    { type: 'damage', amount: { stacks: true }, bypassGuard: true }, { type: 'removeStatus', status: 'poison', amount: 1 },
+    { type: 'removeStatus', status: 'poison', amount: { stacks: true, scale: 0.2 } }
   ] },
   regenerationTick: { trigger: { event: 'cycleStart' }, target: { kind: 'self' }, effects: [
     { type: 'heal', amount: { stacks: true } }, { type: 'removeStatus', status: 'regeneration', amount: 1 }

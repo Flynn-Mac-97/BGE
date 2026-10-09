@@ -43,3 +43,16 @@ above. Chrome has to start without its sandbox as root, and the engine passes
   "the canvas read back empty" on an empty level is the true answer.
 - **`supervisor.open editor-browser` needs a display.** There is none in a
   container, so use a lane.
+
+## An HTML game screen
+
+`see.capture` composes only canvases, so a game drawn with Game UI (HTML) on
+an empty level captures as blank. `see.gif` with `lane` records the lane's
+page through its debugging port instead, HTML included:
+
+```sh
+node bin/engine.mjs play --client sight
+node bin/engine.mjs --headless run see.gif '{"lane":"sight","selector":"body","seconds":0.5,"fps":2,"name":"screen"}'
+```
+
+`"seconds":0.5,"fps":2` gives one still frame in `agent-runs/see/screen.gif`.

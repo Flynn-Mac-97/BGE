@@ -1,24 +1,27 @@
 /**
  * The Descent profile and its one storage boundary.
- * Profile: `{ version: 1, bells, bestFloor, runs, tower: { upgradeId: rank }, forged: [record], duels: [record], history: [run record, newest first], journey }`, where `journey` is the active run or null.
+ * Profile: `{ version: 1, bells, bestFloor, runs, tower: { upgradeId: rank }, mastery: { itemType: xp }, forged: [record], duels: [record], history: [run record, newest first], journey }`, where `journey` is the active run or null.
  * Saves from before the Forge and the Duel Pit load with empty `forged` and `duels`.
  * An unreadable save is kept, not overwritten, and the session runs without saving.
  */
 import { rules } from '../rules.js'
 import { assertState } from '../../grid-game/state.js'
 import { descentCrew } from './pool.js'
-import { towerUpgrades } from './tower.js'
+import { towerUpgrades, upgradeCost } from './tower.js'
+import { bankMastery } from './mastery.js'
 import { isForgeValid, registerForged, forgeLimit } from './forge.js'
 import { runRecord, HISTORY_LIMIT } from './play-log.js'
 
 export const profileSaveKey = 'black-bell-descent-v1'
 /** A fresh profile. */
-export const createProfile = () => ({ version: 1, bells: 0, bestFloor: 0, runs: 0, tower: {}, forged: [], duels: [], history: [], journey: null })
+export const createProfile = () => ({ version: 1, bells: 0, bestFloor: 0, runs: 0, tower: {}, mastery: {}, forged: [], duels: [], history: [], journey: null })
 const count = value => Number.isInteger(value) && value >= 0
 
 function validate(profile) {
   if (profile?.version !== 1 || !count(profile.bells) || !count(profile.bestFloor) || !count(profile.runs) || typeof profile.tower !== 'object' || Array.isArray(profile.tower)) throw new Error('Invalid profile')
-  for (const [id, rank] of Object.entries(profile.tower)) if (!towerUpgrades[id] || !count(rank) || rank > towerUpgrades[id].cost.length) throw new Error('Invalid tower rank')
+  for (const [id, rank] of Object.entries(profile.tower)) if (!towerUpgrades[id] || !count(rank) || rank > (towerUpgrades[id].cost?.length ?? Infinity)) throw new Error('Invalid tower rank')
+  profile.mastery ??= {}
+  if (typeof profile.mastery !== 'object' || !Object.values(profile.mastery).every(count)) throw new Error('Invalid mastery')
   profile.forged ??= []
   profile.duels ??= []
   profile.history ??= []
@@ -27,7 +30,7 @@ function validate(profile) {
   registerForged(profile.forged)
   const journey = profile.journey
   if (!journey) return profile
-  if (!descentCrew[journey.descent?.crew] || !['battle', 'levelUp', 'chest', 'dead'].includes(journey.phase)) throw new Error('Invalid run')
+  if (!descentCrew[journey.descent?.crew] || !['battle', 'levelUp', 'train', 'chest', 'peddler', 'dead'].includes(journey.phase)) throw new Error('Invalid run')
   for (const item of Object.values(journey.descent.items)) if (!rules.catalog.items[item.type] || !count(item.level)) throw new Error('Invalid run item')
   assertState(journey.battle, rules.catalog)
   if (journey.battle.phase === 'resolving') throw new Error('Interrupted frame is not a stable save')
@@ -59,6 +62,7 @@ export function settleRun(profile, journey) {
   profile.bells += run.bells
   profile.bestFloor = Math.max(profile.bestFloor, run.floor)
   profile.runs++
+  bankMastery(profile, run)
   profile.history = [runRecord(run), ...profile.history].slice(0, HISTORY_LIMIT)
   return run.bells
 }
@@ -67,8 +71,9 @@ export function settleRun(profile, journey) {
 export function buyUpgrade(profile, id) {
   const upgrade = towerUpgrades[id]
   const rank = profile.tower[id] ?? 0
-  if (!upgrade || rank >= upgrade.cost.length || profile.bells < upgrade.cost[rank] || profile.journey) return false
-  profile.bells -= upgrade.cost[rank]
+  const cost = upgrade ? upgradeCost(id, rank) : null
+  if (cost === null || profile.bells < cost || profile.journey) return false
+  profile.bells -= cost
   profile.tower[id] = rank + 1
   return true
 }

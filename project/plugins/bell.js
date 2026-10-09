@@ -10,7 +10,7 @@ import { view } from './bell/view.js'
 import { itemLinks } from './bell/inspection.js'
 import { describeStep, stepDuration } from './bell/feedback.js'
 import { profileStore, settleRun, buyUpgrade, unlockedCrew } from './bell/descent/profile-save.js'
-import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun, readyItem, armReadied } from './bell/descent/run.js'
+import { createRun, finishFloor, chooseCard, rerollCards, collectChest, abandonRun, readyItem, armReadied, trainItem, buyFromPeddler, sellToPeddler, leavePeddler } from './bell/descent/run.js'
 import { hubView } from './bell/descent/view.js'
 import { battleLine } from './bell/descent/battle-stage.js'
 import { descentCrew } from './bell/descent/pool.js'
@@ -31,7 +31,7 @@ export default {
     if (!storage) try { storage = globalThis.window?.localStorage } catch {}
     const saves = companyStore(storage), company = saves.load()
     const profiles = profileStore(storage), profile = profiles.load()
-    const state = { profile, crewSelected: 'rook', forgeDraft: forgeDraft(), forgeNotice: '', duelRules: startingRules(), hubNotice: hubWelcome(profile), company, screen: 'hub', tavernSelected: Object.keys(company.roster)[0] ?? 'rook', saveWarning: saves.warning(), journey: company.active ?? createJourney(), selected: null, moving: false, expanded: false, link: null, queue: [], step: null, log: [], paused: false, menu: false, history: false, slow: false, auto: true, left: 0, serial: 0, message: '' }
+    const state = { profile, crewSelected: 'rook', forgeDraft: forgeDraft(), forgeNotice: '', duelRules: startingRules(), hubNotice: hubWelcome(profile), company, screen: 'hub', tavernSelected: Object.keys(company.roster)[0] ?? 'rook', saveWarning: saves.warning(), journey: company.active ?? createJourney(), selected: null, moving: false, expanded: false, link: null, queue: [], step: null, log: [], paused: false, menu: false, history: false, speed: 'normal', auto: true, left: 0, serial: 0, message: '' }
     let html = ''
     let savedJourney = null
     let savedAuto = true
@@ -81,7 +81,7 @@ export default {
       state.message = describeStep(step)
       state.log.push(state.message)
       if (state.log.length > 100) state.log.shift()
-      state.serial++; state.left = stepDuration(step, state.slow ? 'slow' : 'normal')
+      state.serial++; state.left = stepDuration(step, state.speed)
       redraw()
     }
     const actions = {
@@ -134,6 +134,10 @@ export default {
       card(index) { if (!state.queue.length && chooseCard(state.journey, Number(index), () => context.random())) { closeInspection(); redraw() } },
       reroll() { if (rerollCards(state.journey, () => context.random())) redraw() },
       chest() { if (collectChest(state.journey, () => context.random())) redraw() },
+      train(id) { if (trainItem(state.journey, id, () => context.random())) redraw() },
+      peddlerBuy(index) { if (buyFromPeddler(state.journey, Number(index))) redraw() },
+      peddlerSell(id) { if (sellToPeddler(state.journey, id)) redraw() },
+      peddlerLeave() { if (leavePeddler(state.journey, () => context.random())) { closeInspection(); redraw() } },
       abandon() {
         const journey = state.journey.descent ? state.journey : state.profile.journey
         if (!journey || state.queue.length || !abandonRun(journey)) return
@@ -194,7 +198,8 @@ export default {
       pause() { if (state.queue.length) { state.paused = !state.paused; redraw() } },
       step() { if (state.paused && !state.expanded && !state.menu && !state.history) advance() },
       auto(value) { state.auto = !!value; redraw() },
-      slow(value) { state.slow = !!value; redraw() },
+      slow(value) { state.speed = value ? 'slow' : 'normal'; redraw() },
+      fast(value) { state.speed = value ? 'fast' : 'normal'; redraw() },
       menu() { state.menu = !state.menu; state.history = false; redraw() },
       history() { state.history = !state.history; state.menu = false; redraw() },
       retry() { if (state.journey.expedition) { actions.returnTavern(); return } if (!state.queue.length && (state.journey.sandbox ? resetPractice(state.journey) : retryRoom(state.journey))) { clearPresentation(); redraw() } },

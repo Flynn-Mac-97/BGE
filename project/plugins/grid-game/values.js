@@ -3,14 +3,41 @@ import { preparedStates } from './prepared.js'
 import { entityOf, targets, reference, sameReference } from './targets.js'
 import { adjacent, placedItems } from './grid.js'
 
-/** Expressions deliberately have no arbitrary scripts or recursive stat references. */
-export function amountOf(frame, expression, subject = frame.source) {
+/**
+ * A die roll from 1 to `sides`. The battle keeps `rolls: { seed, count }`; each roll hashes the seed with
+ * the count and advances the count, so a fight replays exactly and the compiled path rolls the same numbers.
+ */
+export function rollDie(state, sides) {
+  state.rolls ??= { seed: 1, count: 0 }
+  let value = (state.rolls.seed + Math.imul(++state.rolls.count, 0x9e3779b9)) | 0
+  value = Math.imul(value ^ (value >>> 16), 0x85ebca6b)
+  value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35)
+  return 1 + ((value ^ (value >>> 16)) >>> 0) % sides
+}
+
+/** A resource an entity holds; an item that holds none reads its owner's, so a relic can burn the recruit's Hunger or Salvage. */
+function resourceStock(state, subject, resource) {
+  const entity = entityOf(state, subject)
+  return entity.resources[resource] ?? state.actors[entity.owner]?.resources[resource] ?? 0
+}
+
+/**
+ * Expressions deliberately have no arbitrary scripts or recursive stat references. `target` is the effect's target:
+ * `{ targetStat, scale }` reads it. A `scale` on a stat, resource or target stat rounds down, so health stays whole.
+ */
+export function amountOf(frame, expression, subject = frame.source, target = null) {
   if (typeof expression === 'number') return expression
   if (expression.previous) return (frame.previousAmount ?? 0) * (expression.scale ?? 1)
   if (expression.eventAmount) return (frame.event?.amount ?? 0) * (expression.scale ?? 1)
-  if (expression.stacks) return frame.status?.stacks ?? 0
+  if (expression.stacks) return Math.floor((frame.status?.stacks ?? 0) * (expression.scale ?? 1))
+  // `scaleStat` multiplies the die by a stat of the item rolling it, so a die grows with the item's level.
+  if (expression.roll) return rollDie(frame.state, expression.roll) * (expression.scale ?? 1) * (expression.scaleStat ? statOf(frame.state, frame.catalog, subject, expression.scaleStat) : 1)
+  if (expression.targetStat) return target ? Math.floor(statOf(frame.state, frame.catalog, target, expression.targetStat) * (expression.scale ?? 1)) : 0
+  if (expression.stat && expression.scale !== undefined) return Math.floor(statOf(frame.state, frame.catalog, subject, expression.stat) * expression.scale)
   if (expression.stat) return statOf(frame.state, frame.catalog, subject, expression.stat)
-  if (expression.resource) return entityOf(frame.state, subject).resources[expression.resource] ?? 0
+  // A granted ability reads the item that grants it, so a totem's level grows what it gives.
+  if (expression.grantorStat) return frame.grantor ? statOf(frame.state, frame.catalog, frame.grantor, expression.grantorStat) : 0
+  if (expression.resource) return Math.floor(resourceStock(frame.state, subject, expression.resource) * (expression.scale ?? 1))
   return 0
 }
 

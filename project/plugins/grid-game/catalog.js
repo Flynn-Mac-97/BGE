@@ -2,7 +2,7 @@
 import { selectorNames, conditionNames } from './targets.js'
 
 export const effectNames = ['damage', 'heal', 'guard', 'applyStatus', 'removeStatus', 'modifyStat', 'resource', 'triggerItem', 'removeGuard', 'consumeStatus', 'transferResource', 'modifyCharges']
-export const triggerNames = ['combatStart', 'cycleStart', 'cycleEnd', 'ownTurn', 'itemActivated', 'damageDealt', 'damageTaken', 'statusApplied']
+export const triggerNames = ['combatStart', 'cycleStart', 'cycleEnd', 'ownTurn', 'itemActivated', 'damageDealt', 'damageTaken', 'statusApplied', 'healed']
 export const durationNames = ['instant', 'nextAction', 'cycle', 'combat', 'whileAdjacent']
 const positive = value => Number.isInteger(value) && value > 0
 const fail = (path, message) => { throw new TypeError(`${path}: ${message}`) }
@@ -21,14 +21,19 @@ function validateTarget(selector, path) {
 function validateAmount(amount, path) {
   if (typeof amount === 'number' && Number.isFinite(amount)) return
   if (dictionary(amount) && (amount.previous === true || amount.eventAmount === true) && Object.keys(amount).every(key => ['previous', 'eventAmount', 'scale'].includes(key)) && !(amount.previous && amount.eventAmount) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
-  if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
-  fail(path, 'expected finite number or {stat}, {resource}, {stacks:true}')
+  if (dictionary(amount) && Number.isInteger(amount.roll) && amount.roll > 1 && Object.keys(amount).every(key => ['roll', 'scale', 'scaleStat'].includes(key)) && (amount.scaleStat === undefined || typeof amount.scaleStat === 'string') && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale > 0))) return
+  if (dictionary(amount) && Object.keys(amount).length === 1 && (typeof amount.stat === 'string' || typeof amount.grantorStat === 'string' || typeof amount.resource === 'string' || amount.stacks === true)) return
+  if (dictionary(amount) && amount.stacks === true && Object.keys(amount).every(key => ['stacks', 'scale'].includes(key)) && Number.isFinite(amount.scale) && amount.scale >= 0) return
+  const scaled = ['stat', 'resource', 'targetStat'].find(key => typeof amount?.[key] === 'string')
+  if (dictionary(amount) && scaled && Object.keys(amount).every(key => [scaled, 'scale'].includes(key)) && (amount.scale === undefined || (Number.isFinite(amount.scale) && amount.scale >= 0))) return
+  fail(path, 'expected finite number or {stat}, {grantorStat}, {resource}, {targetStat}, {stacks:true, scale?}, {roll}')
 }
 function validateCondition(condition, path, catalog) {
   if (!conditionNames.includes(condition.kind)) fail(path, 'unknown condition')
   if (condition.subject && !['self', 'selfItem', 'owner', 'enemy', 'eventSource', 'eventTarget'].includes(condition.subject)) fail(path, 'invalid condition subject')
   if (condition.kind === 'hasStatus' && !catalog.statuses[condition.status]) fail(path, 'unknown status')
-  if (condition.kind === 'hasTag' && typeof condition.tag !== 'string') fail(path, 'tag required')
+  if (['hasTag', 'tagCountAtLeast'].includes(condition.kind) && typeof condition.tag !== 'string') fail(path, 'tag required')
+  if (condition.kind === 'tagCountAtLeast' && !positive(condition.amount)) fail(path, 'positive tag count required')
   if (condition.kind === 'resourceAtLeast' && (typeof condition.resource !== 'string' || !Number.isFinite(condition.amount) || condition.amount < 0)) fail(path, 'resource and nonnegative amount required')
   if (condition.kind === 'healthBelow' && !(Number.isFinite(condition.amount) || (Number.isFinite(condition.ratio) && condition.ratio >= 0 && condition.ratio <= 1))) fail(path, 'health amount or ratio required')
   if (['cycleAtLeast', 'cycleEvery'].includes(condition.kind) && !positive(condition.amount)) fail(path, 'positive cycle count required')

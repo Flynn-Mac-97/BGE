@@ -67,3 +67,10 @@ test('a GIF holds every frame, loops, and draws each pixel in its nearest palett
   const colour = [...gif.slice(13 + index * 3, 16 + index * 3)]
   colour.forEach((value, channel) => assert.ok(Math.abs(value - [200, 40, 40][channel]) <= 8, `drawn ${colour}`))
 })
+
+test('a lane name picks that lane browser, and an unknown one names how to start it', async () => {
+  const { laneBrowserOf } = await import('../plugins/builtin/see/gif-recording.mjs')
+  const browsers = [{ client: 'editor', port: 9401 }, { client: 'sight', port: 9400 }]
+  assert.equal(laneBrowserOf(browsers, 'sight').port, 9400)
+  assert.throws(() => laneBrowserOf(browsers, 'other'), /lanes\.start other/)
+})
